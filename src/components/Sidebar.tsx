@@ -15,8 +15,14 @@ interface SidebarProps {
   config: MappingConfig;
   advanced: boolean;
   savedSnippets: SavedSnippet[];
-  playingIdx: number | null;
+  playingSet: Set<number>;
   onPlaySnippet: (idx: number) => void;
+  track: { slots: number[]; speed: number };
+  trackPlaying: boolean;
+  onAddToTrack: (idx: number) => void;
+  onRemoveFromTrack: (slotIdx: number) => void;
+  onTrackSpeedChange: (speed: number) => void;
+  onToggleTrackPlay: () => void;
 }
 
 function paramRow(id: string, value: number) {
@@ -41,8 +47,14 @@ export default function Sidebar({
   config,
   advanced,
   savedSnippets,
-  playingIdx,
+  playingSet,
   onPlaySnippet,
+  track,
+  trackPlaying,
+  onAddToTrack,
+  onRemoveFromTrack,
+  onTrackSpeedChange,
+  onToggleTrackPlay,
 }: SidebarProps) {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
@@ -69,20 +81,68 @@ export default function Sidebar({
           {savedSnippets.map((s, i) => (
             <div
               key={s.timestamp}
-              className={`saved-item${copiedIdx === i ? " saved-item-copied" : ""}${playingIdx === i ? " saved-item-playing" : ""}`}
+              className={`saved-item${copiedIdx === i ? " saved-item-copied" : ""}${playingSet.has(i) ? " saved-item-playing" : ""}`}
               title={s.code}
             >
               <button
                 className="saved-play"
                 onClick={() => onPlaySnippet(i)}
               >
-                {playingIdx === i ? "⏸" : "▶"}
+                {playingSet.has(i) ? "⏸" : "▶"}
               </button>
+              <button
+                className="saved-add-track"
+                onClick={(e) => { e.stopPropagation(); onAddToTrack(i); }}
+                title="Add to track"
+              >
+                +
+              </button>
+              <span className="saved-bpm">{s.bpm}</span>
               <span className="saved-code" onClick={() => handleCopy(s.code, i)}>
                 {s.code.split("\n")[0]}
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {savedSnippets.length > 0 && (
+        <div className="track-builder">
+          <div className="track-header">
+            <span className="track-title">▦ TRACK</span>
+            <button
+              className={`track-play${trackPlaying ? " track-play-active" : ""}`}
+              onClick={onToggleTrackPlay}
+              disabled={track.slots.length === 0}
+            >
+              {trackPlaying ? "⏹" : "▶"}
+            </button>
+            <input
+              type="range"
+              className="track-speed"
+              min={0.25}
+              max={4}
+              step={0.25}
+              value={track.speed}
+              onChange={(e) => onTrackSpeedChange(parseFloat(e.target.value))}
+            />
+            <span className="track-speed-label">{track.speed}×</span>
+          </div>
+          {track.slots.length > 0 && (
+            <div className="track-slots">
+              {track.slots.map((snippetIdx, slotIdx) => (
+                <div key={slotIdx} className="track-slot" title={savedSnippets[snippetIdx]?.code.split("\n")[0] ?? ""}>
+                  <span className="track-slot-num">{snippetIdx + 1}</span>
+                  <button
+                    className="track-slot-remove"
+                    onClick={() => onRemoveFromTrack(slotIdx)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

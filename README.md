@@ -19,7 +19,11 @@ Available parameters include note selection, low-pass filter, reverb, volume, te
 
 ### Save & Playback
 
-Any axis can be mapped to a **save gesture** — when the gesture crosses a threshold, the current Strudel code is snapshotted. Saved snippets appear in the sidebar with play/pause buttons to replay them independently of live hand control.
+Any axis can be mapped to a **save gesture** — when the gesture crosses a threshold, the current Strudel code is snapshotted. Saved snippets appear in the sidebar with play/pause buttons to replay them independently of live hand control. Multiple snippets can be stacked (played simultaneously).
+
+### Track Sequencer
+
+Saved snippets can be arranged into a **track** — an ordered timeline that plays snippets one after another using Strudel's `slowcat`. Add snippets to the track with the "+" button, reorder by adding/removing, and control playback speed from 0.25× to 4×. Starting the track automatically stops individual snippet playback and vice versa.
 
 A step sequencer cycles through rhythmic patterns every 8 seconds, triggering notes based on the current parameters. The generated Strudel code is displayed live in the sidebar.
 

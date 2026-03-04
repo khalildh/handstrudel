@@ -27,6 +27,7 @@ import CameraView from "./CameraView";
 export interface SavedSnippet {
   code: string;
   timestamp: number;
+  bpm: number;
 }
 
 interface UIState {
@@ -35,6 +36,13 @@ interface UIState {
   hands: HandsState;
   noteDisplay: string;
   bpm: number;
+}
+
+function buildTrackCode(slots: number[], speed: number, snippets: SavedSnippet[]): string | null {
+  const codes = slots.map(i => snippets[i]?.code).filter(Boolean);
+  if (codes.length === 0) return null;
+  const inner = codes.length === 1 ? codes[0] : `slowcat(${codes.join(", ")})`;
+  return speed === 1 ? inner : `(${inner}).slow(${1 / speed})`;
 }
 
 export default function HandStrudel() {
@@ -75,9 +83,15 @@ export default function HandStrudel() {
   const lastSaveTimeRef = useRef(0);
   const [savedSnippets, setSavedSnippets] = useState<SavedSnippet[]>([]);
 
-  // Snippet playback
-  const playingIdxRef = useRef<number | null>(null);
-  const [playingIdx, setPlayingIdx] = useState<number | null>(null);
+  // Snippet playback (multiple simultaneous via Set)
+  const playingSetRef = useRef<Set<number>>(new Set());
+  const [playingSet, setPlayingSet] = useState<Set<number>>(new Set());
+
+  // Track sequencer
+  const trackRef = useRef<{ slots: number[]; speed: number }>({ slots: [], speed: 1 });
+  const trackPlayingRef = useRef(false);
+  const [track, setTrack] = useState<{ slots: number[]; speed: number }>({ slots: [], speed: 1 });
+  const [trackPlaying, setTrackPlaying] = useState(false);
 
   // DOM refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -89,19 +103,82 @@ export default function HandStrudel() {
   const structTimerRef = useRef(0);
 
   const handlePlaySnippet = useCallback((idx: number) => {
-    if (playingIdxRef.current === idx) {
-      // Stop: resume live code
-      playingIdxRef.current = null;
-      setPlayingIdx(null);
-      lastCodeRef.current = ""; // force re-eval of live code on next frame
+    // Stop track playback
+    if (trackPlayingRef.current) {
+      trackPlayingRef.current = false;
+      setTrackPlaying(false);
+    }
+
+    const set = new Set(playingSetRef.current);
+    if (set.has(idx)) {
+      set.delete(idx);
     } else {
-      // Play this snippet
-      playingIdxRef.current = idx;
-      setPlayingIdx(idx);
-      const code = savedSnippetsRef.current[idx]?.code;
-      if (code) {
-        evaluateRef.current?.(code).catch((e: unknown) => console.warn("eval:", e));
-      }
+      set.add(idx);
+    }
+    playingSetRef.current = set;
+    setPlayingSet(new Set(set));
+
+    if (set.size === 0) {
+      // Resume live code
+      lastCodeRef.current = ""; // force re-eval on next frame
+    } else {
+      // Evaluate single or stacked snippets
+      const codes = Array.from(set)
+        .map((i) => savedSnippetsRef.current[i]?.code)
+        .filter(Boolean);
+      const code = codes.length === 1 ? codes[0] : `stack(${codes.join(", ")})`;
+      evaluateRef.current?.(code).catch((e: unknown) => console.warn("eval:", e));
+    }
+  }, []);
+
+  const handleAddToTrack = useCallback((idx: number) => {
+    const next = { ...trackRef.current, slots: [...trackRef.current.slots, idx] };
+    trackRef.current = next;
+    setTrack(next);
+    if (trackPlayingRef.current) {
+      const code = buildTrackCode(next.slots, next.speed, savedSnippetsRef.current);
+      if (code) evaluateRef.current?.(code).catch((e: unknown) => console.warn("eval:", e));
+    }
+  }, []);
+
+  const handleRemoveFromTrack = useCallback((slotIdx: number) => {
+    const slots = trackRef.current.slots.filter((_, i) => i !== slotIdx);
+    const next = { ...trackRef.current, slots };
+    trackRef.current = next;
+    setTrack(next);
+    if (slots.length === 0 && trackPlayingRef.current) {
+      trackPlayingRef.current = false;
+      setTrackPlaying(false);
+      lastCodeRef.current = "";
+    } else if (trackPlayingRef.current) {
+      const code = buildTrackCode(slots, trackRef.current.speed, savedSnippetsRef.current);
+      if (code) evaluateRef.current?.(code).catch((e: unknown) => console.warn("eval:", e));
+    }
+  }, []);
+
+  const handleTrackSpeedChange = useCallback((speed: number) => {
+    const next = { ...trackRef.current, speed };
+    trackRef.current = next;
+    setTrack(next);
+    if (trackPlayingRef.current) {
+      const code = buildTrackCode(trackRef.current.slots, speed, savedSnippetsRef.current);
+      if (code) evaluateRef.current?.(code).catch((e: unknown) => console.warn("eval:", e));
+    }
+  }, []);
+
+  const handleToggleTrackPlay = useCallback(() => {
+    if (trackPlayingRef.current) {
+      trackPlayingRef.current = false;
+      setTrackPlaying(false);
+      lastCodeRef.current = "";
+    } else {
+      if (trackRef.current.slots.length === 0) return;
+      playingSetRef.current = new Set();
+      setPlayingSet(new Set());
+      trackPlayingRef.current = true;
+      setTrackPlaying(true);
+      const code = buildTrackCode(trackRef.current.slots, trackRef.current.speed, savedSnippetsRef.current);
+      if (code) evaluateRef.current?.(code).catch((e: unknown) => console.warn("eval:", e));
     }
   }, []);
 
@@ -181,8 +258,8 @@ export default function HandStrudel() {
           }
         }
 
-        // Eval on change (skip when playing a saved snippet)
-        if (playingIdxRef.current === null) {
+        // Eval on change (skip when playing saved snippets)
+        if (playingSetRef.current.size === 0 && !trackPlayingRef.current) {
           const code = buildCode(
             smoothedRef.current,
             structIdxRef.current,
@@ -210,6 +287,7 @@ export default function HandStrudel() {
             const snippet: SavedSnippet = {
               code: lastCodeRef.current,
               timestamp: Date.now(),
+              bpm: Math.round(smoothedRef.current.bpm ?? 120),
             };
             savedSnippetsRef.current = [...savedSnippetsRef.current, snippet];
             saveArmedRef.current.set(armKey, false);
@@ -277,8 +355,14 @@ export default function HandStrudel() {
         config={config}
         advanced={advanced}
         savedSnippets={savedSnippets}
-        playingIdx={playingIdx}
+        playingSet={playingSet}
         onPlaySnippet={handlePlaySnippet}
+        track={track}
+        trackPlaying={trackPlaying}
+        onAddToTrack={handleAddToTrack}
+        onRemoveFromTrack={handleRemoveFromTrack}
+        onTrackSpeedChange={handleTrackSpeedChange}
+        onToggleTrackPlay={handleToggleTrackPlay}
       />
     </div>
   );

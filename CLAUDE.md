@@ -44,7 +44,11 @@ Axes can be mapped to `"save"` instead of a param. When the axis value crosses >
 
 ### Snippet Playback
 
-Saved snippets appear in the Sidebar with play/pause buttons. When a snippet is "playing", the 60fps loop skips live code evaluation — `playingIdxRef` gates the `buildCode → evaluate` path. Clicking the same snippet again resumes live hand-controlled code (sets `playingIdxRef` to `null` and clears `lastCodeRef` to force re-eval).
+Saved snippets appear in the Sidebar with play/pause buttons. Multiple snippets can play simultaneously via `playingSetRef` (a `Set<number>`). When any snippet is playing, the 60fps loop skips live code evaluation. Stacked snippets are combined with `stack()`. Toggling all snippets off resumes live hand-controlled code (clears `lastCodeRef` to force re-eval).
+
+### Track Sequencer
+
+Saved snippets can be arranged into an ordered track via the Sidebar's track builder. Uses `slowcat()` to play each snippet for one cycle before advancing. Speed control (0.25×–4×) applies `.slow(1/speed)` to the overall pattern. State is in `track` (slots + speed) with a mirrored `trackRef` for the 60fps loop. `trackPlayingRef` gates code evaluation alongside `playingSetRef`. Track and individual snippet playback are mutually exclusive — starting one stops the other. `buildTrackCode()` (module-level helper) generates the Strudel code.
 
 ## File Map
 

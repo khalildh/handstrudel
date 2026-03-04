@@ -449,6 +449,18 @@ body {
   color: var(--left);
 }
 
+.saved-bpm {
+  font-size: 8px;
+  color: var(--dim);
+  flex-shrink: 0;
+  width: 24px;
+  text-align: right;
+}
+
+.saved-item-playing .saved-bpm {
+  color: var(--left);
+}
+
 .saved-code {
   font-size: 9px;
   color: var(--text);
@@ -457,6 +469,176 @@ body {
   text-overflow: ellipsis;
   flex: 1;
   cursor: pointer;
+}
+
+/* ── Track Builder ──────────────────────────────────── */
+.track-builder {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.track-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.track-title {
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: var(--dim);
+}
+
+.track-play {
+  font-family: var(--font);
+  font-size: 10px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--dim);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.1s;
+}
+
+.track-play:hover:not(:disabled) {
+  border-color: var(--left);
+  color: var(--left);
+}
+
+.track-play:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.track-play-active {
+  border-color: var(--left);
+  color: var(--left);
+  box-shadow: 0 0 6px rgba(0, 255, 157, 0.2);
+}
+
+.track-speed {
+  flex: 1;
+  height: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
+}
+
+.track-speed::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dim);
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.track-speed::-webkit-slider-thumb:hover {
+  background: var(--left);
+}
+
+.track-speed-label {
+  font-size: 8px;
+  color: var(--dim);
+  flex-shrink: 0;
+  width: 24px;
+  text-align: right;
+}
+
+.track-slots {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.track-slots::-webkit-scrollbar {
+  height: 2px;
+}
+
+.track-slots::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
+.track-slot {
+  position: relative;
+  width: 26px;
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: default;
+}
+
+.track-slot:hover {
+  border-color: var(--dim);
+}
+
+.track-slot-num {
+  font-size: 9px;
+  color: var(--text);
+}
+
+.track-slot-remove {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font);
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--right);
+  border-radius: 3px;
+  color: var(--right);
+  cursor: pointer;
+  padding: 0;
+}
+
+.track-slot:hover .track-slot-remove {
+  display: flex;
+}
+
+.saved-add-track {
+  font-family: var(--font);
+  font-size: 12px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--dim);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.1s;
+  line-height: 1;
+}
+
+.saved-add-track:hover {
+  border-color: var(--left);
+  color: var(--left);
 }
 
 /* ── Hand Panels ─────────────────────────────────────── */
