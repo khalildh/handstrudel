@@ -42,6 +42,10 @@ Users map hand axes to music params via `MappingConfig`:
 
 Axes can be mapped to `"save"` instead of a param. When the axis value crosses > 0.8, it snapshots the current Strudel code. Hysteresis (must drop below 0.3 to re-arm) and debounce (1s minimum) prevent spam.
 
+### Snippet Playback
+
+Saved snippets appear in the Sidebar with play/pause buttons. When a snippet is "playing", the 60fps loop skips live code evaluation — `playingIdxRef` gates the `buildCode → evaluate` path. Clicking the same snippet again resumes live hand-controlled code (sets `playingIdxRef` to `null` and clears `lastCodeRef` to force re-eval).
+
 ## File Map
 
 ```

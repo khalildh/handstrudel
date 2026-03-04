@@ -6,17 +6,20 @@ A browser-based hand-tracking musical instrument. Wave your hands in front of yo
 
 ## How It Works
 
-HandStrudel uses your webcam and [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands) to track both hands in real time. Hand position and finger spread are mapped to synthesizer parameters powered by [Strudel](https://strudel.cc/):
+HandStrudel uses your webcam and [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands) to track both hands in real time. Hand gestures are mapped to synthesizer parameters powered by [Strudel](https://strudel.cc/).
 
-### Left Hand
-- **Pitch** — vertical position selects notes from a pentatonic scale (C2–E5)
-- **Filter (LPF)** — horizontal position sweeps a low-pass filter (120–6120 Hz)
-- **Reverb** — finger spread controls reverb wet mix
+### Configurable Mapping
 
-### Right Hand
-- **Volume** — vertical position controls gain
-- **Tempo** — horizontal position sets BPM (50–205)
-- **Delay** — finger spread controls delay wet mix
+Before starting, a config screen lets you assign any hand axis to any music parameter for each hand:
+
+- **Basic axes** — vertical position, horizontal position, finger spread
+- **Advanced axes** — pinch, fist, rotation, thumb/index/middle/ring/pinky curl
+
+Available parameters include note selection, low-pass filter, reverb, volume, tempo, delay, distortion, pan, vowel filter, octave, pattern density, chord size, and more.
+
+### Save & Playback
+
+Any axis can be mapped to a **save gesture** — when the gesture crosses a threshold, the current Strudel code is snapshotted. Saved snippets appear in the sidebar with play/pause buttons to replay them independently of live hand control.
 
 A step sequencer cycles through rhythmic patterns every 8 seconds, triggering notes based on the current parameters. The generated Strudel code is displayed live in the sidebar.
 
@@ -34,7 +37,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000/handstrudel](http://localhost:3000/handstrudel), grant camera access, and wave your hands.
+Open [http://localhost:3000](http://localhost:3000), grant camera access, and wave your hands.
 
 ## Build & Deploy
 
