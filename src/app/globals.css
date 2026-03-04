@@ -184,18 +184,18 @@ body {
 /* ── Config Grid (Start Overlay) ─────────────────────── */
 .config-grid {
   display: flex;
-  gap: 32px;
+  gap: 48px;
   justify-content: center;
 }
 
 .config-col {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
 .config-title {
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 3px;
   margin-bottom: 4px;
   text-align: center;
@@ -204,28 +204,28 @@ body {
 .config-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
 }
 
 .config-icon {
-  font-size: 11px;
-  width: 16px;
+  font-size: 14px;
+  width: 20px;
   text-align: center;
   color: var(--dim);
 }
 
 .config-select {
   font-family: var(--font);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1px;
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 2px;
-  padding: 3px 6px;
+  border-radius: 3px;
+  padding: 6px 10px;
   cursor: pointer;
   outline: none;
-  width: 90px;
+  width: 120px;
   -webkit-appearance: none;
   appearance: none;
 }
