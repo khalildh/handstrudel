@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HandStrudel</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<style>
+  :root {
+    --bg: #05050a;
+    --panel: #09090f;
+    --border: #16162a;
+    --left: #00ff9d;
+    --right: #ff2d6b;
+    --dim: #2a2a44;
+    --text: #9898c0;
+    --bright: #e0e0ff;
+    --font: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── LAYOUT ─────────────────────────────── */
+  #app {
+    display: grid;
+    grid-template-rows: 36px 1fr;
+    grid-template-columns: 1fr 300px;
+    height: 100vh;
+  }
+
+  #header {
+    grid-column: 1 / -1;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+  }
+
+  #header .logo {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: var(--bright);
+  }
+
+  #header .sep { color: var(--border); }
+
+  #status-text {
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+
+  #beat-indicator {
+    margin-left: auto;
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
+
+  .beat-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.04s;
+  }
+
+  .beat-dot.flash-left  { background: var(--left);  box-shadow: 0 0 6px var(--left); }
+  .beat-dot.flash-right { background: var(--right); box-shadow: 0 0 6px var(--right); }
+
+  /* ── CAMERA AREA ─────────────────────────── */
+  #camera-area {
+    position: relative;
+    background: #000;
+    overflow: hidden;
+  }
+
+  #video {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    filter: grayscale(0.7) brightness(0.45);
+    opacity: 0.9;
+  }
+
+  /* scanlines */
+  #camera-area::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0,0,0,0.12) 2px,
+      rgba(0,0,0,0.12) 4px
+    );
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    z-index: 6;
+  }
+
+  /* ── START SCREEN ────────────────────────── */
+  #start-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5,5,10,0.92);
+    z-index: 20;
+    gap: 20px;
+  }
+
+  #start-screen h1 {
+    font-size: 13px;
+    letter-spacing: 8px;
+    color: var(--bright);
+    font-weight: 300;
+  }
+
+  #start-btn {
+    font-family: var(--font);
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--left);
+    background: none;
+    border: 1px solid var(--left);
+    padding: 10px 28px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  #start-btn:hover {
+    background: rgba(0,255,157,0.08);
+    box-shadow: 0 0 20px rgba(0,255,157,0.2);
+  }
+
+  #start-screen .hint {
+    font-size: 9px;
+    color: var(--dim);
+    text-align: center;
+    line-height: 2;
+    letter-spacing: 1px;
+  }
+
+  /* ── SIDEBAR ─────────────────────────────── */
+  #sidebar {
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── CODE BLOCK ─────────────────────────── */
+  #code-block {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10.5px;
+    line-height: 1.7;
+    flex-shrink: 0;
+  }
+
+  #code-block .comment { color: #2e2e52; font-style: italic; }
+  #code-block .fn      { color: #5c8aff; }
+  #code-block .val     { color: var(--left); transition: color 0.1s; }
+  #code-block .val.right-val { color: var(--right); }
+  #code-block .str     { color: #ffb347; }
+  #code-block .indent  { padding-left: 12px; }
+  #code-block .chain   { color: var(--dim); }
+
+  /* ── HAND PANELS ─────────────────────────── */
+  .hand-panel {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .hand-panel-title {
+    font-size: 8px;
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hand-panel-title .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .lh .hand-panel-title .dot { background: var(--left); box-shadow: 0 0 6px var(--left); }
+  .rh .hand-panel-title .dot { background: var(--right); box-shadow: 0 0 6px var(--right); }
+  .lh .hand-panel-title { color: var(--left); }
+  .rh .hand-panel-title { color: var(--right); }
+
+  .param-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+  }
+
+  .param-row:last-child { margin-bottom: 0; }
+
+  .param-label {
+    font-size: 8px;
+    color: var(--dim);
+    letter-spacing: 1px;
+    width: 42px;
+    flex-shrink: 0;
+  }
+
+  .param-track {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    position: relative;
+    overflow: visible;
+  }
+
+  .param-fill {
+    height: 100%;
+    border-radius: 1px;
+    transition: width 0.08s ease-out;
+    position: relative;
+  }
+
+  .lh .param-fill {
+    background: var(--left);
+    box-shadow: 0 0 4px var(--left);
+  }
+
+  .rh .param-fill {
+    background: var(--right);
+    box-shadow: 0 0 4px var(--right);
+  }
+
+  .param-fill::after {
+    content: '';
+    position: absolute;
+    right: -1px; top: 50%;
+    transform: translateY(-50%);
+    width: 5px; height: 5px;
+    border-radius: 50%;
+  }
+
+  .lh .param-fill::after { background: var(--left); box-shadow: 0 0 5px var(--left); }
+  .rh .param-fill::after { background: var(--right); box-shadow: 0 0 5px var(--right); }
+
+  .param-value {
+    font-size: 8px;
+    color: var(--text);
+    width: 42px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .no-hand-msg {
+    font-size: 8px;
+    color: var(--border);
+    letter-spacing: 1px;
+    font-style: italic;
+  }
+
+  /* ── STEP SEQUENCER ──────────────────────── */
+  #step-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #step-section .section-label {
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--dim);
+    margin-bottom: 10px;
+  }
+
+  #steps {
+    display: flex;
+    gap: 4px;
+  }
+
+  .step-cell {
+    flex: 1;
+    height: 18px;
+    border-radius: 2px;
+    background: var(--border);
+    border: 1px solid transparent;
+    transition: all 0.04s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .step-cell.hit {
+    background: #16162e;
+    border-color: #2e2e52;
+  }
+
+  .step-cell.active {
+    background: var(--left) !important;
+    border-color: var(--left) !important;
+    box-shadow: 0 0 8px var(--left);
+  }
+
+  .step-cell.active.silent {
+    background: var(--dim) !important;
+    border-color: var(--dim) !important;
+    box-shadow: none;
+  }
+
+  /* ── NOTE DISPLAY ────────────────────────── */
+  #note-display {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 60px;
+  }
+
+  #current-note {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--left);
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(0,255,157,0.4);
+    transition: color 0.1s;
+    min-height: 40px;
+  }
+
+  #bpm-display {
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="header">
+    <span class="logo">HANDSTRUDEL</span>
+    <span class="sep">|</span>
+    <span id="status-text">click start</span>
+    <div id="beat-indicator">
+      <div class="beat-dot" id="bd0"></div>
+      <div class="beat-dot" id="bd1"></div>
+      <div class="beat-dot" id="bd2"></div>
+      <div class="beat-dot" id="bd3"></div>
+    </div>
+  </div>
+
+  <!-- CAMERA -->
+  <div id="camera-area">
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+
+    <div id="start-screen">
+      <h1>HANDSTRUDEL</h1>
+      <button id="start-btn">▶ START</button>
+      <div class="hint">
+        allow camera access when prompted<br>
+        <span style="color:var(--left)">left hand</span> — pitch · filter · reverb<br>
+        <span style="color:var(--right)">right hand</span> — volume · tempo
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+
+    <!-- LIVE CODE DISPLAY -->
+    <div id="code-block">
+      <div class="comment">// live pattern</div>
+      <div><span class="fn">note</span>(<span class="str" id="c-note">"c4"</span>)</div>
+      <div class="indent"><span class="chain">.</span><span class="fn">gain</span>(<span class="val right-val" id="c-gain">0.50</span>)</div>
+      <div class="indent"><span class="chain">.</span><span class="fn">lpf</span>(<span class="val" id="c-lpf">3000</span>)</div>
+      <div class="indent"><span class="chain">.</span><span class="fn">room</span>(<span class="val" id="c-room">0.20</span>)</div>
+      <div class="indent"><span class="chain">.</span><span class="fn">delay</span>(<span class="val right-val" id="c-delay">0.15</span>)</div>
+      <div class="indent"><span class="chain">.</span><span class="fn">fast</span>(<span class="val right-val" id="c-bpm">120</span>)</div>
+      <div class="indent"><span class="chain">.</span><span class="fn">s</span>(<span class="str">"sawtooth"</span>)</div>
+    </div>
+
+    <!-- LEFT HAND -->
+    <div class="hand-panel lh">
+      <div class="hand-panel-title">
+        <div class="dot"></div>
+        LEFT HAND
+      </div>
+      <div id="lh-content">
+        <div class="no-hand-msg">no hand detected</div>
+      </div>
+    </div>
+
+    <!-- RIGHT HAND -->
+    <div class="hand-panel rh">
+      <div class="hand-panel-title">
+        <div class="dot"></div>
+        RIGHT HAND
+      </div>
+      <div id="rh-content">
+        <div class="no-hand-msg">no hand detected</div>
+      </div>
+    </div>
+
+    <!-- STEP SEQUENCER -->
+    <div id="step-section">
+      <div class="section-label">PATTERN</div>
+      <div id="steps"></div>
+    </div>
+
+    <!-- NOTE + BPM -->
+    <div id="note-display">
+      <div id="current-note">—</div>
+      <div id="bpm-display">— bpm</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ================================================================
+// CONFIG
+// ================================================================
+
+const PENTATONIC_MIDI = [48, 50, 52, 55, 57, 60, 62, 64, 67, 69, 72, 74, 76];
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const PATTERNS = [
+  [1,0,0,1,0,0,1,0],  // tresillo
+  [1,0,1,0,1,0,1,0],  // 4-on-the-floor 8th
+  [1,0,0,1,0,1,0,0],  // clave
+  [1,1,0,1,0,1,0,1],  // dense
+];
+
+// ================================================================
+// STATE
+// ================================================================
+
+let audioReady = false;
+let currentStep = 0;
+let patternIdx = 0;
+
+const hands = { left: null, right: null };
+
+// Target params
+const P = {
+  noteIdx: 6,
+  gain: 0.55,
+  lpf: 3200,
+  reverb: 0.2,
+  delay: 0.15,
+  bpm: 120,
+};
+
+// Smoothed (displayed + applied)
+const S = { ...P };
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+const ALPHA = 0.12;
+
+function smoothParams() {
+  for (const k in P) S[k] = lerp(S[k], P[k], ALPHA);
+}
+
+// ================================================================
+// AUDIO
+// ================================================================
+
+let synth, filt, rev, dly, masterGain;
+
+async function initAudio() {
+  await Tone.start();
+
+  masterGain = new Tone.Gain(0.55).toDestination();
+
+  rev = new Tone.Reverb({ decay: 3, wet: 0.2 });
+  await rev.ready;
+  rev.connect(masterGain);
+
+  dly = new Tone.FeedbackDelay({ delayTime: "8n", feedback: 0.25, wet: 0.15 });
+  dly.connect(rev);
+
+  filt = new Tone.Filter({ frequency: 3200, type: "lowpass", Q: 2 });
+  filt.connect(dly);
+
+  synth = new Tone.MonoSynth({
+    oscillator: { type: "sawtooth4" },
+    envelope: { attack: 0.008, decay: 0.12, sustain: 0.35, release: 0.5 },
+    filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.4, baseFrequency: 300, octaves: 3 }
+  });
+  synth.connect(filt);
+
+  Tone.Transport.bpm.value = 120;
+
+  let step = 0;
+
+  Tone.Transport.scheduleRepeat((time) => {
+    const pattern = PATTERNS[patternIdx];
+    currentStep = step % pattern.length;
+
+    // Flash beat indicator
+    const beatNum = step % 4;
+    Tone.getDraw().schedule(() => flashBeat(beatNum), time);
+
+    if (pattern[currentStep]) {
+      const ni = Math.round(Math.max(0, Math.min(PENTATONIC_MIDI.length - 1, S.noteIdx)));
+      const midi = PENTATONIC_MIDI[ni];
+      const freq = Tone.Frequency(midi, "midi").toFrequency();
+      synth.triggerAttackRelease(freq, "8n.", time);
+
+      Tone.getDraw().schedule(() => {
+        const name = NOTE_NAMES[midi % 12] + Math.floor(midi / 12 - 1);
+        document.getElementById('current-note').textContent = name;
+        updateSteps(currentStep, pattern, true);
+      }, time);
+    } else {
+      Tone.getDraw().schedule(() => {
+        updateSteps(currentStep, pattern, false);
+      }, time);
+    }
+
+    step++;
+  }, "8n");
+
+  Tone.Transport.start();
+  audioReady = true;
+}
+
+// ================================================================
+// MEDIAPIPE
+// ================================================================
+
+const handsModel = new Hands({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+});
+
+handsModel.setOptions({
+  maxNumHands: 2,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.65,
+  minTrackingConfidence: 0.5,
+});
+
+handsModel.onResults(processResults);
+
+function processResults(results) {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('overlay');
+  const ctx = canvas.getContext('2d');
+
+  const W = video.videoWidth  || 640;
+  const H = video.videoHeight || 480;
+  canvas.width  = W;
+  canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  hands.left  = null;
+  hands.right = null;
+
+  if (results.multiHandLandmarks && results.multiHandedness) {
+    for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+      const lm   = results.multiHandLandmarks[i];
+      const side = results.multiHandedness[i].label === 'Left' ? 'right' : 'left'; // mirror
+
+      // Compute finger spread: thumb tip → pinky tip
+      const spread = Math.hypot(lm[4].x - lm[20].x, lm[4].y - lm[20].y);
+
+      hands[side] = {
+        x: lm[0].x,
+        y: lm[0].y,
+        spread: Math.min(1, spread * 2.8),
+        lm,
+      };
+
+      drawHandGlow(ctx, lm, side === 'left' ? '#00ff9d' : '#ff2d6b', W, H);
+    }
+  }
+
+  updateAudioParams();
+  smoothParams();
+  applyToAudio();
+  updateUI();
+}
+
+// ── DRAWING ──────────────────────────────────────────────────────
+
+const CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],
+  [0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],
+  [0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],
+  [5,9],[9,13],[13,17],
+];
+
+function drawHandGlow(ctx, lm, color, W, H) {
+  const x = i => (1 - lm[i].x) * W;
+  const y = i => lm[i].y * H;
+
+  // Glow connections
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = color;
+  ctx.strokeStyle = color + '66';
+  ctx.lineWidth = 1.5;
+  for (const [a, b] of CONNECTIONS) {
+    ctx.beginPath();
+    ctx.moveTo(x(a), y(a));
+    ctx.lineTo(x(b), y(b));
+    ctx.stroke();
+  }
+
+  // Knuckle dots
+  ctx.shadowBlur = 10;
+  for (let i = 0; i < lm.length; i++) {
+    const r = i === 0 ? 5 : (i % 4 === 0 ? 3.5 : 2);
+    ctx.beginPath();
+    ctx.arc(x(i), y(i), r, 0, Math.PI * 2);
+    ctx.fillStyle = i === 0 ? color : color + 'bb';
+    ctx.fill();
+  }
+
+  ctx.shadowBlur = 0;
+}
+
+// ================================================================
+// PARAMETER MAPPING
+// ================================================================
+
+function updateAudioParams() {
+  if (hands.left) {
+    P.noteIdx = (1 - hands.left.y) * (PENTATONIC_MIDI.length - 1);
+    P.lpf     = 180 + (1 - hands.left.x) * 5500; // left=dark, right=bright (mirrored)
+    P.reverb  = hands.left.spread * 0.85;
+  }
+  if (hands.right) {
+    P.gain  = Math.max(0.04, (1 - hands.right.y) * 0.88);
+    P.bpm   = 55 + (1 - hands.right.x) * 140;  // 55–195 bpm
+    P.delay = hands.right.spread * 0.5;
+  }
+}
+
+function applyToAudio() {
+  if (!audioReady) return;
+  masterGain.gain.rampTo(S.gain, 0.08);
+  filt.frequency.rampTo(Math.max(80, S.lpf), 0.08);
+  rev.wet.rampTo(S.reverb, 0.15);
+  dly.wet.rampTo(S.delay, 0.15);
+  Tone.Transport.bpm.rampTo(S.bpm, 0.4);
+}
+
+// ================================================================
+// UI
+// ================================================================
+
+function paramRow(label, frac, valStr, cls) {
+  const pct = (Math.max(0, Math.min(1, frac)) * 100).toFixed(1);
+  return `
+    <div class="param-row">
+      <div class="param-label">${label}</div>
+      <div class="param-track">
+        <div class="param-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="param-value">${valStr}</div>
+    </div>`;
+}
+
+function updateUI() {
+  // ── Left hand panel ──
+  const lhEl = document.getElementById('lh-content');
+  if (hands.left) {
+    const ni   = Math.round(Math.max(0, Math.min(PENTATONIC_MIDI.length - 1, S.noteIdx)));
+    const midi = PENTATONIC_MIDI[ni];
+    const note = NOTE_NAMES[midi % 12] + Math.floor(midi / 12 - 1);
+    lhEl.innerHTML =
+      paramRow('pitch', S.noteIdx / (PENTATONIC_MIDI.length - 1), note,    'lh') +
+      paramRow('lpf',   (S.lpf - 180) / 5500,  Math.round(S.lpf) + 'hz', 'lh') +
+      paramRow('reverb', S.reverb / 0.85,       S.reverb.toFixed(2),      'lh');
+  } else {
+    lhEl.innerHTML = '<div class="no-hand-msg">no hand detected</div>';
+  }
+
+  // ── Right hand panel ──
+  const rhEl = document.getElementById('rh-content');
+  if (hands.right) {
+    rhEl.innerHTML =
+      paramRow('gain',  S.gain / 0.88,           S.gain.toFixed(2),        'rh') +
+      paramRow('tempo', (S.bpm - 55) / 140,       Math.round(S.bpm) + ' bpm','rh') +
+      paramRow('delay', S.delay / 0.5,            S.delay.toFixed(2),       'rh');
+  } else {
+    rhEl.innerHTML = '<div class="no-hand-msg">no hand detected</div>';
+  }
+
+  // ── Code display ──
+  const ni2  = Math.round(Math.max(0, Math.min(PENTATONIC_MIDI.length - 1, S.noteIdx)));
+  const midi2 = PENTATONIC_MIDI[ni2];
+  const note2 = (NOTE_NAMES[midi2 % 12] + Math.floor(midi2 / 12 - 1)).toLowerCase();
+  document.getElementById('c-note').textContent  = `"${note2}"`;
+  document.getElementById('c-gain').textContent  = S.gain.toFixed(2);
+  document.getElementById('c-lpf').textContent   = Math.round(S.lpf);
+  document.getElementById('c-room').textContent  = S.reverb.toFixed(2);
+  document.getElementById('c-delay').textContent = S.delay.toFixed(2);
+  document.getElementById('c-bpm').textContent   = Math.round(S.bpm);
+
+  // ── BPM display ──
+  document.getElementById('bpm-display').textContent = Math.round(S.bpm) + ' bpm';
+}
+
+function updateSteps(active, pattern, isHit) {
+  const el = document.getElementById('steps');
+  el.innerHTML = pattern.map((on, i) => {
+    let cls = '';
+    if (i === active) cls = 'active' + (isHit ? '' : ' silent');
+    else if (on) cls = 'hit';
+    return `<div class="step-cell ${cls}"></div>`;
+  }).join('');
+}
+
+function flashBeat(n) {
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('bd' + i);
+    d.classList.remove('flash-left', 'flash-right');
+  }
+  const d = document.getElementById('bd' + n);
+  d.classList.add(Math.random() > 0.5 ? 'flash-left' : 'flash-right');
+  setTimeout(() => d.classList.remove('flash-left', 'flash-right'), 80);
+}
+
+// Init step display placeholder
+updateSteps(-1, PATTERNS[0], false);
+
+// ================================================================
+// INITIALIZATION
+// ================================================================
+
+document.getElementById('start-btn').addEventListener('click', async () => {
+  const screen = document.getElementById('start-screen');
+  const status = document.getElementById('status-text');
+
+  screen.style.opacity = '0';
+  screen.style.transition = 'opacity 0.3s';
+  setTimeout(() => screen.style.display = 'none', 300);
+
+  status.textContent = 'starting audio…';
+
+  try {
+    await initAudio();
+    status.textContent = 'requesting camera…';
+
+    const video = document.getElementById('video');
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await handsModel.send({ image: video });
+      },
+      width: 640,
+      height: 480,
+    });
+
+    await camera.start();
+    status.textContent = 'running — wave your hands';
+
+    // Cycle patterns every 8 seconds
+    setInterval(() => {
+      patternIdx = (patternIdx + 1) % PATTERNS.length;
+    }, 8000);
+
+  } catch (err) {
+    status.textContent = 'error: ' + err.message;
+    screen.style.display = 'flex';
+    screen.style.opacity = '1';
+    console.error(err);
+  }
+});
+</script>
+</body>
+</html>
