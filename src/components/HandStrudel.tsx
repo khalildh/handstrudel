@@ -15,6 +15,7 @@ import {
   MappingConfig,
   DEFAULT_MAPPING,
   mapHandsToParams,
+  getSaveAxes,
 } from "../lib/hand-mapping";
 import { initializeStrudel } from "../lib/strudel";
 import { initializeMediaPipe } from "../lib/mediapipe";
@@ -22,6 +23,11 @@ import StartOverlay from "./StartOverlay";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import CameraView from "./CameraView";
+
+export interface SavedSnippet {
+  code: string;
+  timestamp: number;
+}
 
 interface UIState {
   codeHL: string;
@@ -37,6 +43,7 @@ export default function HandStrudel() {
   );
   const [status, setStatus] = useState("click start");
   const [config, setConfig] = useState<MappingConfig>(DEFAULT_MAPPING);
+  const [advanced, setAdvanced] = useState(false);
 
   const defaults = buildDefaultParams(DEFAULT_MAPPING);
   const defaultNI = Math.round(defaults.noteIdx ?? 10);
@@ -53,6 +60,7 @@ export default function HandStrudel() {
   const smoothedRef = useRef<MusicParams>({ ...defaults });
   const handsRef = useRef<HandsState>({ left: null, right: null });
   const configRef = useRef<MappingConfig>(DEFAULT_MAPPING);
+  const advancedRef = useRef(false);
   const structIdxRef = useRef(0);
   const lastCodeRef = useRef("");
   const evaluateRef = useRef<
@@ -60,6 +68,16 @@ export default function HandStrudel() {
   >(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const lastBeatRef = useRef(-1);
+
+  // Save-gesture refs
+  const savedSnippetsRef = useRef<SavedSnippet[]>([]);
+  const saveArmedRef = useRef<Map<string, boolean>>(new Map());
+  const lastSaveTimeRef = useRef(0);
+  const [savedSnippets, setSavedSnippets] = useState<SavedSnippet[]>([]);
+
+  // Snippet playback
+  const playingIdxRef = useRef<number | null>(null);
+  const [playingIdx, setPlayingIdx] = useState<number | null>(null);
 
   // DOM refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -70,9 +88,28 @@ export default function HandStrudel() {
   const uiTimerRef = useRef(0);
   const structTimerRef = useRef(0);
 
-  const handleStart = useCallback(async (cfg: MappingConfig) => {
+  const handlePlaySnippet = useCallback((idx: number) => {
+    if (playingIdxRef.current === idx) {
+      // Stop: resume live code
+      playingIdxRef.current = null;
+      setPlayingIdx(null);
+      lastCodeRef.current = ""; // force re-eval of live code on next frame
+    } else {
+      // Play this snippet
+      playingIdxRef.current = idx;
+      setPlayingIdx(idx);
+      const code = savedSnippetsRef.current[idx]?.code;
+      if (code) {
+        evaluateRef.current?.(code).catch((e: unknown) => console.warn("eval:", e));
+      }
+    }
+  }, []);
+
+  const handleStart = useCallback(async (cfg: MappingConfig, adv: boolean) => {
     setConfig(cfg);
+    setAdvanced(adv);
     configRef.current = cfg;
+    advancedRef.current = adv;
 
     // Reset params for chosen config
     const defs = buildDefaultParams(cfg);
@@ -144,17 +181,42 @@ export default function HandStrudel() {
           }
         }
 
-        // Eval on change
-        const code = buildCode(
-          smoothedRef.current,
-          structIdxRef.current,
-          configRef.current,
-        );
-        if (code !== lastCodeRef.current) {
-          lastCodeRef.current = code;
-          evaluateRef
-            .current?.(code)
-            .catch((e: unknown) => console.warn("eval:", e));
+        // Eval on change (skip when playing a saved snippet)
+        if (playingIdxRef.current === null) {
+          const code = buildCode(
+            smoothedRef.current,
+            structIdxRef.current,
+            configRef.current,
+          );
+          if (code !== lastCodeRef.current) {
+            lastCodeRef.current = code;
+            evaluateRef
+              .current?.(code)
+              .catch((e: unknown) => console.warn("eval:", e));
+          }
+        }
+
+        // Save-gesture trigger
+        const saveAxes = getSaveAxes(configRef.current);
+        const now = performance.now();
+        for (const { side, axisKey } of saveAxes) {
+          const hand = handsRef.current[side];
+          if (!hand) continue;
+          const raw = hand[axisKey];
+          if (typeof raw !== "number") continue;
+          const armKey = `${side}:${axisKey}`;
+          const armed = saveArmedRef.current.get(armKey) ?? true;
+          if (raw > 0.8 && armed && now - lastSaveTimeRef.current > 1000) {
+            const snippet: SavedSnippet = {
+              code: lastCodeRef.current,
+              timestamp: Date.now(),
+            };
+            savedSnippetsRef.current = [...savedSnippetsRef.current, snippet];
+            saveArmedRef.current.set(armKey, false);
+            lastSaveTimeRef.current = now;
+          } else if (raw < 0.3) {
+            saveArmedRef.current.set(armKey, true);
+          }
         }
 
         animFrameRef.current = requestAnimationFrame(loop);
@@ -176,6 +238,7 @@ export default function HandStrudel() {
           noteDisplay: NOTE_DISPLAY[ni],
           bpm: s.bpm ?? 120,
         });
+        setSavedSnippets(savedSnippetsRef.current);
       }, 66);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -212,6 +275,10 @@ export default function HandStrudel() {
         noteDisplay={uiState.noteDisplay}
         bpm={uiState.bpm}
         config={config}
+        advanced={advanced}
+        savedSnippets={savedSnippets}
+        playingIdx={playingIdx}
+        onPlaySnippet={handlePlaySnippet}
       />
     </div>
   );

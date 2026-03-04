@@ -1,10 +1,49 @@
 import { MusicParams, PARAM_MAP } from "./music";
 
+/* ── Axis Definitions ────────────────────────────────── */
+
+export interface AxisDef {
+  key: string;
+  label: string;
+  icon: string;
+  basic: boolean;
+  invert: boolean;
+}
+
+export const AXIS_DEFS: AxisDef[] = [
+  { key: "y",          label: "Y pos",       icon: "↕",  basic: true,  invert: true  },
+  { key: "x",          label: "X pos",       icon: "↔",  basic: true,  invert: true  },
+  { key: "spread",     label: "spread",      icon: "✋", basic: true,  invert: false },
+  { key: "pinch",      label: "pinch",       icon: "🤏", basic: false, invert: false },
+  { key: "fist",       label: "fist",        icon: "✊", basic: false, invert: false },
+  { key: "rotation",   label: "rotation",    icon: "🔄", basic: false, invert: false },
+  { key: "thumbCurl",  label: "thumb curl",  icon: "👍", basic: false, invert: false },
+  { key: "indexCurl",  label: "index curl",  icon: "☝",  basic: false, invert: false },
+  { key: "middleCurl", label: "middle curl", icon: "🖕", basic: false, invert: false },
+  { key: "ringCurl",   label: "ring curl",   icon: "💍", basic: false, invert: false },
+  { key: "pinkyCurl",  label: "pinky curl",  icon: "🤞", basic: false, invert: false },
+];
+
+export const AXIS_MAP: Record<string, AxisDef> = Object.fromEntries(
+  AXIS_DEFS.map((d) => [d.key, d]),
+);
+
+/* ── Hand Data ───────────────────────────────────────── */
+
 export interface HandData {
   x: number;
   y: number;
   spread: number;
+  pinch: number;
+  fist: number;
+  rotation: number;
+  thumbCurl: number;
+  indexCurl: number;
+  middleCurl: number;
+  ringCurl: number;
+  pinkyCurl: number;
   lm: HandLandmark[];
+  [key: string]: number | HandLandmark[];
 }
 
 export interface HandsState {
@@ -12,9 +51,11 @@ export interface HandsState {
   right: HandData | null;
 }
 
+/* ── Mapping Config ──────────────────────────────────── */
+
 export interface MappingConfig {
-  left:  { y: string; x: string; spread: string };
-  right: { y: string; x: string; spread: string };
+  left:  Record<string, string>;
+  right: Record<string, string>;
 }
 
 export const DEFAULT_MAPPING: MappingConfig = {
@@ -22,7 +63,23 @@ export const DEFAULT_MAPPING: MappingConfig = {
   right: { y: "gain",    x: "bpm",  spread: "delay" },
 };
 
-/** Scale a 0–1 axis value into a param's min–max range. */
+export const DEFAULT_ADVANCED_MAPPING: MappingConfig = {
+  left: {
+    y: "noteIdx", x: "lpf", spread: "reverb",
+    pinch: "crush", fist: "shape", rotation: "pan",
+    thumbCurl: "none", indexCurl: "none", middleCurl: "none",
+    ringCurl: "none", pinkyCurl: "none",
+  },
+  right: {
+    y: "gain", x: "bpm", spread: "delay",
+    pinch: "hpf", fist: "attack", rotation: "release",
+    thumbCurl: "none", indexCurl: "none", middleCurl: "none",
+    ringCurl: "none", pinkyCurl: "none",
+  },
+};
+
+/* ── Mapping Logic ───────────────────────────────────── */
+
 function scaleAxis(raw: number, paramId: string, invert: boolean): number {
   const def = PARAM_MAP[paramId];
   if (!def) return 0;
@@ -30,19 +87,33 @@ function scaleAxis(raw: number, paramId: string, invert: boolean): number {
   return def.min + t * (def.max - def.min);
 }
 
+export function getSaveAxes(
+  config: MappingConfig,
+): { side: "left" | "right"; axisKey: string }[] {
+  const result: { side: "left" | "right"; axisKey: string }[] = [];
+  for (const side of ["left", "right"] as const) {
+    for (const [axisKey, paramId] of Object.entries(config[side])) {
+      if (paramId === "save") result.push({ side, axisKey });
+    }
+  }
+  return result;
+}
+
 export function mapHandsToParams(
   hands: HandsState,
   params: MusicParams,
   config: MappingConfig,
 ): void {
-  if (hands.left) {
-    params[config.left.y] = scaleAxis(hands.left.y, config.left.y, true);
-    params[config.left.x] = scaleAxis(hands.left.x, config.left.x, true);
-    params[config.left.spread] = scaleAxis(hands.left.spread, config.left.spread, false);
-  }
-  if (hands.right) {
-    params[config.right.y] = scaleAxis(hands.right.y, config.right.y, true);
-    params[config.right.x] = scaleAxis(hands.right.x, config.right.x, true);
-    params[config.right.spread] = scaleAxis(hands.right.spread, config.right.spread, false);
+  for (const side of ["left", "right"] as const) {
+    const hand = hands[side];
+    if (!hand) continue;
+    for (const [axisKey, paramId] of Object.entries(config[side])) {
+      if (paramId === "none" || paramId === "save") continue;
+      const axisDef = AXIS_MAP[axisKey];
+      if (!axisDef) continue;
+      const raw = hand[axisKey];
+      if (typeof raw !== "number") continue;
+      params[paramId] = scaleAxis(raw, paramId, axisDef.invert);
+    }
   }
 }

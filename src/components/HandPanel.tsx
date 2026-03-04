@@ -10,6 +10,7 @@ interface HandPanelProps {
   side: "left" | "right";
   detected: boolean;
   params: ParamRow[];
+  compact?: boolean;
 }
 
 function PRow({ label, fraction, value }: ParamRow) {
@@ -25,12 +26,12 @@ function PRow({ label, fraction, value }: ParamRow) {
   );
 }
 
-export default function HandPanel({ side, detected, params }: HandPanelProps) {
+export default function HandPanel({ side, detected, params, compact }: HandPanelProps) {
   const cls = side === "left" ? "lh" : "rh";
   const title = side === "left" ? "LEFT HAND" : "RIGHT HAND";
 
   return (
-    <div className={`hpanel ${cls}`}>
+    <div className={`hpanel ${cls} ${compact ? "hpanel-compact" : ""}`}>
       <div className="hpanel-title">
         <div className="htitle-dot" />
         {title}

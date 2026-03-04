@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { MusicParams, PARAM_MAP, NOTES, NOTE_DISPLAY } from "../lib/music";
 import { HandsState, MappingConfig } from "../lib/hand-mapping";
 import HandPanel from "./HandPanel";
+import type { SavedSnippet } from "./HandStrudel";
 
 interface SidebarProps {
   codeHL: string;
@@ -11,6 +13,10 @@ interface SidebarProps {
   noteDisplay: string;
   bpm: number;
   config: MappingConfig;
+  advanced: boolean;
+  savedSnippets: SavedSnippet[];
+  playingIdx: number | null;
+  onPlaySnippet: (idx: number) => void;
 }
 
 function paramRow(id: string, value: number) {
@@ -20,6 +26,12 @@ function paramRow(id: string, value: number) {
   return { label: def.label, fraction, value: def.format(value) };
 }
 
+function buildParamRows(sideConfig: Record<string, string>, smoothed: MusicParams) {
+  return Object.entries(sideConfig)
+    .filter(([, paramId]) => paramId !== "none" && paramId !== "save")
+    .map(([, paramId]) => paramRow(paramId, smoothed[paramId] ?? 0));
+}
+
 export default function Sidebar({
   codeHL,
   smoothed,
@@ -27,7 +39,20 @@ export default function Sidebar({
   noteDisplay,
   bpm,
   config,
+  advanced,
+  savedSnippets,
+  playingIdx,
+  onPlaySnippet,
 }: SidebarProps) {
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+
+  const handleCopy = (code: string, idx: number) => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopiedIdx(idx);
+      setTimeout(() => setCopiedIdx(null), 600);
+    });
+  };
+
   return (
     <div id="sidebar">
       <div id="code-wrap">
@@ -38,24 +63,41 @@ export default function Sidebar({
         />
       </div>
 
+      {savedSnippets.length > 0 && (
+        <div className="saved-list">
+          <div className="saved-title">💾 SAVED</div>
+          {savedSnippets.map((s, i) => (
+            <div
+              key={s.timestamp}
+              className={`saved-item${copiedIdx === i ? " saved-item-copied" : ""}${playingIdx === i ? " saved-item-playing" : ""}`}
+              title={s.code}
+            >
+              <button
+                className="saved-play"
+                onClick={() => onPlaySnippet(i)}
+              >
+                {playingIdx === i ? "⏸" : "▶"}
+              </button>
+              <span className="saved-code" onClick={() => handleCopy(s.code, i)}>
+                {s.code.split("\n")[0]}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <HandPanel
         side="left"
         detected={hands.left !== null}
-        params={[
-          paramRow(config.left.y, smoothed[config.left.y] ?? 0),
-          paramRow(config.left.x, smoothed[config.left.x] ?? 0),
-          paramRow(config.left.spread, smoothed[config.left.spread] ?? 0),
-        ]}
+        params={buildParamRows(config.left, smoothed)}
+        compact={advanced}
       />
 
       <HandPanel
         side="right"
         detected={hands.right !== null}
-        params={[
-          paramRow(config.right.y, smoothed[config.right.y] ?? 0),
-          paramRow(config.right.x, smoothed[config.right.x] ?? 0),
-          paramRow(config.right.spread, smoothed[config.right.spread] ?? 0),
-        ]}
+        params={buildParamRows(config.right, smoothed)}
+        compact={advanced}
       />
 
       <div id="bottom">

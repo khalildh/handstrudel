@@ -16,6 +16,31 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
+function computeAdvancedAxes(lm: HandLandmark[]) {
+  const dist = (a: HandLandmark, b: HandLandmark) =>
+    Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+
+  // Individual finger curls: dist(tip, mcp), scaled and clamped (1 = extended)
+  const thumbCurl  = Math.min(1, dist(lm[4],  lm[2])  * 4);
+  const indexCurl  = Math.min(1, dist(lm[8],  lm[5])  * 4);
+  const middleCurl = Math.min(1, dist(lm[12], lm[9])  * 4);
+  const ringCurl   = Math.min(1, dist(lm[16], lm[13]) * 4);
+  const pinkyCurl  = Math.min(1, dist(lm[20], lm[17]) * 4);
+
+  // Pinch: 1 = pinching (thumb tip close to index tip)
+  const pinch = Math.max(0, Math.min(1, 1 - dist(lm[4], lm[8]) * 5));
+
+  // Fist: average of 5 inverted finger curls (1 = closed)
+  const fist = 1 - (thumbCurl + indexCurl + middleCurl + ringCurl + pinkyCurl) / 5;
+
+  // Rotation: atan2 from wrist to middle_mcp, normalized 0–1
+  const dx = lm[9].x - lm[0].x;
+  const dy = lm[9].y - lm[0].y;
+  const rotation = (Math.atan2(dy, dx) / Math.PI + 1) / 2;
+
+  return { pinch, fist, rotation, thumbCurl, indexCurl, middleCurl, ringCurl, pinkyCurl };
+}
+
 export async function initializeMediaPipe(
   videoEl: HTMLVideoElement,
   canvasEl: HTMLCanvasElement,
@@ -60,10 +85,12 @@ export async function initializeMediaPipe(
           lm[4].x - lm[20].x,
           lm[4].y - lm[20].y,
         );
+        const advanced = computeAdvancedAxes(lm);
         handsRef.current[side] = {
           x: lm[0].x,
           y: lm[0].y,
           spread: Math.min(1, sp * 2.8),
+          ...advanced,
           lm,
         };
         drawHand(
