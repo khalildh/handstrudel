@@ -1,7 +1,7 @@
 "use client";
 
-import { MusicParams, NOTES, NOTE_DISPLAY } from "../lib/music";
-import { HandsState } from "../lib/hand-mapping";
+import { MusicParams, PARAM_MAP, NOTES, NOTE_DISPLAY } from "../lib/music";
+import { HandsState, MappingConfig } from "../lib/hand-mapping";
 import HandPanel from "./HandPanel";
 
 interface SidebarProps {
@@ -10,6 +10,14 @@ interface SidebarProps {
   hands: HandsState;
   noteDisplay: string;
   bpm: number;
+  config: MappingConfig;
+}
+
+function paramRow(id: string, value: number) {
+  const def = PARAM_MAP[id];
+  if (!def) return { label: id, fraction: 0, value: "?" };
+  const fraction = (value - def.min) / (def.max - def.min);
+  return { label: def.label, fraction, value: def.format(value) };
 }
 
 export default function Sidebar({
@@ -18,12 +26,8 @@ export default function Sidebar({
   hands,
   noteDisplay,
   bpm,
+  config,
 }: SidebarProps) {
-  const ni = Math.max(
-    0,
-    Math.min(NOTES.length - 1, Math.round(smoothed.noteIdx)),
-  );
-
   return (
     <div id="sidebar">
       <div id="code-wrap">
@@ -38,21 +42,9 @@ export default function Sidebar({
         side="left"
         detected={hands.left !== null}
         params={[
-          {
-            label: "pitch",
-            fraction: smoothed.noteIdx / (NOTES.length - 1),
-            value: NOTE_DISPLAY[ni],
-          },
-          {
-            label: "lpf",
-            fraction: (smoothed.lpf - 120) / 6000,
-            value: Math.round(smoothed.lpf) + "hz",
-          },
-          {
-            label: "reverb",
-            fraction: smoothed.reverb / 0.9,
-            value: smoothed.reverb.toFixed(2),
-          },
+          paramRow(config.left.y, smoothed[config.left.y] ?? 0),
+          paramRow(config.left.x, smoothed[config.left.x] ?? 0),
+          paramRow(config.left.spread, smoothed[config.left.spread] ?? 0),
         ]}
       />
 
@@ -60,21 +52,9 @@ export default function Sidebar({
         side="right"
         detected={hands.right !== null}
         params={[
-          {
-            label: "gain",
-            fraction: smoothed.gain / 0.9,
-            value: smoothed.gain.toFixed(2),
-          },
-          {
-            label: "bpm",
-            fraction: (smoothed.bpm - 50) / 155,
-            value: Math.round(smoothed.bpm) + " bpm",
-          },
-          {
-            label: "delay",
-            fraction: smoothed.delay / 0.55,
-            value: smoothed.delay.toFixed(2),
-          },
+          paramRow(config.right.y, smoothed[config.right.y] ?? 0),
+          paramRow(config.right.x, smoothed[config.right.x] ?? 0),
+          paramRow(config.right.spread, smoothed[config.right.spread] ?? 0),
         ]}
       />
 

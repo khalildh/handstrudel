@@ -181,6 +181,80 @@ body {
   color: var(--right);
 }
 
+/* ── Config Grid (Start Overlay) ─────────────────────── */
+.config-grid {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+}
+
+.config-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-title {
+  font-size: 8px;
+  letter-spacing: 3px;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.config-icon {
+  font-size: 11px;
+  width: 16px;
+  text-align: center;
+  color: var(--dim);
+}
+
+.config-select {
+  font-family: var(--font);
+  font-size: 9px;
+  letter-spacing: 1px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 3px 6px;
+  cursor: pointer;
+  outline: none;
+  width: 90px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.config-select:focus {
+  border-color: var(--dim);
+}
+
+.config-select-left {
+  border-color: color-mix(in srgb, var(--left) 40%, var(--border));
+}
+
+.config-select-left:focus {
+  border-color: var(--left);
+}
+
+.config-select-right {
+  border-color: color-mix(in srgb, var(--right) 40%, var(--border));
+}
+
+.config-select-right:focus {
+  border-color: var(--right);
+}
+
+.config-select option {
+  background: var(--bg);
+  color: var(--text);
+}
+
 /* ── Sidebar ─────────────────────────────────────────── */
 #sidebar {
   background: var(--panel);

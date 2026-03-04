@@ -9,8 +9,13 @@ import {
   NOTE_DISPLAY,
   STRUCTS,
 } from "../lib/music";
-import { DEFAULT_PARAMS, smoothParams } from "../lib/params";
-import { HandsState, mapHandsToParams } from "../lib/hand-mapping";
+import { buildDefaultParams, smoothParams } from "../lib/params";
+import {
+  HandsState,
+  MappingConfig,
+  DEFAULT_MAPPING,
+  mapHandsToParams,
+} from "../lib/hand-mapping";
 import { initializeStrudel } from "../lib/strudel";
 import { initializeMediaPipe } from "../lib/mediapipe";
 import StartOverlay from "./StartOverlay";
@@ -31,20 +36,23 @@ export default function HandStrudel() {
     "visible",
   );
   const [status, setStatus] = useState("click start");
+  const [config, setConfig] = useState<MappingConfig>(DEFAULT_MAPPING);
 
-  const defaultNI = Math.round(DEFAULT_PARAMS.noteIdx);
+  const defaults = buildDefaultParams(DEFAULT_MAPPING);
+  const defaultNI = Math.round(defaults.noteIdx ?? 10);
   const [uiState, setUiState] = useState<UIState>({
-    codeHL: buildCodeHL({ ...DEFAULT_PARAMS }, 0),
-    smoothed: { ...DEFAULT_PARAMS },
+    codeHL: buildCodeHL(defaults, 0, DEFAULT_MAPPING),
+    smoothed: { ...defaults },
     hands: { left: null, right: null },
     noteDisplay: NOTE_DISPLAY[defaultNI],
-    bpm: DEFAULT_PARAMS.bpm,
+    bpm: defaults.bpm ?? 120,
   });
 
   // Hot-path refs (mutated at 60fps, never trigger React re-renders)
-  const paramsRef = useRef<MusicParams>({ ...DEFAULT_PARAMS });
-  const smoothedRef = useRef<MusicParams>({ ...DEFAULT_PARAMS });
+  const paramsRef = useRef<MusicParams>({ ...defaults });
+  const smoothedRef = useRef<MusicParams>({ ...defaults });
   const handsRef = useRef<HandsState>({ left: null, right: null });
+  const configRef = useRef<MappingConfig>(DEFAULT_MAPPING);
   const structIdxRef = useRef(0);
   const lastCodeRef = useRef("");
   const evaluateRef = useRef<
@@ -62,7 +70,15 @@ export default function HandStrudel() {
   const uiTimerRef = useRef(0);
   const structTimerRef = useRef(0);
 
-  const handleStart = useCallback(async () => {
+  const handleStart = useCallback(async (cfg: MappingConfig) => {
+    setConfig(cfg);
+    configRef.current = cfg;
+
+    // Reset params for chosen config
+    const defs = buildDefaultParams(cfg);
+    paramsRef.current = { ...defs };
+    smoothedRef.current = { ...defs };
+
     // Fade out overlay
     setOverlay("fading");
     setTimeout(() => setOverlay("hidden"), 300);
@@ -74,7 +90,7 @@ export default function HandStrudel() {
       evaluateRef.current = evaluate;
       audioCtxRef.current = audioCtx;
 
-      const initCode = buildCode(paramsRef.current, structIdxRef.current);
+      const initCode = buildCode(paramsRef.current, structIdxRef.current, cfg);
       console.log("Initial code:", initCode);
       await evaluate(initCode);
       lastCodeRef.current = initCode;
@@ -89,7 +105,7 @@ export default function HandStrudel() {
         videoRef.current,
         canvasRef.current,
         handsRef,
-        () => mapHandsToParams(handsRef.current, paramsRef.current),
+        () => mapHandsToParams(handsRef.current, paramsRef.current, configRef.current),
       );
 
       setStatus("running — wave your hands");
@@ -103,13 +119,13 @@ export default function HandStrudel() {
       // 60fps animation loop
       const loop = () => {
         smoothParams(paramsRef.current, smoothedRef.current);
-        mapHandsToParams(handsRef.current, paramsRef.current);
+        mapHandsToParams(handsRef.current, paramsRef.current, configRef.current);
 
         // Beat flash (direct DOM for performance)
         const ctx = audioCtxRef.current;
         if (ctx) {
           try {
-            const cpm = smoothedRef.current.bpm / 4;
+            const cpm = (smoothedRef.current.bpm ?? 120) / 4;
             const beat =
               Math.floor(((ctx.currentTime * cpm) / 60) * 4) % 4;
             if (beat !== lastBeatRef.current) {
@@ -132,6 +148,7 @@ export default function HandStrudel() {
         const code = buildCode(
           smoothedRef.current,
           structIdxRef.current,
+          configRef.current,
         );
         if (code !== lastCodeRef.current) {
           lastCodeRef.current = code;
@@ -150,14 +167,14 @@ export default function HandStrudel() {
         const s = { ...smoothedRef.current };
         const ni = Math.max(
           0,
-          Math.min(NOTES.length - 1, Math.round(s.noteIdx)),
+          Math.min(NOTES.length - 1, Math.round(s.noteIdx ?? 10)),
         );
         setUiState({
-          codeHL: buildCodeHL(s, structIdxRef.current),
+          codeHL: buildCodeHL(s, structIdxRef.current, configRef.current),
           smoothed: s,
           hands: { ...handsRef.current },
           noteDisplay: NOTE_DISPLAY[ni],
-          bpm: s.bpm,
+          bpm: s.bpm ?? 120,
         });
       }, 66);
     } catch (err: unknown) {
@@ -194,6 +211,7 @@ export default function HandStrudel() {
         hands={uiState.hands}
         noteDisplay={uiState.noteDisplay}
         bpm={uiState.bpm}
+        config={config}
       />
     </div>
   );

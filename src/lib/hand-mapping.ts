@@ -1,4 +1,4 @@
-import { MusicParams, NOTES } from "./music";
+import { MusicParams, PARAM_MAP } from "./music";
 
 export interface HandData {
   x: number;
@@ -12,18 +12,37 @@ export interface HandsState {
   right: HandData | null;
 }
 
+export interface MappingConfig {
+  left:  { y: string; x: string; spread: string };
+  right: { y: string; x: string; spread: string };
+}
+
+export const DEFAULT_MAPPING: MappingConfig = {
+  left:  { y: "noteIdx", x: "lpf",  spread: "reverb" },
+  right: { y: "gain",    x: "bpm",  spread: "delay" },
+};
+
+/** Scale a 0–1 axis value into a param's min–max range. */
+function scaleAxis(raw: number, paramId: string, invert: boolean): number {
+  const def = PARAM_MAP[paramId];
+  if (!def) return 0;
+  const t = invert ? 1 - raw : raw;
+  return def.min + t * (def.max - def.min);
+}
+
 export function mapHandsToParams(
   hands: HandsState,
   params: MusicParams,
+  config: MappingConfig,
 ): void {
   if (hands.left) {
-    params.noteIdx = (1 - hands.left.y) * (NOTES.length - 1);
-    params.lpf = 120 + (1 - hands.left.x) * 6000;
-    params.reverb = Math.min(0.9, hands.left.spread * 0.9);
+    params[config.left.y] = scaleAxis(hands.left.y, config.left.y, true);
+    params[config.left.x] = scaleAxis(hands.left.x, config.left.x, true);
+    params[config.left.spread] = scaleAxis(hands.left.spread, config.left.spread, false);
   }
   if (hands.right) {
-    params.gain = Math.max(0.03, (1 - hands.right.y) * 0.9);
-    params.bpm = 50 + (1 - hands.right.x) * 155;
-    params.delay = Math.min(0.55, hands.right.spread * 0.55);
+    params[config.right.y] = scaleAxis(hands.right.y, config.right.y, true);
+    params[config.right.x] = scaleAxis(hands.right.x, config.right.x, true);
+    params[config.right.spread] = scaleAxis(hands.right.spread, config.right.spread, false);
   }
 }
