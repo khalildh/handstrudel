@@ -12,6 +12,10 @@ declare module "@strudel/core" {
   export function evalScope(
     ...modules: Promise<unknown>[]
   ): Promise<void>;
+  export function reify(pattern: string): {
+    queryArc: (start: number, end: number) => { value: number }[];
+  };
+  export function getTime(): number;
 }
 
 declare module "@strudel/webaudio" {

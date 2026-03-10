@@ -1,16 +1,18 @@
 "use client";
 
-import { PARAM_DEFS } from "../lib/music";
+import { PARAM_DEFS, HYDRA_PARAM_DEFS } from "../lib/music";
 import {
   MappingConfig,
   DEFAULT_MAPPING,
+  DEFAULT_HYDRA_MAPPING,
   DEFAULT_ADVANCED_MAPPING,
+  DEFAULT_ADVANCED_HYDRA_MAPPING,
   AXIS_DEFS,
 } from "../lib/hand-mapping";
 import { useState } from "react";
 
 interface StartOverlayProps {
-  onStart: (config: MappingConfig, advanced: boolean) => void;
+  onStart: (config: MappingConfig, hydraConfig: MappingConfig, advanced: boolean) => void;
   fading?: boolean;
 }
 
@@ -20,19 +22,29 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
     left:  { ...DEFAULT_MAPPING.left },
     right: { ...DEFAULT_MAPPING.right },
   });
+  const [hydraConfig, setHydraConfig] = useState<MappingConfig>({
+    left:  { ...DEFAULT_HYDRA_MAPPING.left },
+    right: { ...DEFAULT_HYDRA_MAPPING.right },
+  });
 
   const toggleAdvanced = () => {
     setAdvanced((prev) => {
       const next = !prev;
       if (next) {
-        // Switching to advanced: keep existing basic mappings, add advanced keys
         setConfig((c) => ({
           left:  { ...DEFAULT_ADVANCED_MAPPING.left,  ...c.left },
           right: { ...DEFAULT_ADVANCED_MAPPING.right, ...c.right },
         }));
+        setHydraConfig((c) => ({
+          left:  { ...DEFAULT_ADVANCED_HYDRA_MAPPING.left,  ...c.left },
+          right: { ...DEFAULT_ADVANCED_HYDRA_MAPPING.right, ...c.right },
+        }));
       } else {
-        // Switching to simple: keep only basic keys
         setConfig((c) => ({
+          left:  { y: c.left.y,  x: c.left.x,  spread: c.left.spread },
+          right: { y: c.right.y, x: c.right.x, spread: c.right.spread },
+        }));
+        setHydraConfig((c) => ({
           left:  { y: c.left.y,  x: c.left.x,  spread: c.left.spread },
           right: { y: c.right.y, x: c.right.x, spread: c.right.spread },
         }));
@@ -43,6 +55,13 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
 
   const update = (hand: "left" | "right", axis: string, value: string) => {
     setConfig((prev) => ({
+      ...prev,
+      [hand]: { ...prev[hand], [axis]: value },
+    }));
+  };
+
+  const updateHydra = (hand: "left" | "right", axis: string, value: string) => {
+    setHydraConfig((prev) => ({
       ...prev,
       [hand]: { ...prev[hand], [axis]: value },
     }));
@@ -86,13 +105,25 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
                   ))}
                   <option value="save">💾 save</option>
                 </select>
+                <select
+                  className={`config-select config-select-hydra`}
+                  value={hydraConfig[hand][axis.key] ?? "none"}
+                  onChange={(e) => updateHydra(hand, axis.key, e.target.value)}
+                >
+                  <option value="none">—</option>
+                  {HYDRA_PARAM_DEFS.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             ))}
           </div>
         ))}
       </div>
 
-      <button id="start-btn" onClick={() => onStart(config, advanced)}>
+      <button id="start-btn" onClick={() => onStart(config, hydraConfig, advanced)}>
         ▶ START
       </button>
       <div className="hint">

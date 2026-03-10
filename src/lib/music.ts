@@ -164,19 +164,77 @@ export const PARAM_DEFS: ParamDef[] = [
   },
 ];
 
+/* ── Hydra visual parameter definitions ─────────────── */
+
+export const HYDRA_PARAM_DEFS: ParamDef[] = [
+  {
+    id: "hFreq", label: "osc freq", strudelKey: "",
+    min: 2, max: 60, default: 10,
+    format: (v) => v.toFixed(1), toCode: (v) => v.toFixed(1), hlClass: "c-nr",
+  },
+  {
+    id: "hSync", label: "osc sync", strudelKey: "",
+    min: 0, max: 1, default: 0.1,
+    format: (v) => v.toFixed(2), toCode: (v) => v.toFixed(2), hlClass: "c-nr",
+  },
+  {
+    id: "hKaleid", label: "kaleid", strudelKey: "",
+    min: 1, max: 12, default: 3,
+    format: (v) => Math.round(v).toString(), toCode: (v) => String(Math.round(v)), hlClass: "c-nr",
+  },
+  {
+    id: "hRotate", label: "rotate", strudelKey: "",
+    min: 0, max: 3.14, default: 0,
+    format: (v) => v.toFixed(2), toCode: (v) => v.toFixed(2), hlClass: "c-nr",
+  },
+  {
+    id: "hColorama", label: "colorama", strudelKey: "",
+    min: 0, max: 0.5, default: 0.05,
+    format: (v) => v.toFixed(3), toCode: (v) => v.toFixed(3), hlClass: "c-nr",
+  },
+  {
+    id: "hBright", label: "bright", strudelKey: "",
+    min: 0, max: 2, default: 1,
+    format: (v) => v.toFixed(2), toCode: (v) => v.toFixed(2), hlClass: "c-nr",
+  },
+  {
+    id: "hPixel", label: "pixelate", strudelKey: "",
+    min: 2, max: 200, default: 200,
+    format: (v) => Math.round(v).toString(), toCode: (v) => String(Math.round(v)), hlClass: "c-nr",
+  },
+  {
+    id: "hModulate", label: "modulate", strudelKey: "",
+    min: 0, max: 0.15, default: 0.02,
+    format: (v) => v.toFixed(3), toCode: (v) => v.toFixed(3), hlClass: "c-nr",
+  },
+  {
+    id: "hScale", label: "scale", strudelKey: "",
+    min: 0.5, max: 3, default: 1,
+    format: (v) => v.toFixed(2), toCode: (v) => v.toFixed(2), hlClass: "c-nr",
+  },
+  {
+    id: "hSaturate", label: "saturate", strudelKey: "",
+    min: 0, max: 4, default: 1,
+    format: (v) => v.toFixed(2), toCode: (v) => v.toFixed(2), hlClass: "c-nr",
+  },
+];
+
+export const HYDRA_IDS = new Set(HYDRA_PARAM_DEFS.map((d) => d.id));
+
 export const PARAM_MAP: Record<string, ParamDef> = Object.fromEntries(
-  PARAM_DEFS.map((d) => [d.id, d]),
+  [...PARAM_DEFS, ...HYDRA_PARAM_DEFS].map((d) => [d.id, d]),
 );
 
 export type MusicParams = Record<string, number>;
 
-/** Collect the set of unique param IDs from the mapping config, excluding noteIdx and bpm. */
+/** Collect the set of unique music param IDs from the mapping config, excluding noteIdx, bpm, and hydra params. */
 function extraParamIds(config: { left: Record<string, string>; right: Record<string, string> }): string[] {
   const ids = new Set<string>();
   for (const v of Object.values(config.left)) ids.add(v);
   for (const v of Object.values(config.right)) ids.add(v);
   ids.delete("noteIdx");
   ids.delete("bpm");
+  for (const hid of HYDRA_IDS) ids.delete(hid);
   return Array.from(ids);
 }
 
@@ -199,6 +257,70 @@ export function buildCode(
   }
 
   return code;
+}
+
+/** Check if any hydra params are mapped in the config. */
+export function hasHydraMapping(config: { left: Record<string, string>; right: Record<string, string> }): boolean {
+  for (const v of Object.values(config.left)) if (HYDRA_IDS.has(v)) return true;
+  for (const v of Object.values(config.right)) if (HYDRA_IDS.has(v)) return true;
+  return false;
+}
+
+/** Hydra code driven by mapped hand parameter values. */
+export function buildHydraCode(p: MusicParams): string {
+  const freq = p.hFreq ?? 10;
+  const sync = p.hSync ?? 0.1;
+  const kaleid = Math.round(p.hKaleid ?? 3);
+  const rot = p.hRotate ?? 0;
+  const colorama = p.hColorama ?? 0.05;
+  const bright = p.hBright ?? 1;
+  const pixel = Math.round(p.hPixel ?? 200);
+  const mod = p.hModulate ?? 0.02;
+  const scale = p.hScale ?? 1;
+  const sat = p.hSaturate ?? 1;
+
+  let code = `osc(${freq.toFixed(1)},${sync.toFixed(2)},1.5)`;
+  if (kaleid > 1) code += `.kaleid(${kaleid})`;
+  if (rot > 0.01) code += `.rotate(${rot.toFixed(3)})`;
+  if (scale !== 1) code += `.scale(${scale.toFixed(2)})`;
+  if (pixel < 190) code += `.pixelate(${pixel},${pixel})`;
+  code += `.color(1,1,1)`;
+  if (bright !== 1) code += `.brightness(${bright.toFixed(2)})`;
+  if (sat !== 1) code += `.saturate(${sat.toFixed(2)})`;
+  if (colorama > 0.01) code += `.colorama(${colorama.toFixed(3)})`;
+  if (mod > 0.005) code += `.modulate(noise(3),${mod.toFixed(3)})`;
+  code += `.out()`;
+  return code;
+}
+
+/** Syntax-highlighted HTML for live hydra code display. */
+export function buildHydraCodeHL(p: MusicParams): string {
+  const freq = p.hFreq ?? 10;
+  const sync = p.hSync ?? 0.1;
+  const kaleid = Math.round(p.hKaleid ?? 3);
+  const rot = p.hRotate ?? 0;
+  const colorama = p.hColorama ?? 0.05;
+  const bright = p.hBright ?? 1;
+  const pixel = Math.round(p.hPixel ?? 200);
+  const mod = p.hModulate ?? 0.02;
+  const scale = p.hScale ?? 1;
+  const sat = p.hSaturate ?? 1;
+
+  const pad = `<span style="padding-left:12px" class="c-dot">.</span>`;
+  const lines: string[] = [
+    `<span class="c-fn">osc</span>(<span class="c-nr">${freq.toFixed(1)}</span>,<span class="c-nr">${sync.toFixed(2)}</span>,<span class="c-nr">1.5</span>)`,
+  ];
+  if (kaleid > 1) lines.push(`${pad}<span class="c-fn">kaleid</span>(<span class="c-nr">${kaleid}</span>)`);
+  if (rot > 0.01) lines.push(`${pad}<span class="c-fn">rotate</span>(<span class="c-nr">${rot.toFixed(3)}</span>)`);
+  if (scale !== 1) lines.push(`${pad}<span class="c-fn">scale</span>(<span class="c-nr">${scale.toFixed(2)}</span>)`);
+  if (pixel < 190) lines.push(`${pad}<span class="c-fn">pixelate</span>(<span class="c-nr">${pixel}</span>,<span class="c-nr">${pixel}</span>)`);
+  lines.push(`${pad}<span class="c-fn">color</span>(<span class="c-nr">1</span>,<span class="c-nr">1</span>,<span class="c-nr">1</span>)`);
+  if (bright !== 1) lines.push(`${pad}<span class="c-fn">brightness</span>(<span class="c-nr">${bright.toFixed(2)}</span>)`);
+  if (sat !== 1) lines.push(`${pad}<span class="c-fn">saturate</span>(<span class="c-nr">${sat.toFixed(2)}</span>)`);
+  if (colorama > 0.01) lines.push(`${pad}<span class="c-fn">colorama</span>(<span class="c-nr">${colorama.toFixed(3)}</span>)`);
+  if (mod > 0.005) lines.push(`${pad}<span class="c-fn">modulate</span>(<span class="c-fn">noise</span>(<span class="c-nr">3</span>),<span class="c-nr">${mod.toFixed(3)}</span>)`);
+  lines.push(`${pad}<span class="c-fn">out</span>()<span class="c-cursor"></span>`);
+  return lines.join("\n");
 }
 
 export function buildCodeHL(

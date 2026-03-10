@@ -269,6 +269,15 @@ body {
   border-color: var(--right);
 }
 
+.config-select-hydra {
+  border-color: color-mix(in srgb, #cc88ff 40%, var(--border));
+  width: 90px;
+}
+
+.config-select-hydra:focus {
+  border-color: #cc88ff;
+}
+
 .config-select option {
   background: var(--bg);
   color: var(--text);
@@ -371,6 +380,72 @@ body {
   50% {
     opacity: 0;
   }
+}
+
+/* ── Hydra Code Display ─────────────────────────────── */
+#hydra-code-wrap {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+#hydra-code-wrap::-webkit-scrollbar { width: 3px; }
+#hydra-code-wrap::-webkit-scrollbar-thumb { background: var(--border); }
+#hydra-code-wrap .c-comment { color: #6a3d9a; }
+#hydra-code-display { white-space: pre-wrap; line-height: 1.6; }
+
+/* ── Hydra Toggle ───────────────────────────────────── */
+.hydra-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.hydra-label {
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: var(--dim);
+  margin-right: 4px;
+}
+
+.hydra-btn {
+  font-family: var(--font);
+  font-size: 8px;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--dim);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.hydra-btn:hover {
+  border-color: var(--dim);
+  color: var(--text);
+}
+
+.hydra-btn-active {
+  border-color: #cc88ff;
+  color: #cc88ff;
+  box-shadow: 0 0 6px rgba(204, 136, 255, 0.2);
+}
+
+/* ── Hydra Canvas ───────────────────────────────────── */
+#hydra-canvas {
+  position: fixed !important;
+  top: 36px !important;
+  left: 0 !important;
+  width: calc(100% - 310px) !important;
+  height: calc(100vh - 36px) !important;
+  z-index: 4;
+  opacity: 0.7;
+  mix-blend-mode: screen;
 }
 
 /* ── Saved Snippets ──────────────────────────────────── */

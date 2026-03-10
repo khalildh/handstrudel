@@ -5,6 +5,9 @@ import {
   MusicParams,
   buildCode,
   buildCodeHL,
+  buildHydraCode,
+  buildHydraCodeHL,
+  hasHydraMapping,
   NOTES,
   NOTE_DISPLAY,
   STRUCTS,
@@ -14,6 +17,7 @@ import {
   HandsState,
   MappingConfig,
   DEFAULT_MAPPING,
+  DEFAULT_HYDRA_MAPPING,
   mapHandsToParams,
   getSaveAxes,
 } from "../lib/hand-mapping";
@@ -32,6 +36,7 @@ export interface SavedSnippet {
 
 interface UIState {
   codeHL: string;
+  hydraCodeHL: string;
   smoothed: MusicParams;
   hands: HandsState;
   noteDisplay: string;
@@ -51,12 +56,14 @@ export default function HandStrudel() {
   );
   const [status, setStatus] = useState("click start");
   const [config, setConfig] = useState<MappingConfig>(DEFAULT_MAPPING);
+  const [hydraConfig, setHydraConfig] = useState<MappingConfig>(DEFAULT_HYDRA_MAPPING);
   const [advanced, setAdvanced] = useState(false);
 
   const defaults = buildDefaultParams(DEFAULT_MAPPING);
   const defaultNI = Math.round(defaults.noteIdx ?? 10);
   const [uiState, setUiState] = useState<UIState>({
     codeHL: buildCodeHL(defaults, 0, DEFAULT_MAPPING),
+    hydraCodeHL: "",
     smoothed: { ...defaults },
     hands: { left: null, right: null },
     noteDisplay: NOTE_DISPLAY[defaultNI],
@@ -68,12 +75,14 @@ export default function HandStrudel() {
   const smoothedRef = useRef<MusicParams>({ ...defaults });
   const handsRef = useRef<HandsState>({ left: null, right: null });
   const configRef = useRef<MappingConfig>(DEFAULT_MAPPING);
+  const hydraConfigRef = useRef<MappingConfig>(DEFAULT_HYDRA_MAPPING);
   const advancedRef = useRef(false);
   const structIdxRef = useRef(0);
   const lastCodeRef = useRef("");
   const evaluateRef = useRef<
     ((code: string) => Promise<unknown>) | null
   >(null);
+  const evalHydraRef = useRef<((code: string) => void) | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const lastBeatRef = useRef(-1);
 
@@ -92,6 +101,11 @@ export default function HandStrudel() {
   const trackPlayingRef = useRef(false);
   const [track, setTrack] = useState<{ slots: number[]; speed: number }>({ slots: [], speed: 1 });
   const [trackPlaying, setTrackPlaying] = useState(false);
+
+  // Hydra visuals
+  const hydraEnabledRef = useRef(false);
+  const [hydraEnabled, setHydraEnabled] = useState(false);
+  const lastHydraCodeRef = useRef("");
 
   // DOM refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -182,14 +196,34 @@ export default function HandStrudel() {
     }
   }, []);
 
-  const handleStart = useCallback(async (cfg: MappingConfig, adv: boolean) => {
+  const handleHydraToggle = useCallback(() => {
+    const next = !hydraEnabledRef.current;
+    hydraEnabledRef.current = next;
+    setHydraEnabled(next);
+    const c = document.getElementById("hydra-canvas");
+    if (!next) {
+      lastHydraCodeRef.current = "";
+      // Clear the Hydra canvas by rendering black
+      evalHydraRef.current?.("solid(0,0,0,0).out()");
+      if (c) (c as HTMLCanvasElement).style.display = "none";
+    } else {
+      if (c) (c as HTMLCanvasElement).style.display = "";
+      lastHydraCodeRef.current = ""; // force re-eval
+    }
+  }, []);
+
+  const handleStart = useCallback(async (cfg: MappingConfig, hCfg: MappingConfig, adv: boolean) => {
     setConfig(cfg);
+    setHydraConfig(hCfg);
     setAdvanced(adv);
     configRef.current = cfg;
+    hydraConfigRef.current = hCfg;
     advancedRef.current = adv;
 
-    // Reset params for chosen config
-    const defs = buildDefaultParams(cfg);
+    // Reset params for chosen config (merge music + hydra defaults)
+    const musicDefs = buildDefaultParams(cfg);
+    const hydraDefs = buildDefaultParams(hCfg);
+    const defs = { ...musicDefs, ...hydraDefs };
     paramsRef.current = { ...defs };
     smoothedRef.current = { ...defs };
 
@@ -200,8 +234,9 @@ export default function HandStrudel() {
     setStatus("initialising strudel…");
 
     try {
-      const { evaluate, audioCtx } = await initializeStrudel();
+      const { evaluate, evalHydra, audioCtx } = await initializeStrudel();
       evaluateRef.current = evaluate;
+      evalHydraRef.current = evalHydra;
       audioCtxRef.current = audioCtx;
 
       const initCode = buildCode(paramsRef.current, structIdxRef.current, cfg);
@@ -219,7 +254,10 @@ export default function HandStrudel() {
         videoRef.current,
         canvasRef.current,
         handsRef,
-        () => mapHandsToParams(handsRef.current, paramsRef.current, configRef.current),
+        () => {
+          mapHandsToParams(handsRef.current, paramsRef.current, configRef.current);
+          mapHandsToParams(handsRef.current, paramsRef.current, hydraConfigRef.current);
+        },
       );
 
       setStatus("running — wave your hands");
@@ -234,6 +272,7 @@ export default function HandStrudel() {
       const loop = () => {
         smoothParams(paramsRef.current, smoothedRef.current);
         mapHandsToParams(handsRef.current, paramsRef.current, configRef.current);
+        mapHandsToParams(handsRef.current, paramsRef.current, hydraConfigRef.current);
 
         // Beat flash (direct DOM for performance)
         const ctx = audioCtxRef.current;
@@ -270,6 +309,15 @@ export default function HandStrudel() {
             evaluateRef
               .current?.(code)
               .catch((e: unknown) => console.warn("eval:", e));
+          }
+
+          // Hydra visuals (evaluated separately in global scope)
+          if (hydraEnabledRef.current) {
+            const hydraCode = buildHydraCode(smoothedRef.current);
+            if (hydraCode !== lastHydraCodeRef.current) {
+              lastHydraCodeRef.current = hydraCode;
+              evalHydraRef.current?.(hydraCode);
+            }
           }
         }
 
@@ -311,6 +359,7 @@ export default function HandStrudel() {
         );
         setUiState({
           codeHL: buildCodeHL(s, structIdxRef.current, configRef.current),
+          hydraCodeHL: hydraEnabledRef.current ? buildHydraCodeHL(s) : "",
           smoothed: s,
           hands: { ...handsRef.current },
           noteDisplay: NOTE_DISPLAY[ni],
@@ -348,6 +397,7 @@ export default function HandStrudel() {
       </CameraView>
       <Sidebar
         codeHL={uiState.codeHL}
+        hydraCodeHL={uiState.hydraCodeHL}
         smoothed={uiState.smoothed}
         hands={uiState.hands}
         noteDisplay={uiState.noteDisplay}
@@ -363,6 +413,9 @@ export default function HandStrudel() {
         onRemoveFromTrack={handleRemoveFromTrack}
         onTrackSpeedChange={handleTrackSpeedChange}
         onToggleTrackPlay={handleToggleTrackPlay}
+        hydraEnabled={hydraEnabled}
+        hydraAvailable={hasHydraMapping(hydraConfig)}
+        onHydraToggle={handleHydraToggle}
       />
     </div>
   );

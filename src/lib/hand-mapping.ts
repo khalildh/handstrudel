@@ -63,6 +63,11 @@ export const DEFAULT_MAPPING: MappingConfig = {
   right: { y: "gain",    x: "bpm",  spread: "delay" },
 };
 
+export const DEFAULT_HYDRA_MAPPING: MappingConfig = {
+  left:  { y: "none", x: "none", spread: "none" },
+  right: { y: "none", x: "none", spread: "none" },
+};
+
 export const DEFAULT_ADVANCED_MAPPING: MappingConfig = {
   left: {
     y: "noteIdx", x: "lpf", spread: "reverb",
@@ -73,6 +78,21 @@ export const DEFAULT_ADVANCED_MAPPING: MappingConfig = {
   right: {
     y: "gain", x: "bpm", spread: "delay",
     pinch: "hpf", fist: "attack", rotation: "release",
+    thumbCurl: "none", indexCurl: "none", middleCurl: "none",
+    ringCurl: "none", pinkyCurl: "none",
+  },
+};
+
+export const DEFAULT_ADVANCED_HYDRA_MAPPING: MappingConfig = {
+  left: {
+    y: "none", x: "none", spread: "none",
+    pinch: "none", fist: "none", rotation: "none",
+    thumbCurl: "none", indexCurl: "none", middleCurl: "none",
+    ringCurl: "none", pinkyCurl: "none",
+  },
+  right: {
+    y: "none", x: "none", spread: "none",
+    pinch: "none", fist: "none", rotation: "none",
     thumbCurl: "none", indexCurl: "none", middleCurl: "none",
     ringCurl: "none", pinkyCurl: "none",
   },

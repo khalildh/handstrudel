@@ -8,6 +8,7 @@ import type { SavedSnippet } from "./HandStrudel";
 
 interface SidebarProps {
   codeHL: string;
+  hydraCodeHL: string;
   smoothed: MusicParams;
   hands: HandsState;
   noteDisplay: string;
@@ -23,6 +24,9 @@ interface SidebarProps {
   onRemoveFromTrack: (slotIdx: number) => void;
   onTrackSpeedChange: (speed: number) => void;
   onToggleTrackPlay: () => void;
+  hydraEnabled: boolean;
+  hydraAvailable: boolean;
+  onHydraToggle: () => void;
 }
 
 function paramRow(id: string, value: number) {
@@ -40,6 +44,7 @@ function buildParamRows(sideConfig: Record<string, string>, smoothed: MusicParam
 
 export default function Sidebar({
   codeHL,
+  hydraCodeHL,
   smoothed,
   hands,
   noteDisplay,
@@ -55,6 +60,9 @@ export default function Sidebar({
   onRemoveFromTrack,
   onTrackSpeedChange,
   onToggleTrackPlay,
+  hydraEnabled,
+  hydraAvailable,
+  onHydraToggle,
 }: SidebarProps) {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
@@ -74,6 +82,28 @@ export default function Sidebar({
           dangerouslySetInnerHTML={{ __html: codeHL }}
         />
       </div>
+
+      {hydraCodeHL && (
+        <div id="hydra-code-wrap">
+          <div className="c-comment">{"// live-generated hydra"}</div>
+          <div
+            id="hydra-code-display"
+            dangerouslySetInnerHTML={{ __html: hydraCodeHL }}
+          />
+        </div>
+      )}
+
+      {hydraAvailable && (
+        <div className="hydra-toggle">
+          <span className="hydra-label">HYDRA</span>
+          <button
+            className={`hydra-btn${hydraEnabled ? " hydra-btn-active" : ""}`}
+            onClick={onHydraToggle}
+          >
+            {hydraEnabled ? "on" : "off"}
+          </button>
+        </div>
+      )}
 
       {savedSnippets.length > 0 && (
         <div className="saved-list">
