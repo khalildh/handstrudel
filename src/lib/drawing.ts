@@ -17,24 +17,29 @@ export function drawHand(
   const x = (i: number) => (1 - lm[i].x) * W;
   const y = (i: number) => lm[i].y * H;
 
-  ctx.shadowBlur = 8;
-  ctx.shadowColor = color;
   ctx.strokeStyle = color + "55";
   ctx.lineWidth = 1.5;
 
+  // Draw all connections as a single path (avoids per-segment beginPath/stroke overhead)
+  ctx.beginPath();
   for (const [a, b] of HAND_CONNECTIONS) {
-    ctx.beginPath();
     ctx.moveTo(x(a), y(a));
     ctx.lineTo(x(b), y(b));
-    ctx.stroke();
   }
+  ctx.stroke();
 
-  ctx.shadowBlur = 10;
-  for (let i = 0; i < lm.length; i++) {
-    ctx.beginPath();
-    ctx.arc(x(i), y(i), i === 0 ? 5 : i % 4 === 0 ? 3.5 : 2, 0, Math.PI * 2);
-    ctx.fillStyle = i === 0 ? color : color + "aa";
-    ctx.fill();
+  // Batch landmark dots — single fill call per color
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x(0), y(0), 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = color + "aa";
+  ctx.beginPath();
+  for (let i = 1; i < lm.length; i++) {
+    const r = i % 4 === 0 ? 3.5 : 2;
+    ctx.moveTo(x(i) + r, y(i));
+    ctx.arc(x(i), y(i), r, 0, Math.PI * 2);
   }
-  ctx.shadowBlur = 0;
+  ctx.fill();
 }

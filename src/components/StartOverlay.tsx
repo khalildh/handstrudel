@@ -9,7 +9,13 @@ import {
   DEFAULT_ADVANCED_HYDRA_MAPPING,
   AXIS_DEFS,
 } from "../lib/hand-mapping";
-import { useState } from "react";
+import { useState, useRef } from "react";
+
+interface MappingPreset {
+  config: MappingConfig;
+  hydraConfig: MappingConfig;
+  advanced: boolean;
+}
 
 interface StartOverlayProps {
   onStart: (config: MappingConfig, hydraConfig: MappingConfig, advanced: boolean) => void;
@@ -67,6 +73,43 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
     }));
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    const preset: MappingPreset = { config, hydraConfig, advanced };
+    const blob = new Blob([JSON.stringify(preset, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "handstrudel-preset.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const preset = JSON.parse(reader.result as string) as MappingPreset;
+        if (preset.config?.left && preset.config?.right) {
+          setConfig(preset.config);
+        }
+        if (preset.hydraConfig?.left && preset.hydraConfig?.right) {
+          setHydraConfig(preset.hydraConfig);
+        }
+        if (typeof preset.advanced === "boolean") {
+          setAdvanced(preset.advanced);
+        }
+      } catch {
+        console.warn("Invalid preset file");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // allow re-importing same file
+  };
+
   const axes = advanced ? AXIS_DEFS : AXIS_DEFS.filter((a) => a.basic);
 
   return (
@@ -121,6 +164,18 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
             ))}
           </div>
         ))}
+      </div>
+
+      <div className="preset-actions">
+        <button className="preset-btn" onClick={handleExport}>export</button>
+        <button className="preset-btn" onClick={() => fileInputRef.current?.click()}>import</button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          style={{ display: "none" }}
+          onChange={handleImport}
+        />
       </div>
 
       <button id="start-btn" onClick={() => onStart(config, hydraConfig, advanced)}>

@@ -101,23 +101,11 @@ body {
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
-  filter: grayscale(0.7) brightness(0.4);
+  opacity: 0.35;
 }
 
-#cam-area::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 2px,
-    rgba(0, 0, 0, 0.12) 2px,
-    rgba(0, 0, 0, 0.12) 4px
-  );
-  pointer-events: none;
-  z-index: 5;
-}
+/* Scanline overlay disabled for performance — GPU composites this every frame */
+/* #cam-area::after { ... } */
 
 #overlay {
   position: absolute;
@@ -163,6 +151,30 @@ body {
 #start-btn:hover {
   background: rgba(0, 255, 157, 0.08);
   box-shadow: 0 0 20px rgba(0, 255, 157, 0.2);
+}
+
+/* ── Preset Export/Import ─────────────────────────────── */
+.preset-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.preset-btn {
+  font-family: var(--font);
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.preset-btn:hover {
+  color: var(--text);
+  border-color: var(--dim);
 }
 
 /* ── Advanced Toggle ──────────────────────────────────── */
@@ -465,11 +477,36 @@ body {
   background: var(--border);
 }
 
+.saved-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
 .saved-title {
   font-size: 8px;
   letter-spacing: 3px;
   color: var(--dim);
-  margin-bottom: 6px;
+  margin-right: auto;
+}
+
+.saved-io-btn {
+  font-family: var(--font);
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: var(--dim);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.saved-io-btn:hover {
+  color: var(--text);
+  border-color: var(--dim);
 }
 
 .saved-item {
@@ -817,12 +854,10 @@ body {
 
 .lh .pfill {
   background: var(--left);
-  box-shadow: 0 0 4px var(--left);
 }
 
 .rh .pfill {
   background: var(--right);
-  box-shadow: 0 0 4px var(--right);
 }
 
 .pfill::after {
@@ -838,12 +873,10 @@ body {
 
 .lh .pfill::after {
   background: var(--left);
-  box-shadow: 0 0 5px var(--left);
 }
 
 .rh .pfill::after {
   background: var(--right);
-  box-shadow: 0 0 5px var(--right);
 }
 
 .pval {

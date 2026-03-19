@@ -116,6 +116,11 @@ export default function HandStrudel() {
   const uiTimerRef = useRef(0);
   const structTimerRef = useRef(0);
 
+  const handleImportSnippets = useCallback((snippets: SavedSnippet[]) => {
+    savedSnippetsRef.current = [...savedSnippetsRef.current, ...snippets];
+    setSavedSnippets(savedSnippetsRef.current);
+  }, []);
+
   const handlePlaySnippet = useCallback((idx: number) => {
     // Stop track playback
     if (trackPlayingRef.current) {
@@ -268,11 +273,9 @@ export default function HandStrudel() {
           (structIdxRef.current + 1) % STRUCTS.length;
       }, 8000);
 
-      // 60fps animation loop
+      // 60fps animation loop (mapHandsToParams runs in MediaPipe callback, not here)
       const loop = () => {
         smoothParams(paramsRef.current, smoothedRef.current);
-        mapHandsToParams(handsRef.current, paramsRef.current, configRef.current);
-        mapHandsToParams(handsRef.current, paramsRef.current, hydraConfigRef.current);
 
         // Beat flash (direct DOM for performance)
         const ctx = audioCtxRef.current;
@@ -416,6 +419,7 @@ export default function HandStrudel() {
         hydraEnabled={hydraEnabled}
         hydraAvailable={hasHydraMapping(hydraConfig)}
         onHydraToggle={handleHydraToggle}
+        onImportSnippets={handleImportSnippets}
       />
     </div>
   );

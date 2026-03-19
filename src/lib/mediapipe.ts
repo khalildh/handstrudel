@@ -61,17 +61,17 @@ export async function initializeMediaPipe(
 
   hands.setOptions({
     maxNumHands: 2,
-    modelComplexity: 1,
+    modelComplexity: 0,
     minDetectionConfidence: 0.65,
     minTrackingConfidence: 0.5,
   });
 
   hands.onResults((res: HandResult) => {
-    const drawCtx = canvasEl.getContext("2d")!;
     const W = videoEl.videoWidth || 640;
     const H = videoEl.videoHeight || 480;
-    canvasEl.width = W;
-    canvasEl.height = H;
+    if (canvasEl.width !== W) canvasEl.width = W;
+    if (canvasEl.height !== H) canvasEl.height = H;
+    const drawCtx = canvasEl.getContext("2d")!;
     drawCtx.clearRect(0, 0, W, H);
 
     handsRef.current = { left: null, right: null };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { MusicParams, PARAM_MAP, NOTES, NOTE_DISPLAY } from "../lib/music";
 import { HandsState, MappingConfig } from "../lib/hand-mapping";
 import HandPanel from "./HandPanel";
@@ -27,6 +27,7 @@ interface SidebarProps {
   hydraEnabled: boolean;
   hydraAvailable: boolean;
   onHydraToggle: () => void;
+  onImportSnippets: (snippets: SavedSnippet[]) => void;
 }
 
 function paramRow(id: string, value: number) {
@@ -63,14 +64,44 @@ export default function Sidebar({
   hydraEnabled,
   hydraAvailable,
   onHydraToggle,
+  onImportSnippets,
 }: SidebarProps) {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const handleCopy = (code: string, idx: number) => {
     navigator.clipboard.writeText(code).then(() => {
       setCopiedIdx(idx);
       setTimeout(() => setCopiedIdx(null), 600);
     });
+  };
+
+  const handleExportSnippets = () => {
+    const blob = new Blob([JSON.stringify(savedSnippets, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "handstrudel-snippets.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportSnippets = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string);
+        if (Array.isArray(data) && data.every((s) => s.code && s.timestamp)) {
+          onImportSnippets(data);
+        }
+      } catch {
+        console.warn("Invalid snippets file");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   };
 
   return (
@@ -105,9 +136,17 @@ export default function Sidebar({
         </div>
       )}
 
-      {savedSnippets.length > 0 && (
-        <div className="saved-list">
-          <div className="saved-title">💾 SAVED</div>
+      <div className="saved-list">
+        <div className="saved-header">
+          <span className="saved-title">💾 SAVED</span>
+          <button className="saved-io-btn" onClick={() => importRef.current?.click()}>import</button>
+          <input ref={importRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleImportSnippets} />
+          {savedSnippets.length > 0 && (
+            <button className="saved-io-btn" onClick={handleExportSnippets}>export</button>
+          )}
+        </div>
+        {savedSnippets.length > 0 && (
+          <>
           {savedSnippets.map((s, i) => (
             <div
               key={s.timestamp}
@@ -133,8 +172,9 @@ export default function Sidebar({
               </span>
             </div>
           ))}
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
       {savedSnippets.length > 0 && (
         <div className="track-builder">
