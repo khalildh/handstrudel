@@ -5,6 +5,14 @@ export const NOTES = [
   "c5", "d5", "e5",
 ];
 
+/** MIDI note numbers corresponding to each entry in NOTES (for signal-based playback). */
+export const MIDI_NOTES = [
+  36, 38, 40, 43, 45,
+  48, 50, 52, 55, 57,
+  60, 62, 64, 67, 69,
+  72, 74, 76,
+];
+
 export const NOTE_DISPLAY = NOTES.map((n) => n[0].toUpperCase() + n.slice(1));
 
 export const STRUCTS = [
@@ -323,17 +331,14 @@ export function buildHydraCodeHL(p: MusicParams): string {
   return lines.join("\n");
 }
 
-/** Build code using signal() for continuous params — evaluated once, params update via __hp global. */
+/** Build code using signal() for all params — evaluated once per struct change, params update via __hp global. */
 export function buildSignalCode(
-  p: MusicParams,
   structIdx: number,
   config: { left: Record<string, string>; right: Record<string, string> },
 ): string {
-  const ni = Math.max(0, Math.min(NOTES.length - 1, Math.round(p.noteIdx ?? 10)));
-  const note = NOTES[ni];
   const st = STRUCTS[structIdx];
 
-  let code = `note("${note}").s("sawtooth").struct("${st}").cpm(signal(() => __hp._cpm))`;
+  let code = `note(signal(() => __hp._midi)).s("sawtooth").struct("${st}").cpm(signal(() => __hp._cpm))`;
 
   for (const id of extraParamIds(config)) {
     const def = PARAM_MAP[id];
@@ -344,10 +349,9 @@ export function buildSignalCode(
   return code;
 }
 
-/** Key for detecting when structural re-eval is needed (note or rhythm change). */
-export function getStructuralKey(p: MusicParams, structIdx: number): string {
-  const ni = Math.max(0, Math.min(NOTES.length - 1, Math.round(p.noteIdx ?? 10)));
-  return `${ni}:${structIdx}`;
+/** Key for detecting when structural re-eval is needed (only rhythm pattern changes). */
+export function getStructuralKey(structIdx: number): string {
+  return String(structIdx);
 }
 
 /** Update the global __hp object with current smoothed param values (zero-cost, no re-eval). */
@@ -357,6 +361,8 @@ export function updateSignalParams(
 ): void {
   const hp = (globalThis as Record<string, unknown>).__hp as Record<string, number> | undefined;
   if (!hp) return;
+  const ni = Math.max(0, Math.min(NOTES.length - 1, Math.round(p.noteIdx ?? 10)));
+  hp._midi = MIDI_NOTES[ni];
   hp._cpm = (p.bpm ?? 120) / 4;
   for (const id of extraParamIds(config)) {
     const def = PARAM_MAP[id];

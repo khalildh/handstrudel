@@ -250,11 +250,11 @@ export default function HandStrudel() {
 
       // Initialize signal params and evaluate signal-based code once
       updateSignalParams(paramsRef.current, cfg);
-      const initCode = buildSignalCode(paramsRef.current, structIdxRef.current, cfg);
+      const initCode = buildSignalCode(structIdxRef.current, cfg);
       console.log("Initial code (signal-based):", initCode);
       await evaluate(initCode);
       lastCodeRef.current = initCode;
-      lastStructKeyRef.current = getStructuralKey(paramsRef.current, structIdxRef.current);
+      lastStructKeyRef.current = getStructuralKey(structIdxRef.current);
 
       setStatus("requesting camera…");
 
@@ -311,12 +311,11 @@ export default function HandStrudel() {
         if (playingSetRef.current.size === 0 && !trackPlayingRef.current) {
           updateSignalParams(smoothedRef.current, configRef.current);
 
-          // Only re-eval when structural params change (note or rhythm pattern)
-          const structKey = getStructuralKey(smoothedRef.current, structIdxRef.current);
+          // Only re-eval when struct pattern rotates (every 8s)
+          const structKey = getStructuralKey(structIdxRef.current);
           if (structKey !== lastStructKeyRef.current) {
             lastStructKeyRef.current = structKey;
             const code = buildSignalCode(
-              smoothedRef.current,
               structIdxRef.current,
               configRef.current,
             );
