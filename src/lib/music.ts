@@ -323,6 +323,47 @@ export function buildHydraCodeHL(p: MusicParams): string {
   return lines.join("\n");
 }
 
+/** Build code using signal() for continuous params — evaluated once, params update via __hp global. */
+export function buildSignalCode(
+  p: MusicParams,
+  structIdx: number,
+  config: { left: Record<string, string>; right: Record<string, string> },
+): string {
+  const ni = Math.max(0, Math.min(NOTES.length - 1, Math.round(p.noteIdx ?? 10)));
+  const note = NOTES[ni];
+  const st = STRUCTS[structIdx];
+
+  let code = `note("${note}").s("sawtooth").struct("${st}").cpm(signal(() => __hp._cpm))`;
+
+  for (const id of extraParamIds(config)) {
+    const def = PARAM_MAP[id];
+    if (!def) continue;
+    code += `.${def.strudelKey}(signal(() => __hp.${id}))`;
+  }
+
+  return code;
+}
+
+/** Key for detecting when structural re-eval is needed (note or rhythm change). */
+export function getStructuralKey(p: MusicParams, structIdx: number): string {
+  const ni = Math.max(0, Math.min(NOTES.length - 1, Math.round(p.noteIdx ?? 10)));
+  return `${ni}:${structIdx}`;
+}
+
+/** Update the global __hp object with current smoothed param values (zero-cost, no re-eval). */
+export function updateSignalParams(
+  p: MusicParams,
+  config: { left: Record<string, string>; right: Record<string, string> },
+): void {
+  const hp = (globalThis as Record<string, unknown>).__hp as Record<string, number> | undefined;
+  if (!hp) return;
+  hp._cpm = (p.bpm ?? 120) / 4;
+  for (const id of extraParamIds(config)) {
+    const def = PARAM_MAP[id];
+    if (def) hp[id] = p[id] ?? def.default;
+  }
+}
+
 export function buildCodeHL(
   p: MusicParams,
   structIdx: number,

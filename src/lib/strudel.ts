@@ -85,5 +85,8 @@ export async function initializeStrudel() {
     }
   };
 
+  // Global object for signal-based parameter updates (mutated at 60fps, read by Strudel scheduler)
+  (globalThis as Record<string, unknown>).__hp = {};
+
   return { evaluate, evalHydra, start, stop, audioCtx };
 }

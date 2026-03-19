@@ -5,6 +5,9 @@ import {
   MusicParams,
   buildCode,
   buildCodeHL,
+  buildSignalCode,
+  getStructuralKey,
+  updateSignalParams,
   buildHydraCode,
   buildHydraCodeHL,
   hasHydraMapping,
@@ -79,6 +82,7 @@ export default function HandStrudel() {
   const advancedRef = useRef(false);
   const structIdxRef = useRef(0);
   const lastCodeRef = useRef("");
+  const lastStructKeyRef = useRef("");
   const evaluateRef = useRef<
     ((code: string) => Promise<unknown>) | null
   >(null);
@@ -138,8 +142,8 @@ export default function HandStrudel() {
     setPlayingSet(new Set(set));
 
     if (set.size === 0) {
-      // Resume live code
-      lastCodeRef.current = ""; // force re-eval on next frame
+      // Resume live signal-based code
+      lastStructKeyRef.current = ""; // force re-eval on next frame
     } else {
       // Evaluate single or stacked snippets
       const codes = Array.from(set)
@@ -168,7 +172,7 @@ export default function HandStrudel() {
     if (slots.length === 0 && trackPlayingRef.current) {
       trackPlayingRef.current = false;
       setTrackPlaying(false);
-      lastCodeRef.current = "";
+      lastStructKeyRef.current = ""; // force re-eval on resume
     } else if (trackPlayingRef.current) {
       const code = buildTrackCode(slots, trackRef.current.speed, savedSnippetsRef.current);
       if (code) evaluateRef.current?.(code).catch((e: unknown) => console.warn("eval:", e));
@@ -189,7 +193,7 @@ export default function HandStrudel() {
     if (trackPlayingRef.current) {
       trackPlayingRef.current = false;
       setTrackPlaying(false);
-      lastCodeRef.current = "";
+      lastStructKeyRef.current = ""; // force re-eval on resume
     } else {
       if (trackRef.current.slots.length === 0) return;
       playingSetRef.current = new Set();
@@ -244,10 +248,13 @@ export default function HandStrudel() {
       evalHydraRef.current = evalHydra;
       audioCtxRef.current = audioCtx;
 
-      const initCode = buildCode(paramsRef.current, structIdxRef.current, cfg);
-      console.log("Initial code:", initCode);
+      // Initialize signal params and evaluate signal-based code once
+      updateSignalParams(paramsRef.current, cfg);
+      const initCode = buildSignalCode(paramsRef.current, structIdxRef.current, cfg);
+      console.log("Initial code (signal-based):", initCode);
       await evaluate(initCode);
       lastCodeRef.current = initCode;
+      lastStructKeyRef.current = getStructuralKey(paramsRef.current, structIdxRef.current);
 
       setStatus("requesting camera…");
 
@@ -300,14 +307,19 @@ export default function HandStrudel() {
           }
         }
 
-        // Eval on change (skip when playing saved snippets)
+        // Update signal params (near-zero cost — just writes to __hp global)
         if (playingSetRef.current.size === 0 && !trackPlayingRef.current) {
-          const code = buildCode(
-            smoothedRef.current,
-            structIdxRef.current,
-            configRef.current,
-          );
-          if (code !== lastCodeRef.current) {
+          updateSignalParams(smoothedRef.current, configRef.current);
+
+          // Only re-eval when structural params change (note or rhythm pattern)
+          const structKey = getStructuralKey(smoothedRef.current, structIdxRef.current);
+          if (structKey !== lastStructKeyRef.current) {
+            lastStructKeyRef.current = structKey;
+            const code = buildSignalCode(
+              smoothedRef.current,
+              structIdxRef.current,
+              configRef.current,
+            );
             lastCodeRef.current = code;
             evaluateRef
               .current?.(code)
@@ -335,8 +347,9 @@ export default function HandStrudel() {
           const armKey = `${side}:${axisKey}`;
           const armed = saveArmedRef.current.get(armKey) ?? true;
           if (raw > 0.8 && armed && now - lastSaveTimeRef.current > 1000) {
+            // Capture literal code (not signal refs) for self-contained playback
             const snippet: SavedSnippet = {
-              code: lastCodeRef.current,
+              code: buildCode(smoothedRef.current, structIdxRef.current, configRef.current),
               timestamp: Date.now(),
               bpm: Math.round(smoothedRef.current.bpm ?? 120),
             };
