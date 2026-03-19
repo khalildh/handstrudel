@@ -13,7 +13,7 @@ export function buildDefaultParams(config: MappingConfig): MusicParams {
   return params;
 }
 
-const ALPHA = 0.1;
+const ALPHA = 0.35;
 
 export function smoothParams(
   target: MusicParams,
