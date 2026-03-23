@@ -87,6 +87,86 @@ body {
   box-shadow: 0 0 6px var(--right);
 }
 
+/* ── Recording Controls ─────────────────────────────── */
+#rec-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rec-aspect {
+  font-family: var(--font);
+  font-size: 9px;
+  letter-spacing: 1px;
+  background: var(--bg);
+  color: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 3px 6px;
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.rec-aspect:hover {
+  color: var(--text);
+  border-color: var(--dim);
+}
+
+.rec-aspect option {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.rec-btn {
+  font-family: var(--font);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 3px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+
+.rec-btn:hover {
+  color: #ff4444;
+  border-color: #ff4444;
+}
+
+.rec-btn-active {
+  color: #ff4444;
+  border-color: #ff4444;
+  box-shadow: 0 0 8px rgba(255, 68, 68, 0.2);
+}
+
+.rec-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff4444;
+  flex-shrink: 0;
+}
+
+.rec-btn:not(.rec-btn-active) .rec-dot {
+  background: var(--dim);
+}
+
+.rec-btn-active .rec-dot {
+  animation: rec-pulse 1s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 /* ── Camera ──────────────────────────────────────────── */
 #cam-area {
   position: relative;

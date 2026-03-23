@@ -26,6 +26,7 @@ import {
 } from "../lib/hand-mapping";
 import { initializeStrudel } from "../lib/strudel";
 import { initializeMediaPipe } from "../lib/mediapipe";
+import { createRecorder, downloadBlob, type Recorder, type AspectRatio } from "../lib/recorder";
 import StartOverlay from "./StartOverlay";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
@@ -110,6 +111,15 @@ export default function HandStrudel() {
   const hydraEnabledRef = useRef(false);
   const [hydraEnabled, setHydraEnabled] = useState(false);
   const lastHydraCodeRef = useRef("");
+
+  // Video recording
+  const recorderRef = useRef<Recorder | null>(null);
+  const recordingDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const recTimerRef = useRef(0);
+  const [recording, setRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingAspect, setRecordingAspect] = useState<AspectRatio>("16:9");
+  const [canRecord, setCanRecord] = useState(false);
 
   // DOM refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -221,6 +231,37 @@ export default function HandStrudel() {
     }
   }, []);
 
+  const handleToggleRecording = useCallback(() => {
+    if (recording) {
+      // Stop recording
+      clearInterval(recTimerRef.current);
+      recorderRef.current?.stop().then((blob) => {
+        const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        downloadBlob(blob, `handstrudel-${ts}.webm`);
+        recorderRef.current = null;
+      });
+      setRecording(false);
+      setRecordingTime(0);
+    } else {
+      // Start recording
+      if (!videoRef.current || !canvasRef.current || !audioCtxRef.current || !recordingDestRef.current) return;
+      const rec = createRecorder({
+        video: videoRef.current,
+        overlay: canvasRef.current,
+        audioStream: recordingDestRef.current.stream,
+        aspect: recordingAspect,
+      });
+      recorderRef.current = rec;
+      rec.start();
+      setRecording(true);
+      setRecordingTime(0);
+      const start = Date.now();
+      recTimerRef.current = window.setInterval(() => {
+        setRecordingTime(Math.floor((Date.now() - start) / 1000));
+      }, 1000);
+    }
+  }, [recording, recordingAspect]);
+
   const handleStart = useCallback(async (cfg: MappingConfig, hCfg: MappingConfig, adv: boolean) => {
     setConfig(cfg);
     setHydraConfig(hCfg);
@@ -243,10 +284,11 @@ export default function HandStrudel() {
     setStatus("initialising strudel…");
 
     try {
-      const { evaluate, evalHydra, audioCtx } = await initializeStrudel();
+      const { evaluate, evalHydra, audioCtx, recordingDest } = await initializeStrudel();
       evaluateRef.current = evaluate;
       evalHydraRef.current = evalHydra;
       audioCtxRef.current = audioCtx;
+      recordingDestRef.current = recordingDest;
 
       // Initialize signal params and evaluate signal-based code once
       updateSignalParams(paramsRef.current, cfg);
@@ -273,6 +315,7 @@ export default function HandStrudel() {
       );
 
       setStatus("running — wave your hands");
+      setCanRecord(true);
 
       // Rotate struct every 8s
       structTimerRef.current = window.setInterval(() => {
@@ -396,12 +439,21 @@ export default function HandStrudel() {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (uiTimerRef.current) clearInterval(uiTimerRef.current);
       if (structTimerRef.current) clearInterval(structTimerRef.current);
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
     };
   }, []);
 
   return (
     <div id="app">
-      <Header status={status} />
+      <Header
+        status={status}
+        canRecord={canRecord}
+        recording={recording}
+        recordingTime={recordingTime}
+        recordingAspect={recordingAspect}
+        onToggleRecording={handleToggleRecording}
+        onAspectChange={setRecordingAspect}
+      />
       <CameraView videoRef={videoRef} canvasRef={canvasRef}>
         {overlay !== "hidden" && (
           <StartOverlay

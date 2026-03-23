@@ -40,6 +40,30 @@ export async function initializeStrudel() {
   await initAudio();
   const audioCtx = getAudioContext();
 
+  // Audio tap for video recording: intercept all connections to audioCtx.destination
+  // and mirror them to a MediaStreamAudioDestinationNode so we can capture audio.
+  const recordingDest = audioCtx.createMediaStreamDestination();
+  const origConnect = AudioNode.prototype.connect as (
+    this: AudioNode,
+    destinationNode: AudioNode,
+    output?: number,
+    input?: number,
+  ) => AudioNode;
+  AudioNode.prototype.connect = function (
+    this: AudioNode,
+    ...connectArgs: [AudioNode, number?, number?] | [AudioParam, number?]
+  ): AudioNode | void {
+    const result = origConnect.apply(this, connectArgs as [AudioNode, number?, number?]);
+    if (connectArgs[0] === audioCtx.destination) {
+      try {
+        origConnect.call(this, recordingDest);
+      } catch {
+        /* already connected or incompatible — ignore */
+      }
+    }
+    return result;
+  } as typeof AudioNode.prototype.connect;
+
   // Initialize Hydra visual synthesis via CDN (avoids SSR/build issues)
   await loadScript("https://unpkg.com/hydra-synth");
   const sidebarW = 310;
@@ -88,5 +112,5 @@ export async function initializeStrudel() {
   // Global object for signal-based parameter updates (mutated at 60fps, read by Strudel scheduler)
   (globalThis as Record<string, unknown>).__hp = {};
 
-  return { evaluate, evalHydra, start, stop, audioCtx };
+  return { evaluate, evalHydra, start, stop, audioCtx, recordingDest };
 }
