@@ -245,25 +245,33 @@ struct DrumLoop: Identifiable {
     let code: String  // Strudel code for the drum pattern
 }
 
-// Synth-based drums — distinct timbres, punchy, won't get buried
-let _kick = "note(\"c1\").s(\"sine\").decay(0.2).sustain(0).gain(1.2).lpf(200)"
-let _snare = "note(\"g3\").s(\"sawtooth\").decay(0.1).sustain(0).gain(0.9).hpf(800).lpf(5000).crush(6)"
-let _hat = "note(\"c6\").s(\"square\").decay(0.02).sustain(0).gain(0.5).hpf(8000)"
-let _clap = "note(\"e4\").s(\"sawtooth\").decay(0.12).sustain(0).gain(0.8).hpf(1200).crush(4)"
-let _rim = "note(\"a4\").s(\"triangle\").decay(0.03).sustain(0).gain(0.7).hpf(3000)"
+// Drum loops using real samples from Dirt-Samples + drum machine banks
+// Each genre uses a different drum machine and distinct rhythmic pattern
+// Fallback synth versions appended after "||" won't work in Strudel,
+// so we rely on samples loading. If they don't load, drums will be silent.
 
 let DRUM_LOOPS: [DrumLoop] = [
     DrumLoop(id: "none", name: "None", emoji: "🔇", code: ""),
+
+    // Basic rock beat — standard kit
     DrumLoop(id: "basic", name: "Basic", emoji: "🥁",
-             code: "stack(\(_kick).struct(\"x ~ x ~\"), \(_clap).struct(\"~ x ~ x\"), \(_hat).struct(\"x x x x\"))"),
+             code: "stack(s(\"bd ~ bd ~\").gain(1.2), s(\"~ sd ~ sd\").gain(0.9), s(\"hh hh hh hh\").gain(0.5))"),
+
+    // Hip Hop — 808 boom bap, syncopated kick, snare on 2&4, open hats
     DrumLoop(id: "hiphop", name: "Hip Hop", emoji: "🎤",
-             code: "stack(\(_kick).struct(\"x ~ ~ x ~ ~ x ~\"), \(_clap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_hat).struct(\"~ x ~ x ~ x ~ x\"))"),
+             code: "stack(s(\"bd ~ ~ bd:1 ~ ~ bd ~\").bank(\"RolandTR808\").gain(1.3), s(\"~ ~ ~ ~ sd ~ ~ ~\").bank(\"RolandTR808\").gain(1.0), s(\"hh hh oh hh hh hh oh hh\").bank(\"RolandTR808\").gain(0.45))"),
+
+    // House — four on the floor, 909 kit, offbeat hats
     DrumLoop(id: "house", name: "House", emoji: "🏠",
-             code: "stack(\(_kick).struct(\"x x x x\"), \(_clap).struct(\"~ ~ x ~\"), \(_hat).struct(\"[~ x] [~ x] [~ x] [~ x]\"))"),
+             code: "stack(s(\"bd bd bd bd\").bank(\"RolandTR909\").gain(1.2), s(\"~ cp ~ cp\").bank(\"RolandTR909\").gain(0.7), s(\"[~ hh] [~ hh] [~ hh] [~ hh]\").bank(\"RolandTR909\").gain(0.4))"),
+
+    // Trap — 808 sub kick, rapid hats, sparse clap
     DrumLoop(id: "trap", name: "Trap", emoji: "🔊",
-             code: "stack(\(_kick).struct(\"x ~ ~ ~ x ~ ~ ~\").gain(1.4), \(_clap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_hat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"))"),
+             code: "stack(s(\"bd ~ ~ ~ bd:1 ~ ~ ~\").bank(\"RolandTR808\").gain(1.5), s(\"~ ~ ~ ~ cp ~ ~ ~\").bank(\"RolandTR808\").gain(0.9), s(\"[hh hh hh hh] [hh hh hh hh] [hh hh oh hh] [hh hh hh hh]\").bank(\"RolandTR808\").gain(0.35))"),
+
+    // Minimal — just a click and a thud
     DrumLoop(id: "minimal", name: "Minimal", emoji: "✨",
-             code: "stack(\(_kick).struct(\"x ~ x ~\"), \(_rim).struct(\"~ x ~ x\"))"),
+             code: "stack(s(\"bd ~ bd ~\").bank(\"RolandTR909\").gain(0.9), s(\"~ rm ~ rm\").bank(\"RolandTR909\").gain(0.6))"),
 ]
 
 extension Array {

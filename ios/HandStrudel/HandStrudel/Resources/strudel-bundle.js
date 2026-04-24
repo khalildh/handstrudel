@@ -19506,14 +19506,18 @@ registerProcessor('${n2}', MyProcessor);
       }
       log("loading drum samples...");
       try {
-        if (typeof globalThis.samples === "function") {
-          await globalThis.samples("github:tidalcycles/Dirt-Samples/master");
-          log("drum samples registered");
-        } else {
-          log("samples() function not found on globalThis");
-        }
+        await _evaluate(`samples('github:tidalcycles/Dirt-Samples/master')`);
+        log("drum samples loaded via evaluate");
       } catch (e) {
-        log("drum sample load error (non-fatal): " + e);
+        log("evaluate samples error: " + e);
+        try {
+          if (typeof globalThis.samples === "function") {
+            await globalThis.samples("github:tidalcycles/Dirt-Samples/master");
+            log("drum samples loaded via globalThis");
+          }
+        } catch (e2) {
+          log("globalThis samples also failed: " + e2);
+        }
       }
       _ready = true;
       log("strudel ready");
