@@ -309,6 +309,7 @@ struct ContentView: View {
 
         isRecording = true
         recordCountdown = 7
+        recorder.isMicrophoneEnabled = true
 
         recorder.startRecording { error in
             if let error {
