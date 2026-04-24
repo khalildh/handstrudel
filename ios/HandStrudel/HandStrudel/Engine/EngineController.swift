@@ -53,6 +53,8 @@ final class EngineController: ObservableObject {
     @Published var lockedParams = Set<String>()
     @Published var manualValues = MusicParams()
     @Published var selectedDrumLoop: DrumLoop = DRUM_LOOPS[0]
+    @Published var drumVolume: Double = 1.0
+    @Published var drumSpeed: Double = 1.0  // 0.5x, 1x, 2x
     private var lastDrumLoopId = ""
 
     var bpmIsMapped: Bool {
@@ -198,12 +200,23 @@ final class EngineController: ObservableObject {
             // Update signal params in WebView
             strudelBridge.updateParams(smoothed, config: config)
 
-            // Re-evaluate when struct or drum loop changes
-            let structKey = "\(structIdx)|\(selectedDrumLoop.id)"
+            // Re-evaluate when struct, drum loop, drum volume, or drum speed changes
+            let drumKey = String(format: "%.1f|%.1f", drumVolume, drumSpeed)
+            let structKey = "\(structIdx)|\(selectedDrumLoop.id)|\(drumKey)"
             if structKey != lastStructKey {
                 lastStructKey = structKey
                 let synthCode = buildSignalCode(structIdx: structIdx, config: config)
-                let drumCode = selectedDrumLoop.code
+                var drumCode = selectedDrumLoop.code
+                if !drumCode.isEmpty {
+                    // Apply drum volume
+                    if drumVolume != 1.0 {
+                        drumCode = "(\(drumCode)).gain(\(String(format: "%.2f", drumVolume)))"
+                    }
+                    // Apply drum speed multiplier
+                    if drumSpeed != 1.0 {
+                        drumCode = "(\(drumCode)).fast(\(String(format: "%.1f", drumSpeed)))"
+                    }
+                }
                 let code = drumCode.isEmpty ? synthCode : "stack(\(synthCode), \(drumCode))"
                 strudelBridge.evaluate(code)
             }

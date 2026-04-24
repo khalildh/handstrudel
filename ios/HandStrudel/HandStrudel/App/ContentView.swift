@@ -410,14 +410,14 @@ struct ControlSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Drum loops
-                drumSection
-
                 // BPM section
                 bpmSection
 
                 // Params section
                 paramsSection
+
+                // Drum loops + settings
+                drumSection
 
                 // Snippets
                 if !engine.savedSnippets.isEmpty { snippetsSection }
@@ -438,17 +438,14 @@ struct ControlSheet: View {
                 .foregroundColor(.secondary)
                 .tracking(1.5)
 
+            // Loop picker
             LazyVGrid(columns: [
                 GridItem(.flexible(), spacing: 8),
                 GridItem(.flexible(), spacing: 8),
                 GridItem(.flexible(), spacing: 8)
             ], spacing: 8) {
                 ForEach(DRUM_LOOPS) { loop in
-                    Button(action: {
-                        engine.selectedDrumLoop = loop
-                        // Force re-eval by clearing last key
-                        engine.currentStructIdx = engine.currentStructIdx
-                    }) {
+                    Button(action: { engine.selectedDrumLoop = loop }) {
                         VStack(spacing: 3) {
                             Text(loop.emoji)
                                 .font(.system(size: 20))
@@ -466,6 +463,45 @@ struct ControlSheet: View {
                             RoundedRectangle(cornerRadius: 10)
                                 .stroke(engine.selectedDrumLoop.id == loop.id ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
+                    }
+                }
+            }
+
+            // Drum controls (only when a loop is selected)
+            if engine.selectedDrumLoop.id != "none" {
+                // Volume
+                HStack(spacing: 8) {
+                    Image(systemName: "speaker.wave.2")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .frame(width: 20)
+                    Slider(value: Binding(
+                        get: { engine.drumVolume },
+                        set: { engine.drumVolume = $0 }
+                    ), in: 0.2...2.0)
+                    .tint(.green)
+                    Text(String(format: "%.0f%%", engine.drumVolume * 100))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .frame(width: 40, alignment: .trailing)
+                }
+
+                // Speed
+                HStack(spacing: 6) {
+                    Text("speed")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                    ForEach([0.5, 1.0, 2.0], id: \.self) { speed in
+                        Button(action: { engine.drumSpeed = speed }) {
+                            Text("\(speed == 1.0 ? "1" : speed == 0.5 ? "½" : "2")x")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundColor(engine.drumSpeed == speed ? .green : .secondary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .background(
+                                    Capsule().fill(engine.drumSpeed == speed ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                )
+                        }
                     }
                 }
             }
