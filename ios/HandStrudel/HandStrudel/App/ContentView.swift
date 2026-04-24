@@ -44,8 +44,11 @@ struct ContentView: View {
                     .opacity(0.5)
             }
 
-            // Hand skeleton overlay with glow
-            HandOverlayView(handsState: engine.handsState)
+            // Hand skeleton overlay with glow (aspect-corrected)
+            HandOverlayView(
+                handsState: engine.handsState,
+                videoAspect: engine.handTracker.videoWidth / engine.handTracker.videoHeight
+            )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 

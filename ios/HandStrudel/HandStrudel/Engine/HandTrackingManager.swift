@@ -55,6 +55,8 @@ final class HandTrackingManager: NSObject, ObservableObject {
     var onHandsUpdate: ((HandsState) -> Void)?
 
     @Published var isRunning = false
+    var videoWidth: CGFloat = 480
+    var videoHeight: CGFloat = 640
 
     override init() {
         super.init()
@@ -200,6 +202,14 @@ final class HandTrackingManager: NSObject, ObservableObject {
 extension HandTrackingManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+        // Capture actual video dimensions (after rotation to portrait)
+        let w = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
+        let h = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
+        if w > 0 && h > 0 {
+            videoWidth = w
+            videoHeight = h
+        }
 
         // Video output is set to .portrait + mirrored, so frames arrive correctly oriented
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up)

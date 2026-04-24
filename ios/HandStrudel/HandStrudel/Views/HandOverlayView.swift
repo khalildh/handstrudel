@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HandOverlayView: UIViewRepresentable {
     let handsState: HandsState
+    var videoAspect: CGFloat = 0.75 // default 3:4
 
     func makeUIView(context: Context) -> HandCanvasView {
         let view = HandCanvasView()
@@ -12,12 +13,14 @@ struct HandOverlayView: UIViewRepresentable {
 
     func updateUIView(_ uiView: HandCanvasView, context: Context) {
         uiView.handsState = handsState
+        uiView.videoAspect = videoAspect
         uiView.setNeedsDisplay()
     }
 }
 
 class HandCanvasView: UIView {
     var handsState = HandsState()
+    var videoAspect: CGFloat = 0.75
 
     private let connections: [(Int, Int)] = [
         (0, 1), (1, 2), (2, 3), (3, 4),
@@ -27,6 +30,31 @@ class HandCanvasView: UIView {
         (0, 17), (17, 18), (18, 19), (19, 20),
         (5, 9), (9, 13), (13, 17),
     ]
+
+    /// Convert Vision normalized coordinates to screen coordinates,
+    /// accounting for resizeAspectFill cropping.
+    private func visionToScreen(vx: CGFloat, vy: CGFloat, W: CGFloat, H: CGFloat) -> CGPoint {
+        let screenAspect = W / H
+
+        var sx: CGFloat
+        var sy: CGFloat
+
+        if videoAspect > screenAspect {
+            // Video is wider than screen — width is cropped, height fills
+            let visibleFrac = screenAspect / videoAspect
+            let offset = (1 - visibleFrac) / 2
+            sx = (vx - offset) / visibleFrac * W
+            sy = vy * H
+        } else {
+            // Video is taller than screen — height is cropped, width fills
+            let visibleFrac = videoAspect / screenAspect
+            let offset = (1 - visibleFrac) / 2
+            sx = vx * W
+            sy = (vy - offset) / visibleFrac * H
+        }
+
+        return CGPoint(x: sx, y: sy)
+    }
 
     override func draw(_ rect: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
@@ -44,10 +72,11 @@ class HandCanvasView: UIView {
     }
 
     private func drawHand(ctx: CGContext, landmarks: [HandLandmark], color: UIColor, W: CGFloat, H: CGFloat) {
-        let x = { (i: Int) -> CGFloat in CGFloat(landmarks[i].x) * W }
-        let y = { (i: Int) -> CGFloat in CGFloat(landmarks[i].y) * H }
+        let pt = { (i: Int) -> CGPoint in
+            self.visionToScreen(vx: CGFloat(landmarks[i].x), vy: CGFloat(landmarks[i].y), W: W, H: H)
+        }
 
-        // Glow layer (wider, more transparent)
+        // Glow layer
         ctx.saveGState()
         ctx.setShadow(offset: .zero, blur: 12, color: color.withAlphaComponent(0.5).cgColor)
         ctx.setStrokeColor(color.withAlphaComponent(0.4).cgColor)
@@ -55,46 +84,51 @@ class HandCanvasView: UIView {
         ctx.beginPath()
         for (a, b) in connections {
             guard a < landmarks.count && b < landmarks.count else { continue }
-            ctx.move(to: CGPoint(x: x(a), y: y(a)))
-            ctx.addLine(to: CGPoint(x: x(b), y: y(b)))
+            let pa = pt(a), pb = pt(b)
+            ctx.move(to: pa)
+            ctx.addLine(to: pb)
         }
         ctx.strokePath()
         ctx.restoreGState()
 
-        // Sharp lines on top
+        // Sharp lines
         ctx.setStrokeColor(color.withAlphaComponent(0.7).cgColor)
         ctx.setLineWidth(1.5)
         ctx.beginPath()
         for (a, b) in connections {
             guard a < landmarks.count && b < landmarks.count else { continue }
-            ctx.move(to: CGPoint(x: x(a), y: y(a)))
-            ctx.addLine(to: CGPoint(x: x(b), y: y(b)))
+            let pa = pt(a), pb = pt(b)
+            ctx.move(to: pa)
+            ctx.addLine(to: pb)
         }
         ctx.strokePath()
 
         // Wrist dot with glow
         if !landmarks.isEmpty {
+            let p = pt(0)
             ctx.saveGState()
             ctx.setShadow(offset: .zero, blur: 10, color: color.cgColor)
             ctx.setFillColor(color.cgColor)
-            ctx.fillEllipse(in: CGRect(x: x(0) - 6, y: y(0) - 6, width: 12, height: 12))
+            ctx.fillEllipse(in: CGRect(x: p.x - 6, y: p.y - 6, width: 12, height: 12))
             ctx.restoreGState()
         }
 
-        // Fingertip dots (tips = 4, 8, 12, 16, 20)
+        // Fingertip dots
         let tips = [4, 8, 12, 16, 20]
         ctx.saveGState()
         ctx.setShadow(offset: .zero, blur: 8, color: color.cgColor)
         ctx.setFillColor(color.withAlphaComponent(0.9).cgColor)
         for i in tips where i < landmarks.count {
-            ctx.fillEllipse(in: CGRect(x: x(i) - 4, y: y(i) - 4, width: 8, height: 8))
+            let p = pt(i)
+            ctx.fillEllipse(in: CGRect(x: p.x - 4, y: p.y - 4, width: 8, height: 8))
         }
         ctx.restoreGState()
 
-        // Other landmarks (subtle)
+        // Other landmarks
         ctx.setFillColor(color.withAlphaComponent(0.3).cgColor)
         for i in 1..<landmarks.count where !tips.contains(i) && i != 0 {
-            ctx.fillEllipse(in: CGRect(x: x(i) - 2, y: y(i) - 2, width: 4, height: 4))
+            let p = pt(i)
+            ctx.fillEllipse(in: CGRect(x: p.x - 2, y: p.y - 2, width: 4, height: 4))
         }
     }
 }
