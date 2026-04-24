@@ -138,7 +138,7 @@ struct ContentView: View {
             Spacer()
 
             // Close button
-            Button(action: { /* TODO: stop and go back */ }) {
+            Button(action: { engine.stop() }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white.opacity(0.6))

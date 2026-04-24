@@ -396,6 +396,19 @@ final class EngineController: ObservableObject {
         }
     }
 
+    func stop() {
+        displayLink?.invalidate()
+        displayLink = nil
+        uiTimer?.invalidate()
+        uiTimer = nil
+        structTimer?.invalidate()
+        structTimer = nil
+        handTracker.stopSession()
+        strudelBridge.stop()
+        isRunning = false
+        status = "tap start"
+    }
+
     deinit {
         displayLink?.invalidate()
         uiTimer?.invalidate()
