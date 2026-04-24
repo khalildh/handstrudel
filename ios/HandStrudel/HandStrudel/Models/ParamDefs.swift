@@ -245,25 +245,23 @@ struct DrumLoop: Identifiable {
     let code: String  // Strudel code for the drum pattern
 }
 
-// Synth-based drums (no samples needed — works offline)
-// Kick: low sine with fast decay
-// Snare: noise burst with mid tone
-// Hat: high noise with very short decay
-let _kick = "note(\"c1\").s(\"sine\").decay(0.15).sustain(0).gain(0.8)"
-let _snare = "note(\"a3\").s(\"square\").decay(0.08).sustain(0).gain(0.4).lpf(3000)"
-let _hat = "note(\"f5\").s(\"square\").decay(0.03).sustain(0).gain(0.2).hpf(6000)"
-let _rim = "note(\"e4\").s(\"triangle\").decay(0.04).sustain(0).gain(0.3).hpf(2000)"
+// Synth-based drums — distinct timbres, punchy, won't get buried
+let _kick = "note(\"c1\").s(\"sine\").decay(0.2).sustain(0).gain(1.2).lpf(200)"
+let _snare = "note(\"g3\").s(\"sawtooth\").decay(0.1).sustain(0).gain(0.9).hpf(800).lpf(5000).crush(6)"
+let _hat = "note(\"c6\").s(\"square\").decay(0.02).sustain(0).gain(0.5).hpf(8000)"
+let _clap = "note(\"e4\").s(\"sawtooth\").decay(0.12).sustain(0).gain(0.8).hpf(1200).crush(4)"
+let _rim = "note(\"a4\").s(\"triangle\").decay(0.03).sustain(0).gain(0.7).hpf(3000)"
 
 let DRUM_LOOPS: [DrumLoop] = [
     DrumLoop(id: "none", name: "None", emoji: "🔇", code: ""),
     DrumLoop(id: "basic", name: "Basic", emoji: "🥁",
-             code: "stack(\(_kick).struct(\"x ~ x ~\"), \(_snare).struct(\"~ x ~ x\"))"),
+             code: "stack(\(_kick).struct(\"x ~ x ~\"), \(_clap).struct(\"~ x ~ x\"), \(_hat).struct(\"x x x x\"))"),
     DrumLoop(id: "hiphop", name: "Hip Hop", emoji: "🎤",
-             code: "stack(\(_kick).struct(\"x ~ ~ x ~ ~ x ~\"), \(_snare).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_hat).struct(\"x x x x x x x x\"))"),
+             code: "stack(\(_kick).struct(\"x ~ ~ x ~ ~ x ~\"), \(_clap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_hat).struct(\"~ x ~ x ~ x ~ x\"))"),
     DrumLoop(id: "house", name: "House", emoji: "🏠",
-             code: "stack(\(_kick).struct(\"x x x x\"), \(_snare).struct(\"~ ~ x ~\"), \(_hat).struct(\"[x x] [x x] [x x] [x x]\"))"),
+             code: "stack(\(_kick).struct(\"x x x x\"), \(_clap).struct(\"~ ~ x ~\"), \(_hat).struct(\"[~ x] [~ x] [~ x] [~ x]\"))"),
     DrumLoop(id: "trap", name: "Trap", emoji: "🔊",
-             code: "stack(\(_kick).struct(\"x ~ ~ ~ x ~ ~ ~\"), \(_snare).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_hat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"))"),
+             code: "stack(\(_kick).struct(\"x ~ ~ ~ x ~ ~ ~\").gain(1.4), \(_clap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_hat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"))"),
     DrumLoop(id: "minimal", name: "Minimal", emoji: "✨",
              code: "stack(\(_kick).struct(\"x ~ x ~\"), \(_rim).struct(\"~ x ~ x\"))"),
 ]
