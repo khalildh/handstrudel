@@ -1,8 +1,13 @@
 import SwiftUI
+import ReplayKit
 
 struct ContentView: View {
     @StateObject private var engine = EngineController()
     @State private var showSheet = false
+    @State private var isRecording = false
+    @State private var recordCountdown = 0
+    @State private var showShareSheet = false
+    @State private var recordedVideoURL: URL?
 
     var body: some View {
         ZStack {
@@ -215,7 +220,7 @@ struct ContentView: View {
             // Hydra toggle
             if hasHydraMapping(engine.hydraConfig) {
                 Button(action: engine.toggleHydra) {
-                    Image(systemName: engine.hydraEnabled ? "sparkles" : "sparkles")
+                    Image(systemName: "sparkles")
                         .font(.system(size: 18))
                         .foregroundColor(engine.hydraEnabled ? .purple : .white.opacity(0.4))
                         .frame(width: 44, height: 44)
@@ -228,24 +233,33 @@ struct ContentView: View {
 
             Spacer()
 
-            // Saved count badge
-            if !engine.savedSnippets.isEmpty {
-                Button(action: { showSheet = true }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "music.note.list")
-                            .font(.system(size: 14))
-                        Text("\(engine.savedSnippets.count)")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+            // Record button
+            Button(action: startRecording) {
+                ZStack {
+                    if isRecording {
+                        // Recording indicator with countdown
+                        Circle()
+                            .stroke(Color.red, lineWidth: 3)
+                            .frame(width: 52, height: 52)
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 20, height: 20)
+                        Text("\(recordCountdown)")
+                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .foregroundColor(.white)
+                            .offset(y: -32)
+                    } else {
+                        // Share/record button
+                        Image(systemName: "camera.circle.fill")
+                            .font(.system(size: 44))
+                            .foregroundColor(.white.opacity(0.8))
+                            .shadow(color: .black.opacity(0.3), radius: 4)
                     }
-                    .foregroundColor(.white.opacity(0.7))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(Color.black.opacity(0.4))
-                    )
                 }
             }
+            .disabled(isRecording)
+
+            Spacer()
 
             // Controls sheet button
             Button(action: { showSheet = true }) {
@@ -257,6 +271,57 @@ struct ContentView: View {
                         Circle()
                             .fill(Color.black.opacity(0.3))
                     )
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let url = recordedVideoURL {
+                ShareSheet(activityItems: [url])
+            }
+        }
+    }
+
+    // MARK: - Recording
+
+    private func startRecording() {
+        let recorder = RPScreenRecorder.shared()
+        guard recorder.isAvailable && !isRecording else { return }
+
+        isRecording = true
+        recordCountdown = 7
+
+        recorder.startRecording { error in
+            if let error {
+                print("Recording failed:", error)
+                DispatchQueue.main.async { isRecording = false }
+                return
+            }
+
+            // Countdown timer
+            Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+                DispatchQueue.main.async {
+                    recordCountdown -= 1
+                    if recordCountdown <= 0 {
+                        timer.invalidate()
+                        stopRecording()
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopRecording() {
+        let recorder = RPScreenRecorder.shared()
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("handstrudel_\(Int(Date().timeIntervalSince1970)).mp4")
+
+        recorder.stopRecording(withOutput: outputURL) { error in
+            DispatchQueue.main.async {
+                isRecording = false
+                if let error {
+                    print("Stop recording failed:", error)
+                    return
+                }
+                recordedVideoURL = outputURL
+                showShareSheet = true
             }
         }
     }
@@ -405,6 +470,17 @@ struct ControlSheet: View {
         }
         .frame(height: 20)
     }
+}
+
+// Wraps UIActivityViewController for sharing
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // Wraps WKWebView for SwiftUI
