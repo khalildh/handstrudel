@@ -410,140 +410,251 @@ struct ControlSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // Rhythm section
+                rhythmSection
+
+                // BPM section
+                bpmSection
+
                 // Params section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("PARAMETERS")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(.secondary)
-                        .tracking(1.5)
+                paramsSection
 
-                    ForEach(PARAM_DEFS) { def in
-                        let isActive = engine.config.left.values.contains(def.id) ||
-                                       engine.config.right.values.contains(def.id)
-                        if isActive {
-                            paramRow(def: def, value: engine.smoothedParams[def.id] ?? def.defaultValue)
-                        }
-                    }
-                }
+                // Snippets
+                if !engine.savedSnippets.isEmpty { snippetsSection }
 
-                // Snippets section
-                if !engine.savedSnippets.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("SAVED SNIPPETS")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundColor(.secondary)
-                            .tracking(1.5)
-
-                        ForEach(Array(engine.savedSnippets.enumerated()), id: \.offset) { idx, snippet in
-                            HStack {
-                                Button(action: { engine.toggleSnippet(idx) }) {
-                                    Image(systemName: engine.playingSet.contains(idx) ? "pause.circle.fill" : "play.circle.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(engine.playingSet.contains(idx) ? .orange : .green)
-                                }
-
-                                VStack(alignment: .leading) {
-                                    Text("Snippet #\(idx + 1)")
-                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                    Text("\(snippet.bpm) bpm")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(.secondary)
-                                }
-
-                                Spacer()
-
-                                Button(action: { engine.addToTrack(idx) }) {
-                                    Image(systemName: "plus.circle")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                }
-
-                // Track section
-                if !engine.track.slots.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("TRACK")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundColor(.secondary)
-                                .tracking(1.5)
-
-                            Spacer()
-
-                            Button(action: engine.toggleTrackPlay) {
-                                Image(systemName: engine.trackPlaying ? "stop.circle.fill" : "play.circle.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(engine.trackPlaying ? .orange : .green)
-                            }
-                        }
-
-                        // Speed pills
-                        HStack(spacing: 6) {
-                            ForEach([0.5, 1.0, 2.0, 4.0], id: \.self) { speed in
-                                Button(action: { engine.setTrackSpeed(speed) }) {
-                                    Text("\(speed == Double(Int(speed)) ? "\(Int(speed))" : String(format: "%.1f", speed))x")
-                                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                                        .foregroundColor(engine.track.speed == speed ? .green : .secondary)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(
-                                            Capsule()
-                                                .fill(engine.track.speed == speed ? Color.green.opacity(0.15) : Color.clear)
-                                        )
-                                }
-                            }
-                        }
-
-                        ForEach(Array(engine.track.slots.enumerated()), id: \.offset) { slotIdx, snippetIdx in
-                            HStack {
-                                Text("\(slotIdx + 1).")
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                                Text("Snippet #\(snippetIdx + 1)")
-                                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                                Spacer()
-                                Button(action: { engine.removeFromTrack(slotIdx) }) {
-                                    Image(systemName: "xmark.circle")
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-                    }
-                }
+                // Track
+                if !engine.track.slots.isEmpty { trackSection }
             }
             .padding(20)
         }
     }
 
-    private func paramRow(def: ParamDef, value: Double) -> some View {
-        let normalized = (value - def.min) / (def.max - def.min)
-        return HStack(spacing: 10) {
-            Text(def.label)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(.secondary)
-                .frame(width: 55, alignment: .trailing)
+    // MARK: - Rhythm
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.primary.opacity(0.08))
-                    Capsule()
-                        .fill(Color.green.opacity(0.5))
-                        .frame(width: geo.size.width * max(0, min(1, normalized)))
+    private var rhythmSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("RHYTHM")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .tracking(1.5)
+                Spacer()
+                Toggle("Auto", isOn: Binding(
+                    get: { engine.autoRotateStructs },
+                    set: { engine.autoRotateStructs = $0 }
+                ))
+                .toggleStyle(.button)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .tint(.green)
+            }
+
+            let patterns = STRUCTS.enumerated().map { ($0, $1) }
+            ForEach(patterns, id: \.0) { idx, pattern in
+                Button(action: {
+                    engine.currentStructIdx = idx
+                    engine.autoRotateStructs = false
+                }) {
+                    HStack {
+                        Text(pattern)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(engine.currentStructIdx == idx ? .green : .primary.opacity(0.6))
+                        Spacer()
+                        if engine.currentStructIdx == idx {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.green)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(engine.currentStructIdx == idx ? Color.green.opacity(0.1) : Color.clear)
+                    )
                 }
             }
-            .frame(height: 8)
-
-            Text(def.format(value))
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(.secondary)
-                .frame(width: 50, alignment: .leading)
         }
-        .frame(height: 20)
+    }
+
+    // MARK: - BPM
+
+    private var bpmSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("BPM")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .tracking(1.5)
+                Spacer()
+                Text("\(Int(engine.manualBPM.rounded()))")
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(.green)
+            }
+
+            if engine.bpmIsMapped {
+                Text("Controlled by hand")
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundColor(.secondary)
+            } else {
+                Slider(value: Binding(
+                    get: { engine.manualBPM },
+                    set: { engine.manualBPM = $0 }
+                ), in: 50...205, step: 1)
+                .tint(.green)
+            }
+        }
+    }
+
+    // MARK: - Params
+
+    private var paramsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("PARAMETERS")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(.secondary)
+                .tracking(1.5)
+
+            ForEach(PARAM_DEFS) { def in
+                let isActive = engine.config.left.values.contains(def.id) ||
+                               engine.config.right.values.contains(def.id)
+                if isActive {
+                    paramRow(def: def)
+                }
+            }
+        }
+    }
+
+    private func paramRow(def: ParamDef) -> some View {
+        let isLocked = engine.lockedParams.contains(def.id)
+        let currentValue = isLocked
+            ? (engine.manualValues[def.id] ?? def.defaultValue)
+            : (engine.smoothedParams[def.id] ?? def.defaultValue)
+
+        return VStack(spacing: 4) {
+            HStack(spacing: 8) {
+                // Lock toggle
+                Button(action: { engine.toggleLock(def.id) }) {
+                    Image(systemName: isLocked ? "lock.fill" : "lock.open")
+                        .font(.system(size: 12))
+                        .foregroundColor(isLocked ? .orange : .secondary.opacity(0.4))
+                }
+                .frame(width: 20)
+
+                Text(def.label)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(isLocked ? .orange : .primary)
+                    .frame(width: 55, alignment: .leading)
+
+                if isLocked {
+                    // Slider for manual control
+                    Slider(value: Binding(
+                        get: { engine.manualValues[def.id] ?? def.defaultValue },
+                        set: { engine.setManualValue(def.id, value: $0) }
+                    ), in: def.min...def.max)
+                    .tint(.orange)
+                } else {
+                    // Live meter
+                    let normalized = (currentValue - def.min) / (def.max - def.min)
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.primary.opacity(0.08))
+                            Capsule()
+                                .fill(Color.green.opacity(0.5))
+                                .frame(width: geo.size.width * max(0, min(1, normalized)))
+                        }
+                    }
+                    .frame(height: 8)
+                }
+
+                Text(def.format(currentValue))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .frame(width: 50, alignment: .trailing)
+            }
+        }
+        .frame(minHeight: 28)
+    }
+
+    // MARK: - Snippets
+
+    private var snippetsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SAVED SNIPPETS")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(.secondary)
+                .tracking(1.5)
+
+            ForEach(Array(engine.savedSnippets.enumerated()), id: \.offset) { idx, snippet in
+                HStack {
+                    Button(action: { engine.toggleSnippet(idx) }) {
+                        Image(systemName: engine.playingSet.contains(idx) ? "pause.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(engine.playingSet.contains(idx) ? .orange : .green)
+                    }
+                    VStack(alignment: .leading) {
+                        Text("Snippet #\(idx + 1)")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        Text("\(snippet.bpm) bpm")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button(action: { engine.addToTrack(idx) }) {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 18))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
+    // MARK: - Track
+
+    private var trackSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("TRACK")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .tracking(1.5)
+                Spacer()
+                Button(action: engine.toggleTrackPlay) {
+                    Image(systemName: engine.trackPlaying ? "stop.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(engine.trackPlaying ? .orange : .green)
+                }
+            }
+
+            HStack(spacing: 6) {
+                ForEach([0.5, 1.0, 2.0, 4.0], id: \.self) { speed in
+                    Button(action: { engine.setTrackSpeed(speed) }) {
+                        Text("\(speed == Double(Int(speed)) ? "\(Int(speed))" : String(format: "%.1f", speed))x")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(engine.track.speed == speed ? .green : .secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(engine.track.speed == speed ? Color.green.opacity(0.15) : Color.clear))
+                    }
+                }
+            }
+
+            ForEach(Array(engine.track.slots.enumerated()), id: \.offset) { slotIdx, snippetIdx in
+                HStack {
+                    Text("\(slotIdx + 1).")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    Text("Snippet #\(snippetIdx + 1)")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                    Spacer()
+                    Button(action: { engine.removeFromTrack(slotIdx) }) {
+                        Image(systemName: "xmark.circle")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
     }
 }
 

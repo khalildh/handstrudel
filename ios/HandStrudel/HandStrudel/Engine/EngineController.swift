@@ -46,6 +46,33 @@ final class EngineController: ObservableObject {
     @Published var trackPlaying = false
     @Published var hydraEnabled = false
 
+    // Manual controls
+    @Published var manualBPM: Double = 120
+    @Published var currentStructIdx = 0
+    @Published var autoRotateStructs = true
+    @Published var lockedParams = Set<String>() // param IDs locked to manual values
+    @Published var manualValues = MusicParams()  // manual override values
+
+    var bpmIsMapped: Bool {
+        config.left.values.contains("bpm") || config.right.values.contains("bpm")
+    }
+
+    func setManualValue(_ paramId: String, value: Double) {
+        manualValues[paramId] = value
+        if lockedParams.contains(paramId) {
+            rawParams[paramId] = value
+        }
+    }
+
+    func toggleLock(_ paramId: String) {
+        if lockedParams.contains(paramId) {
+            lockedParams.remove(paramId)
+        } else {
+            lockedParams.insert(paramId)
+            manualValues[paramId] = smoothedParams[paramId] ?? PARAM_MAP[paramId]?.defaultValue ?? 0
+        }
+    }
+
     // Hot-path state (not Published — updated at 60fps)
     private var rawParams = MusicParams()
     private var smoothed = MusicParams()
@@ -145,6 +172,21 @@ final class EngineController: ObservableObject {
     }
 
     private func tick() {
+        // Apply manual BPM if not hand-mapped
+        if !bpmIsMapped {
+            rawParams["bpm"] = manualBPM
+        }
+
+        // Apply locked param overrides (manual values override hand tracking)
+        for paramId in lockedParams {
+            if let val = manualValues[paramId] {
+                rawParams[paramId] = val
+            }
+        }
+
+        // Apply manual struct index
+        structIdx = currentStructIdx
+
         // EMA smoothing
         ParamSmoother.smooth(target: rawParams, smoothed: &smoothed)
 
@@ -186,10 +228,10 @@ final class EngineController: ObservableObject {
     }
 
     private func startTimers() {
-        // Struct rotation every 8s
+        // Struct rotation every 8s (only when auto-rotate is on)
         structTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            self.structIdx = (self.structIdx + 1) % STRUCTS.count
+            guard let self, self.autoRotateStructs else { return }
+            self.currentStructIdx = (self.currentStructIdx + 1) % STRUCTS.count
         }
 
         // UI sync at ~15fps
