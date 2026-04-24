@@ -4,9 +4,11 @@ import AVFoundation
 @main
 struct HandStrudelApp: App {
     init() {
-        // Configure audio session for playback
+        // Configure audio session for playback + recording compatibility
+        // .playAndRecord allows ReplayKit to capture app audio
+        // .defaultToSpeaker routes audio to speaker instead of earpiece
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try? session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
         try? session.setActive(true)
     }
 

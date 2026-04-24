@@ -309,7 +309,10 @@ struct ContentView: View {
 
         isRecording = true
         recordCountdown = 7
-        recorder.isMicrophoneEnabled = true
+
+        // Don't enable microphone — it conflicts with WebView's Web Audio session
+        // and kills Strudel playback. App audio is captured automatically by ReplayKit.
+        recorder.isMicrophoneEnabled = false
 
         recorder.startRecording { error in
             if let error {
