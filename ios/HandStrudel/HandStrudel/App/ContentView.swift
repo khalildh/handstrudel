@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var isRecording = false
     @State private var recordCountdown = 0
     @State private var showShareSheet = false
+    @State private var showSharePicker = false
     @State private var recordedVideoURL: URL?
 
     var body: some View {
@@ -91,6 +92,23 @@ struct ContentView: View {
         .sheet(isPresented: $showShareSheet) {
             if let url = recordedVideoURL {
                 ShareSheet(activityItems: [url])
+            }
+        }
+        .confirmationDialog("Share to", isPresented: $showSharePicker, titleVisibility: .visible) {
+            Button(action: shareToInstagramStories) {
+                Label("Instagram Story", systemImage: "camera.circle")
+            }
+            Button(action: shareToInstagramReels) {
+                Label("Instagram Reels", systemImage: "film")
+            }
+            Button(action: {
+                showSharePicker = false
+                showShareSheet = true
+            }) {
+                Label("Other...", systemImage: "square.and.arrow.up")
+            }
+            Button("Cancel", role: .cancel) {
+                showSharePicker = false
             }
         }
         .sheet(isPresented: $showSheet) {
@@ -347,33 +365,40 @@ struct ContentView: View {
                     return
                 }
                 recordedVideoURL = outputURL
-                shareToInstagram(videoURL: outputURL)
+                showSharePicker = true
             }
         }
     }
 
-    private func shareToInstagram(videoURL: URL) {
-        guard let videoData = try? Data(contentsOf: videoURL) else {
-            // Fallback to share sheet
-            showShareSheet = true
-            return
-        }
+    private func shareToInstagramStories() {
+        guard let url = recordedVideoURL,
+              let videoData = try? Data(contentsOf: url) else { return }
 
-        // Try Instagram Stories first
         if let storiesURL = URL(string: "instagram-stories://share?source_application=com.handstrudel.app"),
            UIApplication.shared.canOpenURL(storiesURL) {
-            let pasteboardItems: [[String: Any]] = [[
+            UIPasteboard.general.setItems([[
                 "com.instagram.sharedSticker.backgroundVideo": videoData,
                 "com.instagram.sharedSticker.appID": "com.handstrudel.app"
-            ]]
-            UIPasteboard.general.setItems(pasteboardItems, options: [
-                .expirationDate: Date().addingTimeInterval(300)
-            ])
+            ]], options: [.expirationDate: Date().addingTimeInterval(300)])
             UIApplication.shared.open(storiesURL)
         } else {
-            // Instagram not installed — fall back to share sheet
             showShareSheet = true
         }
+        showSharePicker = false
+    }
+
+    private func shareToInstagramReels() {
+        guard let url = recordedVideoURL else { return }
+
+        // Share to Reels via document interaction (video file to Instagram)
+        let instagramURL = URL(string: "instagram://library?AssetPath=\(url.absoluteString)")
+        if let instagramURL, UIApplication.shared.canOpenURL(instagramURL) {
+            UIApplication.shared.open(instagramURL)
+        } else {
+            // Fallback: open share sheet which shows Instagram as option
+            showShareSheet = true
+        }
+        showSharePicker = false
     }
 }
 
