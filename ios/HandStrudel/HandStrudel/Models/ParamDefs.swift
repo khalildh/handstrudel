@@ -236,6 +236,29 @@ func buildTrackCode(slots: [Int], speed: Double, snippets: [SavedSnippet]) -> St
     return speed == 1 ? inner : "(\(inner)).slow(\(1 / speed))"
 }
 
+// MARK: - Drum Loops
+
+struct DrumLoop: Identifiable {
+    let id: String
+    let name: String
+    let emoji: String
+    let code: String  // Strudel code for the drum pattern
+}
+
+let DRUM_LOOPS: [DrumLoop] = [
+    DrumLoop(id: "none", name: "None", emoji: "🔇", code: ""),
+    DrumLoop(id: "basic", name: "Basic", emoji: "🥁",
+             code: "s(\"bd sd:1 bd sd:1\").gain(0.7)"),
+    DrumLoop(id: "hiphop", name: "Hip Hop", emoji: "🎤",
+             code: "stack(s(\"bd ~ ~ bd ~ ~ bd ~\").gain(0.7), s(\"~ ~ ~ ~ sd ~ ~ ~\").gain(0.6), s(\"hh hh hh hh hh hh hh hh\").gain(0.3))"),
+    DrumLoop(id: "house", name: "House", emoji: "🏠",
+             code: "stack(s(\"bd bd bd bd\").gain(0.7), s(\"~ ~ sd ~\").gain(0.5), s(\"hh*8\").gain(0.25))"),
+    DrumLoop(id: "trap", name: "Trap", emoji: "🔊",
+             code: "stack(s(\"bd ~ ~ ~ bd ~ ~ ~\").gain(0.8), s(\"~ ~ ~ ~ sd ~ ~ ~\").gain(0.6), s(\"hh*16\").gain(0.2))"),
+    DrumLoop(id: "minimal", name: "Minimal", emoji: "✨",
+             code: "stack(s(\"bd ~ bd ~\").gain(0.5), s(\"~ rim ~ rim\").gain(0.3))"),
+]
+
 extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil

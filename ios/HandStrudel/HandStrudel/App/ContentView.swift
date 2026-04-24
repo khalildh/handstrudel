@@ -410,8 +410,8 @@ struct ControlSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Rhythm section
-                rhythmSection
+                // Drum loops
+                drumSection
 
                 // BPM section
                 bpmSection
@@ -429,48 +429,44 @@ struct ControlSheet: View {
         }
     }
 
-    // MARK: - Rhythm
+    // MARK: - Drums
 
-    private var rhythmSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("RHYTHM")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(.secondary)
-                    .tracking(1.5)
-                Spacer()
-                Toggle("Auto", isOn: Binding(
-                    get: { engine.autoRotateStructs },
-                    set: { engine.autoRotateStructs = $0 }
-                ))
-                .toggleStyle(.button)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .tint(.green)
-            }
+    private var drumSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("DRUMS")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(.secondary)
+                .tracking(1.5)
 
-            let patterns = STRUCTS.enumerated().map { ($0, $1) }
-            ForEach(patterns, id: \.0) { idx, pattern in
-                Button(action: {
-                    engine.currentStructIdx = idx
-                    engine.autoRotateStructs = false
-                }) {
-                    HStack {
-                        Text(pattern)
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(engine.currentStructIdx == idx ? .green : .primary.opacity(0.6))
-                        Spacer()
-                        if engine.currentStructIdx == idx {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.green)
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ], spacing: 8) {
+                ForEach(DRUM_LOOPS) { loop in
+                    Button(action: {
+                        engine.selectedDrumLoop = loop
+                        // Force re-eval by clearing last key
+                        engine.currentStructIdx = engine.currentStructIdx
+                    }) {
+                        VStack(spacing: 3) {
+                            Text(loop.emoji)
+                                .font(.system(size: 20))
+                            Text(loop.name)
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundColor(engine.selectedDrumLoop.id == loop.id ? .green : .primary.opacity(0.6))
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(engine.selectedDrumLoop.id == loop.id ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(engine.selectedDrumLoop.id == loop.id ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                        )
                     }
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(engine.currentStructIdx == idx ? Color.green.opacity(0.1) : Color.clear)
-                    )
                 }
             }
         }

@@ -50,8 +50,10 @@ final class EngineController: ObservableObject {
     @Published var manualBPM: Double = 120
     @Published var currentStructIdx = 0
     @Published var autoRotateStructs = true
-    @Published var lockedParams = Set<String>() // param IDs locked to manual values
-    @Published var manualValues = MusicParams()  // manual override values
+    @Published var lockedParams = Set<String>()
+    @Published var manualValues = MusicParams()
+    @Published var selectedDrumLoop: DrumLoop = DRUM_LOOPS[0]
+    private var lastDrumLoopId = ""
 
     var bpmIsMapped: Bool {
         config.left.values.contains("bpm") || config.right.values.contains("bpm")
@@ -196,11 +198,13 @@ final class EngineController: ObservableObject {
             // Update signal params in WebView
             strudelBridge.updateParams(smoothed, config: config)
 
-            // Re-evaluate only on struct rotation
-            let structKey = String(structIdx)
+            // Re-evaluate when struct or drum loop changes
+            let structKey = "\(structIdx)|\(selectedDrumLoop.id)"
             if structKey != lastStructKey {
                 lastStructKey = structKey
-                let code = buildSignalCode(structIdx: structIdx, config: config)
+                let synthCode = buildSignalCode(structIdx: structIdx, config: config)
+                let drumCode = selectedDrumLoop.code
+                let code = drumCode.isEmpty ? synthCode : "stack(\(synthCode), \(drumCode))"
                 strudelBridge.evaluate(code)
             }
 
