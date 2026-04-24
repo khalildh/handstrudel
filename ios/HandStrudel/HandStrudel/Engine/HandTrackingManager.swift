@@ -103,15 +103,23 @@ final class HandTrackingManager: NSObject, ObservableObject {
             captureSession.addOutput(videoOutput)
         }
 
-        // Mirror front camera (only if supported)
-        if let connection = videoOutput.connection(with: .video), connection.isVideoMirroringSupported {
-            connection.isVideoMirrored = true
+        // Set video orientation to portrait and mirror for front camera
+        if let connection = videoOutput.connection(with: .video) {
+            if connection.isVideoOrientationSupported {
+                connection.videoOrientation = .portrait
+            }
+            if connection.isVideoMirroringSupported {
+                connection.isVideoMirrored = true
+            }
         }
 
         captureSession.commitConfiguration()
 
         let layer = AVCaptureVideoPreviewLayer(session: captureSession)
         layer.videoGravity = .resizeAspectFill
+        if let connection = layer.connection {
+            connection.videoOrientation = .portrait
+        }
         self.previewLayer = layer
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -149,9 +157,9 @@ final class HandTrackingManager: NSObject, ObservableObject {
             guard let point = allPoints[joint], point.confidence > 0.1 else {
                 return nil
             }
-            // Vision coordinates: origin bottom-left, y up.
-            // Flip x to match the mirrored camera preview, flip y so top=0.
-            landmarks.append(HandLandmark(x: 1 - point.location.x, y: 1 - point.location.y, z: 0))
+            // Vision: origin bottom-left, y up. Flip y so top=0.
+            // x stays as-is since video output is already mirrored to match preview.
+            landmarks.append(HandLandmark(x: point.location.x, y: 1 - point.location.y, z: 0))
         }
 
         let wristX = landmarks[0].x
@@ -193,9 +201,8 @@ extension HandTrackingManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        // Front camera in portrait delivers frames rotated — use .leftMirrored
-        // so Vision interprets the image correctly for hand pose detection
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .leftMirrored)
+        // Video output is set to .portrait + mirrored, so frames arrive correctly oriented
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up)
         try? handler.perform([handPoseRequest])
 
         var state = HandsState()
