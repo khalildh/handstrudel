@@ -245,44 +245,58 @@ struct DrumLoop: Identifiable {
     let code: String  // Strudel code for the drum pattern
 }
 
-// Synth drums — each genre uses distinct synthesis, pitch, rhythm, and effects
-// No CDN samples needed — all generated from oscillators
+// Synth drums using proper synthesis techniques:
+// Kick = sine with pitch sweep + sub weight
+// Snare = noise burst (white/pink) + body oscillator
+// Hi-hat = noise through HPF, very short decay
+// Clap = noise burst with resonant filter
+// See: https://dev.opera.com/articles/drum-sounds-webaudio/
 
-// Shared building blocks
-let _dkick = "note(\"c1\").s(\"sine\").decay(0.25).sustain(0).gain(1.3).lpf(150)"        // deep sub kick
-let _tkick = "note(\"e1\").s(\"triangle\").decay(0.12).sustain(0).gain(1.1).lpf(250)"     // tight punchy kick
-let _hkick = "note(\"d1\").s(\"sine\").decay(0.18).sustain(0).gain(1.2).lpf(180)"         // house kick
-let _snap  = "note(\"a4\").s(\"sawtooth\").decay(0.06).sustain(0).gain(0.9).hpf(2000).crush(5)" // snappy clap
-let _clap2 = "note(\"f4\").s(\"square\").decay(0.1).sustain(0).gain(0.8).hpf(1500).crush(8)"    // wide clap
-let _snr   = "note(\"d3\").s(\"sawtooth\").decay(0.12).sustain(0).gain(0.85).hpf(600).lpf(4000)" // snare body
-let _chh   = "note(\"g6\").s(\"square\").decay(0.02).sustain(0).gain(0.4).hpf(9000)"      // closed hat
-let _ohh   = "note(\"g6\").s(\"square\").decay(0.08).sustain(0).gain(0.35).hpf(7000)"     // open hat
-let _shk   = "note(\"c7\").s(\"square\").decay(0.015).sustain(0).gain(0.25).hpf(10000)"   // shaker/tick
-let _rim2  = "note(\"b4\").s(\"triangle\").decay(0.025).sustain(0).gain(0.6).hpf(4000)"   // rim click
-let _perc  = "note(\"e5\").s(\"sine\").decay(0.04).sustain(0).gain(0.5).hpf(3000)"        // perc blip
+// --- KICKS (sine-based, different pitch/decay per genre) ---
+let _deepKick = "note(\"c1\").s(\"sine\").decay(0.3).sustain(0).gain(1.4).lpf(120)"       // 808 sub boom
+let _punchKick = "note(\"f1\").s(\"triangle\").decay(0.1).sustain(0).gain(1.2).lpf(300)"   // tight punch
+let _houseKick = "note(\"d1\").s(\"sine\").decay(0.2).sustain(0).gain(1.3).lpf(200)"       // four-on-floor
+
+// --- SNARES (noise + tone layered) ---
+let _noiseSnare = "note(\"c4\").s(\"white\").decay(0.12).sustain(0).gain(0.7).hpf(1000).lpf(6000)"  // noise burst
+let _toneSnare = "note(\"e3\").s(\"triangle\").decay(0.08).sustain(0).gain(0.5).lpf(3000)"           // body tone
+let _snare = "stack(\(_noiseSnare), \(_toneSnare))"  // layered snare
+
+// --- CLAPS (noise with resonance) ---
+let _clap = "note(\"g4\").s(\"pink\").decay(0.09).sustain(0).gain(0.8).hpf(1500).lpf(8000)"
+let _hardClap = "note(\"a4\").s(\"white\").decay(0.07).sustain(0).gain(0.9).hpf(2000).crush(4)"
+
+// --- HI-HATS (noise through HPF) ---
+let _closedHat = "note(\"a5\").s(\"white\").decay(0.025).sustain(0).gain(0.35).hpf(8000)"   // tight closed
+let _openHat = "note(\"a5\").s(\"white\").decay(0.12).sustain(0).gain(0.3).hpf(7000)"        // ringing open
+let _tinyHat = "note(\"c6\").s(\"pink\").decay(0.015).sustain(0).gain(0.25).hpf(10000)"      // tiny tick
+
+// --- PERC ---
+let _rimshot = "note(\"b4\").s(\"triangle\").decay(0.02).sustain(0).gain(0.6).hpf(5000)"
+let _clave = "note(\"d5\").s(\"sine\").decay(0.03).sustain(0).gain(0.5).hpf(3000)"
 
 let DRUM_LOOPS: [DrumLoop] = [
     DrumLoop(id: "none", name: "None", emoji: "🔇", code: ""),
 
-    // Basic — simple kick-snare-hat, straight 8ths
+    // Basic — kick-snare-hat straight groove
     DrumLoop(id: "basic", name: "Basic", emoji: "🥁",
-             code: "stack(\(_tkick).struct(\"x ~ x ~\"), \(_snr).struct(\"~ x ~ x\"), \(_chh).struct(\"x x x x\"))"),
+             code: "stack(\(_punchKick).struct(\"x ~ x ~\"), \(_snare).struct(\"~ x ~ x\"), \(_closedHat).struct(\"x x x x\"))"),
 
-    // Hip Hop — deep 808 kick syncopated, clap on 2&4, open hats on upbeats
+    // Hip Hop — deep 808, syncopated, boom bap
     DrumLoop(id: "hiphop", name: "Hip Hop", emoji: "🎤",
-             code: "stack(\(_dkick).struct(\"x ~ ~ x ~ ~ x ~\"), \(_snap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_chh).struct(\"~ x ~ x ~ x ~ x\"), \(_ohh).struct(\"~ ~ x ~ ~ ~ x ~\"))"),
+             code: "stack(\(_deepKick).struct(\"x ~ ~ x ~ ~ x ~\"), \(_hardClap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_closedHat).struct(\"~ x ~ x ~ x ~ x\"), \(_openHat).struct(\"~ ~ x ~ ~ ~ x ~\"))"),
 
-    // House — four on the floor, offbeat open hats, claps on 2&4
+    // House — four on the floor, offbeat hats, clap on 3
     DrumLoop(id: "house", name: "House", emoji: "🏠",
-             code: "stack(\(_hkick).struct(\"x x x x\"), \(_clap2).struct(\"~ ~ x ~\"), \(_ohh).struct(\"~ x ~ x ~ x ~ x\"), \(_shk).struct(\"[x x] [x x] [x x] [x x]\"))"),
+             code: "stack(\(_houseKick).struct(\"x x x x\"), \(_clap).struct(\"~ ~ x ~\"), \(_openHat).struct(\"~ x ~ x ~ x ~ x\"), \(_tinyHat).struct(\"[x x] [x x] [x x] [x x]\"))"),
 
-    // Trap — booming sub kick, fast 16th hats, sparse hard clap
+    // Trap — 808 boom, rapid hats, hard clap
     DrumLoop(id: "trap", name: "Trap", emoji: "🔊",
-             code: "stack(\(_dkick).struct(\"x ~ ~ ~ x ~ ~ ~\").gain(1.5), \(_snap).struct(\"~ ~ ~ ~ x ~ ~ ~\").gain(1.1), \(_chh).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"), \(_ohh).struct(\"~ ~ ~ ~ ~ ~ [~ x] ~\"))"),
+             code: "stack(\(_deepKick).struct(\"x ~ ~ ~ x ~ ~ ~\").gain(1.6), \(_hardClap).struct(\"~ ~ ~ ~ x ~ ~ ~\").gain(1.1), \(_closedHat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"), \(_openHat).struct(\"~ ~ ~ ~ ~ ~ [~ x] ~\"))"),
 
-    // Minimal — sparse clicks and thuds
+    // Minimal — sparse, clicky
     DrumLoop(id: "minimal", name: "Minimal", emoji: "✨",
-             code: "stack(\(_tkick).struct(\"x ~ ~ x\"), \(_rim2).struct(\"~ ~ x ~\"), \(_perc).struct(\"~ x ~ ~\"))"),
+             code: "stack(\(_punchKick).struct(\"x ~ ~ x\"), \(_rimshot).struct(\"~ ~ x ~\"), \(_clave).struct(\"~ x ~ ~\"))"),
 ]
 
 extension Array {
