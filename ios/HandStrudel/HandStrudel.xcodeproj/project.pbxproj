@@ -37,6 +37,7 @@
 		6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverlayView.swift; sourceTree = "<group>"; };
 		74287CD261130ADF57405FF3 /* StartOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartOverlayView.swift; sourceTree = "<group>"; };
 		7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelApp.swift; sourceTree = "<group>"; };
+		8B7A548807FF6856B92FC423 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamSmoother.swift; sourceTree = "<group>"; };
 		938A00F6A5044E13D981C663 /* EngineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineController.swift; sourceTree = "<group>"; };
 		ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HandStrudel.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -54,6 +55,7 @@
 			isa = PBXGroup;
 			children = (
 				CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */,
+				8B7A548807FF6856B92FC423 /* Info.plist */,
 				6DCE005A501DEA901F3762F5 /* App */,
 				488478B1D4024AF8209C4C9C /* Engine */,
 				B777E76E23E1B0425E948833 /* Models */,
@@ -233,12 +235,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TVAG3T3Y65;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "HandStrudel uses the camera to track your hand gestures and convert them into music.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "HandStrudel needs microphone access for audio processing.";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIRequiresFullScreen = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_FILE = HandStrudel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -378,12 +375,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TVAG3T3Y65;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "HandStrudel uses the camera to track your hand gestures and convert them into music.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "HandStrudel needs microphone access for audio processing.";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIRequiresFullScreen = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_FILE = HandStrudel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
