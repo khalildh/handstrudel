@@ -44,7 +44,12 @@ struct ContentView: View {
                 }
             } else {
                 // Start overlay
-                StartOverlayView(onStart: engine.start)
+                StartOverlayView(
+                    status: engine.status,
+                    onStart: { cfg, hCfg, adv in
+                        engine.start(config: cfg, hydraConfig: hCfg, advanced: adv)
+                    }
+                )
             }
 
             // Hidden WebView for audio (must be in view hierarchy)

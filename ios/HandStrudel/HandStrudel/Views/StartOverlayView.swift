@@ -1,91 +1,99 @@
 import SwiftUI
 
 struct StartOverlayView: View {
+    let status: String
     let onStart: (MappingConfig, MappingConfig, Bool) -> Void
 
     @State private var config = DEFAULT_MAPPING
     @State private var hydraConfig = DEFAULT_HYDRA_MAPPING
     @State private var advanced = false
+    @State private var starting = false
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.85).ignoresSafeArea()
+            Color.black.opacity(0.9).ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Title
-                    VStack(spacing: 4) {
-                        Text("HandStrudel")
-                            .font(.system(size: 28, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green)
-                        Text("hand-tracking musical instrument")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    .padding(.top, 40)
+            VStack(spacing: 10) {
+                // Title
+                Text("HandStrudel")
+                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                    .foregroundColor(.green)
+                Text("hand-tracking musical instrument")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.5))
 
-                    // Advanced toggle
+                // Advanced toggle
+                HStack {
                     Toggle(isOn: $advanced) {
-                        Text("advanced mode")
-                            .font(.system(size: 12, design: .monospaced))
+                        Text("advanced")
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundColor(.white.opacity(0.6))
                     }
                     .toggleStyle(SwitchToggleStyle(tint: .green))
-                    .padding(.horizontal, 40)
-                    .onChange(of: advanced) { isAdvanced in
-                        if isAdvanced {
-                            config = DEFAULT_ADVANCED_MAPPING
-                            hydraConfig = DEFAULT_ADVANCED_HYDRA_MAPPING
-                        } else {
-                            config = DEFAULT_MAPPING
-                            hydraConfig = DEFAULT_HYDRA_MAPPING
-                        }
+                    .fixedSize()
+                }
+                .onChange(of: advanced) { isAdvanced in
+                    if isAdvanced {
+                        config = DEFAULT_ADVANCED_MAPPING
+                        hydraConfig = DEFAULT_ADVANCED_HYDRA_MAPPING
+                    } else {
+                        config = DEFAULT_MAPPING
+                        hydraConfig = DEFAULT_HYDRA_MAPPING
                     }
+                }
 
-                    // Mapping config
-                    HStack(alignment: .top, spacing: 16) {
-                        handConfigSection(side: "Left Hand", color: .green,
-                                          musicMapping: $config.left, hydraMapping: $hydraConfig.left)
-                        handConfigSection(side: "Right Hand", color: .pink,
-                                          musicMapping: $config.right, hydraMapping: $hydraConfig.right)
-                    }
-                    .padding(.horizontal, 16)
+                // Mapping config — side by side
+                HStack(alignment: .top, spacing: 20) {
+                    handConfigSection(side: "L", color: .green,
+                                      musicMapping: $config.left, hydraMapping: $hydraConfig.left)
+                    handConfigSection(side: "R", color: .pink,
+                                      musicMapping: $config.right, hydraMapping: $hydraConfig.right)
+                }
 
-                    // Start button
-                    Button(action: { onStart(config, hydraConfig, advanced) }) {
+                // Start button + status
+                if starting {
+                    Text(status)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.green.opacity(0.7))
+                        .padding(.top, 4)
+                } else {
+                    Button(action: {
+                        starting = true
+                        onStart(config, hydraConfig, advanced)
+                    }) {
                         Text("START")
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
                             .foregroundColor(.black)
-                            .frame(width: 200, height: 44)
+                            .frame(width: 140, height: 36)
                             .background(Color.green)
-                            .cornerRadius(8)
+                            .cornerRadius(6)
                     }
-                    .padding(.bottom, 40)
+                    .padding(.top, 4)
                 }
             }
+            .padding(.horizontal, 20)
         }
     }
 
     private func handConfigSection(side: String, color: Color,
                                     musicMapping: Binding<[String: String]>,
                                     hydraMapping: Binding<[String: String]>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(side)
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundColor(color)
 
             let axes = advanced ? AXIS_DEFS : AXIS_DEFS.filter(\.basic)
             ForEach(axes) { axis in
-                VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
                     Text(axis.label)
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(size: 8, design: .monospaced))
                         .foregroundColor(.white.opacity(0.4))
+                        .frame(width: 55, alignment: .trailing)
 
-                    // Music param picker
                     paramPicker(binding: musicMapping[axis.key],
                                 options: musicParamOptions, color: color)
 
-                    // Hydra param picker
                     paramPicker(binding: hydraMapping[axis.key],
                                 options: hydraParamOptions, color: .purple)
                 }
@@ -105,28 +113,25 @@ struct StartOverlayView: View {
             }
         } label: {
             Text(options.first(where: { $0.0 == safeBinding.wrappedValue })?.1 ?? "none")
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 8, design: .monospaced))
                 .foregroundColor(safeBinding.wrappedValue == "none" ? .white.opacity(0.3) : color)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
+                .frame(minWidth: 44)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
                 .background(Color.white.opacity(0.05))
-                .cornerRadius(4)
+                .cornerRadius(3)
         }
     }
 
     private var musicParamOptions: [(String, String)] {
         var opts: [(String, String)] = [("none", "none"), ("save", "save")]
-        for def in PARAM_DEFS {
-            opts.append((def.id, def.label))
-        }
+        for def in PARAM_DEFS { opts.append((def.id, def.label)) }
         return opts
     }
 
     private var hydraParamOptions: [(String, String)] {
         var opts: [(String, String)] = [("none", "none")]
-        for def in HYDRA_PARAM_DEFS {
-            opts.append((def.id, def.label))
-        }
+        for def in HYDRA_PARAM_DEFS { opts.append((def.id, def.label)) }
         return opts
     }
 }

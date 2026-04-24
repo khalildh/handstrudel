@@ -1,6 +1,22 @@
 import SwiftUI
 import QuartzCore
 
+private func debugLog(_ msg: String) {
+    let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("debug.log")
+    let line = "\(Date()): \(msg)\n"
+    if let data = line.data(using: .utf8) {
+        if FileManager.default.fileExists(atPath: url.path) {
+            if let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                handle.closeFile()
+            }
+        } else {
+            try? data.write(to: url)
+        }
+    }
+}
+
 @MainActor
 final class EngineController: ObservableObject {
     let handTracker = HandTrackingManager()
@@ -43,6 +59,7 @@ final class EngineController: ObservableObject {
     private var startTime: Date?
 
     func start(config: MappingConfig, hydraConfig: MappingConfig, advanced: Bool) {
+        debugLog("start() called")
         self.config = config
         self.hydraConfig = hydraConfig
         self.advanced = advanced
@@ -55,11 +72,20 @@ final class EngineController: ObservableObject {
         smoothed = defs
 
         status = "initialising strudel..."
+        debugLog("status set to initialising")
 
         // Start Strudel in WebView
         Task {
             do {
+                strudelBridge.onLog = { [weak self] msg in
+                    debugLog("JS: \(msg)")
+                    DispatchQueue.main.async {
+                        self?.status = msg
+                    }
+                }
+                debugLog("calling strudelBridge.initialize()")
                 try await strudelBridge.initialize()
+                debugLog("strudelBridge.initialize() returned")
 
                 // Evaluate initial signal-based code
                 let code = buildSignalCode(structIdx: structIdx, config: config)
@@ -88,6 +114,7 @@ final class EngineController: ObservableObject {
                 status = "running -- wave your hands"
                 isRunning = true
             } catch {
+                debugLog("start error: \(error.localizedDescription)")
                 status = "error: \(error.localizedDescription)"
             }
         }

@@ -26,7 +26,7 @@ targets:
         INFOPLIST_KEY_NSCameraUsageDescription: "HandStrudel uses the camera to track your hand gestures and convert them into music."
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "HandStrudel needs microphone access for audio processing."
         INFOPLIST_KEY_UILaunchScreen_Generation: true
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UIRequiresFullScreen: true
         GENERATE_INFOPLIST_FILE: true
         CODE_SIGN_STYLE: Automatic

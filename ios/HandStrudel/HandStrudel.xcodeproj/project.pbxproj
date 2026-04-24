@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		043BBAAF12C3D3188CF3823F /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C015029D54DF587EDD09DC /* CameraView.swift */; };
+		0AABB3564BB7F0F7CD594B81 /* strudel-bundle.js in Resources */ = {isa = PBXBuildFile; fileRef = 0566FE6FEDB28D58639FD392 /* strudel-bundle.js */; };
 		195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B0EF83FDEC95F58B860F5A /* HandMapper.swift */; };
 		204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 938A00F6A5044E13D981C663 /* EngineController.swift */; };
 		2FC5D55810AF0B87923E355B /* ParamSmoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */; };
@@ -16,6 +17,7 @@
 		532A25B33940063B3913CB83 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96588A98BAB77A0E92B532D /* SidebarView.swift */; };
 		61F3ED12A7BAB424D09491E8 /* Snippet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */; };
 		8590BD09D74A051C39590A4D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */; };
+		8E7C01AF7723050C8C5273E3 /* hydra-synth.js in Resources */ = {isa = PBXBuildFile; fileRef = B7C5E8B642D49636F852D200 /* hydra-synth.js */; };
 		90224DD8E3719A286A3B008A /* strudel-engine.html in Resources */ = {isa = PBXBuildFile; fileRef = BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */; };
 		9503457E7EFD70FAE22ADA09 /* HeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E138BA736E133B23F2253383 /* HeaderView.swift */; };
 		9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F66A4286F922F3805EADFE /* ParamDefs.swift */; };
@@ -28,6 +30,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
 		18B0EF83FDEC95F58B860F5A /* HandMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandMapper.swift; sourceTree = "<group>"; };
@@ -40,6 +43,7 @@
 		938A00F6A5044E13D981C663 /* EngineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineController.swift; sourceTree = "<group>"; };
 		A96588A98BAB77A0E92B532D /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HandStrudel.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B7C5E8B642D49636F852D200 /* hydra-synth.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "hydra-synth.js"; sourceTree = "<group>"; };
 		BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "strudel-engine.html"; sourceTree = "<group>"; };
 		C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTrackingManager.swift; sourceTree = "<group>"; };
 		CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -126,6 +130,8 @@
 		D874A610C5361667A208FDF5 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				B7C5E8B642D49636F852D200 /* hydra-synth.js */,
+				0566FE6FEDB28D58639FD392 /* strudel-bundle.js */,
 				BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */,
 			);
 			path = Resources;
@@ -192,6 +198,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				8590BD09D74A051C39590A4D /* Assets.xcassets in Resources */,
+				8E7C01AF7723050C8C5273E3 /* hydra-synth.js in Resources */,
+				0AABB3564BB7F0F7CD594B81 /* strudel-bundle.js in Resources */,
 				90224DD8E3719A286A3B008A /* strudel-engine.html in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -238,7 +246,7 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "HandStrudel needs microphone access for audio processing.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -383,7 +391,7 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "HandStrudel needs microphone access for audio processing.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
