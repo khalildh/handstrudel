@@ -79,8 +79,13 @@ window.initStrudel = async function() {
         // Load drum samples from Strudel CDN
         log('loading drum samples...');
         try {
-            await _evaluate(`samples('github:tidalcycles/Dirt-Samples/master')`);
-            log('drum samples loaded');
+            // samples() is registered on globalThis by evalScope
+            if (typeof globalThis.samples === 'function') {
+                await globalThis.samples('github:tidalcycles/Dirt-Samples/master');
+                log('drum samples registered');
+            } else {
+                log('samples() function not found on globalThis');
+            }
         } catch (e) {
             log('drum sample load error (non-fatal): ' + e);
         }
