@@ -88,6 +88,11 @@ struct ContentView: View {
                     .padding(.bottom, 16)
             }
         }
+        .sheet(isPresented: $showShareSheet) {
+            if let url = recordedVideoURL {
+                ShareSheet(activityItems: [url])
+            }
+        }
         .sheet(isPresented: $showSheet) {
             ControlSheet(engine: engine)
                 .presentationDetents([.medium, .large])
@@ -233,27 +238,48 @@ struct ContentView: View {
 
             Spacer()
 
-            // Record button
+            // Instagram share button
             Button(action: startRecording) {
                 ZStack {
                     if isRecording {
                         // Recording indicator with countdown
-                        Circle()
-                            .stroke(Color.red, lineWidth: 3)
-                            .frame(width: 52, height: 52)
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 20, height: 20)
-                        Text("\(recordCountdown)")
-                            .font(.system(size: 10, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
-                            .offset(y: -32)
+                        ZStack {
+                            Circle()
+                                .stroke(Color.red.opacity(0.3), lineWidth: 3)
+                                .frame(width: 62, height: 62)
+                            Circle()
+                                .trim(from: 0, to: CGFloat(7 - recordCountdown) / 7.0)
+                                .stroke(Color.red, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                .frame(width: 62, height: 62)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.linear(duration: 1), value: recordCountdown)
+                            Text("\(recordCountdown)")
+                                .font(.system(size: 18, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                        }
                     } else {
-                        // Share/record button
-                        Image(systemName: "camera.circle.fill")
-                            .font(.system(size: 44))
-                            .foregroundColor(.white.opacity(0.8))
-                            .shadow(color: .black.opacity(0.3), radius: 4)
+                        // Instagram-style share button
+                        VStack(spacing: 3) {
+                            ZStack {
+                                // Instagram gradient ring
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [.purple, .pink, .orange, .yellow],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2.5
+                                    )
+                                    .frame(width: 52, height: 52)
+                                Image(systemName: "video.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.white)
+                            }
+                            Text("7s")
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
                     }
                 }
             }
@@ -271,11 +297,6 @@ struct ContentView: View {
                         Circle()
                             .fill(Color.black.opacity(0.3))
                     )
-            }
-        }
-        .sheet(isPresented: $showShareSheet) {
-            if let url = recordedVideoURL {
-                ShareSheet(activityItems: [url])
             }
         }
     }
@@ -321,8 +342,32 @@ struct ContentView: View {
                     return
                 }
                 recordedVideoURL = outputURL
-                showShareSheet = true
+                shareToInstagram(videoURL: outputURL)
             }
+        }
+    }
+
+    private func shareToInstagram(videoURL: URL) {
+        guard let videoData = try? Data(contentsOf: videoURL) else {
+            // Fallback to share sheet
+            showShareSheet = true
+            return
+        }
+
+        // Try Instagram Stories first
+        if let storiesURL = URL(string: "instagram-stories://share?source_application=com.handstrudel.app"),
+           UIApplication.shared.canOpenURL(storiesURL) {
+            let pasteboardItems: [[String: Any]] = [[
+                "com.instagram.sharedSticker.backgroundVideo": videoData,
+                "com.instagram.sharedSticker.appID": "com.handstrudel.app"
+            ]]
+            UIPasteboard.general.setItems(pasteboardItems, options: [
+                .expirationDate: Date().addingTimeInterval(300)
+            ])
+            UIApplication.shared.open(storiesURL)
+        } else {
+            // Instagram not installed — fall back to share sheet
+            showShareSheet = true
         }
     }
 }

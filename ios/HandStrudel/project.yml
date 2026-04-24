@@ -16,6 +16,11 @@ targets:
     resources:
       - path: HandStrudel/Assets.xcassets
       - path: HandStrudel/Resources
+    info:
+      properties:
+        LSApplicationQueriesSchemes:
+          - instagram-stories
+          - instagram
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.handstrudel.app
