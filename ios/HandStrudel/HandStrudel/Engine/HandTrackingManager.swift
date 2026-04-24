@@ -225,14 +225,14 @@ extension HandTrackingManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         for observation in results {
             guard let handData = processObservation(observation) else { continue }
 
-            // With .leftMirrored orientation + flipped x, coordinates match the mirrored preview.
-            // Chirality maps directly: user's left hand = .left in Vision.
+            // Video output is mirrored, so Vision's chirality is flipped:
+            // Vision .left in mirrored frame = user's right hand, and vice versa.
             let chirality = observation.chirality
             switch chirality {
             case .left:
-                state.left = handData
-            case .right:
                 state.right = handData
+            case .right:
+                state.left = handData
             default:
                 if state.left == nil {
                     state.left = handData
