@@ -149,8 +149,9 @@ final class HandTrackingManager: NSObject, ObservableObject {
             guard let point = allPoints[joint], point.confidence > 0.1 else {
                 return nil
             }
-            // Vision coordinates: origin bottom-left, y up. We want y inverted (top=0).
-            landmarks.append(HandLandmark(x: point.location.x, y: 1 - point.location.y, z: 0))
+            // Vision coordinates: origin bottom-left, y up.
+            // Flip x to match the mirrored camera preview, flip y so top=0.
+            landmarks.append(HandLandmark(x: 1 - point.location.x, y: 1 - point.location.y, z: 0))
         }
 
         let wristX = landmarks[0].x
@@ -192,7 +193,9 @@ extension HandTrackingManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up)
+        // Front camera in portrait delivers frames rotated — use .leftMirrored
+        // so Vision interprets the image correctly for hand pose detection
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .leftMirrored)
         try? handler.perform([handPoseRequest])
 
         var state = HandsState()
@@ -205,14 +208,14 @@ extension HandTrackingManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         for observation in results {
             guard let handData = processObservation(observation) else { continue }
 
-            // Vision framework reports chirality — use it directly
-            // Front camera is mirrored, so left hand appears as right visually
+            // With .leftMirrored orientation + flipped x, coordinates match the mirrored preview.
+            // Chirality maps directly: user's left hand = .left in Vision.
             let chirality = observation.chirality
             switch chirality {
-            case .right:
-                state.left = handData  // Right hand in mirror = user's left
             case .left:
-                state.right = handData // Left hand in mirror = user's right
+                state.left = handData
+            case .right:
+                state.right = handData
             default:
                 if state.left == nil {
                     state.left = handData
