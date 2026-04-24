@@ -123,6 +123,14 @@ struct ContentView: View {
 
     // MARK: - Logo
 
+    private var strudelHue: Double {
+        // Map note index (0-17) to hue (0-1), shift with beat for extra life
+        let ni = engine.smoothedParams["noteIdx"] ?? 10
+        let base = ni / 17.0
+        let beatShift = Double(engine.currentBeat) * 0.03
+        return (base + beatShift).truncatingRemainder(dividingBy: 1.0)
+    }
+
     private var logoMark: some View {
         HStack(spacing: 0) {
             Text("hand")
@@ -130,9 +138,10 @@ struct ContentView: View {
                 .foregroundColor(.white.opacity(0.9))
             Text("strudel")
                 .font(.system(size: 20, weight: .black, design: .monospaced))
-                .foregroundColor(.green)
+                .foregroundColor(Color(hue: strudelHue, saturation: 0.8, brightness: 1.0))
+                .animation(.easeInOut(duration: 0.3), value: strudelHue)
         }
-        .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 2)
+        .shadow(color: Color(hue: strudelHue, saturation: 0.6, brightness: 0.8).opacity(0.5), radius: 10, x: 0, y: 2)
     }
 
     // MARK: - Code Pill
