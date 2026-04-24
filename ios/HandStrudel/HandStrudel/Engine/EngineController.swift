@@ -88,10 +88,12 @@ final class EngineController: ObservableObject {
                 debugLog("strudelBridge.initialize() returned")
 
                 // Evaluate initial signal-based code
+                debugLog("evaluating initial code...")
                 let code = buildSignalCode(structIdx: structIdx, config: config)
                 strudelBridge.evaluate(code)
                 lastStructKey = String(structIdx)
 
+                debugLog("requesting camera...")
                 status = "requesting camera..."
 
                 // Start camera + hand tracking
@@ -99,6 +101,7 @@ final class EngineController: ObservableObject {
                     self?.handleHandsUpdate(hands)
                 }
                 handTracker.startSession()
+                debugLog("camera started")
 
                 // Beat callback
                 strudelBridge.onBeat = { [weak self] beat in
@@ -107,10 +110,12 @@ final class EngineController: ObservableObject {
                     }
                 }
 
+                debugLog("starting display link and timers...")
                 startTime = Date()
                 startDisplayLink()
                 startTimers()
 
+                debugLog("all started, setting isRunning=true")
                 status = "running -- wave your hands"
                 isRunning = true
             } catch {
@@ -120,10 +125,14 @@ final class EngineController: ObservableObject {
         }
     }
 
-    private func handleHandsUpdate(_ hands: HandsState) {
-        currentHands = hands
-        HandMapper.mapHandsToParams(hands, params: &rawParams, config: config)
-        HandMapper.mapHandsToParams(hands, params: &rawParams, config: hydraConfig)
+    private nonisolated func handleHandsUpdate(_ hands: HandsState) {
+        // Called from background processingQueue — dispatch to main for @MainActor state
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.currentHands = hands
+            HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.config)
+            HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.hydraConfig)
+        }
     }
 
     private func startDisplayLink() {

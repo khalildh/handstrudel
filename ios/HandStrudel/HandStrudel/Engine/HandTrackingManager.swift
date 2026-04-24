@@ -64,6 +64,27 @@ final class HandTrackingManager: NSObject, ObservableObject {
     func startSession() {
         guard !isRunning else { return }
 
+        // Request camera permission first
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                if granted {
+                    DispatchQueue.main.async {
+                        self?.setupAndStart()
+                    }
+                }
+            }
+            return
+        case .authorized:
+            setupAndStart()
+        default:
+            return
+        }
+    }
+
+    private func setupAndStart() {
+        guard !isRunning else { return }
+
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
               let input = try? AVCaptureDeviceInput(device: device) else {
             return
