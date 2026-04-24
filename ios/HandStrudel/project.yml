@@ -30,4 +30,5 @@ targets:
         INFOPLIST_KEY_UIRequiresFullScreen: true
         GENERATE_INFOPLIST_FILE: true
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: TVAG3T3Y65
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

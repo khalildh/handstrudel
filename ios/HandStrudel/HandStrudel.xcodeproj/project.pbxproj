@@ -162,6 +162,7 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					EB6C91B49BB8F9A04096CC97 = {
+						DevelopmentTeam = TVAG3T3Y65;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -231,6 +232,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TVAG3T3Y65;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "HandStrudel uses the camera to track your hand gestures and convert them into music.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "HandStrudel needs microphone access for audio processing.";
@@ -375,6 +377,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TVAG3T3Y65;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "HandStrudel uses the camera to track your hand gestures and convert them into music.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "HandStrudel needs microphone access for audio processing.";
