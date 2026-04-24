@@ -34,10 +34,12 @@ class HandCanvasView: UIView {
         let H = bounds.height
 
         if let left = handsState.left {
-            drawHand(ctx: ctx, landmarks: left.landmarks, color: UIColor(red: 0, green: 1, blue: 0.616, alpha: 1), W: W, H: H)
+            drawHand(ctx: ctx, landmarks: left.landmarks,
+                     color: UIColor(red: 0, green: 1, blue: 0.62, alpha: 1), W: W, H: H)
         }
         if let right = handsState.right {
-            drawHand(ctx: ctx, landmarks: right.landmarks, color: UIColor(red: 1, green: 0.176, blue: 0.42, alpha: 1), W: W, H: H)
+            drawHand(ctx: ctx, landmarks: right.landmarks,
+                     color: UIColor(red: 1, green: 0.18, blue: 0.42, alpha: 1), W: W, H: H)
         }
     }
 
@@ -45,8 +47,22 @@ class HandCanvasView: UIView {
         let x = { (i: Int) -> CGFloat in CGFloat(landmarks[i].x) * W }
         let y = { (i: Int) -> CGFloat in CGFloat(landmarks[i].y) * H }
 
-        // Draw connections
-        ctx.setStrokeColor(color.withAlphaComponent(0.33).cgColor)
+        // Glow layer (wider, more transparent)
+        ctx.saveGState()
+        ctx.setShadow(offset: .zero, blur: 12, color: color.withAlphaComponent(0.5).cgColor)
+        ctx.setStrokeColor(color.withAlphaComponent(0.4).cgColor)
+        ctx.setLineWidth(4)
+        ctx.beginPath()
+        for (a, b) in connections {
+            guard a < landmarks.count && b < landmarks.count else { continue }
+            ctx.move(to: CGPoint(x: x(a), y: y(a)))
+            ctx.addLine(to: CGPoint(x: x(b), y: y(b)))
+        }
+        ctx.strokePath()
+        ctx.restoreGState()
+
+        // Sharp lines on top
+        ctx.setStrokeColor(color.withAlphaComponent(0.7).cgColor)
         ctx.setLineWidth(1.5)
         ctx.beginPath()
         for (a, b) in connections {
@@ -56,17 +72,29 @@ class HandCanvasView: UIView {
         }
         ctx.strokePath()
 
-        // Draw wrist dot
+        // Wrist dot with glow
         if !landmarks.isEmpty {
+            ctx.saveGState()
+            ctx.setShadow(offset: .zero, blur: 10, color: color.cgColor)
             ctx.setFillColor(color.cgColor)
-            ctx.fillEllipse(in: CGRect(x: x(0) - 5, y: y(0) - 5, width: 10, height: 10))
+            ctx.fillEllipse(in: CGRect(x: x(0) - 6, y: y(0) - 6, width: 12, height: 12))
+            ctx.restoreGState()
         }
 
-        // Draw other landmarks
-        ctx.setFillColor(color.withAlphaComponent(0.67).cgColor)
-        for i in 1..<landmarks.count {
-            let r: CGFloat = i % 4 == 0 ? 3.5 : 2
-            ctx.fillEllipse(in: CGRect(x: x(i) - r, y: y(i) - r, width: r * 2, height: r * 2))
+        // Fingertip dots (tips = 4, 8, 12, 16, 20)
+        let tips = [4, 8, 12, 16, 20]
+        ctx.saveGState()
+        ctx.setShadow(offset: .zero, blur: 8, color: color.cgColor)
+        ctx.setFillColor(color.withAlphaComponent(0.9).cgColor)
+        for i in tips where i < landmarks.count {
+            ctx.fillEllipse(in: CGRect(x: x(i) - 4, y: y(i) - 4, width: 8, height: 8))
+        }
+        ctx.restoreGState()
+
+        // Other landmarks (subtle)
+        ctx.setFillColor(color.withAlphaComponent(0.3).cgColor)
+        for i in 1..<landmarks.count where !tips.contains(i) && i != 0 {
+            ctx.fillEllipse(in: CGRect(x: x(i) - 2, y: y(i) - 2, width: 4, height: 4))
         }
     }
 }

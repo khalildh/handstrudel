@@ -55,6 +55,61 @@ let DEFAULT_ADVANCED_MAPPING = MappingConfig(
     ]
 )
 
+// MARK: - Presets
+
+struct Preset: Identifiable {
+    let id: String
+    let name: String
+    let emoji: String
+    let description: String
+    let color: (Double, Double, Double) // RGB 0-1
+    let mapping: MappingConfig
+    let hydraMapping: MappingConfig
+}
+
+let PRESETS: [Preset] = [
+    Preset(
+        id: "dreamy", name: "Dreamy", emoji: "🌙",
+        description: "Floaty reverb & delay",
+        color: (0.5, 0.3, 1.0),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "spread": "reverb", "x": "lpf"],
+            right: ["y": "gain", "spread": "delay", "x": "pan"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING
+    ),
+    Preset(
+        id: "gritty", name: "Gritty", emoji: "🔥",
+        description: "Crunchy distortion vibes",
+        color: (1.0, 0.3, 0.2),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
+            right: ["y": "gain", "x": "hpf", "spread": "bpm"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING
+    ),
+    Preset(
+        id: "bouncy", name: "Bouncy", emoji: "🎾",
+        description: "Playful filter bounce",
+        color: (0.2, 0.9, 0.4),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "spread": "lpf", "x": "delay"],
+            right: ["y": "bpm", "spread": "gain", "x": "reverb"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING
+    ),
+    Preset(
+        id: "chill", name: "Chill", emoji: "🧊",
+        description: "Slow & spacious",
+        color: (0.3, 0.7, 1.0),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "pan", "spread": "reverb"],
+            right: ["y": "gain", "x": "attack", "spread": "release"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING
+    ),
+]
+
 let DEFAULT_ADVANCED_HYDRA_MAPPING = MappingConfig(
     left: [
         "y": "none", "x": "none", "spread": "none",

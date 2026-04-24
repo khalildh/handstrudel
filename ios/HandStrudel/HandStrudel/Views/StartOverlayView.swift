@@ -4,134 +4,151 @@ struct StartOverlayView: View {
     let status: String
     let onStart: (MappingConfig, MappingConfig, Bool) -> Void
 
-    @State private var config = DEFAULT_MAPPING
-    @State private var hydraConfig = DEFAULT_HYDRA_MAPPING
-    @State private var advanced = false
+    @State private var selectedPreset: Preset? = nil
     @State private var starting = false
+    @State private var pulseScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.9).ignoresSafeArea()
+            // Background gradient
+            LinearGradient(
+                colors: [Color.black, Color(white: 0.06), Color.black],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
-            VStack(spacing: 10) {
-                // Title
-                Text("HandStrudel")
-                    .font(.system(size: 22, weight: .bold, design: .monospaced))
-                    .foregroundColor(.green)
-                Text("hand-tracking musical instrument")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.5))
+            VStack(spacing: 0) {
+                Spacer()
 
-                // Advanced toggle
-                HStack {
-                    Toggle(isOn: $advanced) {
-                        Text("advanced")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-                    .toggleStyle(SwitchToggleStyle(tint: .green))
-                    .fixedSize()
-                }
-                .onChange(of: advanced) { isAdvanced in
-                    if isAdvanced {
-                        config = DEFAULT_ADVANCED_MAPPING
-                        hydraConfig = DEFAULT_ADVANCED_HYDRA_MAPPING
-                    } else {
-                        config = DEFAULT_MAPPING
-                        hydraConfig = DEFAULT_HYDRA_MAPPING
-                    }
-                }
+                // App title
+                VStack(spacing: 6) {
+                    Text("hand")
+                        .font(.system(size: 42, weight: .thin, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.6))
+                    +
+                    Text("strudel")
+                        .font(.system(size: 42, weight: .bold, design: .monospaced))
+                        .foregroundColor(.green)
 
-                // Mapping config — side by side
-                HStack(alignment: .top, spacing: 20) {
-                    handConfigSection(side: "L", color: .green,
-                                      musicMapping: $config.left, hydraMapping: $hydraConfig.left)
-                    handConfigSection(side: "R", color: .pink,
-                                      musicMapping: $config.right, hydraMapping: $hydraConfig.right)
-                }
-
-                // Start button + status
-                if starting {
-                    Text(status)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(.green.opacity(0.7))
-                        .padding(.top, 4)
-                } else {
-                    Button(action: {
-                        starting = true
-                        onStart(config, hydraConfig, advanced)
-                    }) {
-                        Text("START")
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
-                            .foregroundColor(.black)
-                            .frame(width: 140, height: 36)
-                            .background(Color.green)
-                            .cornerRadius(6)
-                    }
-                    .padding(.top, 4)
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-    }
-
-    private func handConfigSection(side: String, color: Color,
-                                    musicMapping: Binding<[String: String]>,
-                                    hydraMapping: Binding<[String: String]>) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(side)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(color)
-
-            let axes = advanced ? AXIS_DEFS : AXIS_DEFS.filter(\.basic)
-            ForEach(axes) { axis in
-                HStack(spacing: 4) {
-                    Text(axis.label)
-                        .font(.system(size: 8, design: .monospaced))
+                    Text("make music with your hands")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundColor(.white.opacity(0.4))
-                        .frame(width: 55, alignment: .trailing)
+                }
+                .padding(.bottom, 40)
 
-                    paramPicker(binding: musicMapping[axis.key],
-                                options: musicParamOptions, color: color)
+                // Preset cards
+                Text("pick a vibe")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.3))
+                    .textCase(.uppercase)
+                    .tracking(2)
+                    .padding(.bottom, 12)
 
-                    paramPicker(binding: hydraMapping[axis.key],
-                                options: hydraParamOptions, color: .purple)
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12)
+                ], spacing: 12) {
+                    ForEach(PRESETS) { preset in
+                        PresetCard(
+                            preset: preset,
+                            isSelected: selectedPreset?.id == preset.id
+                        )
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedPreset = preset
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+
+                Spacer()
+
+                // Start button or status
+                if starting {
+                    VStack(spacing: 8) {
+                        ProgressView()
+                            .tint(.green)
+                        Text(status)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(.green.opacity(0.7))
+                    }
+                    .padding(.bottom, 50)
+                } else {
+                    Button(action: startTapped) {
+                        Text("LET'S GO")
+                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(
+                                selectedPreset != nil
+                                    ? Color.green
+                                    : Color.white.opacity(0.1)
+                            )
+                            .cornerRadius(16)
+                            .scaleEffect(pulseScale)
+                    }
+                    .disabled(selectedPreset == nil)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 50)
+                    .onChange(of: selectedPreset?.id) { _ in
+                        startPulse()
+                    }
                 }
             }
         }
     }
 
-    private func paramPicker(binding: Binding<String?>, options: [(String, String)], color: Color) -> some View {
-        let safeBinding = Binding<String>(
-            get: { binding.wrappedValue ?? "none" },
-            set: { binding.wrappedValue = $0 }
-        )
+    private func startTapped() {
+        guard let preset = selectedPreset else { return }
+        starting = true
+        onStart(preset.mapping, preset.hydraMapping, false)
+    }
 
-        return Menu {
-            ForEach(options, id: \.0) { id, label in
-                Button(label) { safeBinding.wrappedValue = id }
-            }
-        } label: {
-            Text(options.first(where: { $0.0 == safeBinding.wrappedValue })?.1 ?? "none")
-                .font(.system(size: 8, design: .monospaced))
-                .foregroundColor(safeBinding.wrappedValue == "none" ? .white.opacity(0.3) : color)
-                .frame(minWidth: 44)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
-                .background(Color.white.opacity(0.05))
-                .cornerRadius(3)
+    private func startPulse() {
+        guard selectedPreset != nil else { return }
+        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+            pulseScale = 1.04
         }
     }
+}
 
-    private var musicParamOptions: [(String, String)] {
-        var opts: [(String, String)] = [("none", "none"), ("save", "save")]
-        for def in PARAM_DEFS { opts.append((def.id, def.label)) }
-        return opts
+struct PresetCard: View {
+    let preset: Preset
+    let isSelected: Bool
+
+    var presetColor: Color {
+        Color(red: preset.color.0, green: preset.color.1, blue: preset.color.2)
     }
 
-    private var hydraParamOptions: [(String, String)] {
-        var opts: [(String, String)] = [("none", "none")]
-        for def in HYDRA_PARAM_DEFS { opts.append((def.id, def.label)) }
-        return opts
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(preset.emoji)
+                .font(.system(size: 32))
+
+            Text(preset.name)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+
+            Text(preset.description)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundColor(.white.opacity(0.5))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(isSelected ? presetColor.opacity(0.25) : Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isSelected ? presetColor : Color.white.opacity(0.08), lineWidth: isSelected ? 2 : 1)
+        )
+        .scaleEffect(isSelected ? 1.02 : 1.0)
     }
 }
