@@ -19504,6 +19504,13 @@ registerProcessor('${n2}', MyProcessor);
       } else {
         log("hydra not available (script not loaded)");
       }
+      log("loading drum samples...");
+      try {
+        await _evaluate(`samples('github:tidalcycles/Dirt-Samples/master')`);
+        log("drum samples loaded");
+      } catch (e) {
+        log("drum sample load error (non-fatal): " + e);
+      }
       _ready = true;
       log("strudel ready");
       return "ok";

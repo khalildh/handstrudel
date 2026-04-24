@@ -76,6 +76,15 @@ window.initStrudel = async function() {
             log('hydra not available (script not loaded)');
         }
 
+        // Load drum samples from Strudel CDN
+        log('loading drum samples...');
+        try {
+            await _evaluate(`samples('github:tidalcycles/Dirt-Samples/master')`);
+            log('drum samples loaded');
+        } catch (e) {
+            log('drum sample load error (non-fatal): ' + e);
+        }
+
         _ready = true;
         log('strudel ready');
         return 'ok';
