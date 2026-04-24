@@ -487,22 +487,20 @@ struct ControlSheet: View {
                 }
 
                 // Speed
-                HStack(spacing: 6) {
-                    Text("speed")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                HStack(spacing: 8) {
+                    Image(systemName: "metronome")
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
-                    ForEach([0.5, 1.0, 2.0], id: \.self) { speed in
-                        Button(action: { engine.drumSpeed = speed }) {
-                            Text("\(speed == 1.0 ? "1" : speed == 0.5 ? "½" : "2")x")
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundColor(engine.drumSpeed == speed ? .green : .secondary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 5)
-                                .background(
-                                    Capsule().fill(engine.drumSpeed == speed ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
-                                )
-                        }
-                    }
+                        .frame(width: 20)
+                    Slider(value: Binding(
+                        get: { engine.drumSpeed },
+                        set: { engine.drumSpeed = $0 }
+                    ), in: 0.25...4.0, step: 0.25)
+                    .tint(.green)
+                    Text(String(format: "%.2gx", engine.drumSpeed))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .frame(width: 35, alignment: .trailing)
                 }
             }
         }
