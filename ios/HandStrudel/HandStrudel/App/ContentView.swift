@@ -59,10 +59,14 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
 
+                // Logo
+                logoMark
+                    .padding(.top, 2)
+
                 // Floating code pill
                 codePill
                     .padding(.horizontal, 20)
-                    .padding(.top, 4)
+                    .padding(.top, 2)
 
                 Spacer()
 
@@ -115,6 +119,20 @@ struct ContentView: View {
                     .clipShape(Circle())
             }
         }
+    }
+
+    // MARK: - Logo
+
+    private var logoMark: some View {
+        HStack(spacing: 0) {
+            Text("hand")
+                .font(.system(size: 20, weight: .light, design: .monospaced))
+                .foregroundColor(.white.opacity(0.9))
+            Text("strudel")
+                .font(.system(size: 20, weight: .black, design: .monospaced))
+                .foregroundColor(.green)
+        }
+        .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 2)
     }
 
     // MARK: - Code Pill
