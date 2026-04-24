@@ -245,33 +245,44 @@ struct DrumLoop: Identifiable {
     let code: String  // Strudel code for the drum pattern
 }
 
-// Drum loops using real samples from Dirt-Samples + drum machine banks
-// Each genre uses a different drum machine and distinct rhythmic pattern
-// Fallback synth versions appended after "||" won't work in Strudel,
-// so we rely on samples loading. If they don't load, drums will be silent.
+// Synth drums — each genre uses distinct synthesis, pitch, rhythm, and effects
+// No CDN samples needed — all generated from oscillators
+
+// Shared building blocks
+let _dkick = "note(\"c1\").s(\"sine\").decay(0.25).sustain(0).gain(1.3).lpf(150)"        // deep sub kick
+let _tkick = "note(\"e1\").s(\"triangle\").decay(0.12).sustain(0).gain(1.1).lpf(250)"     // tight punchy kick
+let _hkick = "note(\"d1\").s(\"sine\").decay(0.18).sustain(0).gain(1.2).lpf(180)"         // house kick
+let _snap  = "note(\"a4\").s(\"sawtooth\").decay(0.06).sustain(0).gain(0.9).hpf(2000).crush(5)" // snappy clap
+let _clap2 = "note(\"f4\").s(\"square\").decay(0.1).sustain(0).gain(0.8).hpf(1500).crush(8)"    // wide clap
+let _snr   = "note(\"d3\").s(\"sawtooth\").decay(0.12).sustain(0).gain(0.85).hpf(600).lpf(4000)" // snare body
+let _chh   = "note(\"g6\").s(\"square\").decay(0.02).sustain(0).gain(0.4).hpf(9000)"      // closed hat
+let _ohh   = "note(\"g6\").s(\"square\").decay(0.08).sustain(0).gain(0.35).hpf(7000)"     // open hat
+let _shk   = "note(\"c7\").s(\"square\").decay(0.015).sustain(0).gain(0.25).hpf(10000)"   // shaker/tick
+let _rim2  = "note(\"b4\").s(\"triangle\").decay(0.025).sustain(0).gain(0.6).hpf(4000)"   // rim click
+let _perc  = "note(\"e5\").s(\"sine\").decay(0.04).sustain(0).gain(0.5).hpf(3000)"        // perc blip
 
 let DRUM_LOOPS: [DrumLoop] = [
     DrumLoop(id: "none", name: "None", emoji: "🔇", code: ""),
 
-    // Basic rock beat — standard kit
+    // Basic — simple kick-snare-hat, straight 8ths
     DrumLoop(id: "basic", name: "Basic", emoji: "🥁",
-             code: "stack(s(\"bd ~ bd ~\").gain(1.2), s(\"~ sd ~ sd\").gain(0.9), s(\"hh hh hh hh\").gain(0.5))"),
+             code: "stack(\(_tkick).struct(\"x ~ x ~\"), \(_snr).struct(\"~ x ~ x\"), \(_chh).struct(\"x x x x\"))"),
 
-    // Hip Hop — 808 boom bap, syncopated kick, snare on 2&4, open hats
+    // Hip Hop — deep 808 kick syncopated, clap on 2&4, open hats on upbeats
     DrumLoop(id: "hiphop", name: "Hip Hop", emoji: "🎤",
-             code: "stack(s(\"bd ~ ~ bd:1 ~ ~ bd ~\").bank(\"RolandTR808\").gain(1.3), s(\"~ ~ ~ ~ sd ~ ~ ~\").bank(\"RolandTR808\").gain(1.0), s(\"hh hh oh hh hh hh oh hh\").bank(\"RolandTR808\").gain(0.45))"),
+             code: "stack(\(_dkick).struct(\"x ~ ~ x ~ ~ x ~\"), \(_snap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_chh).struct(\"~ x ~ x ~ x ~ x\"), \(_ohh).struct(\"~ ~ x ~ ~ ~ x ~\"))"),
 
-    // House — four on the floor, 909 kit, offbeat hats
+    // House — four on the floor, offbeat open hats, claps on 2&4
     DrumLoop(id: "house", name: "House", emoji: "🏠",
-             code: "stack(s(\"bd bd bd bd\").bank(\"RolandTR909\").gain(1.2), s(\"~ cp ~ cp\").bank(\"RolandTR909\").gain(0.7), s(\"[~ hh] [~ hh] [~ hh] [~ hh]\").bank(\"RolandTR909\").gain(0.4))"),
+             code: "stack(\(_hkick).struct(\"x x x x\"), \(_clap2).struct(\"~ ~ x ~\"), \(_ohh).struct(\"~ x ~ x ~ x ~ x\"), \(_shk).struct(\"[x x] [x x] [x x] [x x]\"))"),
 
-    // Trap — 808 sub kick, rapid hats, sparse clap
+    // Trap — booming sub kick, fast 16th hats, sparse hard clap
     DrumLoop(id: "trap", name: "Trap", emoji: "🔊",
-             code: "stack(s(\"bd ~ ~ ~ bd:1 ~ ~ ~\").bank(\"RolandTR808\").gain(1.5), s(\"~ ~ ~ ~ cp ~ ~ ~\").bank(\"RolandTR808\").gain(0.9), s(\"[hh hh hh hh] [hh hh hh hh] [hh hh oh hh] [hh hh hh hh]\").bank(\"RolandTR808\").gain(0.35))"),
+             code: "stack(\(_dkick).struct(\"x ~ ~ ~ x ~ ~ ~\").gain(1.5), \(_snap).struct(\"~ ~ ~ ~ x ~ ~ ~\").gain(1.1), \(_chh).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"), \(_ohh).struct(\"~ ~ ~ ~ ~ ~ [~ x] ~\"))"),
 
-    // Minimal — just a click and a thud
+    // Minimal — sparse clicks and thuds
     DrumLoop(id: "minimal", name: "Minimal", emoji: "✨",
-             code: "stack(s(\"bd ~ bd ~\").bank(\"RolandTR909\").gain(0.9), s(\"~ rm ~ rm\").bank(\"RolandTR909\").gain(0.6))"),
+             code: "stack(\(_tkick).struct(\"x ~ ~ x\"), \(_rim2).struct(\"~ ~ x ~\"), \(_perc).struct(\"~ x ~ ~\"))"),
 ]
 
 extension Array {
