@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { margin: 0; background: black; overflow: hidden; }
+        #hydra-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="hydra-canvas"></canvas>
+
+    <!-- Strudel packages loaded via unpkg CDN -->
+    <script type="module">
+        import { repl, evalScope, reify, getTime } from 'https://unpkg.com/@strudel/core@1.0.0/dist/index.mjs';
+        import { webaudioOutput, initAudio, getAudioContext, registerSynthSounds } from 'https://unpkg.com/@strudel/webaudio@1.0.0/dist/index.mjs';
+
+        // Make available globally
+        window._strudelCore = { repl, evalScope, reify, getTime };
+        window._strudelAudio = { webaudioOutput, initAudio, getAudioContext, registerSynthSounds };
+
+        // Global signal param object (mutated at 60fps from native side)
+        window.__hp = {};
+
+        let _evaluate = null;
+        let _stop = null;
+        let _audioCtx = null;
+
+        window.initStrudel = async function() {
+            const { registerSynthSounds } = window._strudelAudio;
+            const { evalScope } = window._strudelCore;
+
+            registerSynthSounds();
+
+            await evalScope(
+                import('https://unpkg.com/@strudel/core@1.0.0/dist/index.mjs'),
+                import('https://unpkg.com/@strudel/mini@1.0.0/dist/index.mjs'),
+                import('https://unpkg.com/@strudel/tonal@1.0.0/dist/index.mjs'),
+                import('https://unpkg.com/@strudel/webaudio@1.0.0/dist/index.mjs'),
+            );
+
+            const { initAudio, getAudioContext, webaudioOutput } = window._strudelAudio;
+            const { repl } = window._strudelCore;
+
+            await initAudio();
+            _audioCtx = getAudioContext();
+
+            const r = repl({
+                defaultOutput: webaudioOutput,
+                getTime: () => _audioCtx?.currentTime ?? 0,
+                onSchedulerError: e => console.error('sched:', e),
+                onEvalError: e => console.error('eval:', e),
+            });
+
+            _evaluate = r.evaluate;
+            _stop = r.stop;
+
+            // Initialize Hydra
+            try {
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/hydra-synth';
+                script.onload = () => {
+                    const canvas = document.getElementById('hydra-canvas');
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                    new Hydra({
+                        canvas,
+                        detectAudio: false,
+                        makeGlobal: true,
+                        autoLoop: true,
+                    });
+
+                    // H() bridges Strudel patterns to Hydra
+                    const { reify, getTime } = window._strudelCore;
+                    window.H = (pat) => () => reify(pat).queryArc(getTime(), getTime())[0]?.value ?? 0;
+                };
+                document.head.appendChild(script);
+            } catch (e) {
+                console.warn('Hydra init failed:', e);
+            }
+
+            // Beat reporting
+            if (_audioCtx) {
+                let lastBeat = -1;
+                const checkBeat = () => {
+                    try {
+                        const cpm = (window.__hp._cpm || 30);
+                        const beat = Math.floor((_audioCtx.currentTime * cpm / 60) * 4) % 4;
+                        if (beat !== lastBeat) {
+                            lastBeat = beat;
+                            window.webkit?.messageHandlers?.strudelBridge?.postMessage({ beat });
+                        }
+                    } catch {}
+                    requestAnimationFrame(checkBeat);
+                };
+                checkBeat();
+            }
+
+            return true;
+        };
+
+        window.strudelEval = async function(code) {
+            if (_evaluate) {
+                try {
+                    await _evaluate(code);
+                } catch (e) {
+                    console.warn('eval error:', e);
+                }
+            }
+        };
+
+        window.hydraEval = function(code) {
+            try {
+                new Function(code)();
+            } catch (e) {
+                console.warn('hydra eval:', e);
+            }
+        };
+
+        window.strudelStop = function() {
+            if (_stop) _stop();
+        };
+
+        window.showHydra = function() {
+            const c = document.getElementById('hydra-canvas');
+            if (c) c.style.display = '';
+        };
+
+        window.hideHydra = function() {
+            const c = document.getElementById('hydra-canvas');
+            if (c) c.style.display = 'none';
+            try { new Function('solid(0,0,0,0).out()')(); } catch {}
+        };
+
+        window.addEventListener('resize', () => {
+            const c = document.getElementById('hydra-canvas');
+            if (c) {
+                c.width = window.innerWidth;
+                c.height = window.innerHeight;
+            }
+        });
+    </script>
+</body>
+</html>
