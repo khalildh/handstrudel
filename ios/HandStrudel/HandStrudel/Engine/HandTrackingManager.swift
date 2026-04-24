@@ -103,8 +103,8 @@ final class HandTrackingManager: NSObject, ObservableObject {
             captureSession.addOutput(videoOutput)
         }
 
-        // Mirror front camera
-        if let connection = videoOutput.connection(with: .video) {
+        // Mirror front camera (only if supported)
+        if let connection = videoOutput.connection(with: .video), connection.isVideoMirroringSupported {
             connection.isVideoMirrored = true
         }
 
@@ -112,9 +112,6 @@ final class HandTrackingManager: NSObject, ObservableObject {
 
         let layer = AVCaptureVideoPreviewLayer(session: captureSession)
         layer.videoGravity = .resizeAspectFill
-        if let connection = layer.connection {
-            connection.isVideoMirrored = true
-        }
         self.previewLayer = layer
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
