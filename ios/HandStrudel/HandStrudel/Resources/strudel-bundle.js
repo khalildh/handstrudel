@@ -19490,20 +19490,8 @@ registerProcessor('${n2}', MyProcessor);
         };
         checkBeat();
       }
-      if (typeof Hydra !== "undefined") {
-        try {
-          const canvas = document.getElementById("hydra-canvas");
-          canvas.width = window.innerWidth || 390;
-          canvas.height = window.innerHeight || 844;
-          new Hydra({ canvas, detectAudio: false, makeGlobal: true, autoLoop: true });
-          window.H = (pat) => () => d(pat).queryArc(Wy(), Wy())[0]?.value ?? 0;
-          log("hydra initialized");
-        } catch (e) {
-          log("hydra init failed: " + e);
-        }
-      } else {
-        log("hydra not available (script not loaded)");
-      }
+      log("hydra available: " + (typeof Hydra !== "undefined"));
+      window._hydraInitialized = false;
       log("loading drum samples...");
       try {
         await _evaluate(`samples('github:tidalcycles/Dirt-Samples/master')`);
@@ -19546,9 +19534,28 @@ registerProcessor('${n2}', MyProcessor);
   window.strudelStop = function() {
     if (_stop) _stop();
   };
-  window.showHydra = function() {
+  window.showHydra = function(w5, h) {
     const c3 = document.getElementById("hydra-canvas");
-    if (c3) c3.style.display = "";
+    if (!c3) return;
+    c3.width = w5 || window.innerWidth || 390;
+    c3.height = h || window.innerHeight || 844;
+    c3.style.display = "";
+    log("showHydra: canvas " + c3.width + "x" + c3.height);
+    if (!window._hydraInitialized && typeof Hydra !== "undefined") {
+      try {
+        new Hydra({ canvas: c3, detectAudio: false, makeGlobal: true, autoLoop: true });
+        window.H = (pat) => () => d(pat).queryArc(Wy(), Wy())[0]?.value ?? 0;
+        window._hydraInitialized = true;
+        log("hydra initialized at " + c3.width + "x" + c3.height);
+      } catch (e) {
+        log("hydra init failed: " + e);
+      }
+    }
+    try {
+      new Function("osc(10,0.1,1.5).out()")();
+    } catch (e) {
+      log("hydra kickstart error: " + e);
+    }
   };
   window.hideHydra = function() {
     const c3 = document.getElementById("hydra-canvas");

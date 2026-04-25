@@ -152,8 +152,15 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
 
     func setHydraEnabled(_ enabled: Bool) {
         hydraEnabled = enabled
-        let js = enabled ? "showHydra()" : "hideHydra()"
-        webView.evaluateJavaScript(js, completionHandler: nil)
+        if enabled {
+            let screen = UIScreen.main.bounds
+            let w = Int(screen.width * UIScreen.main.scale)
+            let h = Int(screen.height * UIScreen.main.scale)
+            // Pass screen size to JS since WebView may still be 1x1 when this runs
+            webView.evaluateJavaScript("showHydra(\(w), \(h))", completionHandler: nil)
+        } else {
+            webView.evaluateJavaScript("hideHydra()", completionHandler: nil)
+        }
     }
 
     func stop() {

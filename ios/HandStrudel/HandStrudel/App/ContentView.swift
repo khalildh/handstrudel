@@ -26,13 +26,10 @@ struct ContentView: View {
                 )
             }
 
-            // Hidden WebView for audio (must be in view hierarchy, but only when not showing Hydra full-screen)
-            if !engine.isRunning || !engine.hydraEnabled {
-                WebViewContainer(webView: engine.strudelBridge.view)
-                    .frame(width: 1, height: 1)
-                    .opacity(0.01)
-                    .allowsHitTesting(false)
-            }
+            // WebView — always full-screen for audio. Visually hidden unless Hydra is on.
+            HydraWebView(webView: engine.strudelBridge.view, visible: engine.isRunning && engine.hydraEnabled, opacity: hydraOpacity)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
         }
         .statusBarHidden(engine.isRunning)
     }
@@ -44,14 +41,6 @@ struct ContentView: View {
             // Full-screen camera
             CameraView(handTracker: engine.handTracker)
                 .ignoresSafeArea()
-
-            // Hydra visuals overlay
-            if engine.hydraEnabled {
-                WebViewContainer(webView: engine.strudelBridge.view)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .opacity(hydraOpacity)
-            }
 
             // Hand skeleton overlay with glow (aspect-corrected)
             HandOverlayView(
@@ -751,4 +740,30 @@ struct WebViewContainer: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {}
+}
+
+// WebView wrapper that manages visibility via UIKit alpha (not SwiftUI opacity)
+struct HydraWebView: UIViewRepresentable {
+    let webView: UIView
+    let visible: Bool
+    let opacity: Double
+
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .clear
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(webView)
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: container.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            webView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        ])
+        return container
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        // Use UIKit alpha directly — SwiftUI opacity(0) can skip rendering
+        uiView.alpha = visible ? opacity : 0.001
+    }
 }
