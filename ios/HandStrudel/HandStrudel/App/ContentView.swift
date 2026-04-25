@@ -26,11 +26,13 @@ struct ContentView: View {
                 )
             }
 
-            // Hidden WebView for audio (must be in view hierarchy)
-            WebViewContainer(webView: engine.strudelBridge.view)
-                .frame(width: 1, height: 1)
-                .opacity(0.01)
-                .allowsHitTesting(false)
+            // Hidden WebView for audio (must be in view hierarchy, but only when not showing Hydra full-screen)
+            if !engine.isRunning || !engine.hydraEnabled {
+                WebViewContainer(webView: engine.strudelBridge.view)
+                    .frame(width: 1, height: 1)
+                    .opacity(0.01)
+                    .allowsHitTesting(false)
+            }
         }
         .statusBarHidden(engine.isRunning)
     }
