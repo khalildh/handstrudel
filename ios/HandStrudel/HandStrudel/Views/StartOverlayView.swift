@@ -13,10 +13,12 @@ struct FloatingNote: Identifiable {
 
 struct StartOverlayView: View {
     let status: String
+    @ObservedObject var storeManager: StoreManager
     let onStart: (MappingConfig, MappingConfig, Bool) -> Void
 
     @State private var selectedPreset: Preset? = nil
     @State private var starting = false
+    @State private var paywallPackId: String?
     @State private var pulseScale: CGFloat = 1.0
     @State private var buttonGlow: CGFloat = 0.0
     @State private var cardsAppeared = false
@@ -101,9 +103,11 @@ struct StartOverlayView: View {
                         GridItem(.flexible(), spacing: 12)
                     ], spacing: 12) {
                         ForEach(Array(PRESETS.enumerated()), id: \.element.id) { index, preset in
+                            let locked = preset.isPremium && !storeManager.isUnlocked(preset.packId ?? "")
                             PresetCard(
                                 preset: preset,
-                                isSelected: selectedPreset?.id == preset.id
+                                isSelected: selectedPreset?.id == preset.id,
+                                isLocked: locked
                             )
                             .opacity(cardsAppeared ? 1 : 0)
                             .scaleEffect(cardsAppeared ? 1 : 0.85)
@@ -113,8 +117,12 @@ struct StartOverlayView: View {
                                 value: cardsAppeared
                             )
                             .onTapGesture {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    selectedPreset = preset
+                                if locked, let packId = preset.packId {
+                                    paywallPackId = packId
+                                } else {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        selectedPreset = preset
+                                    }
                                 }
                             }
                         }
@@ -173,6 +181,37 @@ struct StartOverlayView: View {
             notesAnimating = true
             startTitleGlow()
         }
+        .sheet(item: $paywallPackId) { packId in
+            paywallSheet(for: packId)
+                .presentationDetents([.medium])
+        }
+        .task {
+            if storeManager.products.isEmpty {
+                await storeManager.loadProducts()
+            }
+        }
+    }
+
+    private func paywallSheet(for packId: String) -> some View {
+        let info = paywallInfo(for: packId)
+        let product = storeManager.products.first(where: { $0.id == packId })
+        return PaywallOverlay(
+            packId: packId,
+            packName: info.name,
+            packDescription: info.description,
+            price: product?.displayPrice ?? "---",
+            items: info.items,
+            storeManager: storeManager
+        )
+    }
+
+    private func paywallInfo(for packId: String) -> (name: String, description: String, items: [String]) {
+        switch packId {
+        case StoreManager.studioPack: return ("Studio Pack", "Professional studio presets", ["Studio preset", "Cinematic preset"])
+        case StoreManager.partyPack: return ("Party Pack", "High-energy party presets", ["Party preset", "Rave preset"])
+        case StoreManager.experimentalPack: return ("Experimental Pack", "Experimental sound presets", ["Glitch preset", "Ambient preset"])
+        default: return ("Pack", "Premium content", [])
+        }
     }
 
     private func startTapped() {
@@ -205,6 +244,7 @@ struct StartOverlayView: View {
 struct PresetCard: View {
     let preset: Preset
     let isSelected: Bool
+    var isLocked: Bool = false
 
     var presetColor: Color {
         Color(red: preset.color.0, green: preset.color.1, blue: preset.color.2)
@@ -236,6 +276,15 @@ struct PresetCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(isSelected ? presetColor : Color.white.opacity(0.08), lineWidth: isSelected ? 2 : 1)
         )
+        .overlay(alignment: .topTrailing) {
+            if isLocked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.6))
+                    .padding(8)
+            }
+        }
+        .opacity(isLocked ? 0.5 : 1.0)
         .scaleEffect(isSelected ? 1.02 : 1.0)
     }
 }

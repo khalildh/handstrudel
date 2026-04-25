@@ -1,8 +1,13 @@
 import SwiftUI
 import ReplayKit
 
+extension String: @retroactive Identifiable {
+    public var id: String { self }
+}
+
 struct ContentView: View {
     @StateObject private var engine = EngineController()
+    @StateObject private var storeManager = StoreManager()
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var showSheet = false
     @State private var isRecording = false
@@ -26,6 +31,7 @@ struct ContentView: View {
             } else {
                 StartOverlayView(
                     status: engine.status,
+                    storeManager: storeManager,
                     onStart: { cfg, hCfg, adv in
                         engine.start(config: cfg, hydraConfig: hCfg, advanced: adv)
                     }
@@ -111,7 +117,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showSheet) {
-            ControlSheet(engine: engine)
+            ControlSheet(engine: engine, storeManager: storeManager)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -391,10 +397,25 @@ struct ContentView: View {
 
 struct ControlSheet: View {
     @ObservedObject var engine: EngineController
+    @ObservedObject var storeManager: StoreManager
+    @State private var showStore = false
+    @State private var paywallPackId: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // Header with store button
+                HStack {
+                    Spacer()
+                    Button(action: { showStore = true }) {
+                        Image(systemName: "bag")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(Color.white.opacity(0.08)))
+                    }
+                }
+
                 // Sound/waveform section
                 soundSection
 
@@ -427,6 +448,46 @@ struct ControlSheet: View {
             }
             .padding(20)
         }
+        .sheet(isPresented: $showStore) {
+            StoreView(storeManager: storeManager)
+        }
+        .sheet(item: $paywallPackId) { packId in
+            paywallSheet(for: packId)
+                .presentationDetents([.medium])
+        }
+        .task {
+            if storeManager.products.isEmpty {
+                await storeManager.loadProducts()
+            }
+        }
+    }
+
+    private func paywallSheet(for packId: String) -> some View {
+        let info = packInfo(for: packId)
+        let product = storeManager.products.first(where: { $0.id == packId })
+        return PaywallOverlay(
+            packId: packId,
+            packName: info.name,
+            packDescription: info.description,
+            price: product?.displayPrice ?? "---",
+            items: info.items,
+            storeManager: storeManager
+        )
+    }
+
+    private func packInfo(for packId: String) -> (name: String, description: String, items: [String]) {
+        switch packId {
+        case StoreManager.studioPack: return ("Studio Pack", "Professional studio presets", ["Studio preset", "Cinematic preset"])
+        case StoreManager.partyPack: return ("Party Pack", "High-energy party presets", ["Party preset", "Rave preset"])
+        case StoreManager.experimentalPack: return ("Experimental Pack", "Experimental sound presets", ["Glitch preset", "Ambient preset"])
+        case StoreManager.analogPack: return ("Analog Pack", "Warm analog-style waveforms", ["FM synth", "Supersaw", "Pulse"])
+        case StoreManager.texturePack: return ("Texture Pack", "Textural sound sources", ["Noise", "Metallic", "Pad"])
+        case StoreManager.vocalPack: return ("Vocal Pack", "Vocal synthesis sounds", ["Choir", "Formant", "Whisper"])
+        case StoreManager.kit808: return ("808 Kit", "Classic 808 drum machine", ["808 kick", "808 snare", "808 hat patterns"])
+        case StoreManager.kitElectronic: return ("Electronic Kit", "Modern electronic drums", ["Electro kick", "Glitch snare", "Digital hat patterns"])
+        case StoreManager.kitWorld: return ("World Kit", "World percussion drums", ["Djembe", "Tabla", "World percussion patterns"])
+        default: return ("Pack", "Premium content", [])
+        }
     }
 
     // MARK: - Sound
@@ -440,7 +501,14 @@ struct ControlSheet: View {
 
             HStack(spacing: 8) {
                 ForEach(WAVEFORMS) { wf in
-                    Button(action: { engine.selectedWaveform = wf.id }) {
+                    let locked = wf.isPremium && !storeManager.isUnlocked(wf.packId ?? "")
+                    Button(action: {
+                        if locked, let packId = wf.packId {
+                            paywallPackId = packId
+                        } else {
+                            engine.selectedWaveform = wf.id
+                        }
+                    }) {
                         VStack(spacing: 3) {
                             Text(wf.emoji)
                                 .font(.system(size: 18))
@@ -458,6 +526,15 @@ struct ControlSheet: View {
                             RoundedRectangle(cornerRadius: 10)
                                 .stroke(engine.selectedWaveform == wf.id ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
+                        .overlay(alignment: .topTrailing) {
+                            if locked {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.white.opacity(0.6))
+                                    .padding(5)
+                            }
+                        }
+                        .opacity(locked ? 0.5 : 1.0)
                     }
                 }
             }
@@ -479,7 +556,14 @@ struct ControlSheet: View {
                 GridItem(.flexible(), spacing: 8)
             ], spacing: 8) {
                 ForEach(DRUM_LOOPS) { drumLoop in
-                    Button(action: { loop.wrappedValue = drumLoop }) {
+                    let locked = drumLoop.isPremium && !storeManager.isUnlocked(drumLoop.packId ?? "")
+                    Button(action: {
+                        if locked, let packId = drumLoop.packId {
+                            paywallPackId = packId
+                        } else {
+                            loop.wrappedValue = drumLoop
+                        }
+                    }) {
                         VStack(spacing: 3) {
                             Text(drumLoop.emoji)
                                 .font(.system(size: 20))
@@ -497,6 +581,15 @@ struct ControlSheet: View {
                             RoundedRectangle(cornerRadius: 10)
                                 .stroke(loop.wrappedValue.id == drumLoop.id ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
+                        .overlay(alignment: .topTrailing) {
+                            if locked {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.white.opacity(0.6))
+                                    .padding(5)
+                            }
+                        }
+                        .opacity(locked ? 0.5 : 1.0)
                     }
                 }
             }

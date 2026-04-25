@@ -243,6 +243,8 @@ struct DrumLoop: Identifiable {
     let name: String
     let emoji: String
     let code: String  // Strudel code for the drum pattern
+    let isPremium: Bool
+    let packId: String?
 }
 
 // Synth drums using proper synthesis techniques:
@@ -276,27 +278,65 @@ let _rimshot = "note(\"b4\").s(\"triangle\").decay(0.02).sustain(0).gain(0.6).hp
 let _clave = "note(\"d5\").s(\"sine\").decay(0.03).sustain(0).gain(0.5).hpf(3000)"
 
 let DRUM_LOOPS: [DrumLoop] = [
-    DrumLoop(id: "none", name: "None", emoji: "🔇", code: ""),
+    DrumLoop(id: "none", name: "None", emoji: "🔇", code: "",
+             isPremium: false, packId: nil),
 
     // Basic — kick-snare-hat straight groove
     DrumLoop(id: "basic", name: "Basic", emoji: "🥁",
-             code: "stack(\(_punchKick).struct(\"x ~ x ~\"), \(_snare).struct(\"~ x ~ x\"), \(_closedHat).struct(\"x x x x\"))"),
+             code: "stack(\(_punchKick).struct(\"x ~ x ~\"), \(_snare).struct(\"~ x ~ x\"), \(_closedHat).struct(\"x x x x\"))",
+             isPremium: false, packId: nil),
 
     // Hip Hop — deep 808, syncopated, boom bap
     DrumLoop(id: "hiphop", name: "Hip Hop", emoji: "🎤",
-             code: "stack(\(_deepKick).struct(\"x ~ ~ x ~ ~ x ~\"), \(_hardClap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_closedHat).struct(\"~ x ~ x ~ x ~ x\"), \(_openHat).struct(\"~ ~ x ~ ~ ~ x ~\"))"),
+             code: "stack(\(_deepKick).struct(\"x ~ ~ x ~ ~ x ~\"), \(_hardClap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_closedHat).struct(\"~ x ~ x ~ x ~ x\"), \(_openHat).struct(\"~ ~ x ~ ~ ~ x ~\"))",
+             isPremium: false, packId: nil),
 
     // House — four on the floor, offbeat hats, clap on 3
     DrumLoop(id: "house", name: "House", emoji: "🏠",
-             code: "stack(\(_houseKick).struct(\"x x x x\"), \(_clap).struct(\"~ ~ x ~\"), \(_openHat).struct(\"~ x ~ x ~ x ~ x\"), \(_tinyHat).struct(\"[x x] [x x] [x x] [x x]\"))"),
+             code: "stack(\(_houseKick).struct(\"x x x x\"), \(_clap).struct(\"~ ~ x ~\"), \(_openHat).struct(\"~ x ~ x ~ x ~ x\"), \(_tinyHat).struct(\"[x x] [x x] [x x] [x x]\"))",
+             isPremium: false, packId: nil),
 
     // Trap — 808 boom, rapid hats, hard clap
     DrumLoop(id: "trap", name: "Trap", emoji: "🔊",
-             code: "stack(\(_deepKick).struct(\"x ~ ~ ~ x ~ ~ ~\").gain(1.6), \(_hardClap).struct(\"~ ~ ~ ~ x ~ ~ ~\").gain(1.1), \(_closedHat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"), \(_openHat).struct(\"~ ~ ~ ~ ~ ~ [~ x] ~\"))"),
+             code: "stack(\(_deepKick).struct(\"x ~ ~ ~ x ~ ~ ~\").gain(1.6), \(_hardClap).struct(\"~ ~ ~ ~ x ~ ~ ~\").gain(1.1), \(_closedHat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"), \(_openHat).struct(\"~ ~ ~ ~ ~ ~ [~ x] ~\"))",
+             isPremium: false, packId: nil),
 
     // Minimal — sparse, clicky
     DrumLoop(id: "minimal", name: "Minimal", emoji: "✨",
-             code: "stack(\(_punchKick).struct(\"x ~ ~ x\"), \(_rimshot).struct(\"~ ~ x ~\"), \(_clave).struct(\"~ x ~ ~\"))"),
+             code: "stack(\(_punchKick).struct(\"x ~ ~ x\"), \(_rimshot).struct(\"~ ~ x ~\"), \(_clave).struct(\"~ x ~ ~\"))",
+             isPremium: false, packId: nil),
+
+    // MARK: - Premium Drum Loops
+
+    // Boom Bap — syncopated deep kick, snappy snare on 2&4, open hats
+    DrumLoop(id: "boombap", name: "Boom Bap", emoji: "🎧",
+             code: "stack(\(_deepKick).struct(\"x ~ ~ ~ ~ ~ x ~\"), \(_snare).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_closedHat).struct(\"x ~ x ~ x ~ x ~\"), \(_openHat).struct(\"~ ~ ~ x ~ ~ ~ x\"))",
+             isPremium: true, packId: "kit_808"),
+
+    // Drill — sliding 808 kick, rapid hats, sparse clap
+    DrumLoop(id: "drill", name: "Drill", emoji: "🔫",
+             code: "stack(\(_deepKick).struct(\"x ~ ~ ~ ~ x ~ ~\").gain(1.5), \(_hardClap).struct(\"~ ~ ~ ~ ~ ~ ~ x\"), \(_closedHat).struct(\"[x x x] [x x x] [x x x] [x x x]\"), \(_openHat).struct(\"~ ~ [~ x] ~ ~ ~ [~ x] ~\"))",
+             isPremium: true, packId: "kit_808"),
+
+    // Techno — four-on-floor tight kick, metallic hats, clap on 2&4
+    DrumLoop(id: "techno", name: "Techno", emoji: "🤖",
+             code: "stack(\(_punchKick).struct(\"x x x x\").gain(1.3), \(_clap).struct(\"~ x ~ x\"), \(_tinyHat).struct(\"[x x] [x x] [x x] [x x]\"), \(_openHat).struct(\"~ [~ x] ~ [~ x]\"))",
+             isPremium: true, packId: "kit_electronic"),
+
+    // Breakbeat — broken kick pattern, fast snare rolls, open hats
+    DrumLoop(id: "breakbeat", name: "Breakbeat", emoji: "💥",
+             code: "stack(\(_punchKick).struct(\"x ~ x ~ ~ x ~ ~\"), \(_snare).struct(\"~ ~ ~ ~ x ~ [x x] ~\"), \(_closedHat).struct(\"[x x] [x x] [x x] [x x]\"), \(_openHat).struct(\"~ ~ ~ ~ ~ ~ ~ x\"))",
+             isPremium: true, packId: "kit_electronic"),
+
+    // Bossa Nova — syncopated light kick, rim on offbeats, shaker 16ths
+    DrumLoop(id: "bossanova", name: "Bossa Nova", emoji: "🌴",
+             code: "stack(\(_houseKick).struct(\"x ~ ~ x ~ ~ x ~\").gain(0.9), \(_rimshot).struct(\"~ ~ x ~ ~ x ~ x\"), \(_tinyHat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\").gain(0.3))",
+             isPremium: true, packId: "kit_world"),
+
+    // Reggae — one-drop kick on 3, rim on 2&4, offbeat clicks
+    DrumLoop(id: "reggae", name: "Reggae", emoji: "🟢",
+             code: "stack(\(_deepKick).struct(\"~ ~ x ~\").gain(1.2), \(_rimshot).struct(\"~ x ~ x\"), \(_clave).struct(\"~ x ~ x ~ x ~ x\").gain(0.4))",
+             isPremium: true, packId: "kit_world"),
 ]
 
 extension Array {

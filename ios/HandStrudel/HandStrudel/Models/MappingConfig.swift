@@ -65,6 +65,8 @@ struct Preset: Identifiable {
     let color: (Double, Double, Double) // RGB 0-1
     let mapping: MappingConfig
     let hydraMapping: MappingConfig
+    let isPremium: Bool
+    let packId: String?
 }
 
 let PRESETS: [Preset] = [
@@ -76,7 +78,8 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "spread": "reverb", "x": "lpf"],
             right: ["y": "gain", "spread": "delay", "x": "pan"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: false, packId: nil
     ),
     Preset(
         id: "gritty", name: "Gritty", emoji: "🔥",
@@ -86,7 +89,8 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
             right: ["y": "gain", "x": "hpf", "spread": "bpm"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: false, packId: nil
     ),
     Preset(
         id: "bouncy", name: "Bouncy", emoji: "🎾",
@@ -96,7 +100,8 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "spread": "lpf", "x": "delay"],
             right: ["y": "bpm", "spread": "gain", "x": "reverb"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: false, packId: nil
     ),
     Preset(
         id: "chill", name: "Chill", emoji: "🧊",
@@ -106,7 +111,77 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "pan", "spread": "reverb"],
             right: ["y": "gain", "x": "attack", "spread": "release"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: false, packId: nil
+    ),
+
+    // MARK: - Premium Presets
+
+    Preset(
+        id: "lofi", name: "Lo-Fi", emoji: "📻",
+        description: "Slow, warm & dusty",
+        color: (0.8, 0.6, 0.4),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "reverb"],
+            right: ["y": "gain", "x": "delay", "spread": "crush"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
+    Preset(
+        id: "ambient", name: "Ambient", emoji: "🌊",
+        description: "Spacious & ethereal",
+        color: (0.4, 0.6, 0.9),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "reverb", "spread": "pan"],
+            right: ["y": "gain", "x": "attack", "spread": "release"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
+    Preset(
+        id: "glitch", name: "Glitch", emoji: "👾",
+        description: "Broken & digital",
+        color: (0.0, 1.0, 0.6),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
+            right: ["y": "gain", "x": "hpf", "spread": "delay"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "experimental"
+    ),
+    Preset(
+        id: "edm", name: "EDM", emoji: "⚡",
+        description: "High energy dancefloor",
+        color: (1.0, 0.9, 0.0),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "hpf"],
+            right: ["y": "bpm", "x": "gain", "spread": "delay"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "party"
+    ),
+    Preset(
+        id: "dnb", name: "DnB", emoji: "🥁",
+        description: "Fast & aggressive",
+        color: (0.9, 0.2, 0.5),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "shape"],
+            right: ["y": "bpm", "x": "gain", "spread": "reverb"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "party"
+    ),
+    Preset(
+        id: "dubstep", name: "Dubstep", emoji: "💀",
+        description: "Heavy bass & wobble",
+        color: (0.3, 0.0, 0.6),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "crush", "spread": "lpf"],
+            right: ["y": "gain", "x": "shape", "spread": "delay"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "party"
     ),
 ]
 
