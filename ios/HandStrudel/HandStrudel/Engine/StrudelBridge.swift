@@ -40,6 +40,9 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
 
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
         if #available(iOS 16.4, *) {
             webView.isInspectable = true
         }
