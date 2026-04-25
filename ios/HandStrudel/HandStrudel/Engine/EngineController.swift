@@ -390,10 +390,9 @@ final class EngineController: ObservableObject {
 
     func toggleHydra() {
         hydraEnabled.toggle()
-        debugLog("toggleHydra: \(hydraEnabled)")
         strudelBridge.setHydraEnabled(hydraEnabled)
-        if hydraEnabled {
-            lastHydraCode = "" // force re-eval
+        if !hydraEnabled {
+            lastHydraCode = ""
         }
     }
 

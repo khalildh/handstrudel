@@ -76,10 +76,7 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "spread": "reverb", "x": "lpf"],
             right: ["y": "gain", "spread": "delay", "x": "pan"]
         ),
-        hydraMapping: MappingConfig(
-            left:  ["y": "hRotate", "spread": "hColorama", "x": "hModulate"],
-            right: ["y": "hFreq", "spread": "hKaleid", "x": "hScale"]
-        )
+        hydraMapping: DEFAULT_HYDRA_MAPPING
     ),
     Preset(
         id: "gritty", name: "Gritty", emoji: "🔥",
@@ -89,10 +86,7 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
             right: ["y": "gain", "x": "hpf", "spread": "bpm"]
         ),
-        hydraMapping: MappingConfig(
-            left:  ["y": "hPixel", "spread": "hSaturate", "x": "hColorama"],
-            right: ["y": "hFreq", "spread": "hBright", "x": "hRotate"]
-        )
+        hydraMapping: DEFAULT_HYDRA_MAPPING
     ),
     Preset(
         id: "bouncy", name: "Bouncy", emoji: "🎾",
@@ -102,10 +96,7 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "spread": "lpf", "x": "delay"],
             right: ["y": "bpm", "spread": "gain", "x": "reverb"]
         ),
-        hydraMapping: MappingConfig(
-            left:  ["y": "hKaleid", "spread": "hScale", "x": "hFreq"],
-            right: ["y": "hRotate", "spread": "hModulate", "x": "hColorama"]
-        )
+        hydraMapping: DEFAULT_HYDRA_MAPPING
     ),
     Preset(
         id: "chill", name: "Chill", emoji: "🧊",
@@ -115,10 +106,7 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "pan", "spread": "reverb"],
             right: ["y": "gain", "x": "attack", "spread": "release"]
         ),
-        hydraMapping: MappingConfig(
-            left:  ["y": "hFreq", "spread": "hSync", "x": "hScale"],
-            right: ["y": "hBright", "spread": "hModulate", "x": "hSaturate"]
-        )
+        hydraMapping: DEFAULT_HYDRA_MAPPING
     ),
 ]
 

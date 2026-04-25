@@ -60,9 +60,21 @@ window.initStrudel = async function() {
             checkBeat();
         }
 
-        // Hydra will be initialized lazily in showHydra() when canvas is full-screen
-        log('hydra available: ' + (typeof Hydra !== 'undefined'));
-        window._hydraInitialized = false;
+        // Initialize Hydra (loaded via classic script tag before this module)
+        if (typeof Hydra !== 'undefined') {
+            try {
+                const canvas = document.getElementById('hydra-canvas');
+                canvas.width = window.innerWidth || 390;
+                canvas.height = window.innerHeight || 844;
+                new Hydra({ canvas, detectAudio: false, makeGlobal: true, autoLoop: true });
+                window.H = (pat) => () => reify(pat).queryArc(getTime(), getTime())[0]?.value ?? 0;
+                log('hydra initialized');
+            } catch (e) {
+                log('hydra init failed: ' + e);
+            }
+        } else {
+            log('hydra not available (script not loaded)');
+        }
 
         // Load drum samples via Strudel's evaluate (runs in sandboxed scope where samples() lives)
         log('loading drum samples...');
@@ -105,29 +117,9 @@ window.hydraEval = function(code) {
 
 window.strudelStop = function() { if (_stop) _stop(); };
 
-window.showHydra = function(w, h) {
+window.showHydra = function() {
     const c = document.getElementById('hydra-canvas');
-    if (!c) return;
-
-    c.width = w || window.innerWidth || 390;
-    c.height = h || window.innerHeight || 844;
-    c.style.display = '';
-    log('showHydra: canvas ' + c.width + 'x' + c.height);
-
-    // Initialize Hydra on first show (WebGL context needs correct canvas size)
-    if (!window._hydraInitialized && typeof Hydra !== 'undefined') {
-        try {
-            new Hydra({ canvas: c, detectAudio: false, makeGlobal: true, autoLoop: true });
-            window.H = (pat) => () => reify(pat).queryArc(getTime(), getTime())[0]?.value ?? 0;
-            window._hydraInitialized = true;
-            log('hydra initialized at ' + c.width + 'x' + c.height);
-        } catch (e) {
-            log('hydra init failed: ' + e);
-        }
-    }
-
-    // Kick-start with a default pattern
-    try { new Function('osc(10,0.1,1.5).out()')(); } catch(e) { log('hydra kickstart error: ' + e); }
+    if (c) c.style.display = '';
 };
 
 window.hideHydra = function() {
