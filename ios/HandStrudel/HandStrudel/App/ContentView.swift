@@ -3,6 +3,7 @@ import ReplayKit
 
 struct ContentView: View {
     @StateObject private var engine = EngineController()
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var showSheet = false
     @State private var isRecording = false
     @State private var recordCountdown = 0
@@ -16,6 +17,12 @@ struct ContentView: View {
 
             if engine.isRunning {
                 performanceView
+                    .overlay {
+                        if !hasSeenOnboarding {
+                            OnboardingView(hasSeenOnboarding: $hasSeenOnboarding)
+                                .transition(.opacity)
+                        }
+                    }
             } else {
                 StartOverlayView(
                     status: engine.status,
@@ -388,6 +395,9 @@ struct ControlSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // Sound/waveform section
+                soundSection
+
                 // BPM section
                 bpmSection
 
@@ -404,6 +414,41 @@ struct ControlSheet: View {
                 if !engine.track.slots.isEmpty { trackSection }
             }
             .padding(20)
+        }
+    }
+
+    // MARK: - Sound
+
+    private var soundSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("SOUND")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(.secondary)
+                .tracking(1.5)
+
+            HStack(spacing: 8) {
+                ForEach(WAVEFORMS) { wf in
+                    Button(action: { engine.selectedWaveform = wf.id }) {
+                        VStack(spacing: 3) {
+                            Text(wf.emoji)
+                                .font(.system(size: 18))
+                            Text(wf.name)
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundColor(engine.selectedWaveform == wf.id ? .green : .primary.opacity(0.6))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(engine.selectedWaveform == wf.id ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(engine.selectedWaveform == wf.id ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                        )
+                    }
+                }
+            }
         }
     }
 

@@ -1,6 +1,19 @@
 import SwiftUI
 import QuartzCore
 
+struct Waveform: Identifiable {
+    let id: String
+    let name: String
+    let emoji: String
+}
+
+let WAVEFORMS: [Waveform] = [
+    Waveform(id: "sawtooth", name: "Saw", emoji: "\u{1FAB5}"),
+    Waveform(id: "square", name: "Square", emoji: "\u{25A0}"),
+    Waveform(id: "triangle", name: "Triangle", emoji: "\u{25B3}"),
+    Waveform(id: "sine", name: "Sine", emoji: "\u{223F}"),
+]
+
 private func debugLog(_ msg: String) {
     let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("debug.log")
     let line = "\(Date()): \(msg)\n"
@@ -52,6 +65,7 @@ final class EngineController: ObservableObject {
     @Published var autoRotateStructs = true
     @Published var lockedParams = Set<String>()
     @Published var manualValues = MusicParams()
+    @Published var selectedWaveform: String = "sawtooth"
     @Published var selectedDrumLoop: DrumLoop = DRUM_LOOPS[0]
     @Published var drumVolume: Double = 1.0
     @Published var drumSpeed: Double = 1.0  // 0.5x, 1x, 2x
@@ -120,7 +134,7 @@ final class EngineController: ObservableObject {
 
                 // Evaluate initial signal-based code
                 debugLog("evaluating initial code...")
-                let code = buildSignalCode(structIdx: structIdx, config: config)
+                let code = buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
                 strudelBridge.evaluate(code)
                 lastStructKey = String(structIdx)
 
@@ -202,10 +216,10 @@ final class EngineController: ObservableObject {
 
             // Re-evaluate when struct, drum loop, drum volume, or drum speed changes
             let drumKey = String(format: "%.1f|%.1f", drumVolume, drumSpeed)
-            let structKey = "\(structIdx)|\(selectedDrumLoop.id)|\(drumKey)"
+            let structKey = "\(structIdx)|\(selectedDrumLoop.id)|\(drumKey)|\(selectedWaveform)"
             if structKey != lastStructKey {
                 lastStructKey = structKey
-                let synthCode = buildSignalCode(structIdx: structIdx, config: config)
+                let synthCode = buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
                 var drumCode = selectedDrumLoop.code
                 if !drumCode.isEmpty {
                     // Apply drum volume
@@ -235,7 +249,7 @@ final class EngineController: ObservableObject {
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         if saveDetector.check(hands: currentHands, config: config, currentTime: elapsed) {
             let snippet = SavedSnippet(
-                code: buildCode(smoothed, structIdx: structIdx, config: config),
+                code: buildCode(smoothed, structIdx: structIdx, config: config, waveform: selectedWaveform),
                 bpm: Int((smoothed["bpm"] ?? 120).rounded())
             )
             DispatchQueue.main.async { [weak self] in
@@ -280,7 +294,7 @@ final class EngineController: ObservableObject {
 
         var lines = [
             "note(\"\(note)\")",
-            "  .s(\"sawtooth\")",
+            "  .s(\"\(selectedWaveform)\")",
             "  .struct(\"\(st)\")",
             "  .cpm(\(cpm))",
         ]

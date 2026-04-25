@@ -168,13 +168,13 @@ func extraParamIds(_ config: MappingConfig) -> [String] {
     return Array(ids).sorted()
 }
 
-func buildCode(_ p: MusicParams, structIdx: Int, config: MappingConfig) -> String {
+func buildCode(_ p: MusicParams, structIdx: Int, config: MappingConfig, waveform: String = "sawtooth") -> String {
     let ni = max(0, min(NOTES.count - 1, Int((p["noteIdx"] ?? 10).rounded())))
     let note = NOTES[ni]
     let cpm = String(format: "%.1f", (p["bpm"] ?? 120) / 4)
     let st = STRUCTS[structIdx]
 
-    var code = "note(\"\(note)\").s(\"sawtooth\").struct(\"\(st)\").cpm(\(cpm))"
+    var code = "note(\"\(note)\").s(\"\(waveform)\").struct(\"\(st)\").cpm(\(cpm))"
 
     for id in extraParamIds(config) {
         guard let def = PARAM_MAP[id] else { continue }
@@ -184,10 +184,10 @@ func buildCode(_ p: MusicParams, structIdx: Int, config: MappingConfig) -> Strin
     return code
 }
 
-func buildSignalCode(structIdx: Int, config: MappingConfig) -> String {
+func buildSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth") -> String {
     let st = STRUCTS[structIdx]
 
-    var code = "note(signal(() => __hp._midi)).s(\"sawtooth\").struct(\"\(st)\").cpm(signal(() => __hp._cpm))"
+    var code = "note(signal(() => __hp._midi)).s(\"\(waveform)\").struct(\"\(st)\").cpm(signal(() => __hp._cpm))"
 
     for id in extraParamIds(config) {
         guard let def = PARAM_MAP[id] else { continue }
