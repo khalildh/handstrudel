@@ -4,6 +4,7 @@ import ReplayKit
 struct ContentView: View {
     @StateObject private var engine = EngineController()
     @State private var showSheet = false
+    @State private var hydraOpacity: Double = 0.5
     @State private var isRecording = false
     @State private var recordCountdown = 0
     @State private var showShareSheet = false
@@ -47,7 +48,7 @@ struct ContentView: View {
                 WebViewContainer(webView: engine.strudelBridge.view)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
-                    .opacity(0.5)
+                    .opacity(hydraOpacity)
             }
 
             // Hand skeleton overlay with glow (aspect-corrected)
@@ -112,7 +113,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showSheet) {
-            ControlSheet(engine: engine)
+            ControlSheet(engine: engine, hydraOpacity: $hydraOpacity)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -240,18 +241,16 @@ struct ContentView: View {
 
     private var bottomControls: some View {
         HStack(spacing: 16) {
-            // Hydra toggle
-            if hasHydraMapping(engine.hydraConfig) {
-                Button(action: engine.toggleHydra) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 18))
-                        .foregroundColor(engine.hydraEnabled ? .purple : .white.opacity(0.4))
-                        .frame(width: 44, height: 44)
-                        .background(
-                            Circle()
-                                .fill(engine.hydraEnabled ? Color.purple.opacity(0.2) : Color.black.opacity(0.3))
-                        )
-                }
+            // Hydra visuals toggle
+            Button(action: engine.toggleHydra) {
+                Image(systemName: engine.hydraEnabled ? "sparkles" : "sparkles")
+                    .font(.system(size: 18))
+                    .foregroundColor(engine.hydraEnabled ? .purple : .white.opacity(0.4))
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(engine.hydraEnabled ? Color.purple.opacity(0.2) : Color.black.opacity(0.3))
+                    )
             }
 
             Spacer()
@@ -406,6 +405,7 @@ struct ContentView: View {
 
 struct ControlSheet: View {
     @ObservedObject var engine: EngineController
+    @Binding var hydraOpacity: Double
 
     var body: some View {
         ScrollView {
@@ -418,6 +418,9 @@ struct ControlSheet: View {
 
                 // Drum loops + settings
                 drumSection
+
+                // Hydra visuals
+                hydraSection
 
                 // Snippets
                 if !engine.savedSnippets.isEmpty { snippetsSection }
@@ -498,6 +501,44 @@ struct ControlSheet: View {
                     ), in: 0.25...4.0, step: 0.25)
                     .tint(.green)
                     Text(String(format: "%.2gx", engine.drumSpeed))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .frame(width: 35, alignment: .trailing)
+                }
+            }
+        }
+    }
+
+    // MARK: - Hydra
+
+    private var hydraSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("VISUALS")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .tracking(1.5)
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { engine.hydraEnabled },
+                    set: { _ in engine.toggleHydra() }
+                ))
+                .toggleStyle(SwitchToggleStyle(tint: .purple))
+                .labelsHidden()
+            }
+
+            if engine.hydraEnabled {
+                HStack(spacing: 8) {
+                    Image(systemName: "circle.lefthalf.filled")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .frame(width: 20)
+                    Text("blend")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                    Slider(value: $hydraOpacity, in: 0.1...1.0)
+                        .tint(.purple)
+                    Text(String(format: "%.0f%%", hydraOpacity * 100))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
                         .frame(width: 35, alignment: .trailing)
