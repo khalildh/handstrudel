@@ -68,7 +68,10 @@ final class EngineController: ObservableObject {
     @Published var selectedWaveform: String = "sawtooth"
     @Published var selectedDrumLoop: DrumLoop = DRUM_LOOPS[0]
     @Published var drumVolume: Double = 1.0
-    @Published var drumSpeed: Double = 1.0  // 0.5x, 1x, 2x
+    @Published var drumSpeed: Double = 1.0
+    @Published var selectedDrumLoop2: DrumLoop = DRUM_LOOPS[0]
+    @Published var drumVolume2: Double = 1.0
+    @Published var drumSpeed2: Double = 1.0
     private var lastDrumLoopId = ""
 
     var bpmIsMapped: Bool {
@@ -214,24 +217,32 @@ final class EngineController: ObservableObject {
             // Update signal params in WebView
             strudelBridge.updateParams(smoothed, config: config)
 
-            // Re-evaluate when struct, drum loop, drum volume, or drum speed changes
-            let drumKey = String(format: "%.1f|%.1f", drumVolume, drumSpeed)
-            let structKey = "\(structIdx)|\(selectedDrumLoop.id)|\(drumKey)|\(selectedWaveform)"
+            // Re-evaluate when struct, drum loops, or waveform changes
+            let drumKey1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
+            let drumKey2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
+            let structKey = "\(structIdx)|\(drumKey1)|\(drumKey2)|\(selectedWaveform)"
             if structKey != lastStructKey {
                 lastStructKey = structKey
                 let synthCode = buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                var drumCode = selectedDrumLoop.code
-                if !drumCode.isEmpty {
-                    // Apply drum volume
-                    if drumVolume != 1.0 {
-                        drumCode = "(\(drumCode)).gain(\(String(format: "%.2f", drumVolume)))"
-                    }
-                    // Apply drum speed multiplier
-                    if drumSpeed != 1.0 {
-                        drumCode = "(\(drumCode)).fast(\(String(format: "%.1f", drumSpeed)))"
-                    }
+
+                // Build drum codes
+                var parts = [synthCode]
+
+                var drumCode1 = selectedDrumLoop.code
+                if !drumCode1.isEmpty {
+                    if drumVolume != 1.0 { drumCode1 = "(\(drumCode1)).gain(\(String(format: "%.2f", drumVolume)))" }
+                    if drumSpeed != 1.0 { drumCode1 = "(\(drumCode1)).fast(\(String(format: "%.1f", drumSpeed)))" }
+                    parts.append(drumCode1)
                 }
-                let code = drumCode.isEmpty ? synthCode : "stack(\(synthCode), \(drumCode))"
+
+                var drumCode2 = selectedDrumLoop2.code
+                if !drumCode2.isEmpty {
+                    if drumVolume2 != 1.0 { drumCode2 = "(\(drumCode2)).gain(\(String(format: "%.2f", drumVolume2)))" }
+                    if drumSpeed2 != 1.0 { drumCode2 = "(\(drumCode2)).fast(\(String(format: "%.1f", drumSpeed2)))" }
+                    parts.append(drumCode2)
+                }
+
+                let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
                 strudelBridge.evaluate(code)
             }
 

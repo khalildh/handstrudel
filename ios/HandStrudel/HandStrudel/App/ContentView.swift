@@ -405,7 +405,19 @@ struct ControlSheet: View {
                 paramsSection
 
                 // Drum loops + settings
-                drumSection
+                drumTrackSection(
+                    label: "DRUMS 1",
+                    loop: $engine.selectedDrumLoop,
+                    volume: $engine.drumVolume,
+                    speed: $engine.drumSpeed
+                )
+
+                drumTrackSection(
+                    label: "DRUMS 2",
+                    loop: $engine.selectedDrumLoop2,
+                    volume: $engine.drumVolume2,
+                    speed: $engine.drumSpeed2
+                )
 
                 // Snippets
                 if !engine.savedSnippets.isEmpty { snippetsSection }
@@ -454,73 +466,63 @@ struct ControlSheet: View {
 
     // MARK: - Drums
 
-    private var drumSection: some View {
+    private func drumTrackSection(label: String, loop: Binding<DrumLoop>, volume: Binding<Double>, speed: Binding<Double>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("DRUMS")
+            Text(label)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundColor(.secondary)
                 .tracking(1.5)
 
-            // Loop picker
             LazyVGrid(columns: [
                 GridItem(.flexible(), spacing: 8),
                 GridItem(.flexible(), spacing: 8),
                 GridItem(.flexible(), spacing: 8)
             ], spacing: 8) {
-                ForEach(DRUM_LOOPS) { loop in
-                    Button(action: { engine.selectedDrumLoop = loop }) {
+                ForEach(DRUM_LOOPS) { drumLoop in
+                    Button(action: { loop.wrappedValue = drumLoop }) {
                         VStack(spacing: 3) {
-                            Text(loop.emoji)
+                            Text(drumLoop.emoji)
                                 .font(.system(size: 20))
-                            Text(loop.name)
+                            Text(drumLoop.name)
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundColor(engine.selectedDrumLoop.id == loop.id ? .green : .primary.opacity(0.6))
+                                .foregroundColor(loop.wrappedValue.id == drumLoop.id ? .green : .primary.opacity(0.6))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(engine.selectedDrumLoop.id == loop.id ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                                .fill(loop.wrappedValue.id == drumLoop.id ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(engine.selectedDrumLoop.id == loop.id ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                .stroke(loop.wrappedValue.id == drumLoop.id ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
                     }
                 }
             }
 
-            // Drum controls (only when a loop is selected)
-            if engine.selectedDrumLoop.id != "none" {
-                // Volume
+            if loop.wrappedValue.id != "none" {
                 HStack(spacing: 8) {
                     Image(systemName: "speaker.wave.2")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .frame(width: 20)
-                    Slider(value: Binding(
-                        get: { engine.drumVolume },
-                        set: { engine.drumVolume = $0 }
-                    ), in: 0.2...2.0)
-                    .tint(.green)
-                    Text(String(format: "%.0f%%", engine.drumVolume * 100))
+                    Slider(value: volume, in: 0.2...2.0)
+                        .tint(.green)
+                    Text(String(format: "%.0f%%", volume.wrappedValue * 100))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
                         .frame(width: 40, alignment: .trailing)
                 }
 
-                // Speed
                 HStack(spacing: 8) {
                     Image(systemName: "metronome")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .frame(width: 20)
-                    Slider(value: Binding(
-                        get: { engine.drumSpeed },
-                        set: { engine.drumSpeed = $0 }
-                    ), in: 0.25...4.0, step: 0.25)
-                    .tint(.green)
-                    Text(String(format: "%.2gx", engine.drumSpeed))
+                    Slider(value: speed, in: 0.25...4.0, step: 0.25)
+                        .tint(.green)
+                    Text(String(format: "%.2gx", speed.wrappedValue))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
                         .frame(width: 35, alignment: .trailing)
