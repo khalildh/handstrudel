@@ -11,6 +11,7 @@
 		0AABB3564BB7F0F7CD594B81 /* strudel-bundle.js in Resources */ = {isa = PBXBuildFile; fileRef = 0566FE6FEDB28D58639FD392 /* strudel-bundle.js */; };
 		195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B0EF83FDEC95F58B860F5A /* HandMapper.swift */; };
 		1D40AE3AA1F2B1FA4B31CBB2 /* StoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15B500CE35D9D44107CDAC4 /* StoreView.swift */; };
+		1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */; };
 		204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 938A00F6A5044E13D981C663 /* EngineController.swift */; };
 		2FC5D55810AF0B87923E355B /* ParamSmoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */; };
 		375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D986625C7BF30952FBAED619 /* OnboardingView.swift */; };
@@ -29,6 +30,7 @@
 		C9D0CB8C617776591C669A1D /* HandTrackingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */; };
 		D2520D85FD921167AEA6EB1C /* HandStrudelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */; };
 		D75E25A96408DCA1BE5AA284 /* StrudelBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDA338219566335AD58643B /* StrudelBridge.swift */; };
+		F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F505B00217A74555C8E226 /* MusicTheory.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,7 +48,9 @@
 		925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamSmoother.swift; sourceTree = "<group>"; };
 		938A00F6A5044E13D981C663 /* EngineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineController.swift; sourceTree = "<group>"; };
 		A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallOverlay.swift; sourceTree = "<group>"; };
+		A9F505B00217A74555C8E226 /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
 		ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HandStrudel.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeManager.swift; sourceTree = "<group>"; };
 		B7C5E8B642D49636F852D200 /* hydra-synth.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "hydra-synth.js"; sourceTree = "<group>"; };
 		BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "strudel-engine.html"; sourceTree = "<group>"; };
 		C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTrackingManager.swift; sourceTree = "<group>"; };
@@ -89,6 +93,7 @@
 		488478B1D4024AF8209C4C9C /* Engine */ = {
 			isa = PBXGroup;
 			children = (
+				AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */,
 				938A00F6A5044E13D981C663 /* EngineController.swift */,
 				18B0EF83FDEC95F58B860F5A /* HandMapper.swift */,
 				C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */,
@@ -120,6 +125,7 @@
 			isa = PBXGroup;
 			children = (
 				5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */,
+				A9F505B00217A74555C8E226 /* MusicTheory.swift */,
 				10F66A4286F922F3805EADFE /* ParamDefs.swift */,
 				F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */,
 				21E972CF1E53A24CA899C1A5 /* StoreManager.swift */,
@@ -221,12 +227,14 @@
 			files = (
 				043BBAAF12C3D3188CF3823F /* CameraView.swift in Sources */,
 				B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */,
+				1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */,
 				204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */,
 				195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */,
 				A380AD271A6485FF679B0DCD /* HandOverlayView.swift in Sources */,
 				D2520D85FD921167AEA6EB1C /* HandStrudelApp.swift in Sources */,
 				C9D0CB8C617776591C669A1D /* HandTrackingManager.swift in Sources */,
 				467B330FAF19DF881621A97A /* MappingConfig.swift in Sources */,
+				F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */,
 				375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */,
 				9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */,
 				2FC5D55810AF0B87923E355B /* ParamSmoother.swift in Sources */,

@@ -67,6 +67,11 @@ final class EngineController: ObservableObject {
     @Published var trackPlaying = false
     @Published var hydraEnabled = false
 
+    // Drum mode
+    @Published var drumModeEnabled = false
+    private let drumModeManager = DrumModeManager()
+    @Published var lastDrumHit: String = ""
+
     // Manual controls
     @Published var manualBPM: Double = 120
     @Published var currentStructIdx = 0
@@ -81,6 +86,21 @@ final class EngineController: ObservableObject {
     @Published var drumVolume2: Double = 1.0
     @Published var drumSpeed2: Double = 1.0
     private var lastDrumLoopId = ""
+
+    // Harmony
+    @Published var selectedKey: MusicKey = .C
+    @Published var selectedScale: Scale = .pentatonic
+    @Published var chordMode: Bool = false
+    @Published var circleOfFifthsEnabled: Bool = false
+    @Published var chordDisplay: String = ""
+
+    // Cached scale notes (recomputed when key/scale changes)
+    private var cachedScaleNotes: [Int] = scaleNotes(key: .C, scale: .pentatonic)
+    private var lastHarmonyKey = ""
+
+    func recomputeScaleNotes() {
+        cachedScaleNotes = scaleNotes(key: selectedKey, scale: selectedScale)
+    }
 
     var bpmIsMapped: Bool {
         config.left.values.contains("bpm") || config.right.values.contains("bpm")
@@ -213,6 +233,16 @@ final class EngineController: ObservableObject {
             }
         }
 
+        // Circle of fifths: left hand X position maps to key
+        if circleOfFifthsEnabled, let leftHand = currentHands.left {
+            let cofIdx = max(0, min(11, Int(leftHand.x * 12)))
+            let newKey = CIRCLE_OF_FIFTHS[cofIdx]
+            if newKey != selectedKey {
+                selectedKey = newKey
+                recomputeScaleNotes()
+            }
+        }
+
         // Apply manual struct index
         structIdx = currentStructIdx
 
@@ -221,17 +251,72 @@ final class EngineController: ObservableObject {
 
         let isLive = playingSet.isEmpty && !trackPlaying
 
-        if isLive {
-            // Update signal params in WebView
-            strudelBridge.updateParams(smoothed, config: config)
+        if isLive && drumModeEnabled {
+            // Drum mode: detect hand velocity and trigger one-shot drum hits
+            let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+            let hits = drumModeManager.checkHits(hands: currentHands, currentTime: elapsed)
+            for hit in hits {
+                strudelBridge.evaluate(hit)
+                lastDrumHit = hit
+            }
 
-            // Re-evaluate when struct, drum loops, or waveform changes
+            // Still handle drum loop tracks alongside drum mode
             let drumKey1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
             let drumKey2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
-            let structKey = "\(structIdx)|\(drumKey1)|\(drumKey2)|\(selectedWaveform)"
+            let drumStructKey = "drum|\(drumKey1)|\(drumKey2)"
+            if drumStructKey != lastStructKey {
+                lastStructKey = drumStructKey
+                var parts: [String] = []
+
+                var drumCode1 = selectedDrumLoop.code
+                if !drumCode1.isEmpty {
+                    if drumVolume != 1.0 { drumCode1 = "(\(drumCode1)).gain(\(String(format: "%.2f", drumVolume)))" }
+                    if drumSpeed != 1.0 { drumCode1 = "(\(drumCode1)).fast(\(String(format: "%.1f", drumSpeed)))" }
+                    parts.append(drumCode1)
+                }
+
+                var drumCode2 = selectedDrumLoop2.code
+                if !drumCode2.isEmpty {
+                    if drumVolume2 != 1.0 { drumCode2 = "(\(drumCode2)).gain(\(String(format: "%.2f", drumVolume2)))" }
+                    if drumSpeed2 != 1.0 { drumCode2 = "(\(drumCode2)).fast(\(String(format: "%.1f", drumSpeed2)))" }
+                    parts.append(drumCode2)
+                }
+
+                if !parts.isEmpty {
+                    let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
+                    strudelBridge.evaluate(code)
+                }
+            }
+        } else if isLive {
+            // Update signal params in WebView (key/scale aware)
+            let notes = cachedScaleNotes
+            if chordMode {
+                let noteCount = selectedScale.intervals.count
+                let degree = max(0, min(noteCount - 1, Int((smoothed["noteIdx"] ?? 0) / Double(NOTES.count - 1) * Double(noteCount - 1) + 0.5)))
+                let chord = chordNotes(key: selectedKey, scale: selectedScale, degree: degree)
+                strudelBridge.updateChordParams(smoothed, config: config, chordMidi: chord)
+            } else {
+                let noteIdx = max(0, min(notes.count - 1, Int((smoothed["noteIdx"] ?? 10) / Double(NOTES.count - 1) * Double(notes.count - 1) + 0.5)))
+                let midi = notes[noteIdx]
+                strudelBridge.updateScaleParams(smoothed, config: config, midi: midi)
+            }
+
+            // Harmony key for re-eval: includes key, scale, chord mode
+            let harmonyKey = "\(selectedKey.rawValue)|\(selectedScale.rawValue)|\(chordMode)"
+
+            // Re-evaluate when struct, drum loops, waveform, or harmony changes
+            let drumKey1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
+            let drumKey2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
+            let structKey = "\(structIdx)|\(drumKey1)|\(drumKey2)|\(selectedWaveform)|\(harmonyKey)"
             if structKey != lastStructKey {
                 lastStructKey = structKey
-                let synthCode = buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
+                recomputeScaleNotes()
+                let synthCode: String
+                if chordMode {
+                    synthCode = buildChordSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
+                } else {
+                    synthCode = buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
+                }
 
                 // Build drum codes
                 var parts = [synthCode]
@@ -288,13 +373,33 @@ final class EngineController: ObservableObject {
         uiTimer = Timer.scheduledTimer(withTimeInterval: 0.066, repeats: true) { [weak self] _ in
             guard let self else { return }
             let s = self.smoothed
-            let ni = max(0, min(NOTES.count - 1, Int((s["noteIdx"] ?? 10).rounded())))
+            let notes = self.cachedScaleNotes
 
             DispatchQueue.main.async {
                 self.smoothedParams = s
                 self.handsState = self.currentHands
-                self.noteDisplay = NOTE_DISPLAY[ni]
                 self.bpm = s["bpm"] ?? 120
+
+                if self.chordMode {
+                    let noteCount: Int = self.selectedScale.intervals.count
+                    let rawIdx: Double = s["noteIdx"] ?? 0
+                    let normalized: Double = rawIdx / Double(NOTES.count - 1)
+                    let degree: Int = max(0, min(noteCount - 1, Int(normalized * Double(noteCount - 1) + 0.5)))
+                    self.noteDisplay = chordDisplayName(key: self.selectedKey, scale: self.selectedScale, degree: degree)
+                    self.chordDisplay = self.noteDisplay
+                } else if !notes.isEmpty {
+                    let rawIdx: Double = s["noteIdx"] ?? 10
+                    let normalized: Double = rawIdx / Double(NOTES.count - 1)
+                    let idx: Int = max(0, min(notes.count - 1, Int(normalized * Double(notes.count - 1) + 0.5)))
+                    let midi: Int = notes[idx]
+                    self.noteDisplay = midiNoteName(midi)
+                    self.chordDisplay = ""
+                } else {
+                    let ni: Int = max(0, min(NOTES.count - 1, Int((s["noteIdx"] ?? 10).rounded())))
+                    self.noteDisplay = NOTE_DISPLAY[ni]
+                    self.chordDisplay = ""
+                }
+
                 self.codeDisplay = self.buildDisplayCode(s)
                 if self.hydraEnabled {
                     self.hydraCodeDisplay = self.buildHydraDisplayCode(s)
@@ -306,13 +411,26 @@ final class EngineController: ObservableObject {
     // MARK: - Display code (simplified, no HTML needed)
 
     private func buildDisplayCode(_ p: MusicParams) -> String {
-        let ni = max(0, min(NOTES.count - 1, Int((p["noteIdx"] ?? 10).rounded())))
-        let note = NOTES[ni]
         let cpm = String(format: "%.1f", (p["bpm"] ?? 120) / 4)
         let st = STRUCTS[structIdx]
+        let notes = cachedScaleNotes
+
+        let noteStr: String
+        if chordMode {
+            let noteCount = selectedScale.intervals.count
+            let degree = max(0, min(noteCount - 1, Int((p["noteIdx"] ?? 0) / Double(NOTES.count - 1) * Double(noteCount - 1) + 0.5)))
+            let chord = chordNotes(key: selectedKey, scale: selectedScale, degree: degree)
+            noteStr = chord.map { midiToStrudelNote($0) }.joined(separator: ",")
+        } else if !notes.isEmpty {
+            let noteIdx = max(0, min(notes.count - 1, Int((p["noteIdx"] ?? 10) / Double(NOTES.count - 1) * Double(notes.count - 1) + 0.5)))
+            noteStr = midiToStrudelNote(notes[noteIdx])
+        } else {
+            let ni = max(0, min(NOTES.count - 1, Int((p["noteIdx"] ?? 10).rounded())))
+            noteStr = NOTES[ni]
+        }
 
         var lines = [
-            "note(\"\(note)\")",
+            "note(\"\(noteStr)\")",
             "  .s(\"\(selectedWaveform)\")",
             "  .struct(\"\(st)\")",
             "  .cpm(\(cpm))",

@@ -147,6 +147,39 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
+    func updateScaleParams(_ params: MusicParams, config: MappingConfig, midi: Int) {
+        let cpm = (params["bpm"] ?? 120) / 4
+
+        var js = "__hp._midi=\(midi);__hp._cpm=\(String(format: "%.2f", cpm));"
+
+        for id in extraParamIds(config) {
+            guard let def = PARAM_MAP[id] else { continue }
+            let val = params[id] ?? def.defaultValue
+            js += "__hp.\(id)=\(String(format: "%.4f", val));"
+        }
+
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    func updateChordParams(_ params: MusicParams, config: MappingConfig, chordMidi: [Int]) {
+        let cpm = (params["bpm"] ?? 120) / 4
+
+        var js = "__hp._cpm=\(String(format: "%.2f", cpm));__hp._midi=\(chordMidi.first ?? 60);"
+        // Set individual chord voice MIDI values
+        for i in 0..<3 {
+            let midi = i < chordMidi.count ? chordMidi[i] : (chordMidi.first ?? 60)
+            js += "__hp._cm\(i)=\(midi);"
+        }
+
+        for id in extraParamIds(config) {
+            guard let def = PARAM_MAP[id] else { continue }
+            let val = params[id] ?? def.defaultValue
+            js += "__hp.\(id)=\(String(format: "%.4f", val));"
+        }
+
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
     func setHydraEnabled(_ enabled: Bool) {
         hydraEnabled = enabled
         let js = enabled ? "showHydra()" : "hideHydra()"

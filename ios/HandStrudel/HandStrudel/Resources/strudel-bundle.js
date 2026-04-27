@@ -19445,7 +19445,7 @@ registerProcessor('${n2}', MyProcessor);
   var _1 = "@strudel/tonal";
 
   // ios/strudel-entry.mjs
-  window.__hp = {};
+  window.__hp = {_cm0:60,_cm1:64,_cm2:67};
   var _evaluate = null;
   var _stop = null;
   var _audioCtx = null;

@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var showShareSheet = false
     @State private var showSharePicker = false
     @State private var recordedVideoURL: URL?
+    @AppStorage("hideSkeletonWhenRecording") private var hideSkeletonWhenRecording = true
 
     var body: some View {
         ZStack {
@@ -62,6 +63,14 @@ struct ContentView: View {
             )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
+                .opacity(isRecording && hideSkeletonWhenRecording ? 0 : 1)
+
+            // Drum zone overlay
+            if engine.drumModeEnabled {
+                drumZoneOverlay
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
 
             // Floating UI overlays
             VStack {
@@ -117,7 +126,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showSheet) {
-            ControlSheet(engine: engine, storeManager: storeManager)
+            ControlSheet(engine: engine, storeManager: storeManager, hideSkeletonWhenRecording: $hideSkeletonWhenRecording)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -238,6 +247,38 @@ struct ContentView: View {
             Text("\(Int(engine.bpm.rounded()))")
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundColor(.white.opacity(0.5))
+        }
+    }
+
+    // MARK: - Drum Zone Overlay
+
+    private var drumZoneOverlay: some View {
+        HStack(spacing: 0) {
+            // Left hand zones
+            VStack(spacing: 0) {
+                ForEach(Array(DrumModeManager.leftZones.enumerated()), id: \.offset) { _, zone in
+                    Text(zone.name)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .frame(width: 80)
+            .background(Color.black.opacity(0.15))
+
+            Spacer()
+
+            // Right hand zones
+            VStack(spacing: 0) {
+                ForEach(Array(DrumModeManager.rightZones.enumerated()), id: \.offset) { _, zone in
+                    Text(zone.name)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .frame(width: 80)
+            .background(Color.black.opacity(0.15))
         }
     }
 
@@ -398,6 +439,7 @@ struct ContentView: View {
 struct ControlSheet: View {
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
+    @Binding var hideSkeletonWhenRecording: Bool
     @State private var showStore = false
     @State private var paywallPackId: String?
 
@@ -415,6 +457,12 @@ struct ControlSheet: View {
                             .background(Circle().fill(Color.white.opacity(0.08)))
                     }
                 }
+
+                // Mode section
+                modeSection
+
+                // Harmony section
+                harmonySection
 
                 // Sound/waveform section
                 soundSection
@@ -439,6 +487,9 @@ struct ControlSheet: View {
                     volume: $engine.drumVolume2,
                     speed: $engine.drumSpeed2
                 )
+
+                // Recording settings
+                recordingSection
 
                 // Snippets
                 if !engine.savedSnippets.isEmpty { snippetsSection }
@@ -487,6 +538,135 @@ struct ControlSheet: View {
         case StoreManager.kitElectronic: return ("Electronic Kit", "Modern electronic drums", ["Electro kick", "Glitch snare", "Digital hat patterns"])
         case StoreManager.kitWorld: return ("World Kit", "World percussion drums", ["Djembe", "Tabla", "World percussion patterns"])
         default: return ("Pack", "Premium content", [])
+        }
+    }
+
+    // MARK: - Mode
+
+    private var modeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("MODE")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(.secondary)
+                .tracking(1.5)
+
+            HStack(spacing: 8) {
+                Button(action: { engine.drumModeEnabled = false }) {
+                    VStack(spacing: 3) {
+                        Image(systemName: "pianokeys")
+                            .font(.system(size: 20))
+                        Text("Melodic")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundColor(!engine.drumModeEnabled ? .green : .primary.opacity(0.6))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(!engine.drumModeEnabled ? Color.green.opacity(0.12) : Color.primary.opacity(0.04)))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(!engine.drumModeEnabled ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5))
+                }
+
+                Button(action: { engine.drumModeEnabled = true }) {
+                    VStack(spacing: 3) {
+                        Image(systemName: "drum.fill")
+                            .font(.system(size: 20))
+                        Text("Drums")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundColor(engine.drumModeEnabled ? .green : .primary.opacity(0.6))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(engine.drumModeEnabled ? Color.green.opacity(0.12) : Color.primary.opacity(0.04)))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(engine.drumModeEnabled ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5))
+                }
+            }
+        }
+    }
+
+    // MARK: - Harmony
+
+    private var harmonySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("HARMONY")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(.secondary)
+                .tracking(1.5)
+
+            // Key picker
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(MusicKey.allCases) { key in
+                        Button(action: {
+                            engine.selectedKey = key
+                            engine.recomputeScaleNotes()
+                        }) {
+                            Text(key.rawValue)
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundColor(engine.selectedKey == key ? .green : .primary.opacity(0.6))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(
+                                    Capsule()
+                                        .fill(engine.selectedKey == key ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(engine.selectedKey == key ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                )
+                        }
+                    }
+                }
+            }
+
+            // Scale picker
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Scale.allCases) { scale in
+                        Button(action: {
+                            engine.selectedScale = scale
+                            engine.recomputeScaleNotes()
+                        }) {
+                            Text(scale.rawValue)
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundColor(engine.selectedScale == scale ? .green : .primary.opacity(0.6))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(engine.selectedScale == scale ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(engine.selectedScale == scale ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                )
+                        }
+                    }
+                }
+            }
+
+            // Toggles
+            HStack(spacing: 16) {
+                Toggle(isOn: $engine.chordMode) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "music.note.list")
+                            .font(.system(size: 12))
+                        Text("Chords")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(.green)
+
+                Toggle(isOn: $engine.circleOfFifthsEnabled) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "circle.circle")
+                            .font(.system(size: 12))
+                        Text("Circle of 5ths")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(.green)
+            }
         }
     }
 
@@ -721,6 +901,27 @@ struct ControlSheet: View {
             }
         }
         .frame(minHeight: 28)
+    }
+
+    // MARK: - Recording Settings
+
+    private var recordingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("RECORDING")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(.secondary)
+                .tracking(1.5)
+
+            Toggle(isOn: $hideSkeletonWhenRecording) {
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.raised.slash")
+                        .font(.system(size: 14))
+                    Text("Hide hand tracking in recordings")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                }
+            }
+            .toggleStyle(SwitchToggleStyle(tint: .green))
+        }
     }
 
     // MARK: - Snippets

@@ -197,6 +197,24 @@ func buildSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "
     return code
 }
 
+func buildChordSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth") -> String {
+    let st = STRUCTS[structIdx]
+
+    // Build extra params chain (shared across all chord voices)
+    var extras = ""
+    for id in extraParamIds(config) {
+        guard let def = PARAM_MAP[id] else { continue }
+        extras += ".\(def.strudelKey)(signal(() => __hp.\(id)))"
+    }
+
+    // Chord mode: stack 3 note voices using separate MIDI signals
+    let voice: (Int) -> String = { i in
+        "note(signal(() => __hp._cm\(i))).s(\"\(waveform)\").struct(\"\(st)\").cpm(signal(() => __hp._cpm))\(extras)"
+    }
+
+    return "stack(\(voice(0)), \(voice(1)), \(voice(2)))"
+}
+
 func buildHydraCode(_ p: MusicParams) -> String {
     let freq = p["hFreq"] ?? 10
     let sync = p["hSync"] ?? 0.1
