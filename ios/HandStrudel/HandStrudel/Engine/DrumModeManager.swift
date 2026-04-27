@@ -2,22 +2,21 @@ import Foundation
 
 struct DrumZone {
     let name: String
-    let code: String
+    let hitType: String  // matches playHit() JS function parameter
     let color: String
 }
 
 final class DrumModeManager {
-    // Zones for each hand (Y ranges: 0-0.33 = high, 0.33-0.66 = mid, 0.66-1.0 = low)
     static let leftZones: [DrumZone] = [
-        DrumZone(name: "Crash", code: "note(\"c6\").s(\"white\").decay(0.15).sustain(0).gain(0.4).hpf(6000)", color: "yellow"),
-        DrumZone(name: "Hi-Hat", code: "note(\"a5\").s(\"white\").decay(0.025).sustain(0).gain(0.35).hpf(8000)", color: "cyan"),
-        DrumZone(name: "Kick", code: "note(\"c1\").s(\"sine\").decay(0.3).sustain(0).gain(1.4).lpf(120)", color: "red"),
+        DrumZone(name: "Crash", hitType: "crash", color: "yellow"),
+        DrumZone(name: "Hi-Hat", hitType: "hihat", color: "cyan"),
+        DrumZone(name: "Kick", hitType: "kick", color: "red"),
     ]
 
     static let rightZones: [DrumZone] = [
-        DrumZone(name: "Ride", code: "note(\"e6\").s(\"pink\").decay(0.1).sustain(0).gain(0.3).hpf(5000)", color: "gold"),
-        DrumZone(name: "Snare", code: "stack(note(\"c4\").s(\"white\").decay(0.12).sustain(0).gain(0.7).hpf(1000).lpf(6000), note(\"e3\").s(\"triangle\").decay(0.08).sustain(0).gain(0.5).lpf(3000))", color: "orange"),
-        DrumZone(name: "Tom", code: "note(\"g2\").s(\"sine\").decay(0.2).sustain(0).gain(0.9).lpf(400)", color: "purple"),
+        DrumZone(name: "Ride", hitType: "ride", color: "gold"),
+        DrumZone(name: "Snare", hitType: "snare", color: "orange"),
+        DrumZone(name: "Tom", hitType: "tom", color: "purple"),
     ]
 
     // Track previous Y positions to detect velocity
@@ -27,7 +26,7 @@ final class DrumModeManager {
     private var rightCooldown: TimeInterval = 0
     private let cooldownDuration: TimeInterval = 0.1
 
-    // Returns Strudel code to evaluate if a hit was detected, nil otherwise
+    // Returns hit type strings for playHit() JS function
     func checkHits(hands: HandsState, currentTime: TimeInterval) -> [String] {
         var hits: [String] = []
 
@@ -35,7 +34,7 @@ final class DrumModeManager {
             let velocity = abs(left.y - prevLeftY)
             if velocity > 0.04 && currentTime > leftCooldown {
                 let zoneIdx = min(2, Int(left.y * 3))
-                hits.append(Self.leftZones[zoneIdx].code)
+                hits.append(Self.leftZones[zoneIdx].hitType)
                 leftCooldown = currentTime + cooldownDuration
             }
             prevLeftY = left.y
@@ -45,7 +44,7 @@ final class DrumModeManager {
             let velocity = abs(right.y - prevRightY)
             if velocity > 0.04 && currentTime > rightCooldown {
                 let zoneIdx = min(2, Int(right.y * 3))
-                hits.append(Self.rightZones[zoneIdx].code)
+                hits.append(Self.rightZones[zoneIdx].hitType)
                 rightCooldown = currentTime + cooldownDuration
             }
             prevRightY = right.y

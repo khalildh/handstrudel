@@ -19445,7 +19445,7 @@ registerProcessor('${n2}', MyProcessor);
   var _1 = "@strudel/tonal";
 
   // ios/strudel-entry.mjs
-  window.__hp = {_cm0:60,_cm1:64,_cm2:67};
+  window.__hp = {};
   var _evaluate = null;
   var _stop = null;
   var _audioCtx = null;
@@ -19545,6 +19545,125 @@ registerProcessor('${n2}', MyProcessor);
   };
   window.strudelStop = function() {
     if (_stop) _stop();
+  };
+  window.playHit = function(type) {
+    if (!_audioCtx) return;
+    const now = _audioCtx.currentTime;
+    const gain = _audioCtx.createGain();
+    gain.connect(_audioCtx.destination);
+    switch (type) {
+      case "kick": {
+        const osc = _audioCtx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+        gain.gain.setValueAtTime(1.2, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.3);
+        osc.connect(gain);
+        osc.start(now);
+        osc.stop(now + 0.3);
+        break;
+      }
+      case "snare": {
+        const bufSize = _audioCtx.sampleRate * 0.12;
+        const buf = _audioCtx.createBuffer(1, bufSize, _audioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = _audioCtx.createBufferSource();
+        noise.buffer = buf;
+        const hpf = _audioCtx.createBiquadFilter();
+        hpf.type = "highpass";
+        hpf.frequency.value = 1e3;
+        const lpf = _audioCtx.createBiquadFilter();
+        lpf.type = "lowpass";
+        lpf.frequency.value = 6e3;
+        gain.gain.setValueAtTime(0.8, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.12);
+        noise.connect(hpf);
+        hpf.connect(lpf);
+        lpf.connect(gain);
+        noise.start(now);
+        noise.stop(now + 0.12);
+        const osc = _audioCtx.createOscillator();
+        const g22 = _audioCtx.createGain();
+        g22.connect(_audioCtx.destination);
+        osc.type = "triangle";
+        osc.frequency.value = 160;
+        g22.gain.setValueAtTime(0.5, now);
+        g22.gain.exponentialRampToValueAtTime(1e-3, now + 0.08);
+        osc.connect(g22);
+        osc.start(now);
+        osc.stop(now + 0.08);
+        break;
+      }
+      case "hihat": {
+        const bufSize = _audioCtx.sampleRate * 0.03;
+        const buf = _audioCtx.createBuffer(1, bufSize, _audioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = _audioCtx.createBufferSource();
+        noise.buffer = buf;
+        const hpf = _audioCtx.createBiquadFilter();
+        hpf.type = "highpass";
+        hpf.frequency.value = 8e3;
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.03);
+        noise.connect(hpf);
+        hpf.connect(gain);
+        noise.start(now);
+        noise.stop(now + 0.03);
+        break;
+      }
+      case "crash": {
+        const bufSize = _audioCtx.sampleRate * 0.2;
+        const buf = _audioCtx.createBuffer(1, bufSize, _audioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = _audioCtx.createBufferSource();
+        noise.buffer = buf;
+        const hpf = _audioCtx.createBiquadFilter();
+        hpf.type = "highpass";
+        hpf.frequency.value = 5e3;
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.2);
+        noise.connect(hpf);
+        hpf.connect(gain);
+        noise.start(now);
+        noise.stop(now + 0.2);
+        break;
+      }
+      case "ride": {
+        const bufSize = _audioCtx.sampleRate * 0.15;
+        const buf = _audioCtx.createBuffer(1, bufSize, _audioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = _audioCtx.createBufferSource();
+        noise.buffer = buf;
+        const bpf = _audioCtx.createBiquadFilter();
+        bpf.type = "bandpass";
+        bpf.frequency.value = 6e3;
+        bpf.Q.value = 2;
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.15);
+        noise.connect(bpf);
+        bpf.connect(gain);
+        noise.start(now);
+        noise.stop(now + 0.15);
+        break;
+      }
+      case "tom": {
+        const osc = _audioCtx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 0.15);
+        gain.gain.setValueAtTime(0.9, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.2);
+        osc.connect(gain);
+        osc.start(now);
+        osc.stop(now + 0.2);
+        break;
+      }
+    }
   };
   window.showHydra = function() {
     const c3 = document.getElementById("hydra-canvas");

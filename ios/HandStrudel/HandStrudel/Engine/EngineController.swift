@@ -257,9 +257,9 @@ final class EngineController: ObservableObject {
             // Drum mode: detect hand velocity and trigger one-shot drum hits
             let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
             let hits = drumModeManager.checkHits(hands: currentHands, currentTime: elapsed)
-            for hit in hits {
-                strudelBridge.evaluate(hit)
-                lastDrumHit = hit
+            for hitType in hits {
+                strudelBridge.playHit(hitType)
+                lastDrumHit = hitType
             }
 
             // Still handle drum loop tracks alongside drum mode

@@ -188,6 +188,10 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
+    func playHit(_ type: String) {
+        webView.evaluateJavaScript("playHit('\(type)')", completionHandler: nil)
+    }
+
     func stop() {
         webView.evaluateJavaScript("strudelStop()", completionHandler: nil)
     }

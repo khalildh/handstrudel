@@ -279,7 +279,7 @@ struct ContentView: View {
                 let allZones = DrumModeManager.leftZones + DrumModeManager.rightZones
                 ForEach(Array(allZones.enumerated()), id: \.offset) { idx, zone in
                     Button(action: {
-                        engine.strudelBridge.evaluate(zone.code)
+                        engine.strudelBridge.playHit(zone.hitType)
                         flashingPad = zone.name
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                             if flashingPad == zone.name { flashingPad = nil }
