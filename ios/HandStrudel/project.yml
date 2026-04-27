@@ -16,6 +16,7 @@ targets:
     resources:
       - path: HandStrudel/Assets.xcassets
       - path: HandStrudel/Resources
+      - path: HandStrudel/PrivacyInfo.xcprivacy
     info:
       path: HandStrudel/Info.plist
       properties:

@@ -367,7 +367,7 @@ struct ContentView: View {
 
         recorder.startRecording { error in
             if let error {
-                print("Recording failed:", error)
+                debugPrint("Recording failed:", error)
                 DispatchQueue.main.async { isRecording = false }
                 return
             }
@@ -393,7 +393,7 @@ struct ContentView: View {
             DispatchQueue.main.async {
                 isRecording = false
                 if let error {
-                    print("Stop recording failed:", error)
+                    debugPrint("Stop recording failed:", error)
                     return
                 }
                 recordedVideoURL = outputURL

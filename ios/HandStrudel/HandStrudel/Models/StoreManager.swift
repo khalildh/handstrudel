@@ -60,7 +60,7 @@ final class StoreManager: ObservableObject {
         do {
             products = try await Product.products(for: Self.allProductIds)
         } catch {
-            print("[StoreManager] Failed to load products: \(error)")
+            debugPrint("[StoreManager] Failed to load products:", error)
         }
     }
 
@@ -89,7 +89,7 @@ final class StoreManager: ObservableObject {
             try await AppStore.sync()
             await updatePurchasedProducts()
         } catch {
-            print("[StoreManager] Failed to restore purchases: \(error)")
+            debugPrint("[StoreManager] Failed to restore purchases:", error)
         }
     }
 

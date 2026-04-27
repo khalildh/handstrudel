@@ -2,6 +2,7 @@ import WebKit
 import UIKit
 
 private func debugLog(_ msg: String) {
+    #if DEBUG
     let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("debug.log")
     let line = "\(Date()): [bridge] \(msg)\n"
     if let data = line.data(using: .utf8) {
@@ -15,6 +16,7 @@ private func debugLog(_ msg: String) {
             try? data.write(to: url)
         }
     }
+    #endif
 }
 
 final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
