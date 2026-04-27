@@ -65,11 +65,10 @@ struct ContentView: View {
                 .allowsHitTesting(false)
                 .opacity(isRecording && hideSkeletonWhenRecording ? 0 : 1)
 
-            // Drum zone overlay
+            // Drum zone overlay (tappable pads)
             if engine.drumModeEnabled {
                 drumZoneOverlay
                     .ignoresSafeArea()
-                    .allowsHitTesting(false)
             }
 
             // Floating UI overlays
@@ -252,33 +251,78 @@ struct ContentView: View {
 
     // MARK: - Drum Zone Overlay
 
+    @State private var flashingPad: String? = nil
+
     private var drumZoneOverlay: some View {
-        HStack(spacing: 0) {
-            // Left hand zones
-            VStack(spacing: 0) {
-                ForEach(Array(DrumModeManager.leftZones.enumerated()), id: \.offset) { _, zone in
-                    Text(zone.name)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.5))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+        VStack(spacing: 0) {
+            // Hand zone labels at top
+            HStack {
+                Text("L hand")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(.green.opacity(0.5))
+                Spacer()
+                Text("R hand")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(.pink.opacity(0.5))
             }
-            .frame(width: 80)
-            .background(Color.black.opacity(0.15))
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
 
             Spacer()
 
-            // Right hand zones
-            VStack(spacing: 0) {
-                ForEach(Array(DrumModeManager.rightZones.enumerated()), id: \.offset) { _, zone in
-                    Text(zone.name)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.5))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Tap-to-play drum pad grid
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ], spacing: 8) {
+                let allZones = DrumModeManager.leftZones + DrumModeManager.rightZones
+                ForEach(Array(allZones.enumerated()), id: \.offset) { idx, zone in
+                    Button(action: {
+                        engine.strudelBridge.evaluate(zone.code)
+                        flashingPad = zone.name
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            if flashingPad == zone.name { flashingPad = nil }
+                        }
+                    }) {
+                        VStack(spacing: 4) {
+                            Text(padEmoji(for: zone.name))
+                                .font(.system(size: 24))
+                            Text(zone.name)
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 70)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(flashingPad == zone.name
+                                    ? Color.green.opacity(0.4)
+                                    : Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
+                        .scaleEffect(flashingPad == zone.name ? 0.95 : 1.0)
+                        .animation(.easeOut(duration: 0.1), value: flashingPad)
+                    }
                 }
             }
-            .frame(width: 80)
-            .background(Color.black.opacity(0.15))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 120) // space for bottom controls
+        }
+    }
+
+    private func padEmoji(for name: String) -> String {
+        switch name {
+        case "Crash": return "💥"
+        case "Hi-Hat": return "🔔"
+        case "Kick": return "🦶"
+        case "Ride": return "🛎️"
+        case "Snare": return "🥁"
+        case "Tom": return "🪘"
+        default: return "🎵"
         }
     }
 
