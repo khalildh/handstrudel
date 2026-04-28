@@ -65,6 +65,13 @@ struct ContentView: View {
                 .allowsHitTesting(false)
                 .opacity(isRecording && hideSkeletonWhenRecording ? 0 : 1)
 
+            // Grid mode note lanes overlay
+            if engine.gridModeEnabled {
+                noteGridOverlay
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+
             // Drum zone overlay (tappable pads)
             if engine.drumModeEnabled {
                 drumZoneOverlay
@@ -246,6 +253,78 @@ struct ContentView: View {
             Text("\(Int(engine.bpm.rounded()))")
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundColor(.white.opacity(0.5))
+        }
+    }
+
+    // MARK: - Note Grid Overlay
+
+    private var noteGridOverlay: some View {
+        GeometryReader { geo in
+            let notes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale)
+            let count = notes.count
+            let laneHeight = geo.size.height / CGFloat(max(1, count))
+
+            ZStack {
+                // Note lane lines + labels
+                ForEach(0..<count, id: \.self) { i in
+                    let noteIdx = count - 1 - i  // invert: top = high
+                    let y = CGFloat(i) * laneHeight
+                    let midi = notes[noteIdx]
+                    let name = midiNoteName(midi)
+                    let isHighlighted = engine.gridLeftLane == noteIdx || engine.gridRightLane == noteIdx
+
+                    // Lane separator line
+                    Rectangle()
+                        .fill(Color.white.opacity(isHighlighted ? 0.15 : 0.04))
+                        .frame(height: 1)
+                        .offset(y: y)
+
+                    // Note label on the left
+                    Text(name)
+                        .font(.system(size: isHighlighted ? 12 : 9, weight: isHighlighted ? .bold : .regular, design: .monospaced))
+                        .foregroundColor(isHighlighted ? .green : .white.opacity(0.25))
+                        .position(x: 24, y: y + laneHeight / 2)
+
+                    // Highlight the active lane
+                    if isHighlighted {
+                        Rectangle()
+                            .fill(Color.green.opacity(0.08))
+                            .frame(height: laneHeight)
+                            .offset(y: y)
+                    }
+                }
+
+                // Pinch indicators
+                if engine.gridModeManager.isLeftPinching {
+                    Circle()
+                        .fill(Color.green.opacity(0.4))
+                        .frame(width: 30, height: 30)
+                        .position(
+                            x: geo.size.width * 0.3,
+                            y: engine.gridLeftLane.map { CGFloat(count - 1 - $0) * laneHeight + laneHeight / 2 } ?? 0
+                        )
+                        .blur(radius: 4)
+                }
+                if engine.gridModeManager.isRightPinching {
+                    Circle()
+                        .fill(Color.pink.opacity(0.4))
+                        .frame(width: 30, height: 30)
+                        .position(
+                            x: geo.size.width * 0.7,
+                            y: engine.gridRightLane.map { CGFloat(count - 1 - $0) * laneHeight + laneHeight / 2 } ?? 0
+                        )
+                        .blur(radius: 4)
+                }
+
+                // Last played note flash
+                if !engine.lastGridNote.isEmpty {
+                    Text(engine.lastGridNote)
+                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .foregroundColor(.green)
+                        .shadow(color: .green.opacity(0.5), radius: 10)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                }
+            }
         }
     }
 
@@ -587,6 +666,18 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
+    private enum AppMode: String { case melodic, grid, drums }
+    private var currentMode: AppMode {
+        if engine.gridModeEnabled { return .grid }
+        if engine.drumModeEnabled { return .drums }
+        return .melodic
+    }
+
+    private func setMode(_ mode: AppMode) {
+        engine.gridModeEnabled = mode == .grid
+        engine.drumModeEnabled = mode == .drums
+    }
+
     private var modeSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("MODE")
@@ -594,35 +685,35 @@ struct ControlSheet: View {
                 .foregroundColor(.secondary)
                 .tracking(1.5)
 
-            HStack(spacing: 8) {
-                Button(action: { engine.drumModeEnabled = false }) {
-                    VStack(spacing: 3) {
-                        Image(systemName: "pianokeys")
-                            .font(.system(size: 20))
-                        Text("Melodic")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundColor(!engine.drumModeEnabled ? .green : .primary.opacity(0.6))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(!engine.drumModeEnabled ? Color.green.opacity(0.12) : Color.primary.opacity(0.04)))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(!engine.drumModeEnabled ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5))
-                }
-
-                Button(action: { engine.drumModeEnabled = true }) {
-                    VStack(spacing: 3) {
-                        Image(systemName: "drum.fill")
-                            .font(.system(size: 20))
-                        Text("Drums")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundColor(engine.drumModeEnabled ? .green : .primary.opacity(0.6))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(engine.drumModeEnabled ? Color.green.opacity(0.12) : Color.primary.opacity(0.04)))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(engine.drumModeEnabled ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5))
-                }
+            HStack(spacing: 6) {
+                modeButton("Melodic", icon: "pianokeys", mode: .melodic)
+                modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
+                modeButton("Drums", icon: "drum.fill", mode: .drums)
             }
+
+            if currentMode == .grid {
+                Text("Pinch to play notes. Move hand up/down to change pitch.")
+                    .font(.system(size: 10, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+            }
+        }
+    }
+
+    private func modeButton(_ label: String, icon: String, mode: AppMode) -> some View {
+        let isActive = currentMode == mode
+        return Button(action: { setMode(mode) }) {
+            VStack(spacing: 3) {
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(isActive ? .green : .primary.opacity(0.6))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 10).fill(isActive ? Color.green.opacity(0.12) : Color.primary.opacity(0.04)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(isActive ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5))
         }
     }
 

@@ -74,6 +74,13 @@ final class EngineController: ObservableObject {
     private let drumModeManager = DrumModeManager()
     @Published var lastDrumHit: String = ""
 
+    // Grid mode (pinch-to-play)
+    @Published var gridModeEnabled = false
+    let gridModeManager = GridModeManager()
+    @Published var lastGridNote: String = ""
+    @Published var gridLeftLane: Int? = nil
+    @Published var gridRightLane: Int? = nil
+
     // Manual controls
     @Published var manualBPM: Double = 120
     @Published var currentStructIdx = 0
@@ -253,7 +260,45 @@ final class EngineController: ObservableObject {
 
         let isLive = playingSet.isEmpty && !trackPlaying
 
-        if isLive && drumModeEnabled {
+        if isLive && gridModeEnabled {
+            // Grid mode: pinch-to-play with quantized pitch
+            let notes = cachedScaleNotes
+            let events = gridModeManager.checkNotes(hands: currentHands, scaleNotes: notes, currentBeat: 0)
+            for event in events {
+                strudelBridge.playNote(midi: event.midi, waveform: selectedWaveform, velocity: event.velocity)
+                lastGridNote = event.noteName
+            }
+
+            // Update lane display
+            let lanes = gridModeManager.currentLanes(hands: currentHands, scaleNotes: notes)
+            gridLeftLane = lanes.left
+            gridRightLane = lanes.right
+
+            // Still handle drum loop tracks
+            let drumKey1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
+            let drumKey2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
+            let gridStructKey = "grid|\(drumKey1)|\(drumKey2)"
+            if gridStructKey != lastStructKey {
+                lastStructKey = gridStructKey
+                var parts: [String] = []
+                var drumCode1 = selectedDrumLoop.code
+                if !drumCode1.isEmpty {
+                    if drumVolume != 1.0 { drumCode1 = "(\(drumCode1)).gain(\(String(format: "%.2f", drumVolume)))" }
+                    if drumSpeed != 1.0 { drumCode1 = "(\(drumCode1)).fast(\(String(format: "%.1f", drumSpeed)))" }
+                    parts.append(drumCode1)
+                }
+                var drumCode2 = selectedDrumLoop2.code
+                if !drumCode2.isEmpty {
+                    if drumVolume2 != 1.0 { drumCode2 = "(\(drumCode2)).gain(\(String(format: "%.2f", drumVolume2)))" }
+                    if drumSpeed2 != 1.0 { drumCode2 = "(\(drumCode2)).fast(\(String(format: "%.1f", drumSpeed2)))" }
+                    parts.append(drumCode2)
+                }
+                if !parts.isEmpty {
+                    let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
+                    strudelBridge.evaluate(code)
+                }
+            }
+        } else if isLive && drumModeEnabled {
             // Drum mode: detect hand velocity and trigger one-shot drum hits
             let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
             let hits = drumModeManager.checkHits(hands: currentHands, currentTime: elapsed)

@@ -241,6 +241,36 @@ window.playHit = function(type) {
     }
 };
 
+// Instant melodic note via Web Audio (for grid mode pinch-to-play)
+// midi = MIDI note number, waveform = 'sine'|'square'|'triangle'|'sawtooth', vel = 0-1
+window.playNote = function(midi, waveform, vel, duration) {
+    if (!_audioCtx) return;
+    const now = _audioCtx.currentTime;
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+    const dur = duration || 0.3;
+    const v = vel || 0.6;
+
+    const osc = _audioCtx.createOscillator();
+    osc.type = waveform || 'sawtooth';
+    osc.frequency.setValueAtTime(freq, now);
+
+    const gain = _audioCtx.createGain();
+    gain.gain.setValueAtTime(v * 0.5, now);
+    gain.gain.setValueAtTime(v * 0.5, now + dur * 0.7);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    // Add a subtle filter for warmth
+    const lpf = _audioCtx.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.frequency.value = 3000 + v * 3000;
+
+    osc.connect(lpf);
+    lpf.connect(gain);
+    gain.connect(_audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + dur);
+};
+
 window.showHydra = function() {
     const c = document.getElementById('hydra-canvas');
     if (c) c.style.display = '';
