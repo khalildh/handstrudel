@@ -133,9 +133,11 @@ struct ContentView: View {
                         .transition(.opacity)
                 }
             }
-            .gesture(
-                DragGesture(minimumDistance: 40)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 50)
                     .onEnded { value in
+                        // Only handle horizontal swipes (not vertical scrolls or taps near buttons)
+                        guard abs(value.translation.width) > abs(value.translation.height) else { return }
                         let filters = CAMERA_FILTERS.filter { !$0.isPremium || storeManager.isUnlocked($0.packId ?? "") }
                         guard let currentIdx = filters.firstIndex(where: { $0.id == engine.selectedFilter.id }) else { return }
 
@@ -205,12 +207,12 @@ struct ContentView: View {
 
             Spacer()
 
-            // Close button
+            // Close button — larger tap target, high z-order
             Button(action: { engine.stop() }) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white.opacity(0.75))
-                    .frame(width: 32, height: 32)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white.opacity(0.85))
+                    .frame(width: 44, height: 44)
                     .background(Color.black.opacity(0.4))
                     .clipShape(Circle())
             }

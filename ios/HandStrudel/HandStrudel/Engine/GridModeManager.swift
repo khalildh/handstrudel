@@ -3,8 +3,8 @@ import Foundation
 final class GridModeManager {
     private var leftPinching = false
     private var rightPinching = false
-    private let pinchThreshold: Double = 0.25  // easier to trigger
-    private let releaseThreshold: Double = 0.15 // slight open releases
+    private let pinchThreshold: Double = 0.65  // fingers must be close together
+    private let releaseThreshold: Double = 0.4  // slight open releases
 
     // Track current held MIDI note per hand (for slide detection)
     private var leftHeldMidi: Int? = nil
