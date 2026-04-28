@@ -1,87 +1,92 @@
 import Foundation
 
 final class GridModeManager {
-    // Pinch detection — lower thresholds for faster response
     private var leftPinching = false
     private var rightPinching = false
-    private let pinchThreshold: Double = 0.35  // pinch value to trigger (was 0.6)
-    private let releaseThreshold: Double = 0.15 // pinch value to release (was 0.3)
+    private let pinchThreshold: Double = 0.35
+    private let releaseThreshold: Double = 0.15
 
-    // Beat quantization
+    // Track current held MIDI note per hand (for slide detection)
+    private var leftHeldMidi: Int? = nil
+    private var rightHeldMidi: Int? = nil
+
     var quantizeEnabled = false
-    var quantizeDiv: Double = 8  // 8 = eighth notes, 16 = sixteenth notes
+    var quantizeDiv: Double = 8
 
-    struct NoteEvent {
-        let midi: Int
-        let noteName: String
-        let hand: String  // "left" or "right"
-        let velocity: Double // 0-1
+    enum NoteAction {
+        case noteOn(hand: String, midi: Int, noteName: String, velocity: Double)
+        case noteOff(hand: String)
+        case slide(hand: String, midi: Int, noteName: String)
     }
 
-    /// Given hand state and available scale notes, determine which note lane each hand is in
-    /// and whether a pinch trigger happened.
-    func checkNotes(hands: HandsState, scaleNotes: [Int], currentBeat: Double) -> [NoteEvent] {
+    func checkNotes(hands: HandsState, scaleNotes: [Int], currentBeat: Double) -> [NoteAction] {
         guard !scaleNotes.isEmpty else { return [] }
-        var events: [NoteEvent] = []
+        var actions: [NoteAction] = []
 
         // Left hand
         if let left = hands.left {
             let noteIdx = yToNoteIndex(y: left.y, noteCount: scaleNotes.count)
             let midi = scaleNotes[noteIdx]
-            let wasPinching = leftPinching
             let isPinching = left.pinch > pinchThreshold
 
-            if isPinching && !wasPinching {
-                // New pinch — trigger note
+            if isPinching && !leftPinching {
+                // New pinch — note on
                 leftPinching = true
-                events.append(NoteEvent(
-                    midi: midi,
-                    noteName: midiNoteName(midi),
-                    hand: "left",
-                    velocity: min(1, left.pinch)
-                ))
-            } else if left.pinch < releaseThreshold {
+                leftHeldMidi = midi
+                actions.append(.noteOn(hand: "left", midi: midi, noteName: midiNoteName(midi), velocity: min(1, left.pinch)))
+            } else if isPinching && leftPinching {
+                // Still pinching — check if lane changed (slide)
+                if midi != leftHeldMidi {
+                    leftHeldMidi = midi
+                    actions.append(.slide(hand: "left", midi: midi, noteName: midiNoteName(midi)))
+                }
+            } else if left.pinch < releaseThreshold && leftPinching {
+                // Released — note off
                 leftPinching = false
+                leftHeldMidi = nil
+                actions.append(.noteOff(hand: "left"))
             }
-        } else {
+        } else if leftPinching {
             leftPinching = false
+            leftHeldMidi = nil
+            actions.append(.noteOff(hand: "left"))
         }
 
         // Right hand
         if let right = hands.right {
             let noteIdx = yToNoteIndex(y: right.y, noteCount: scaleNotes.count)
             let midi = scaleNotes[noteIdx]
-            let wasPinching = rightPinching
             let isPinching = right.pinch > pinchThreshold
 
-            if isPinching && !wasPinching {
+            if isPinching && !rightPinching {
                 rightPinching = true
-                events.append(NoteEvent(
-                    midi: midi,
-                    noteName: midiNoteName(midi),
-                    hand: "right",
-                    velocity: min(1, right.pinch)
-                ))
-            } else if right.pinch < releaseThreshold {
+                rightHeldMidi = midi
+                actions.append(.noteOn(hand: "right", midi: midi, noteName: midiNoteName(midi), velocity: min(1, right.pinch)))
+            } else if isPinching && rightPinching {
+                if midi != rightHeldMidi {
+                    rightHeldMidi = midi
+                    actions.append(.slide(hand: "right", midi: midi, noteName: midiNoteName(midi)))
+                }
+            } else if right.pinch < releaseThreshold && rightPinching {
                 rightPinching = false
+                rightHeldMidi = nil
+                actions.append(.noteOff(hand: "right"))
             }
-        } else {
+        } else if rightPinching {
             rightPinching = false
+            rightHeldMidi = nil
+            actions.append(.noteOff(hand: "right"))
         }
 
-        return events
+        return actions
     }
 
-    /// Map Y position (0=top, 1=bottom) to note index (0=highest, count-1=lowest)
-    /// This makes moving hand UP = higher pitch (natural mapping)
     func yToNoteIndex(y: Double, noteCount: Int) -> Int {
         guard noteCount > 0 else { return 0 }
-        // Invert: y=0 (top) → highest note, y=1 (bottom) → lowest note
         let normalized = 1 - max(0, min(1, y))
         return max(0, min(noteCount - 1, Int(normalized * Double(noteCount))))
     }
 
-    /// Get the current note lane each hand is hovering over (for visual display)
     func currentLanes(hands: HandsState, scaleNotes: [Int]) -> (left: Int?, right: Int?) {
         guard !scaleNotes.isEmpty else { return (nil, nil) }
         let leftIdx = hands.left.map { yToNoteIndex(y: $0.y, noteCount: scaleNotes.count) }
@@ -89,7 +94,6 @@ final class GridModeManager {
         return (leftIdx, rightIdx)
     }
 
-    /// Check if either hand is currently pinching (for visual feedback)
     var isLeftPinching: Bool { leftPinching }
     var isRightPinching: Bool { rightPinching }
 }

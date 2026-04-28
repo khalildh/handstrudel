@@ -261,13 +261,20 @@ final class EngineController: ObservableObject {
         let isLive = playingSet.isEmpty && !trackPlaying
 
         if isLive && gridModeEnabled {
-            // Grid mode: pinch-to-play with quantized pitch
-            // Notes are triggered via playNote() (Web Audio), NOT Strudel scheduler
+            // Grid mode: pinch-to-play with sustained notes
             let notes = cachedScaleNotes
-            let events = gridModeManager.checkNotes(hands: currentHands, scaleNotes: notes, currentBeat: 0)
-            for event in events {
-                strudelBridge.playNote(midi: event.midi, waveform: selectedWaveform, velocity: event.velocity)
-                lastGridNote = event.noteName
+            let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: notes, currentBeat: 0)
+            for action in actions {
+                switch action {
+                case .noteOn(let hand, let midi, let name, let vel):
+                    strudelBridge.noteOn(hand: hand, midi: midi, waveform: selectedWaveform, velocity: vel)
+                    lastGridNote = name
+                case .noteOff(let hand):
+                    strudelBridge.noteOff(hand: hand)
+                case .slide(let hand, let midi, let name):
+                    strudelBridge.noteSlide(hand: hand, midi: midi)
+                    lastGridNote = name
+                }
             }
 
             // Update lane display

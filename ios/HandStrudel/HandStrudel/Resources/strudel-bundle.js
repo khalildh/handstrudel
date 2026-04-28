@@ -19665,19 +19665,19 @@ registerProcessor('${n2}', MyProcessor);
       }
     }
   };
-  window.playNote = function(midi2, waveform, vel, duration) {
+  window._voices = {};
+  window.noteOn = function(hand, midi2, waveform, vel) {
     if (!_audioCtx) return;
+    window.noteOff(hand);
     const now = _audioCtx.currentTime;
     const freq = 440 * Math.pow(2, (midi2 - 69) / 12);
-    const dur = duration || 0.3;
     const v2 = vel || 0.6;
     const osc = _audioCtx.createOscillator();
     osc.type = waveform || "sawtooth";
     osc.frequency.setValueAtTime(freq, now);
     const gain = _audioCtx.createGain();
-    gain.gain.setValueAtTime(v2 * 0.5, now);
-    gain.gain.setValueAtTime(v2 * 0.5, now + dur * 0.7);
-    gain.gain.exponentialRampToValueAtTime(1e-3, now + dur);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(v2 * 0.5, now + 0.01);
     const lpf = _audioCtx.createBiquadFilter();
     lpf.type = "lowpass";
     lpf.frequency.value = 3e3 + v2 * 3e3;
@@ -19685,7 +19685,29 @@ registerProcessor('${n2}', MyProcessor);
     lpf.connect(gain);
     gain.connect(_audioCtx.destination);
     osc.start(now);
-    osc.stop(now + dur);
+    window._voices[hand] = { osc, gain, midi: midi2 };
+  };
+  window.noteOff = function(hand) {
+    const voice = window._voices[hand];
+    if (!voice) return;
+    const now = _audioCtx.currentTime;
+    voice.gain.gain.cancelScheduledValues(now);
+    voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+    voice.gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.05);
+    voice.osc.stop(now + 0.06);
+    delete window._voices[hand];
+  };
+  window.noteSlide = function(hand, midi2) {
+    const voice = window._voices[hand];
+    if (!voice || voice.midi === midi2) return;
+    const now = _audioCtx.currentTime;
+    const freq = 440 * Math.pow(2, (midi2 - 69) / 12);
+    voice.osc.frequency.setValueAtTime(freq, now);
+    voice.midi = midi2;
+  };
+  window.playNote = function(midi2, waveform, vel, duration) {
+    window.noteOn("oneshot", midi2, waveform, vel);
+    setTimeout(() => window.noteOff("oneshot"), (duration || 0.3) * 1e3);
   };
   window.showHydra = function() {
     const c3 = document.getElementById("hydra-canvas");

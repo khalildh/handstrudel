@@ -241,13 +241,17 @@ window.playHit = function(type) {
     }
 };
 
-// Instant melodic note via Web Audio (for grid mode pinch-to-play)
-// midi = MIDI note number, waveform = 'sine'|'square'|'triangle'|'sawtooth', vel = 0-1
-window.playNote = function(midi, waveform, vel, duration) {
+// Sustained note system — noteOn starts, noteOff releases
+// Each hand gets its own voice (left/right) so they don't interfere
+window._voices = {};
+
+window.noteOn = function(hand, midi, waveform, vel) {
     if (!_audioCtx) return;
+    // Stop any existing voice for this hand
+    window.noteOff(hand);
+
     const now = _audioCtx.currentTime;
     const freq = 440 * Math.pow(2, (midi - 69) / 12);
-    const dur = duration || 0.3;
     const v = vel || 0.6;
 
     const osc = _audioCtx.createOscillator();
@@ -255,11 +259,10 @@ window.playNote = function(midi, waveform, vel, duration) {
     osc.frequency.setValueAtTime(freq, now);
 
     const gain = _audioCtx.createGain();
-    gain.gain.setValueAtTime(v * 0.5, now);
-    gain.gain.setValueAtTime(v * 0.5, now + dur * 0.7);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    // Quick attack
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(v * 0.5, now + 0.01);
 
-    // Add a subtle filter for warmth
     const lpf = _audioCtx.createBiquadFilter();
     lpf.type = 'lowpass';
     lpf.frequency.value = 3000 + v * 3000;
@@ -268,7 +271,36 @@ window.playNote = function(midi, waveform, vel, duration) {
     lpf.connect(gain);
     gain.connect(_audioCtx.destination);
     osc.start(now);
-    osc.stop(now + dur);
+
+    window._voices[hand] = { osc, gain, midi };
+};
+
+window.noteOff = function(hand) {
+    const voice = window._voices[hand];
+    if (!voice) return;
+    const now = _audioCtx.currentTime;
+    // Quick release (fade out over 50ms to avoid click)
+    voice.gain.gain.cancelScheduledValues(now);
+    voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+    voice.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    voice.osc.stop(now + 0.06);
+    delete window._voices[hand];
+};
+
+// Change pitch of a held note without retriggering (for sliding between lanes)
+window.noteSlide = function(hand, midi) {
+    const voice = window._voices[hand];
+    if (!voice || voice.midi === midi) return;
+    const now = _audioCtx.currentTime;
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+    voice.osc.frequency.setValueAtTime(freq, now);
+    voice.midi = midi;
+};
+
+// Legacy one-shot (kept for backward compat)
+window.playNote = function(midi, waveform, vel, duration) {
+    window.noteOn('oneshot', midi, waveform, vel);
+    setTimeout(() => window.noteOff('oneshot'), (duration || 0.3) * 1000);
 };
 
 window.showHydra = function() {
