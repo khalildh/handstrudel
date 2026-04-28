@@ -381,31 +381,7 @@ struct ContentView: View {
                         .position(x: geo.size.width - 32, y: y + laneHeight / 2)
                 }
 
-                // Pinch indicators at actual hand position
-                if engine.gridModeManager.isLeftPinching, let left = engine.handsState.left {
-                    Circle()
-                        .stroke(Color.green.opacity(0.7), lineWidth: 3)
-                        .frame(width: 40, height: 40)
-                        .shadow(color: .green.opacity(0.5), radius: 8)
-                        .scaleEffect(1.2)
-                        .position(
-                            x: CGFloat(left.x) * geo.size.width,
-                            y: CGFloat(left.y) * geo.size.height
-                        )
-                        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: engine.gridModeManager.isLeftPinching)
-                }
-                if engine.gridModeManager.isRightPinching, let right = engine.handsState.right {
-                    Circle()
-                        .stroke(Color.pink.opacity(0.7), lineWidth: 3)
-                        .frame(width: 40, height: 40)
-                        .shadow(color: .pink.opacity(0.5), radius: 8)
-                        .scaleEffect(1.2)
-                        .position(
-                            x: CGFloat(right.x) * geo.size.width,
-                            y: CGFloat(right.y) * geo.size.height
-                        )
-                        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: engine.gridModeManager.isRightPinching)
-                }
+                // Pinch indicators removed — lane glow provides enough feedback
             }
         }
     }

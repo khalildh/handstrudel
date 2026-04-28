@@ -3,8 +3,8 @@ import Foundation
 final class GridModeManager {
     private var leftPinching = false
     private var rightPinching = false
-    private let pinchThreshold: Double = 0.35
-    private let releaseThreshold: Double = 0.3
+    private let pinchThreshold: Double = 0.5   // need a real pinch
+    private let releaseThreshold: Double = 0.35 // slight open releases
 
     // Track current held MIDI note per hand (for slide detection)
     private var leftHeldMidi: Int? = nil
@@ -81,9 +81,21 @@ final class GridModeManager {
         return actions
     }
 
+    /// Video aspect ratio for correcting Y position (set from HandTrackingManager)
+    var videoAspect: CGFloat = 0.75
+    var screenAspect: CGFloat = 0.46  // iPhone ~390/844
+
     func yToNoteIndex(y: Double, noteCount: Int) -> Int {
         guard noteCount > 0 else { return 0 }
-        let normalized = 1 - max(0, min(1, y))
+        // Correct for aspect fill cropping (same math as HandOverlayView)
+        var correctedY = y
+        if videoAspect < screenAspect {
+            // Height is cropped
+            let visibleFrac = Double(videoAspect / screenAspect)
+            let offset = (1 - visibleFrac) / 2
+            correctedY = (y - offset) / visibleFrac
+        }
+        let normalized = 1 - max(0, min(1, correctedY))
         return max(0, min(noteCount - 1, Int(normalized * Double(noteCount))))
     }
 

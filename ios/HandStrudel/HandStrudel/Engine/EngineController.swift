@@ -265,6 +265,11 @@ final class EngineController: ObservableObject {
 
         if isLive && gridModeEnabled {
             // Grid mode: pinch-to-play with sustained notes
+            // Update aspect ratios for correct Y mapping
+            gridModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
+            let screenBounds = UIScreen.main.bounds
+            gridModeManager.screenAspect = screenBounds.width / screenBounds.height
+
             let notes = cachedScaleNotes
             let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: notes, currentBeat: 0)
             for action in actions {
