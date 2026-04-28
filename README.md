@@ -4,38 +4,51 @@ A hand-tracking musical instrument for web and iOS. Wave your hands to control a
 
 **[handstrudel.com](https://handstrudel.com)** — try it now in your browser
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/01_start_screen.png" width="250" alt="Start Screen" />
+  <img src="docs/screenshots/02_onboarding.png" width="250" alt="Onboarding" />
+  <img src="docs/screenshots/03_performance.png" width="250" alt="Performance" />
+</p>
+
 ## How It Works
 
 HandStrudel uses your camera and hand tracking to detect both hands in real time. Hand gestures are mapped to synthesizer parameters powered by [Strudel](https://strudel.cc/).
 
+### iOS App
+- Native SwiftUI app with Apple Vision hand tracking
+- Full-screen portrait camera with glowing neon hand skeleton + motion trails
+- 3 modes: **Melodic** (continuous), **Grid** (pinch-to-play), **Drums** (air drumming)
+- Key/scale selection with chord mode and circle of fifths
+- 10 presets: Dreamy, Gritty, Bouncy, Chill + 6 premium
+- 8 synth waveforms (4 free + 4 premium)
+- 12 drum loops with dual tracks, volume, and speed control
+- 7-second screen recording with Instagram Stories/Reels sharing
+- In-app purchases for premium content
+- Music theory: key, scale, chord mode, circle of fifths
+
 ### Web App
 - Works in any modern browser with a webcam
 - [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands) for hand tracking
-- Configurable axis-to-parameter mapping (pitch, filter, reverb, tempo, delay, and more)
+- Configurable axis-to-parameter mapping
 - Save gesture snapshots, stack snippets, and arrange tracks
 
-### iOS App
-- Native SwiftUI app with Apple Vision hand tracking
-- Full-screen portrait camera with glowing neon hand skeleton overlay
-- 4 preset vibes: Dreamy, Gritty, Bouncy, Chill
-- Synth waveform selection (sine, square, triangle, sawtooth)
-- Dual drum tracks with volume and speed control
-- 7-second screen recording with Instagram Stories/Reels sharing
-- Lockable manual parameter overrides
-
 ## Tech Stack
+
+**iOS:**
+- SwiftUI + Apple Vision framework
+- WKWebView running Strudel (hybrid architecture)
+- Web Audio API for real-time drum/note hits
+- AVCaptureSession + CADisplayLink (60fps)
+- StoreKit 2 for in-app purchases
+- ReplayKit for screen recording
 
 **Web:**
 - [Strudel](https://strudel.cc/) — live-coded music patterns
 - [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands) — hand landmark detection
 - [Next.js](https://nextjs.org/) — static export
 - TypeScript
-
-**iOS:**
-- SwiftUI + Apple Vision framework
-- WKWebView running Strudel (hybrid architecture)
-- AVCaptureSession + CADisplayLink (60fps)
-- ReplayKit for screen recording
 
 ## Development
 
