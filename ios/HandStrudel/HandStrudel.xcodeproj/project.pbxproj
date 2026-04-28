@@ -17,6 +17,7 @@
 		375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D986625C7BF30952FBAED619 /* OnboardingView.swift */; };
 		380966C71A0162507C985C6C /* StartOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74287CD261130ADF57405FF3 /* StartOverlayView.swift */; };
 		39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */; };
+		3FDADBDC4BFF18F21A29F680 /* LoopRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EE16108C9368E03A5293FC /* LoopRecorder.swift */; };
 		467B330FAF19DF881621A97A /* MappingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */; };
 		575A0CD71B422DFD7ACB6FDF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */; };
 		61F3ED12A7BAB424D09491E8 /* Snippet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */; };
@@ -34,6 +35,7 @@
 		D2520D85FD921167AEA6EB1C /* HandStrudelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */; };
 		D75E25A96408DCA1BE5AA284 /* StrudelBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDA338219566335AD58643B /* StrudelBridge.swift */; };
 		E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */; };
+		EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D6C035D4A9EE1A66C31839 /* Loop.swift */; };
 		F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F505B00217A74555C8E226 /* MusicTheory.swift */; };
 /* End PBXBuildFile section */
 
@@ -51,6 +53,7 @@
 		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
+		15EE16108C9368E03A5293FC /* LoopRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopRecorder.swift; sourceTree = "<group>"; };
 		18B0EF83FDEC95F58B860F5A /* HandMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandMapper.swift; sourceTree = "<group>"; };
 		21E972CF1E53A24CA899C1A5 /* StoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreManager.swift; sourceTree = "<group>"; };
 		3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelTests.swift; sourceTree = "<group>"; };
@@ -63,6 +66,7 @@
 		8B7A548807FF6856B92FC423 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamSmoother.swift; sourceTree = "<group>"; };
 		938A00F6A5044E13D981C663 /* EngineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineController.swift; sourceTree = "<group>"; };
+		93D6C035D4A9EE1A66C31839 /* Loop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loop.swift; sourceTree = "<group>"; };
 		953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallOverlay.swift; sourceTree = "<group>"; };
 		A9F505B00217A74555C8E226 /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
@@ -118,6 +122,7 @@
 				F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */,
 				18B0EF83FDEC95F58B860F5A /* HandMapper.swift */,
 				C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */,
+				15EE16108C9368E03A5293FC /* LoopRecorder.swift */,
 				925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */,
 				6C89256347633541234267B8 /* SaveGestureDetector.swift */,
 				FDDA338219566335AD58643B /* StrudelBridge.swift */,
@@ -147,6 +152,7 @@
 			isa = PBXGroup;
 			children = (
 				AE98AF54FEB607CE395267C8 /* CameraFilter.swift */,
+				93D6C035D4A9EE1A66C31839 /* Loop.swift */,
 				5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */,
 				A9F505B00217A74555C8E226 /* MusicTheory.swift */,
 				10F66A4286F922F3805EADFE /* ParamDefs.swift */,
@@ -287,6 +293,8 @@
 				A380AD271A6485FF679B0DCD /* HandOverlayView.swift in Sources */,
 				D2520D85FD921167AEA6EB1C /* HandStrudelApp.swift in Sources */,
 				C9D0CB8C617776591C669A1D /* HandTrackingManager.swift in Sources */,
+				EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */,
+				3FDADBDC4BFF18F21A29F680 /* LoopRecorder.swift in Sources */,
 				467B330FAF19DF881621A97A /* MappingConfig.swift in Sources */,
 				F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */,
 				375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */,

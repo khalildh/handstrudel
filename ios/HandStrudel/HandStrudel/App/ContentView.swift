@@ -499,7 +499,13 @@ struct ContentView: View {
 
     private var bottomControls: some View {
         ZStack {
-            // Record button centered
+            // Loop record button on left
+            HStack {
+                loopRecordButton
+                Spacer()
+            }
+
+            // Video record button centered
             recordButton
 
             // Settings button aligned right
@@ -511,6 +517,38 @@ struct ContentView: View {
                         .foregroundColor(.white.opacity(0.4))
                         .frame(width: 36, height: 36)
                         .background(Circle().fill(Color.black.opacity(0.3)))
+                }
+            }
+        }
+    }
+
+    private var loopRecordButton: some View {
+        Button(action: {
+            if engine.isLoopRecording {
+                engine.stopLoopRecording()
+            } else {
+                engine.startLoopRecording()
+            }
+        }) {
+            ZStack {
+                Circle()
+                    .stroke(engine.isLoopRecording ? Color.red : Color.white.opacity(0.3), lineWidth: 2)
+                    .frame(width: 44, height: 44)
+
+                if engine.isLoopRecording {
+                    // Progress ring
+                    Circle()
+                        .trim(from: 0, to: engine.loopRecordingProgress)
+                        .stroke(Color.red, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .frame(width: 44, height: 44)
+                        .rotationEffect(.degrees(-90))
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 14, height: 14)
+                } else {
+                    Circle()
+                        .fill(Color.red.opacity(0.8))
+                        .frame(width: 18, height: 18)
                 }
             }
         }
@@ -710,6 +748,11 @@ struct ControlSheet: View {
 
                 sectionDivider
                 filterSection
+
+                if !engine.savedLoops.isEmpty {
+                    sectionDivider
+                    loopsSection
+                }
 
                 sectionDivider
                 recordingSection
@@ -1292,6 +1335,88 @@ struct ControlSheet: View {
                         .opacity(locked ? 0.5 : 1.0)
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: - Loops
+
+    private var loopsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionHeader("LOOPS", icon: "waveform.circle")
+                Spacer()
+                if !engine.playingLoopIds.isEmpty {
+                    Button(action: engine.stopAllLoops) {
+                        Text("Stop All")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundColor(.red.opacity(0.8))
+                    }
+                }
+            }
+
+            Text("Tap the red circle button to record a loop. Loops auto-play and layer on top of each other.")
+                .font(.system(size: 10, design: .rounded))
+                .foregroundColor(.secondary)
+
+            // Bar length picker
+            HStack(spacing: 6) {
+                Text("Length")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+                ForEach(LoopRecorder.barOptions, id: \.self) { bars in
+                    Button(action: { engine.loopRecorder.selectedBars = bars }) {
+                        Text("\(bars) bars")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundColor(engine.loopRecorder.selectedBars == bars ? .green : .secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule().fill(engine.loopRecorder.selectedBars == bars ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                            )
+                    }
+                }
+            }
+
+            // Saved loops
+            ForEach(engine.savedLoops) { loop in
+                HStack(spacing: 10) {
+                    // Play/stop toggle
+                    Button(action: { engine.toggleLoopPlayback(loop.id) }) {
+                        Image(systemName: engine.playingLoopIds.contains(loop.id) ? "stop.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(engine.playingLoopIds.contains(loop.id) ? .orange : .green)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(loop.name)
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        HStack(spacing: 6) {
+                            Text(loop.mode)
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.green.opacity(0.15)))
+                            Text("\(loop.events.count) events")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.secondary)
+                            Text("\(String(format: "%.1f", loop.duration))s")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Delete
+                    Button(action: { engine.deleteLoop(loop.id) }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary.opacity(0.5))
+                    }
+                }
+                .padding(.vertical, 4)
             }
         }
     }

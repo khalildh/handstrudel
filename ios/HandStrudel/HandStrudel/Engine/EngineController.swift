@@ -77,6 +77,13 @@ final class EngineController: ObservableObject {
     // Camera filter
     @Published var selectedFilter: CameraFilter = CAMERA_FILTERS[0]
 
+    // Loop recording & playback
+    let loopRecorder = LoopRecorder()
+    @Published var isLoopRecording = false
+    @Published var loopRecordingProgress: Double = 0
+    @Published var savedLoops = [RecordedLoop]()
+    @Published var playingLoopIds = Set<UUID>()
+
     // Grid mode (pinch-to-play)
     @Published var gridModeEnabled = false
     @Published var gridOctaveRange: Int = 2  // 1, 2, or 3 octaves
@@ -253,6 +260,8 @@ final class EngineController: ObservableObject {
             tickMelodicMode()
         }
 
+        tickLoopPlayback()
+        tickLoopRecordingProgress()
         tickSaveGesture()
     }
 
@@ -279,13 +288,16 @@ final class EngineController: ObservableObject {
 
         let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale, baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
         let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: gridNotes, currentBeat: 0)
+        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         for action in actions {
             switch action {
             case .noteOn(let hand, let midi, let name, let vel):
                 strudelBridge.noteOn(hand: hand, midi: midi, waveform: selectedWaveform, velocity: vel)
                 lastGridNote = name
+                loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel), currentTime: elapsed)
             case .noteOff(let hand):
                 strudelBridge.noteOff(hand: hand)
+                loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
             case .slide(let hand, let midi, let name):
                 strudelBridge.noteSlide(hand: hand, midi: midi)
                 lastGridNote = name
@@ -306,6 +318,7 @@ final class EngineController: ObservableObject {
         for hitType in hits {
             strudelBridge.playHit(hitType)
             lastDrumHit = hitType
+            loopRecorder.recordEvent(.drumHit(hitType: hitType), currentTime: elapsed)
         }
         evaluateDrumLoopsIfChanged(modePrefix: "drum")
     }
@@ -362,6 +375,81 @@ final class EngineController: ObservableObject {
             )
             savedSnippets.append(snippet)
         }
+    }
+
+    // MARK: - Loop Recording & Playback
+
+    private func tickLoopPlayback() {
+        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+        let events = loopRecorder.getPlaybackEvents(currentTime: elapsed)
+        for (event, volume) in events {
+            switch event {
+            case .noteOn(let midi, let waveform, let vel):
+                strudelBridge.playNote(midi: midi, waveform: waveform, velocity: vel * volume, duration: 0.2)
+            case .drumHit(let hitType):
+                strudelBridge.playHit(hitType)
+            case .noteOff:
+                break // one-shot playback, no sustained notes in loops
+            }
+        }
+    }
+
+    private func tickLoopRecordingProgress() {
+        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+        let currentBpm = smoothed["bpm"] ?? manualBPM
+
+        // Auto-stop recording when loop duration reached
+        if loopRecorder.isRecording && loopRecorder.checkAutoStop(currentTime: elapsed, bpm: currentBpm) {
+            if let loop = loopRecorder.stopRecording(bpm: currentBpm) {
+                savedLoops.append(loop)
+                // Auto-play the just-recorded loop
+                loopRecorder.addLoop(loop, startTime: elapsed)
+                playingLoopIds.insert(loop.id)
+            }
+            isLoopRecording = false
+        }
+
+        loopRecordingProgress = loopRecorder.recordingProgress(currentTime: elapsed, bpm: currentBpm)
+    }
+
+    func startLoopRecording() {
+        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+        let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
+        loopRecorder.startRecording(currentTime: elapsed, mode: mode)
+        isLoopRecording = true
+    }
+
+    func stopLoopRecording() {
+        let currentBpm = smoothed["bpm"] ?? manualBPM
+        if let loop = loopRecorder.stopRecording(bpm: currentBpm) {
+            savedLoops.append(loop)
+            let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+            loopRecorder.addLoop(loop, startTime: elapsed)
+            playingLoopIds.insert(loop.id)
+        }
+        isLoopRecording = false
+    }
+
+    func toggleLoopPlayback(_ loopId: UUID) {
+        if playingLoopIds.contains(loopId) {
+            loopRecorder.removeLoop(loopId)
+            playingLoopIds.remove(loopId)
+        } else if let loop = savedLoops.first(where: { $0.id == loopId }) {
+            let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+            loopRecorder.addLoop(loop, startTime: elapsed)
+            playingLoopIds.insert(loopId)
+        }
+    }
+
+    func deleteLoop(_ loopId: UUID) {
+        loopRecorder.removeLoop(loopId)
+        playingLoopIds.remove(loopId)
+        savedLoops.removeAll { $0.id == loopId }
+    }
+
+    func stopAllLoops() {
+        loopRecorder.stopPlayback()
+        playingLoopIds.removeAll()
     }
 
     // MARK: - Drum Code Helpers (shared by all modes)
