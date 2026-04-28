@@ -459,7 +459,7 @@ final class EngineController: ObservableObject {
 
     private func buildDisplayCode(_ p: MusicParams) -> String {
         let cpm = String(format: "%.1f", (p["bpm"] ?? 120) / 4)
-        let st = STRUCTS[structIdx]
+        let st = STRUCTS[max(0, min(STRUCTS.count - 1, structIdx))]
         let notes = cachedScaleNotes
 
         let noteStr: String
@@ -610,7 +610,8 @@ final class EngineController: ObservableObject {
         strudelBridge.onBeat = nil
         strudelBridge.onLog = nil
 
-        // Reset mode state
+        // Reset all state
+        saveDetector.reset()
         gridModeEnabled = false
         drumModeEnabled = false
         gridLeftLane = nil

@@ -172,7 +172,7 @@ func buildCode(_ p: MusicParams, structIdx: Int, config: MappingConfig, waveform
     let ni = max(0, min(NOTES.count - 1, Int((p["noteIdx"] ?? 10).rounded())))
     let note = NOTES[ni]
     let cpm = String(format: "%.1f", (p["bpm"] ?? 120) / 4)
-    let st = STRUCTS[structIdx]
+    let st = STRUCTS[max(0, min(STRUCTS.count - 1, structIdx))]
 
     var code = "note(\"\(note)\").s(\"\(waveform)\").struct(\"\(st)\").cpm(\(cpm))"
 
@@ -185,7 +185,7 @@ func buildCode(_ p: MusicParams, structIdx: Int, config: MappingConfig, waveform
 }
 
 func buildSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth") -> String {
-    let st = STRUCTS[structIdx]
+    let st = STRUCTS[max(0, min(STRUCTS.count - 1, structIdx))]
 
     var code = "note(signal(() => __hp._midi)).s(\"\(waveform)\").struct(\"\(st)\").cpm(signal(() => __hp._cpm))"
 
@@ -198,7 +198,7 @@ func buildSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "
 }
 
 func buildChordSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth") -> String {
-    let st = STRUCTS[structIdx]
+    let st = STRUCTS[max(0, min(STRUCTS.count - 1, structIdx))]
 
     // Build extra params chain (shared across all chord voices)
     var extras = ""

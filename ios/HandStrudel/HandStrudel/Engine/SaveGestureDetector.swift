@@ -4,6 +4,11 @@ final class SaveGestureDetector {
     private var armed = [String: Bool]()
     private var lastSaveTime: TimeInterval = 0
 
+    func reset() {
+        armed.removeAll()
+        lastSaveTime = 0
+    }
+
     func check(hands: HandsState, config: MappingConfig, currentTime: TimeInterval) -> Bool {
         let saveAxes = HandMapper.getSaveAxes(config)
         var triggered = false

@@ -183,8 +183,8 @@ final class HandTrackingManager: NSObject, ObservableObject {
         // Pinch: thumb tip close to index tip
         let pinch = max(0, min(1, 1 - dist(landmarks[4], landmarks[8]) * 5))
 
-        // Fist: average of inverted curls
-        let fist = 1 - (thumbCurl + indexCurl + middleCurl + ringCurl + pinkyCurl) / 5
+        // Fist: average of inverted curls (clamped 0-1)
+        let fist = max(0, min(1, 1 - (thumbCurl + indexCurl + middleCurl + ringCurl + pinkyCurl) / 5))
 
         // Rotation: atan2 from wrist to middle MCP
         let dx = landmarks[9].x - landmarks[0].x
@@ -234,18 +234,13 @@ extension HandTrackingManager: AVCaptureVideoDataOutputSampleBufferDelegate {
 
             // Video output is mirrored, so Vision's chirality is flipped:
             // Vision .left in mirrored frame = user's right hand, and vice versa.
-            let chirality = observation.chirality
-            switch chirality {
+            switch observation.chirality {
             case .left:
                 state.right = handData
             case .right:
                 state.left = handData
-            default:
-                if state.left == nil {
-                    state.left = handData
-                } else {
-                    state.right = handData
-                }
+            @unknown default:
+                break
             }
         }
 

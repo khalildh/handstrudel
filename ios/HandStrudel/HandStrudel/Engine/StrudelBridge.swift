@@ -26,8 +26,6 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
 
     var onBeat: ((Int) -> Void)?
     var onLog: ((String) -> Void)?
-    private var moduleReadyContinuation: CheckedContinuation<Void, Never>?
-    private var pageLoaded = false
 
     override init() {
         super.init()
@@ -58,7 +56,6 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     // WKNavigationDelegate
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         debugLog("page finished loading")
-        pageLoaded = true
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -87,7 +84,7 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
             // Check for errors and module started status
             let started = try? await webView.evaluateJavaScript("window._moduleStarted === true")
             let lastErr = try? await webView.evaluateJavaScript("window._lastError")
-            debugLog("module not ready yet, pageLoaded=\(pageLoaded), moduleStarted=\(started ?? false), lastError=\(lastErr ?? "none")")
+            debugLog("module not ready yet, moduleStarted=\(started ?? false), lastError=\(lastErr ?? "none")")
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
         }
 

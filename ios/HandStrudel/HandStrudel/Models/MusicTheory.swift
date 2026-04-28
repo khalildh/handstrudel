@@ -84,6 +84,7 @@ func scaleNotes(key: MusicKey, scale: Scale, baseOctave: Int, octaveRange: Int) 
 func chordNotes(key: MusicKey, scale: Scale, degree: Int) -> [Int] {
     let scaleIntervals = scale.intervals
     let count = scaleIntervals.count
+    guard count > 0 else { return [60] } // fallback to middle C
     let safeDegree = ((degree % count) + count) % count
 
     // Root in octave 3
