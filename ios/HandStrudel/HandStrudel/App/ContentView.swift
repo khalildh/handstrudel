@@ -291,9 +291,7 @@ struct ContentView: View {
 
                     // Alternating lane background
                     Rectangle()
-                        .fill(isAnyActive
-                              ? Color.green.opacity(0.15)
-                              : Color.white.opacity(isEven ? 0.04 : 0.0))
+                        .fill(Color.white.opacity(isEven ? 0.03 : 0.0))
                         .frame(height: laneHeight)
                         .offset(y: y)
 
