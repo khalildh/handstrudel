@@ -262,6 +262,7 @@ final class EngineController: ObservableObject {
 
         if isLive && gridModeEnabled {
             // Grid mode: pinch-to-play with quantized pitch
+            // Notes are triggered via playNote() (Web Audio), NOT Strudel scheduler
             let notes = cachedScaleNotes
             let events = gridModeManager.checkNotes(hands: currentHands, scaleNotes: notes, currentBeat: 0)
             for event in events {
@@ -274,7 +275,7 @@ final class EngineController: ObservableObject {
             gridLeftLane = lanes.left
             gridRightLane = lanes.right
 
-            // Still handle drum loop tracks
+            // Stop continuous synth, only keep drum loops
             let drumKey1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
             let drumKey2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
             let gridStructKey = "grid|\(drumKey1)|\(drumKey2)"
@@ -293,7 +294,11 @@ final class EngineController: ObservableObject {
                     if drumSpeed2 != 1.0 { drumCode2 = "(\(drumCode2)).fast(\(String(format: "%.1f", drumSpeed2)))" }
                     parts.append(drumCode2)
                 }
-                if !parts.isEmpty {
+                if parts.isEmpty {
+                    // No drums — stop Strudel entirely (notes play via Web Audio)
+                    strudelBridge.evaluate("silence")
+                } else {
+                    // Only drums, no synth
                     let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
                     strudelBridge.evaluate(code)
                 }
