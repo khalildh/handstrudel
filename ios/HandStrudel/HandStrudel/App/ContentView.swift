@@ -439,10 +439,26 @@ struct ContentView: View {
     // MARK: - Bottom Controls
 
     private var bottomControls: some View {
-        HStack(spacing: 16) {
-            Spacer()
+        ZStack {
+            // Record button centered
+            recordButton
 
-            // Instagram share button
+            // Settings button aligned right
+            HStack {
+                Spacer()
+                Button(action: { showSheet = true }) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.4))
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Color.black.opacity(0.3)))
+                }
+            }
+        }
+    }
+
+    private var recordButton: some View {
+        // Instagram share button
             Button(action: startRecording) {
                 ZStack {
                     if isRecording {
@@ -488,32 +504,6 @@ struct ContentView: View {
                 }
             }
             .disabled(isRecording)
-
-            Spacer()
-
-            // Controls sheet button
-            Button(action: { showSheet = true }) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.4))
-                    .frame(width: 36, height: 36)
-                    .background(
-                        Circle()
-                            .fill(Color.black.opacity(0.2))
-                    )
-            }
-        }
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.black.opacity(0.2))
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.3)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-        )
     }
 
     // MARK: - Recording
