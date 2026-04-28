@@ -17,6 +17,9 @@ struct HandStrudelApp: App {
             ContentView()
                 .preferredColorScheme(.dark)
                 .persistentSystemOverlays(.hidden)
+                .onAppear {
+                    UIApplication.shared.isIdleTimerDisabled = true
+                }
         }
     }
 }

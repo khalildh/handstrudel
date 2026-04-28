@@ -1,11 +1,11 @@
 import Foundation
 
 final class GridModeManager {
-    // Pinch detection
+    // Pinch detection — lower thresholds for faster response
     private var leftPinching = false
     private var rightPinching = false
-    private let pinchThreshold: Double = 0.6   // pinch value to trigger
-    private let releaseThreshold: Double = 0.3  // pinch value to release
+    private let pinchThreshold: Double = 0.35  // pinch value to trigger (was 0.6)
+    private let releaseThreshold: Double = 0.15 // pinch value to release (was 0.3)
 
     // Beat quantization
     var quantizeEnabled = false
