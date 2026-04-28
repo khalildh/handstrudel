@@ -294,26 +294,26 @@ struct ContentView: View {
                     }
                 }
 
-                // Pinch indicators
-                if engine.gridModeManager.isLeftPinching {
+                // Pinch indicators at actual hand position
+                if engine.gridModeManager.isLeftPinching, let left = engine.handsState.left {
                     Circle()
-                        .fill(Color.green.opacity(0.4))
-                        .frame(width: 30, height: 30)
+                        .fill(Color.green.opacity(0.5))
+                        .frame(width: 40, height: 40)
                         .position(
-                            x: geo.size.width * 0.3,
-                            y: engine.gridLeftLane.map { CGFloat(count - 1 - $0) * laneHeight + laneHeight / 2 } ?? 0
+                            x: CGFloat(left.x) * geo.size.width,
+                            y: CGFloat(left.y) * geo.size.height
                         )
-                        .blur(radius: 4)
+                        .blur(radius: 6)
                 }
-                if engine.gridModeManager.isRightPinching {
+                if engine.gridModeManager.isRightPinching, let right = engine.handsState.right {
                     Circle()
-                        .fill(Color.pink.opacity(0.4))
-                        .frame(width: 30, height: 30)
+                        .fill(Color.pink.opacity(0.5))
+                        .frame(width: 40, height: 40)
                         .position(
-                            x: geo.size.width * 0.7,
-                            y: engine.gridRightLane.map { CGFloat(count - 1 - $0) * laneHeight + laneHeight / 2 } ?? 0
+                            x: CGFloat(right.x) * geo.size.width,
+                            y: CGFloat(right.y) * geo.size.height
                         )
-                        .blur(radius: 4)
+                        .blur(radius: 6)
                 }
 
                 // Last played note flash

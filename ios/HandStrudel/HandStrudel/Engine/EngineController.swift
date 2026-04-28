@@ -432,7 +432,12 @@ final class EngineController: ObservableObject {
                 self.handsState = self.currentHands
                 self.bpm = s["bpm"] ?? 120
 
-                if self.chordMode {
+                if self.gridModeEnabled {
+                    // Grid mode: show last triggered note
+                    self.noteDisplay = self.lastGridNote.isEmpty ? "pinch to play" : self.lastGridNote
+                    self.chordDisplay = ""
+                    self.codeDisplay = "grid mode — \(self.selectedKey.rawValue) \(self.selectedScale.rawValue)"
+                } else if self.chordMode {
                     let noteCount: Int = self.selectedScale.intervals.count
                     let rawIdx: Double = s["noteIdx"] ?? 0
                     let normalized: Double = rawIdx / Double(NOTES.count - 1)
@@ -452,7 +457,9 @@ final class EngineController: ObservableObject {
                     self.chordDisplay = ""
                 }
 
-                self.codeDisplay = self.buildDisplayCode(s)
+                if !self.gridModeEnabled {
+                    self.codeDisplay = self.buildDisplayCode(s)
+                }
                 if self.hydraEnabled {
                     self.hydraCodeDisplay = self.buildHydraDisplayCode(s)
                 }
