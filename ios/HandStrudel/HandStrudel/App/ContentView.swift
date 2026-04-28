@@ -325,7 +325,11 @@ struct ContentView: View {
         GeometryReader { geo in
             let notes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale, baseOctave: engine.gridBaseOctave, octaveRange: engine.gridOctaveRange)
             let count = notes.count
-            let laneHeight = geo.size.height / CGFloat(max(1, count))
+            // Pad top/bottom 15% to avoid dead zones where camera can't see hands
+            let topPad = geo.size.height * 0.15
+            let bottomPad = geo.size.height * 0.2  // more bottom padding for UI controls
+            let usableHeight = geo.size.height - topPad - bottomPad
+            let laneHeight = usableHeight / CGFloat(max(1, count))
 
             // Apply same aspect fill correction as HandOverlayView
             let vidAspect = engine.handTracker.videoWidth / engine.handTracker.videoHeight
@@ -342,15 +346,16 @@ struct ContentView: View {
             }
 
             let leftVisualLane: Int? = engine.handsState.left.map { hand in
-                let screenY = correctedY(hand.pinchY)
+                let screenY = correctedY(hand.pinchY) - topPad
                 return max(0, min(count - 1, Int(screenY / laneHeight)))
             }
             let rightVisualLane: Int? = engine.handsState.right.map { hand in
-                let screenY = correctedY(hand.pinchY)
+                let screenY = correctedY(hand.pinchY) - topPad
                 return max(0, min(count - 1, Int(screenY / laneHeight)))
             }
 
             VStack(spacing: 0) {
+                Spacer().frame(height: topPad)
                 ForEach(0..<count, id: \.self) { i in
                     let noteIdx = count - 1 - i
                     let midi = notes[noteIdx]
@@ -391,7 +396,7 @@ struct ContentView: View {
                         }
                         .padding(.horizontal, 8)
                     }
-                    .frame(maxHeight: .infinity)
+                    .frame(height: laneHeight)
                     // Separator line at top of each lane
                     .overlay(alignment: .top) {
                         Rectangle()
@@ -399,6 +404,7 @@ struct ContentView: View {
                             .frame(height: 1)
                     }
                 }
+                Spacer()
             }
         }
     }

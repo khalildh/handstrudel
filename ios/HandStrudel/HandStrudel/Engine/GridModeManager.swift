@@ -87,15 +87,11 @@ final class GridModeManager {
 
     func yToNoteIndex(y: Double, noteCount: Int) -> Int {
         guard noteCount > 0 else { return 0 }
-        // Correct for aspect fill cropping (same math as HandOverlayView)
-        var correctedY = y
-        if videoAspect < screenAspect {
-            // Height is cropped
-            let visibleFrac = Double(videoAspect / screenAspect)
-            let offset = (1 - visibleFrac) / 2
-            correctedY = (y - offset) / visibleFrac
-        }
-        let normalized = 1 - max(0, min(1, correctedY))
+        // Map Y from padded range (15% top, 20% bottom = usable 0.15-0.80)
+        let topPad = 0.15
+        let bottomPad = 0.20
+        let usable = 1.0 - topPad - bottomPad
+        let normalized = 1 - max(0, min(1, (y - topPad) / usable))
         return max(0, min(noteCount - 1, Int(normalized * Double(noteCount))))
     }
 
