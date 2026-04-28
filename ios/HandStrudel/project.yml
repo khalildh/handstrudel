@@ -40,3 +40,15 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: TVAG3T3Y65
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  HandStrudelTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HandStrudelTests
+    dependencies:
+      - target: HandStrudel
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: true

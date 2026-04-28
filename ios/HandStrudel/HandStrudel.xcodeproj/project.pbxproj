@@ -16,6 +16,7 @@
 		2FC5D55810AF0B87923E355B /* ParamSmoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */; };
 		375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D986625C7BF30952FBAED619 /* OnboardingView.swift */; };
 		380966C71A0162507C985C6C /* StartOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74287CD261130ADF57405FF3 /* StartOverlayView.swift */; };
+		39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */; };
 		467B330FAF19DF881621A97A /* MappingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */; };
 		575A0CD71B422DFD7ACB6FDF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */; };
 		61F3ED12A7BAB424D09491E8 /* Snippet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */; };
@@ -34,17 +35,29 @@
 		F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F505B00217A74555C8E226 /* MusicTheory.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		ADA4C0F1828ED0110F74525A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B0BCD6C2162A67C8FB0F5866 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EB6C91B49BB8F9A04096CC97;
+			remoteInfo = HandStrudel;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
 		18B0EF83FDEC95F58B860F5A /* HandMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandMapper.swift; sourceTree = "<group>"; };
 		21E972CF1E53A24CA899C1A5 /* StoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreManager.swift; sourceTree = "<group>"; };
+		3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelTests.swift; sourceTree = "<group>"; };
 		5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingConfig.swift; sourceTree = "<group>"; };
 		6C89256347633541234267B8 /* SaveGestureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGestureDetector.swift; sourceTree = "<group>"; };
 		6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverlayView.swift; sourceTree = "<group>"; };
 		74287CD261130ADF57405FF3 /* StartOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartOverlayView.swift; sourceTree = "<group>"; };
 		7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelApp.swift; sourceTree = "<group>"; };
+		868D2939892D7ADF96F5D122 /* HandStrudelTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HandStrudelTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B7A548807FF6856B92FC423 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamSmoother.swift; sourceTree = "<group>"; };
 		938A00F6A5044E13D981C663 /* EngineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineController.swift; sourceTree = "<group>"; };
@@ -111,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */,
+				868D2939892D7ADF96F5D122 /* HandStrudelTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -140,6 +154,7 @@
 			isa = PBXGroup;
 			children = (
 				15D4EC6E1A58084378B10F32 /* HandStrudel */,
+				E4178A89ACBF1EB624EC830E /* HandStrudelTests */,
 				4D2345EC9B39CE8C21A6B162 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -154,9 +169,35 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		E4178A89ACBF1EB624EC830E /* HandStrudelTests */ = {
+			isa = PBXGroup;
+			children = (
+				3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */,
+			);
+			path = HandStrudelTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		DF7A3978895A25A5E6C0C33A /* HandStrudelTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8D9401AD3B6FC15976879378 /* Build configuration list for PBXNativeTarget "HandStrudelTests" */;
+			buildPhases = (
+				488A3B6C06ED32763290F344 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				29394584EA0D0683045B6A81 /* PBXTargetDependency */,
+			);
+			name = HandStrudelTests;
+			packageProductDependencies = (
+			);
+			productName = HandStrudelTests;
+			productReference = 868D2939892D7ADF96F5D122 /* HandStrudelTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		EB6C91B49BB8F9A04096CC97 /* HandStrudel */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 102C95BB435B7F1561E4BBB8 /* Build configuration list for PBXNativeTarget "HandStrudel" */;
@@ -205,6 +246,7 @@
 			projectRoot = "";
 			targets = (
 				EB6C91B49BB8F9A04096CC97 /* HandStrudel */,
+				DF7A3978895A25A5E6C0C33A /* HandStrudelTests */,
 			);
 		};
 /* End PBXProject section */
@@ -252,9 +294,43 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		488A3B6C06ED32763290F344 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		29394584EA0D0683045B6A81 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EB6C91B49BB8F9A04096CC97 /* HandStrudel */;
+			targetProxy = ADA4C0F1828ED0110F74525A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		1190D64CF79ED61C56CA571C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.handstrudel.HandStrudelTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HandStrudel.app/HandStrudel";
+			};
+			name = Debug;
+		};
 		5710A42F1C7A82CB77AE21C1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -329,6 +405,24 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		6C7C30583E55EF196A0A8A00 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.handstrudel.HandStrudelTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HandStrudel.app/HandStrudel";
 			};
 			name = Release;
 		};
@@ -424,6 +518,15 @@
 			buildConfigurations = (
 				5710A42F1C7A82CB77AE21C1 /* Debug */,
 				FDFD5E0D636B7585B52581B1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8D9401AD3B6FC15976879378 /* Build configuration list for PBXNativeTarget "HandStrudelTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1190D64CF79ED61C56CA571C /* Debug */,
+				6C7C30583E55EF196A0A8A00 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
