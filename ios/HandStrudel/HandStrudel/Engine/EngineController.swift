@@ -220,8 +220,11 @@ final class EngineController: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.currentHands = hands
-            HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.config)
-            HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.hydraConfig)
+            // Skip param mapping in grid/drum mode — hands control notes/hits, not synth params
+            if !self.gridModeEnabled && !self.drumModeEnabled {
+                HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.config)
+                HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.hydraConfig)
+            }
         }
     }
 
