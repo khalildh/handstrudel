@@ -325,13 +325,26 @@ struct ContentView: View {
             let count = notes.count
             let laneHeight = geo.size.height / CGFloat(max(1, count))
 
-            // Compute which visual lane each hand is in based on screen position
+            // Apply same aspect fill correction as HandOverlayView
+            let vidAspect = engine.handTracker.videoWidth / engine.handTracker.videoHeight
+            let scrAspect = geo.size.width / geo.size.height
+
+            let correctedY: (Double) -> CGFloat = { vy in
+                if vidAspect > scrAspect {
+                    return CGFloat(vy) * geo.size.height
+                } else {
+                    let vis = vidAspect / scrAspect
+                    let off = (1 - vis) / 2
+                    return (CGFloat(vy) - off) / vis * geo.size.height
+                }
+            }
+
             let leftVisualLane: Int? = engine.handsState.left.map { hand in
-                let screenY = CGFloat(hand.y) * geo.size.height
+                let screenY = correctedY(hand.y)
                 return max(0, min(count - 1, Int(screenY / laneHeight)))
             }
             let rightVisualLane: Int? = engine.handsState.right.map { hand in
-                let screenY = CGFloat(hand.y) * geo.size.height
+                let screenY = correctedY(hand.y)
                 return max(0, min(count - 1, Int(screenY / laneHeight)))
             }
 
