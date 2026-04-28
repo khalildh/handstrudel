@@ -79,6 +79,8 @@ final class EngineController: ObservableObject {
 
     // Grid mode (pinch-to-play)
     @Published var gridModeEnabled = false
+    @Published var gridOctaveRange: Int = 2  // 1, 2, or 3 octaves
+    @Published var gridBaseOctave: Int = 3   // starting octave
     let gridModeManager = GridModeManager()
     @Published var lastGridNote: String = ""
     @Published var gridLeftLane: Int? = nil
@@ -270,8 +272,9 @@ final class EngineController: ObservableObject {
             let screenBounds = UIScreen.main.bounds
             gridModeManager.screenAspect = screenBounds.width / screenBounds.height
 
-            let notes = cachedScaleNotes
-            let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: notes, currentBeat: 0)
+            // Use limited octave range for grid mode
+            let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale, baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
+            let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: gridNotes, currentBeat: 0)
             for action in actions {
                 switch action {
                 case .noteOn(let hand, let midi, let name, let vel):
@@ -286,7 +289,7 @@ final class EngineController: ObservableObject {
             }
 
             // Update lane display
-            let lanes = gridModeManager.currentLanes(hands: currentHands, scaleNotes: notes)
+            let lanes = gridModeManager.currentLanes(hands: currentHands, scaleNotes: gridNotes)
             gridLeftLane = lanes.left
             gridRightLane = lanes.right
 

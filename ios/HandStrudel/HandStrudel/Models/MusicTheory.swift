@@ -64,6 +64,22 @@ func scaleNotes(key: MusicKey, scale: Scale) -> [Int] {
     return notes
 }
 
+/// Generate scale notes for a limited octave range (for grid mode)
+func scaleNotes(key: MusicKey, scale: Scale, baseOctave: Int, octaveRange: Int) -> [Int] {
+    var notes = [Int]()
+    let endOctave = baseOctave + octaveRange - 1
+    for octave in baseOctave...endOctave {
+        let base = (octave + 1) * 12 + key.semitone
+        for interval in scale.intervals {
+            let midi = base + interval
+            if midi <= 96 { // cap at C7
+                notes.append(midi)
+            }
+        }
+    }
+    return notes
+}
+
 /// Generate chord (triad) from a scale degree (0-based)
 func chordNotes(key: MusicKey, scale: Scale, degree: Int) -> [Int] {
     let scaleIntervals = scale.intervals

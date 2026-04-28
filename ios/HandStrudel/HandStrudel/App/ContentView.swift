@@ -323,7 +323,7 @@ struct ContentView: View {
 
     private var noteGridOverlay: some View {
         GeometryReader { geo in
-            let notes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale)
+            let notes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale, baseOctave: engine.gridBaseOctave, octaveRange: engine.gridOctaveRange)
             let count = notes.count
             let laneHeight = geo.size.height / CGFloat(max(1, count))
 
@@ -808,6 +808,53 @@ struct ControlSheet: View {
                     .font(.system(size: 10, design: .rounded))
                     .foregroundColor(.secondary)
                     .padding(.top, 2)
+
+                // Octave range controls
+                HStack(spacing: 12) {
+                    // Octave range
+                    HStack(spacing: 6) {
+                        Text("Range")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary)
+                        ForEach([1, 2, 3], id: \.self) { range in
+                            Button(action: { engine.gridOctaveRange = range }) {
+                                Text("\(range)")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundColor(engine.gridOctaveRange == range ? .green : .secondary)
+                                    .frame(width: 28, height: 28)
+                                    .background(Circle().fill(engine.gridOctaveRange == range ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
+                            }
+                        }
+                    }
+
+                    Spacer()
+
+                    // Base octave
+                    HStack(spacing: 4) {
+                        Text("Oct")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary)
+                        Button(action: { if engine.gridBaseOctave > 1 { engine.gridBaseOctave -= 1 } }) {
+                            Image(systemName: "minus")
+                                .font(.system(size: 10, weight: .bold))
+                                .frame(width: 24, height: 24)
+                                .background(Circle().fill(Color.primary.opacity(0.06)))
+                                .foregroundColor(.secondary)
+                        }
+                        Text("\(engine.gridBaseOctave)")
+                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .foregroundColor(.green)
+                            .frame(width: 20)
+                        Button(action: { if engine.gridBaseOctave < 6 { engine.gridBaseOctave += 1 } }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .bold))
+                                .frame(width: 24, height: 24)
+                                .background(Circle().fill(Color.primary.opacity(0.06)))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(.top, 4)
             }
         }
     }
