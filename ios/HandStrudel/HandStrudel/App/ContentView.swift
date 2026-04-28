@@ -103,19 +103,22 @@ struct ContentView: View {
                 logoMark
                     .padding(.top, 2)
 
-                // Floating code pill
-                codePill
-                    .padding(.horizontal, 20)
-                    .padding(.top, 2)
+                // Floating code pill — hide in grid/drum mode
+                if !engine.gridModeEnabled && !engine.drumModeEnabled {
+                    codePill
+                        .padding(.horizontal, 20)
+                        .padding(.top, 2)
+                }
 
                 Spacer()
 
-                // Note badge
-                noteBadge
+                // Note badge — hide in grid/drum mode (grid has lane labels, drums have pad labels)
+                if !engine.gridModeEnabled && !engine.drumModeEnabled {
+                    noteBadge
 
-                // Beat pulse ring
-                beatRing
-                    .padding(.bottom, 8)
+                    beatRing
+                        .padding(.bottom, 8)
+                }
 
                 // Bottom controls
                 bottomControls

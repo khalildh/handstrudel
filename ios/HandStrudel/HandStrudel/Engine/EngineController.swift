@@ -99,7 +99,6 @@ final class EngineController: ObservableObject {
     @Published var selectedDrumLoop2: DrumLoop = DRUM_LOOPS[0]
     @Published var drumVolume2: Double = 1.0
     @Published var drumSpeed2: Double = 1.0
-    private var lastDrumLoopId = ""
 
     // Harmony
     @Published var selectedKey: MusicKey = .C
@@ -628,14 +627,30 @@ final class EngineController: ObservableObject {
     }
 
     func stop() {
+        // Timers
         displayLink?.invalidate()
         displayLink = nil
         uiTimer?.invalidate()
         uiTimer = nil
         structTimer?.invalidate()
         structTimer = nil
+
+        // Audio/camera
         handTracker.stopSession()
+        handTracker.onHandsUpdate = nil
         strudelBridge.stop()
+        strudelBridge.onBeat = nil
+        strudelBridge.onLog = nil
+
+        // Reset mode state
+        gridModeEnabled = false
+        drumModeEnabled = false
+        gridLeftLane = nil
+        gridRightLane = nil
+        lastGridNote = ""
+        lastDrumHit = ""
+        lastStructKey = ""
+
         isRunning = false
         status = "tap start"
     }
