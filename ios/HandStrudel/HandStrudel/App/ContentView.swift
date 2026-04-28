@@ -149,7 +149,7 @@ struct ContentView: View {
                         .fill(i == engine.currentBeat
                               ? (i % 2 == 0 ? Color.green : Color.pink)
                               : Color.white.opacity(0.15))
-                        .frame(width: 6, height: 6)
+                        .frame(width: 7, height: 7)
                         .scaleEffect(i == engine.currentBeat ? 1.5 : 1.0)
                         .animation(.easeOut(duration: 0.1), value: engine.currentBeat)
                 }
@@ -161,9 +161,9 @@ struct ContentView: View {
             Button(action: { engine.stop() }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.white.opacity(0.75))
                     .frame(width: 32, height: 32)
-                    .background(Color.black.opacity(0.3))
+                    .background(Color.black.opacity(0.4))
                     .clipShape(Circle())
             }
         }
@@ -182,13 +182,21 @@ struct ContentView: View {
     private var logoMark: some View {
         HStack(spacing: 0) {
             Text("hand")
-                .font(.system(size: 20, weight: .light, design: .monospaced))
+                .font(.system(size: 18, weight: .light, design: .monospaced))
                 .foregroundColor(.white.opacity(0.9))
             Text("strudel")
-                .font(.system(size: 20, weight: .black, design: .monospaced))
+                .font(.system(size: 18, weight: .black, design: .monospaced))
                 .foregroundColor(Color(hue: strudelHue, saturation: 0.8, brightness: 1.0))
                 .animation(.easeInOut(duration: 0.3), value: strudelHue)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(Color.black.opacity(0.3))
+                .background(Capsule().fill(.ultraThinMaterial).opacity(0.3))
+        )
+        .clipShape(Capsule())
         .shadow(color: Color(hue: strudelHue, saturation: 0.6, brightness: 0.8).opacity(0.5), radius: 10, x: 0, y: 2)
     }
 
@@ -198,19 +206,20 @@ struct ContentView: View {
         Group {
             if !engine.codeDisplay.isEmpty {
                 Text(engine.codeDisplay.components(separatedBy: "\n").prefix(3).joined(separator: "\n"))
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 8, design: .monospaced))
                     .foregroundColor(.green.opacity(0.8))
                     .lineLimit(3)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 14)
                             .fill(Color.black.opacity(0.5))
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.green.opacity(0.15), lineWidth: 1)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.green.opacity(0.12), lineWidth: 0.5)
                             )
                     )
+                    .shadow(color: Color.green.opacity(0.25), radius: 8, x: 0, y: 0)
             }
         }
     }
@@ -219,15 +228,19 @@ struct ContentView: View {
 
     private var noteBadge: some View {
         Text(engine.noteDisplay)
-            .font(.system(size: 22, weight: .black, design: .rounded))
+            .font(.system(size: 28, weight: .black, design: .rounded))
             .foregroundColor(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
             .background(
                 Capsule()
-                    .fill(Color.green.opacity(0.3))
-                    .overlay(Capsule().stroke(Color.green.opacity(0.4), lineWidth: 1))
+                    .fill(Color(hue: strudelHue, saturation: 0.6, brightness: 0.3).opacity(0.5))
+                    .overlay(
+                        Capsule()
+                            .stroke(Color(hue: strudelHue, saturation: 0.8, brightness: 1.0).opacity(0.6), lineWidth: 2)
+                    )
             )
+            .shadow(color: Color(hue: strudelHue, saturation: 0.8, brightness: 1.0).opacity(0.5), radius: 12, x: 0, y: 0)
             .scaleEffect(engine.currentBeat == 0 ? 1.1 : 1.0)
             .animation(.spring(response: 0.15, dampingFraction: 0.5), value: engine.currentBeat)
     }
@@ -237,21 +250,21 @@ struct ContentView: View {
     private var beatRing: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.05), lineWidth: 2)
+                .stroke(Color.white.opacity(0.04), lineWidth: 1.5)
                 .frame(width: 50, height: 50)
 
             Circle()
                 .stroke(
                     engine.currentBeat % 2 == 0 ? Color.green.opacity(0.6) : Color.pink.opacity(0.6),
-                    lineWidth: 3
+                    lineWidth: 1.5
                 )
                 .frame(width: 50, height: 50)
-                .scaleEffect(engine.currentBeat == 0 ? 1.3 : 1.0)
-                .opacity(engine.currentBeat == 0 ? 0.3 : 0.8)
+                .scaleEffect(engine.currentBeat == 0 ? 1.15 : 1.0)
+                .opacity(engine.currentBeat == 0 ? 0.4 : 0.8)
                 .animation(.easeOut(duration: 0.3), value: engine.currentBeat)
 
             Text("\(Int(engine.bpm.rounded()))")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
                 .foregroundColor(.white.opacity(0.5))
         }
     }
@@ -275,15 +288,20 @@ struct ContentView: View {
 
                     // Lane separator line
                     Rectangle()
-                        .fill(Color.white.opacity(isHighlighted ? 0.15 : 0.04))
-                        .frame(height: 1)
+                        .fill(Color.white.opacity(isHighlighted ? 0.12 : 0.025))
+                        .frame(height: 0.5)
                         .offset(y: y)
 
                     // Note label on the left
                     Text(name)
-                        .font(.system(size: isHighlighted ? 12 : 9, weight: isHighlighted ? .bold : .regular, design: .monospaced))
+                        .font(.system(size: isHighlighted ? 13 : 9, weight: isHighlighted ? .bold : .regular, design: .monospaced))
                         .foregroundColor(isHighlighted ? .green : .white.opacity(0.25))
-                        .position(x: 24, y: y + laneHeight / 2)
+                        .padding(.horizontal, isHighlighted ? 6 : 0)
+                        .padding(.vertical, isHighlighted ? 2 : 0)
+                        .background(
+                            Capsule().fill(Color.black.opacity(isHighlighted ? 0.4 : 0))
+                        )
+                        .position(x: 28, y: y + laneHeight / 2)
 
                     // Highlight the active lane
                     if isHighlighted {
@@ -297,32 +315,27 @@ struct ContentView: View {
                 // Pinch indicators at actual hand position
                 if engine.gridModeManager.isLeftPinching, let left = engine.handsState.left {
                     Circle()
-                        .fill(Color.green.opacity(0.5))
+                        .stroke(Color.green.opacity(0.7), lineWidth: 3)
                         .frame(width: 40, height: 40)
+                        .shadow(color: .green.opacity(0.5), radius: 8)
+                        .scaleEffect(1.2)
                         .position(
                             x: CGFloat(left.x) * geo.size.width,
                             y: CGFloat(left.y) * geo.size.height
                         )
-                        .blur(radius: 6)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: engine.gridModeManager.isLeftPinching)
                 }
                 if engine.gridModeManager.isRightPinching, let right = engine.handsState.right {
                     Circle()
-                        .fill(Color.pink.opacity(0.5))
+                        .stroke(Color.pink.opacity(0.7), lineWidth: 3)
                         .frame(width: 40, height: 40)
+                        .shadow(color: .pink.opacity(0.5), radius: 8)
+                        .scaleEffect(1.2)
                         .position(
                             x: CGFloat(right.x) * geo.size.width,
                             y: CGFloat(right.y) * geo.size.height
                         )
-                        .blur(radius: 6)
-                }
-
-                // Last played note flash
-                if !engine.lastGridNote.isEmpty {
-                    Text(engine.lastGridNote)
-                        .font(.system(size: 28, weight: .black, design: .rounded))
-                        .foregroundColor(.green)
-                        .shadow(color: .green.opacity(0.5), radius: 10)
-                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: engine.gridModeManager.isRightPinching)
                 }
             }
         }
@@ -351,16 +364,16 @@ struct ContentView: View {
 
             // Tap-to-play drum pad grid
             LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 8),
-                GridItem(.flexible(), spacing: 8),
-                GridItem(.flexible(), spacing: 8)
-            ], spacing: 8) {
+                GridItem(.flexible(), spacing: 1),
+                GridItem(.flexible(), spacing: 1),
+                GridItem(.flexible(), spacing: 1)
+            ], spacing: 1) {
                 let allZones = DrumModeManager.leftZones + DrumModeManager.rightZones
                 ForEach(Array(allZones.enumerated()), id: \.offset) { idx, zone in
                     Button(action: {
                         engine.strudelBridge.playHit(zone.hitType)
                         flashingPad = zone.name
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                             if flashingPad == zone.name { flashingPad = nil }
                         }
                     }) {
@@ -375,16 +388,22 @@ struct ContentView: View {
                         .frame(height: 70)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(flashingPad == zone.name
-                                    ? Color.green.opacity(0.4)
-                                    : Color.white.opacity(0.08))
+                                .fill(
+                                    LinearGradient(
+                                        colors: flashingPad == zone.name
+                                            ? [Color.green.opacity(0.5), Color.green.opacity(0.2)]
+                                            : [Color.white.opacity(0.1), Color.white.opacity(0.04)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
                         )
-                        .scaleEffect(flashingPad == zone.name ? 0.95 : 1.0)
-                        .animation(.easeOut(duration: 0.1), value: flashingPad)
+                        .scaleEffect(flashingPad == zone.name ? 0.9 : 1.0)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.5), value: flashingPad)
                     }
                 }
             }
@@ -442,11 +461,11 @@ struct ContentView: View {
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
                                         ),
-                                        lineWidth: 2.5
+                                        lineWidth: 3
                                     )
-                                    .frame(width: 52, height: 52)
+                                    .frame(width: 56, height: 56)
                                 Image(systemName: "video.fill")
-                                    .font(.system(size: 18))
+                                    .font(.system(size: 20))
                                     .foregroundColor(.white)
                             }
                             Text("7s")
@@ -462,16 +481,27 @@ struct ContentView: View {
 
             // Controls sheet button
             Button(action: { showSheet = true }) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 18))
-                    .foregroundColor(.white.opacity(0.6))
-                    .frame(width: 44, height: 44)
+                Image(systemName: "gearshape")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.4))
+                    .frame(width: 36, height: 36)
                     .background(
                         Circle()
-                            .fill(Color.black.opacity(0.3))
+                            .fill(Color.black.opacity(0.2))
                     )
             }
         }
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.black.opacity(0.2))
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.3)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+        )
     }
 
     // MARK: - Recording
@@ -568,35 +598,40 @@ struct ControlSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 24) {
                 // Header with store button
                 HStack {
                     Spacer()
                     Button(action: { showStore = true }) {
-                        Image(systemName: "bag")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
-                            .frame(width: 36, height: 36)
-                            .background(Circle().fill(Color.white.opacity(0.08)))
+                        HStack(spacing: 6) {
+                            Image(systemName: "bag.fill")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("Store")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        }
+                        .foregroundColor(.white.opacity(0.7))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(Color.white.opacity(0.08)))
+                        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
                     }
                 }
 
-                // Mode section
                 modeSection
 
-                // Harmony section
+                sectionDivider
                 harmonySection
 
-                // Sound/waveform section
+                sectionDivider
                 soundSection
 
-                // BPM section
+                sectionDivider
                 bpmSection
 
-                // Params section
+                sectionDivider
                 paramsSection
 
-                // Drum loops + settings
+                sectionDivider
                 drumTrackSection(
                     label: "DRUMS 1",
                     loop: $engine.selectedDrumLoop,
@@ -604,6 +639,7 @@ struct ControlSheet: View {
                     speed: $engine.drumSpeed
                 )
 
+                sectionDivider
                 drumTrackSection(
                     label: "DRUMS 2",
                     loop: $engine.selectedDrumLoop2,
@@ -611,14 +647,18 @@ struct ControlSheet: View {
                     speed: $engine.drumSpeed2
                 )
 
-                // Recording settings
+                sectionDivider
                 recordingSection
 
-                // Snippets
-                if !engine.savedSnippets.isEmpty { snippetsSection }
+                if !engine.savedSnippets.isEmpty {
+                    sectionDivider
+                    snippetsSection
+                }
 
-                // Track
-                if !engine.track.slots.isEmpty { trackSection }
+                if !engine.track.slots.isEmpty {
+                    sectionDivider
+                    trackSection
+                }
             }
             .padding(20)
         }
@@ -633,6 +673,26 @@ struct ControlSheet: View {
             if storeManager.products.isEmpty {
                 await storeManager.loadProducts()
             }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var sectionDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.06))
+            .frame(height: 1)
+    }
+
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.green.opacity(0.6))
+            Text(title)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundColor(.secondary)
+                .tracking(1.5)
         }
     }
 
@@ -679,13 +739,10 @@ struct ControlSheet: View {
     }
 
     private var modeSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("MODE")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(.secondary)
-                .tracking(1.5)
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("MODE", icon: "gamecontroller")
 
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 modeButton("Melodic", icon: "pianokeys", mode: .melodic)
                 modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
                 modeButton("Drums", icon: "drum.fill", mode: .drums)
@@ -703,17 +760,26 @@ struct ControlSheet: View {
     private func modeButton(_ label: String, icon: String, mode: AppMode) -> some View {
         let isActive = currentMode == mode
         return Button(action: { setMode(mode) }) {
-            VStack(spacing: 3) {
+            VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 18))
+                    .font(.system(size: 20))
+                    .foregroundColor(isActive ? .green : .primary.opacity(0.5))
                 Text(label)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundColor(isActive ? .green : .primary.opacity(0.6))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 10).fill(isActive ? Color.green.opacity(0.12) : Color.primary.opacity(0.04)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(isActive ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5))
+            .frame(height: 48)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isActive
+                        ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                        : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1.5 : 0.5)
+            )
         }
     }
 
@@ -721,10 +787,7 @@ struct ControlSheet: View {
 
     private var harmonySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("HARMONY")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(.secondary)
-                .tracking(1.5)
+            sectionHeader("HARMONY", icon: "music.note")
 
             // Key picker
             ScrollView(.horizontal, showsIndicators: false) {
@@ -737,8 +800,8 @@ struct ControlSheet: View {
                             Text(key.rawValue)
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                                 .foregroundColor(engine.selectedKey == key ? .green : .primary.opacity(0.6))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
                                 .background(
                                     Capsule()
                                         .fill(engine.selectedKey == key ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
@@ -763,8 +826,8 @@ struct ControlSheet: View {
                             Text(scale.rawValue)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
                                 .foregroundColor(engine.selectedScale == scale ? .green : .primary.opacity(0.6))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
                                 .background(
                                     Capsule()
                                         .fill(engine.selectedScale == scale ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
@@ -778,30 +841,33 @@ struct ControlSheet: View {
                 }
             }
 
-            // Toggles
-            HStack(spacing: 16) {
-                Toggle(isOn: $engine.chordMode) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "music.note.list")
-                            .font(.system(size: 12))
-                        Text("Chords")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                    }
-                }
-                .toggleStyle(.switch)
-                .tint(.green)
-
-                Toggle(isOn: $engine.circleOfFifthsEnabled) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "circle.circle")
-                            .font(.system(size: 12))
-                        Text("Circle of 5ths")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                    }
-                }
-                .toggleStyle(.switch)
-                .tint(.green)
+            // Toggles - pill style
+            HStack(spacing: 12) {
+                pillToggle("Chords", icon: "music.note.list", isOn: $engine.chordMode)
+                pillToggle("Circle of 5ths", icon: "circle.circle", isOn: $engine.circleOfFifthsEnabled)
             }
+        }
+    }
+
+    private func pillToggle(_ label: String, icon: String, isOn: Binding<Bool>) -> some View {
+        Button(action: { isOn.wrappedValue.toggle() }) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                Text(label)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+            }
+            .foregroundColor(isOn.wrappedValue ? .green : .primary.opacity(0.5))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(isOn.wrappedValue ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(isOn.wrappedValue ? Color.green.opacity(0.4) : Color.white.opacity(0.06), lineWidth: isOn.wrappedValue ? 1.5 : 0.5)
+            )
         }
     }
 
@@ -809,10 +875,7 @@ struct ControlSheet: View {
 
     private var soundSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("SOUND")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(.secondary)
-                .tracking(1.5)
+            sectionHeader("SOUND", icon: "waveform")
 
             HStack(spacing: 8) {
                 ForEach(WAVEFORMS) { wf in
@@ -824,28 +887,33 @@ struct ControlSheet: View {
                             engine.selectedWaveform = wf.id
                         }
                     }) {
-                        VStack(spacing: 3) {
+                        VStack(spacing: 5) {
                             Text(wf.emoji)
-                                .font(.system(size: 18))
+                                .font(.system(size: 20))
                             Text(wf.name)
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                                 .foregroundColor(engine.selectedWaveform == wf.id ? .green : .primary.opacity(0.6))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .frame(height: 48)
                         .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(engine.selectedWaveform == wf.id ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(engine.selectedWaveform == wf.id
+                                    ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                                    : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(engine.selectedWaveform == wf.id ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(engine.selectedWaveform == wf.id ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: engine.selectedWaveform == wf.id ? 1.5 : 0.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
-                                Image(systemName: "lock.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.white.opacity(0.6))
+                                Text("PRO")
+                                    .font(.system(size: 8, weight: .heavy, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(.ultraThinMaterial))
                                     .padding(5)
                             }
                         }
@@ -860,10 +928,7 @@ struct ControlSheet: View {
 
     private func drumTrackSection(label: String, loop: Binding<DrumLoop>, volume: Binding<Double>, speed: Binding<Double>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(label)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(.secondary)
-                .tracking(1.5)
+            sectionHeader(label, icon: "drum")
 
             LazyVGrid(columns: [
                 GridItem(.flexible(), spacing: 8),
@@ -879,28 +944,33 @@ struct ControlSheet: View {
                             loop.wrappedValue = drumLoop
                         }
                     }) {
-                        VStack(spacing: 3) {
+                        VStack(spacing: 5) {
                             Text(drumLoop.emoji)
-                                .font(.system(size: 20))
+                                .font(.system(size: 22))
                             Text(drumLoop.name)
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                                 .foregroundColor(loop.wrappedValue.id == drumLoop.id ? .green : .primary.opacity(0.6))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .frame(height: 48)
                         .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(loop.wrappedValue.id == drumLoop.id ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(loop.wrappedValue.id == drumLoop.id
+                                    ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                                    : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(loop.wrappedValue.id == drumLoop.id ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(loop.wrappedValue.id == drumLoop.id ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: loop.wrappedValue.id == drumLoop.id ? 1.5 : 0.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
-                                Image(systemName: "lock.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.white.opacity(0.6))
+                                Text("PRO")
+                                    .font(.system(size: 8, weight: .heavy, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(.ultraThinMaterial))
                                     .padding(5)
                             }
                         }
@@ -911,10 +981,10 @@ struct ControlSheet: View {
 
             if loop.wrappedValue.id != "none" {
                 HStack(spacing: 8) {
-                    Image(systemName: "speaker.wave.2")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                        .frame(width: 20)
+                    Text("VOL")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .frame(width: 28)
                     Slider(value: volume, in: 0.2...2.0)
                         .tint(.green)
                     Text(String(format: "%.0f%%", volume.wrappedValue * 100))
@@ -924,10 +994,10 @@ struct ControlSheet: View {
                 }
 
                 HStack(spacing: 8) {
-                    Image(systemName: "metronome")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                        .frame(width: 20)
+                    Text("SPD")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .frame(width: 28)
                     Slider(value: speed, in: 0.25...4.0, step: 0.25)
                         .tint(.green)
                     Text(String(format: "%.2gx", speed.wrappedValue))
@@ -942,16 +1012,15 @@ struct ControlSheet: View {
     // MARK: - BPM
 
     private var bpmSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("BPM", icon: "metronome")
+
             HStack {
-                Text("BPM")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(.secondary)
-                    .tracking(1.5)
                 Spacer()
                 Text("\(Int(engine.manualBPM.rounded()))")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .font(.system(size: 32, weight: .bold, design: .monospaced))
                     .foregroundColor(.green)
+                Spacer()
             }
 
             if engine.bpmIsMapped {
@@ -959,11 +1028,29 @@ struct ControlSheet: View {
                     .font(.system(size: 11, design: .rounded))
                     .foregroundColor(.secondary)
             } else {
-                Slider(value: Binding(
-                    get: { engine.manualBPM },
-                    set: { engine.manualBPM = $0 }
-                ), in: 50...205, step: 1)
-                .tint(.green)
+                HStack(spacing: 10) {
+                    Button(action: { engine.manualBPM = max(50, engine.manualBPM - 1) }) {
+                        Image(systemName: "minus")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.primary.opacity(0.6))
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(Color.primary.opacity(0.06)))
+                    }
+
+                    Slider(value: Binding(
+                        get: { engine.manualBPM },
+                        set: { engine.manualBPM = $0 }
+                    ), in: 50...205, step: 1)
+                    .tint(.green)
+
+                    Button(action: { engine.manualBPM = min(205, engine.manualBPM + 1) }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.primary.opacity(0.6))
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(Color.primary.opacity(0.06)))
+                    }
+                }
             }
         }
     }
@@ -971,11 +1058,8 @@ struct ControlSheet: View {
     // MARK: - Params
 
     private var paramsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("PARAMETERS")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(.secondary)
-                .tracking(1.5)
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("PARAMETERS", icon: "slider.horizontal.3")
 
             ForEach(PARAM_DEFS) { def in
                 let isActive = engine.config.left.values.contains(def.id) ||
@@ -995,28 +1079,31 @@ struct ControlSheet: View {
 
         return VStack(spacing: 4) {
             HStack(spacing: 8) {
-                // Lock toggle
+                // Lock toggle with filled circle background
                 Button(action: { engine.toggleLock(def.id) }) {
-                    Image(systemName: isLocked ? "lock.fill" : "lock.open")
-                        .font(.system(size: 12))
-                        .foregroundColor(isLocked ? .orange : .secondary.opacity(0.4))
+                    ZStack {
+                        Circle()
+                            .fill(isLocked ? Color.orange.opacity(0.2) : Color.clear)
+                            .frame(width: 24, height: 24)
+                        Image(systemName: isLocked ? "lock.fill" : "lock.open")
+                            .font(.system(size: 11))
+                            .foregroundColor(isLocked ? .orange : .secondary.opacity(0.4))
+                    }
                 }
-                .frame(width: 20)
+                .frame(width: 24)
 
                 Text(def.label)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundColor(isLocked ? .orange : .primary)
                     .frame(width: 55, alignment: .leading)
 
                 if isLocked {
-                    // Slider for manual control
                     Slider(value: Binding(
                         get: { engine.manualValues[def.id] ?? def.defaultValue },
                         set: { engine.setManualValue(def.id, value: $0) }
                     ), in: def.min...def.max)
                     .tint(.orange)
                 } else {
-                    // Live meter
                     let normalized = (currentValue - def.min) / (def.max - def.min)
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -1030,32 +1117,21 @@ struct ControlSheet: View {
                 }
 
                 Text(def.format(currentValue))
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundColor(.secondary)
                     .frame(width: 50, alignment: .trailing)
             }
         }
-        .frame(minHeight: 28)
+        .frame(minHeight: 32)
     }
 
     // MARK: - Recording Settings
 
     private var recordingSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("RECORDING")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(.secondary)
-                .tracking(1.5)
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("RECORDING", icon: "video")
 
-            Toggle(isOn: $hideSkeletonWhenRecording) {
-                HStack(spacing: 8) {
-                    Image(systemName: "hand.raised.slash")
-                        .font(.system(size: 14))
-                    Text("Hide hand tracking in recordings")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                }
-            }
-            .toggleStyle(SwitchToggleStyle(tint: .green))
+            pillToggle("Hide hand tracking in recordings", icon: "hand.raised.slash", isOn: $hideSkeletonWhenRecording)
         }
     }
 
@@ -1063,10 +1139,7 @@ struct ControlSheet: View {
 
     private var snippetsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("SAVED SNIPPETS")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(.secondary)
-                .tracking(1.5)
+            sectionHeader("SAVED SNIPPETS", icon: "bookmark")
 
             ForEach(Array(engine.savedSnippets.enumerated()), id: \.offset) { idx, snippet in
                 HStack {
@@ -1099,10 +1172,7 @@ struct ControlSheet: View {
     private var trackSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("TRACK")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(.secondary)
-                    .tracking(1.5)
+                sectionHeader("TRACK", icon: "list.bullet.rectangle")
                 Spacer()
                 Button(action: engine.toggleTrackPlay) {
                     Image(systemName: engine.trackPlaying ? "stop.circle.fill" : "play.circle.fill")

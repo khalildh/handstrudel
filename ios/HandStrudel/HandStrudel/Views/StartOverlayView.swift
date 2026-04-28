@@ -11,6 +11,33 @@ struct FloatingNote: Identifiable {
     let size: CGFloat
 }
 
+struct ShimmerModifier: ViewModifier {
+    @State private var phase: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geo in
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: phase - 0.2),
+                            .init(color: .white.opacity(0.4), location: phase),
+                            .init(color: .clear, location: phase + 0.2)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .mask(content)
+                }
+            )
+            .onAppear {
+                withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: false)) {
+                    phase = 1.4
+                }
+            }
+    }
+}
+
 struct StartOverlayView: View {
     let status: String
     @ObservedObject var storeManager: StoreManager
@@ -25,13 +52,14 @@ struct StartOverlayView: View {
     @State private var titleAppeared = false
     @State private var notesAnimating = false
     @State private var titleGlowPhase: CGFloat = 0.0
+    @State private var shimmerPhase: CGFloat = 0.0
 
     private let floatingNotes: [FloatingNote] = [
-        FloatingNote(emoji: "🎵", x: 0.12, startY: 1.1, duration: 8.0, delay: 0.0, opacity: 0.15, size: 20),
-        FloatingNote(emoji: "🎶", x: 0.35, startY: 1.2, duration: 10.0, delay: 1.5, opacity: 0.1, size: 16),
-        FloatingNote(emoji: "🎵", x: 0.62, startY: 1.15, duration: 9.0, delay: 0.8, opacity: 0.12, size: 22),
-        FloatingNote(emoji: "🎶", x: 0.85, startY: 1.25, duration: 11.0, delay: 2.0, opacity: 0.08, size: 18),
-        FloatingNote(emoji: "🎵", x: 0.48, startY: 1.3, duration: 12.0, delay: 3.0, opacity: 0.1, size: 14),
+        FloatingNote(emoji: "\u{1F3B5}", x: 0.12, startY: 1.1, duration: 8.0, delay: 0.0, opacity: 0.18, size: 22),
+        FloatingNote(emoji: "\u{1F3B6}", x: 0.35, startY: 1.2, duration: 10.0, delay: 1.5, opacity: 0.14, size: 18),
+        FloatingNote(emoji: "\u{1F3B5}", x: 0.62, startY: 1.15, duration: 9.0, delay: 0.8, opacity: 0.16, size: 24),
+        FloatingNote(emoji: "\u{1F3B6}", x: 0.85, startY: 1.25, duration: 11.0, delay: 2.0, opacity: 0.12, size: 20),
+        FloatingNote(emoji: "\u{1F3B5}", x: 0.48, startY: 1.3, duration: 12.0, delay: 3.0, opacity: 0.15, size: 16),
     ]
 
     var body: some View {
@@ -39,7 +67,7 @@ struct StartOverlayView: View {
             ZStack {
                 // Background gradient
                 LinearGradient(
-                    colors: [Color.black, Color(white: 0.06), Color.black],
+                    colors: [Color.black, Color(white: 0.05), Color(white: 0.02), Color.black],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -68,40 +96,79 @@ struct StartOverlayView: View {
                     Spacer()
 
                     // App title
-                    VStack(spacing: 6) {
-                        Text("hand")
-                            .font(.system(size: 42, weight: .thin, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.6))
-                        +
-                        Text("strudel")
-                            .font(.system(size: 42, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green)
+                    VStack(spacing: 10) {
+                        ZStack {
+                            // Base text
+                            HStack(spacing: 0) {
+                                Text("hand")
+                                    .font(.system(size: 44, weight: .ultraLight, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.7))
 
-                        Text("make music with your hands")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundColor(.white.opacity(0.4))
+                                Text("strudel")
+                                    .font(.system(size: 44, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.green, .cyan],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                            }
+
+                            // Shimmer overlay
+                            HStack(spacing: 0) {
+                                Text("hand")
+                                    .font(.system(size: 44, weight: .ultraLight, design: .monospaced))
+                                    .foregroundColor(.clear)
+
+                                Text("strudel")
+                                    .font(.system(size: 44, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            stops: [
+                                                .init(color: .clear, location: max(0, shimmerPhase - 0.15)),
+                                                .init(color: .white.opacity(0.5), location: shimmerPhase),
+                                                .init(color: .clear, location: min(1, shimmerPhase + 0.15))
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                            }
+                        }
+
+                        Text("your hands are the instrument")
+                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.45))
                     }
                     .shadow(color: .green.opacity(titleGlowPhase * 0.4), radius: 20)
-                    .shadow(color: .green.opacity(titleGlowPhase * 0.2), radius: 40)
+                    .shadow(color: .cyan.opacity(titleGlowPhase * 0.2), radius: 40)
                     .opacity(titleAppeared ? 1 : 0)
                     .scaleEffect(titleAppeared ? 1 : 0.9)
                     .animation(.easeOut(duration: 0.6), value: titleAppeared)
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 48)
 
-                    // Preset cards
-                    Text("pick a vibe")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.3))
-                        .textCase(.uppercase)
-                        .tracking(2)
-                        .padding(.bottom, 12)
-                        .opacity(cardsAppeared ? 1 : 0)
-                        .animation(.easeOut(duration: 0.4).delay(0.3), value: cardsAppeared)
+                    // Section header with decorative lines
+                    HStack(spacing: 12) {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.15))
+                            .frame(width: 32, height: 1)
+                        Text("PICK A VIBE")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.35))
+                            .tracking(2)
+                        Rectangle()
+                            .fill(Color.white.opacity(0.15))
+                            .frame(width: 32, height: 1)
+                    }
+                    .padding(.bottom, 18)
+                    .opacity(cardsAppeared ? 1 : 0)
+                    .animation(.easeOut(duration: 0.4).delay(0.3), value: cardsAppeared)
 
                     LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 12),
-                        GridItem(.flexible(), spacing: 12)
-                    ], spacing: 12) {
+                        GridItem(.flexible(), spacing: 14),
+                        GridItem(.flexible(), spacing: 14)
+                    ], spacing: 14) {
                         ForEach(Array(PRESETS.enumerated()), id: \.element.id) { index, preset in
                             let locked = preset.isPremium && !storeManager.isUnlocked(preset.packId ?? "")
                             PresetCard(
@@ -145,22 +212,45 @@ struct StartOverlayView: View {
                         Button(action: startTapped) {
                             Text("LET'S GO")
                                 .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundColor(.black)
+                                .foregroundColor(selectedPreset != nil ? .black : .white.opacity(0.25))
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 56)
+                                .frame(height: 58)
                                 .background(
-                                    selectedPreset != nil
-                                        ? Color.green
-                                        : Color.white.opacity(0.1)
+                                    Group {
+                                        if selectedPreset != nil {
+                                            LinearGradient(
+                                                colors: [.green, Color(red: 0.0, green: 0.8, blue: 0.6)],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                            .overlay(
+                                                // Top shine highlight
+                                                LinearGradient(
+                                                    colors: [.white.opacity(0.25), .clear],
+                                                    startPoint: .top,
+                                                    endPoint: .center
+                                                )
+                                            )
+                                        } else {
+                                            Color.white.opacity(0.05)
+                                        }
+                                    }
                                 )
-                                .cornerRadius(16)
+                                .cornerRadius(20)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(
+                                            selectedPreset != nil ? Color.clear : Color.white.opacity(0.06),
+                                            lineWidth: 1
+                                        )
+                                )
                                 .scaleEffect(pulseScale)
                                 .shadow(
                                     color: .green.opacity(selectedPreset != nil ? buttonGlow * 0.6 : 0),
                                     radius: 16
                                 )
                                 .shadow(
-                                    color: .green.opacity(selectedPreset != nil ? buttonGlow * 0.3 : 0),
+                                    color: .cyan.opacity(selectedPreset != nil ? buttonGlow * 0.3 : 0),
                                     radius: 30
                                 )
                         }
@@ -180,6 +270,7 @@ struct StartOverlayView: View {
             cardsAppeared = true
             notesAnimating = true
             startTitleGlow()
+            startShimmer()
         }
         .sheet(item: $paywallPackId) { packId in
             paywallSheet(for: packId)
@@ -239,6 +330,12 @@ struct StartOverlayView: View {
             titleGlowPhase = 1.0
         }
     }
+
+    private func startShimmer() {
+        withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: false)) {
+            shimmerPhase = 1.3
+        }
+    }
 }
 
 struct PresetCard: View {
@@ -251,9 +348,9 @@ struct PresetCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 10) {
             Text(preset.emoji)
-                .font(.system(size: 32))
+                .font(.system(size: 36))
 
             Text(preset.name)
                 .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -266,25 +363,50 @@ struct PresetCard: View {
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .padding(.horizontal, 8)
+        .padding(.vertical, 20)
+        .padding(.horizontal, 10)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(isSelected ? presetColor.opacity(0.25) : Color.white.opacity(0.04))
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: isSelected
+                            ? [presetColor.opacity(0.3), presetColor.opacity(0.12)]
+                            : [Color.white.opacity(0.06), Color.white.opacity(0.02)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(isSelected ? presetColor : Color.white.opacity(0.08), lineWidth: isSelected ? 2 : 1)
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    isSelected ? presetColor.opacity(0.9) : Color.white.opacity(0.08),
+                    lineWidth: isSelected ? 2 : 1
+                )
+        )
+        .shadow(
+            color: isSelected ? presetColor.opacity(0.4) : .clear,
+            radius: 12
         )
         .overlay(alignment: .topTrailing) {
             if isLocked {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.6))
+                Text("PRO")
+                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white.opacity(0.9))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                    )
                     .padding(8)
             }
         }
-        .opacity(isLocked ? 0.5 : 1.0)
-        .scaleEffect(isSelected ? 1.02 : 1.0)
+        .opacity(isLocked ? 0.55 : 1.0)
+        .scaleEffect(isSelected ? 1.03 : 1.0)
     }
 }
