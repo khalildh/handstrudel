@@ -284,12 +284,14 @@ struct ContentView: View {
                     let y = CGFloat(i) * laneHeight
                     let midi = notes[noteIdx]
                     let name = midiNoteName(midi)
-                    let isHighlighted = engine.gridLeftLane == noteIdx || engine.gridRightLane == noteIdx
+                    let leftActive = engine.gridLeftLane == noteIdx
+                    let rightActive = engine.gridRightLane == noteIdx
+                    let isAnyActive = leftActive || rightActive
                     let isEven = i % 2 == 0
 
-                    // Alternating lane background for visibility
+                    // Alternating lane background
                     Rectangle()
-                        .fill(isHighlighted
+                        .fill(isAnyActive
                               ? Color.green.opacity(0.15)
                               : Color.white.opacity(isEven ? 0.04 : 0.0))
                         .frame(height: laneHeight)
@@ -297,29 +299,29 @@ struct ContentView: View {
 
                     // Lane separator line
                     Rectangle()
-                        .fill(Color.white.opacity(isHighlighted ? 0.3 : 0.08))
+                        .fill(Color.white.opacity(isAnyActive ? 0.3 : 0.08))
                         .frame(height: 1)
                         .offset(y: y)
 
-                    // Note label on the left with background pill
+                    // Left label — green only when left hand is here
                     Text(name)
-                        .font(.system(size: isHighlighted ? 14 : 11, weight: isHighlighted ? .black : .medium, design: .monospaced))
-                        .foregroundColor(isHighlighted ? .green : .white.opacity(0.5))
+                        .font(.system(size: leftActive ? 14 : 11, weight: leftActive ? .black : .medium, design: .monospaced))
+                        .foregroundColor(leftActive ? .green : .white.opacity(0.5))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(
-                            Capsule().fill(Color.black.opacity(isHighlighted ? 0.6 : 0.3))
+                            Capsule().fill(Color.black.opacity(leftActive ? 0.6 : 0.3))
                         )
                         .position(x: 32, y: y + laneHeight / 2)
 
-                    // Note label on the right too (for right hand)
+                    // Right label — pink only when right hand is here
                     Text(name)
-                        .font(.system(size: isHighlighted ? 14 : 11, weight: isHighlighted ? .black : .medium, design: .monospaced))
-                        .foregroundColor(isHighlighted ? .pink : .white.opacity(0.3))
+                        .font(.system(size: rightActive ? 14 : 11, weight: rightActive ? .black : .medium, design: .monospaced))
+                        .foregroundColor(rightActive ? .pink : .white.opacity(0.3))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(
-                            Capsule().fill(Color.black.opacity(isHighlighted ? 0.6 : 0.2))
+                            Capsule().fill(Color.black.opacity(rightActive ? 0.6 : 0.2))
                         )
                         .position(x: geo.size.width - 32, y: y + laneHeight / 2)
                 }
