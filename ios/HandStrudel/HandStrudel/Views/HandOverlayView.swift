@@ -2,7 +2,7 @@ import SwiftUI
 
 struct HandOverlayView: UIViewRepresentable {
     let handsState: HandsState
-    var videoAspect: CGFloat = 0.75 // default 3:4
+    var videoAspect: CGFloat = 0.75
 
     func makeUIView(context: Context) -> HandCanvasView {
         let view = HandCanvasView()
@@ -12,15 +12,26 @@ struct HandOverlayView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: HandCanvasView, context: Context) {
-        uiView.handsState = handsState
         uiView.videoAspect = videoAspect
-        uiView.setNeedsDisplay()
+        uiView.updateHands(handsState)
     }
+}
+
+// A single trail point with timestamp
+private struct TrailPoint {
+    let position: CGPoint  // normalized Vision coords
+    let timestamp: TimeInterval
 }
 
 class HandCanvasView: UIView {
     var handsState = HandsState()
     var videoAspect: CGFloat = 0.75
+
+    // Motion trails — store recent positions for each fingertip + wrist
+    // Key: "left_4" = left hand thumb tip, "right_0" = right wrist, etc.
+    private var trails: [String: [TrailPoint]] = [:]
+    private let trailDuration: TimeInterval = 0.8  // how long trails last (seconds)
+    private let trackedPoints = [0, 4, 8, 12, 16, 20]  // wrist + 5 fingertips
 
     private let connections: [(Int, Int)] = [
         (0, 1), (1, 2), (2, 3), (3, 4),
@@ -31,36 +42,59 @@ class HandCanvasView: UIView {
         (5, 9), (9, 13), (13, 17),
     ]
 
-    /// Convert Vision normalized coordinates to screen coordinates,
-    /// accounting for resizeAspectFill cropping.
-    private func visionToScreen(vx: CGFloat, vy: CGFloat, W: CGFloat, H: CGFloat) -> CGPoint {
-        let screenAspect = W / H
+    func updateHands(_ hands: HandsState) {
+        handsState = hands
+        let now = CACurrentMediaTime()
 
-        var sx: CGFloat
-        var sy: CGFloat
-
-        if videoAspect > screenAspect {
-            // Video is wider than screen — width is cropped, height fills
-            let visibleFrac = screenAspect / videoAspect
-            let offset = (1 - visibleFrac) / 2
-            sx = (vx - offset) / visibleFrac * W
-            sy = vy * H
-        } else {
-            // Video is taller than screen — height is cropped, width fills
-            let visibleFrac = videoAspect / screenAspect
-            let offset = (1 - visibleFrac) / 2
-            sx = vx * W
-            sy = (vy - offset) / visibleFrac * H
+        // Record trail points for each tracked landmark
+        for (side, hand) in [("left", hands.left), ("right", hands.right)] {
+            guard let hand else { continue }
+            for idx in trackedPoints where idx < hand.landmarks.count {
+                let key = "\(side)_\(idx)"
+                let lm = hand.landmarks[idx]
+                let pt = TrailPoint(
+                    position: CGPoint(x: lm.x, y: lm.y),
+                    timestamp: now
+                )
+                trails[key, default: []].append(pt)
+            }
         }
 
-        return CGPoint(x: sx, y: sy)
+        // Prune old trail points
+        let cutoff = now - trailDuration
+        for key in trails.keys {
+            trails[key]?.removeAll { $0.timestamp < cutoff }
+        }
+
+        setNeedsDisplay()
+    }
+
+    private func visionToScreen(vx: CGFloat, vy: CGFloat, W: CGFloat, H: CGFloat) -> CGPoint {
+        let screenAspect = W / H
+        if videoAspect > screenAspect {
+            let visibleFrac = screenAspect / videoAspect
+            let offset = (1 - visibleFrac) / 2
+            return CGPoint(x: (vx - offset) / visibleFrac * W, y: vy * H)
+        } else {
+            let visibleFrac = videoAspect / screenAspect
+            let offset = (1 - visibleFrac) / 2
+            return CGPoint(x: vx * W, y: (vy - offset) / visibleFrac * H)
+        }
     }
 
     override func draw(_ rect: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
         let W = bounds.width
         let H = bounds.height
+        let now = CACurrentMediaTime()
 
+        // Draw motion trails first (behind hands)
+        drawTrails(ctx: ctx, side: "left",
+                   color: UIColor(red: 0, green: 1, blue: 0.62, alpha: 1), W: W, H: H, now: now)
+        drawTrails(ctx: ctx, side: "right",
+                   color: UIColor(red: 1, green: 0.18, blue: 0.42, alpha: 1), W: W, H: H, now: now)
+
+        // Draw hands on top
         if let left = handsState.left {
             drawHand(ctx: ctx, landmarks: left.landmarks,
                      color: UIColor(red: 0, green: 1, blue: 0.62, alpha: 1), W: W, H: H)
@@ -70,6 +104,55 @@ class HandCanvasView: UIView {
                      color: UIColor(red: 1, green: 0.18, blue: 0.42, alpha: 1), W: W, H: H)
         }
     }
+
+    // MARK: - Motion Trails
+
+    private func drawTrails(ctx: CGContext, side: String, color: UIColor, W: CGFloat, H: CGFloat, now: TimeInterval) {
+        for idx in trackedPoints {
+            let key = "\(side)_\(idx)"
+            guard let points = trails[key], points.count >= 2 else { continue }
+
+            // Fingertips get thicker, brighter trails
+            let isTip = idx != 0
+            let baseWidth: CGFloat = isTip ? 3.0 : 2.0
+
+            ctx.saveGState()
+
+            // Draw trail as connected line segments with fading opacity
+            for i in 1..<points.count {
+                let p0 = visionToScreen(vx: points[i-1].position.x, vy: points[i-1].position.y, W: W, H: H)
+                let p1 = visionToScreen(vx: points[i].position.x, vy: points[i].position.y, W: W, H: H)
+
+                // Age-based fade: newer = brighter
+                let age = now - points[i].timestamp
+                let fade = CGFloat(max(0, 1 - age / trailDuration))
+                let alpha = fade * (isTip ? 0.6 : 0.3)
+
+                if alpha < 0.01 { continue }
+
+                // Width tapers with age
+                let width = baseWidth * fade
+
+                ctx.setStrokeColor(color.withAlphaComponent(alpha).cgColor)
+                ctx.setLineWidth(width)
+                ctx.setLineCap(.round)
+
+                // Glow on fingertip trails
+                if isTip && fade > 0.3 {
+                    ctx.setShadow(offset: .zero, blur: 6 * fade, color: color.withAlphaComponent(alpha * 0.5).cgColor)
+                }
+
+                ctx.beginPath()
+                ctx.move(to: p0)
+                ctx.addLine(to: p1)
+                ctx.strokePath()
+            }
+
+            ctx.restoreGState()
+        }
+    }
+
+    // MARK: - Hand Drawing
 
     private func drawHand(ctx: CGContext, landmarks: [HandLandmark], color: UIColor, W: CGFloat, H: CGFloat) {
         let pt = { (i: Int) -> CGPoint in
@@ -84,9 +167,8 @@ class HandCanvasView: UIView {
         ctx.beginPath()
         for (a, b) in connections {
             guard a < landmarks.count && b < landmarks.count else { continue }
-            let pa = pt(a), pb = pt(b)
-            ctx.move(to: pa)
-            ctx.addLine(to: pb)
+            ctx.move(to: pt(a))
+            ctx.addLine(to: pt(b))
         }
         ctx.strokePath()
         ctx.restoreGState()
@@ -97,13 +179,12 @@ class HandCanvasView: UIView {
         ctx.beginPath()
         for (a, b) in connections {
             guard a < landmarks.count && b < landmarks.count else { continue }
-            let pa = pt(a), pb = pt(b)
-            ctx.move(to: pa)
-            ctx.addLine(to: pb)
+            ctx.move(to: pt(a))
+            ctx.addLine(to: pt(b))
         }
         ctx.strokePath()
 
-        // Wrist dot with glow
+        // Wrist dot
         if !landmarks.isEmpty {
             let p = pt(0)
             ctx.saveGState()
