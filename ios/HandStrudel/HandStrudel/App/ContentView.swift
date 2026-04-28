@@ -52,9 +52,21 @@ struct ContentView: View {
 
     private var performanceView: some View {
         ZStack {
-            // Full-screen camera
-            CameraView(handTracker: engine.handTracker)
-                .ignoresSafeArea()
+            // Full-screen camera with filter
+            ZStack {
+                CameraView(handTracker: engine.handTracker)
+
+                // Filter overlay
+                if let color = engine.selectedFilter.overlayColor {
+                    color.opacity(engine.selectedFilter.overlayOpacity)
+                        .blendMode(engine.selectedFilter.blendMode)
+                }
+            }
+            .saturation(engine.selectedFilter.saturation)
+            .contrast(engine.selectedFilter.contrast)
+            .brightness(engine.selectedFilter.brightness)
+            .hueRotation(.degrees(engine.selectedFilter.hueRotation))
+            .ignoresSafeArea()
 
             // Hand skeleton overlay with glow (aspect-corrected)
             HandOverlayView(
@@ -650,6 +662,9 @@ struct ControlSheet: View {
                 )
 
                 sectionDivider
+                filterSection
+
+                sectionDivider
                 recordingSection
 
                 if !engine.savedSnippets.isEmpty {
@@ -1128,6 +1143,64 @@ struct ControlSheet: View {
     }
 
     // MARK: - Recording Settings
+
+    // MARK: - Filters
+
+    private var filterSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("FILTERS", icon: "camera.filters")
+
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ], spacing: 8) {
+                ForEach(CAMERA_FILTERS) { filter in
+                    let locked = filter.isPremium && !storeManager.isUnlocked(filter.packId ?? "")
+                    let isSelected = engine.selectedFilter.id == filter.id
+                    Button(action: {
+                        if locked, let packId = filter.packId {
+                            paywallPackId = packId
+                        } else {
+                            engine.selectedFilter = filter
+                        }
+                    }) {
+                        VStack(spacing: 2) {
+                            Text(filter.emoji)
+                                .font(.system(size: 18))
+                            Text(filter.name)
+                                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                                .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(isSelected ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(isSelected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                        )
+                        .overlay(alignment: .topTrailing) {
+                            if locked {
+                                Text("PRO")
+                                    .font(.system(size: 7, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.white.opacity(0.15)))
+                                    .padding(4)
+                            }
+                        }
+                        .opacity(locked ? 0.5 : 1.0)
+                    }
+                }
+            }
+        }
+    }
 
     private var recordingSection: some View {
         VStack(alignment: .leading, spacing: 10) {

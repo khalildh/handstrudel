@@ -74,6 +74,9 @@ final class EngineController: ObservableObject {
     private let drumModeManager = DrumModeManager()
     @Published var lastDrumHit: String = ""
 
+    // Camera filter
+    @Published var selectedFilter: CameraFilter = CAMERA_FILTERS[0]
+
     // Grid mode (pinch-to-play)
     @Published var gridModeEnabled = false
     let gridModeManager = GridModeManager()
