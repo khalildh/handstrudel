@@ -5,13 +5,15 @@ import XCTest
 
 private func makeHandData(
     x: Double = 0.5, y: Double = 0.5, spread: Double = 0.5,
-    pinch: Double = 0.0, fist: Double = 0.0, rotation: Double = 0.5,
+    pinch: Double = 0.0, pinchX: Double = 0.5, pinchY: Double = 0.5,
+    fist: Double = 0.0, rotation: Double = 0.5,
     thumbCurl: Double = 0.5, indexCurl: Double = 0.5, middleCurl: Double = 0.5,
     ringCurl: Double = 0.5, pinkyCurl: Double = 0.5
 ) -> HandData {
     HandData(
         x: x, y: y, spread: spread,
-        pinch: pinch, fist: fist, rotation: rotation,
+        pinch: pinch, pinchX: pinchX, pinchY: pinchY,
+        fist: fist, rotation: rotation,
         thumbCurl: thumbCurl, indexCurl: indexCurl, middleCurl: middleCurl,
         ringCurl: ringCurl, pinkyCurl: pinkyCurl,
         landmarks: []

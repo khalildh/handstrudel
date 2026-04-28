@@ -25,7 +25,7 @@ final class GridModeManager {
 
         // Left hand
         if let left = hands.left {
-            let noteIdx = yToNoteIndex(y: left.y, noteCount: scaleNotes.count)
+            let noteIdx = yToNoteIndex(y: left.pinchY, noteCount: scaleNotes.count)
             let midi = scaleNotes[noteIdx]
             let isPinching = left.pinch > pinchThreshold
 
@@ -54,7 +54,7 @@ final class GridModeManager {
 
         // Right hand
         if let right = hands.right {
-            let noteIdx = yToNoteIndex(y: right.y, noteCount: scaleNotes.count)
+            let noteIdx = yToNoteIndex(y: right.pinchY, noteCount: scaleNotes.count)
             let midi = scaleNotes[noteIdx]
             let isPinching = right.pinch > pinchThreshold
 
@@ -101,8 +101,8 @@ final class GridModeManager {
 
     func currentLanes(hands: HandsState, scaleNotes: [Int]) -> (left: Int?, right: Int?) {
         guard !scaleNotes.isEmpty else { return (nil, nil) }
-        let leftIdx = hands.left.map { yToNoteIndex(y: $0.y, noteCount: scaleNotes.count) }
-        let rightIdx = hands.right.map { yToNoteIndex(y: $0.y, noteCount: scaleNotes.count) }
+        let leftIdx = hands.left.map { yToNoteIndex(y: $0.pinchY, noteCount: scaleNotes.count) }
+        let rightIdx = hands.right.map { yToNoteIndex(y: $0.pinchY, noteCount: scaleNotes.count) }
         return (leftIdx, rightIdx)
     }
 

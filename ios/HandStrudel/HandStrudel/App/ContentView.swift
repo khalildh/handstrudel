@@ -340,71 +340,63 @@ struct ContentView: View {
             }
 
             let leftVisualLane: Int? = engine.handsState.left.map { hand in
-                let screenY = correctedY(hand.y)
+                let screenY = correctedY(hand.pinchY)
                 return max(0, min(count - 1, Int(screenY / laneHeight)))
             }
             let rightVisualLane: Int? = engine.handsState.right.map { hand in
-                let screenY = correctedY(hand.y)
+                let screenY = correctedY(hand.pinchY)
                 return max(0, min(count - 1, Int(screenY / laneHeight)))
             }
 
-            ZStack {
-                // Note lane backgrounds + labels
+            VStack(spacing: 0) {
                 ForEach(0..<count, id: \.self) { i in
-                    let noteIdx = count - 1 - i  // invert: top = high
-                    let y = CGFloat(i) * laneHeight
+                    let noteIdx = count - 1 - i
                     let midi = notes[noteIdx]
                     let name = midiNoteName(midi)
                     let leftActive = leftVisualLane == i
                     let rightActive = rightVisualLane == i
                     let isEven = i % 2 == 0
 
-                    // Lane background — split left/right halves
-                    HStack(spacing: 0) {
-                        // Left half — green glow when left hand is here
-                        Rectangle()
-                            .fill(leftActive
-                                  ? Color.green.opacity(engine.gridModeManager.isLeftPinching ? 0.25 : 0.1)
-                                  : Color.white.opacity(isEven ? 0.03 : 0.0))
-                        // Right half — pink glow when right hand is here
-                        Rectangle()
-                            .fill(rightActive
-                                  ? Color.pink.opacity(engine.gridModeManager.isRightPinching ? 0.25 : 0.1)
-                                  : Color.white.opacity(isEven ? 0.03 : 0.0))
+                    ZStack {
+                        // Lane background — split left/right
+                        HStack(spacing: 0) {
+                            Rectangle()
+                                .fill(leftActive
+                                      ? Color.green.opacity(engine.gridModeManager.isLeftPinching ? 0.25 : 0.1)
+                                      : Color.white.opacity(isEven ? 0.03 : 0.0))
+                            Rectangle()
+                                .fill(rightActive
+                                      ? Color.pink.opacity(engine.gridModeManager.isRightPinching ? 0.25 : 0.1)
+                                      : Color.white.opacity(isEven ? 0.03 : 0.0))
+                        }
+
+                        // Left label
+                        HStack {
+                            Text(name)
+                                .font(.system(size: leftActive ? 14 : 11, weight: leftActive ? .black : .medium, design: .monospaced))
+                                .foregroundColor(leftActive ? .green : .white.opacity(0.5))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(leftActive ? Color.green.opacity(0.2) : Color.black.opacity(0.3)))
+                            Spacer()
+                            // Right label
+                            Text(name)
+                                .font(.system(size: rightActive ? 14 : 11, weight: rightActive ? .black : .medium, design: .monospaced))
+                                .foregroundColor(rightActive ? .pink : .white.opacity(0.3))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(rightActive ? Color.pink.opacity(0.2) : Color.black.opacity(0.2)))
+                        }
+                        .padding(.horizontal, 8)
                     }
-                    .frame(height: laneHeight)
-                    .offset(y: y)
-
-                    // Lane separator line
-                    Rectangle()
-                        .fill(Color.white.opacity(leftActive || rightActive ? 0.2 : 0.06))
-                        .frame(height: 1)
-                        .offset(y: y)
-
-                    // Left label — green when left hand is here
-                    Text(name)
-                        .font(.system(size: leftActive ? 14 : 11, weight: leftActive ? .black : .medium, design: .monospaced))
-                        .foregroundColor(leftActive ? .green : .white.opacity(0.5))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule().fill(leftActive ? Color.green.opacity(0.2) : Color.black.opacity(0.3))
-                        )
-                        .position(x: 32, y: y + laneHeight / 2)
-
-                    // Right label — pink when right hand is here
-                    Text(name)
-                        .font(.system(size: rightActive ? 14 : 11, weight: rightActive ? .black : .medium, design: .monospaced))
-                        .foregroundColor(rightActive ? .pink : .white.opacity(0.3))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule().fill(rightActive ? Color.pink.opacity(0.2) : Color.black.opacity(0.2))
-                        )
-                        .position(x: geo.size.width - 32, y: y + laneHeight / 2)
+                    .frame(maxHeight: .infinity)
+                    // Separator line at top of each lane
+                    .overlay(alignment: .top) {
+                        Rectangle()
+                            .fill(Color.white.opacity(leftActive || rightActive ? 0.2 : 0.06))
+                            .frame(height: 1)
+                    }
                 }
-
-                // Pinch indicators removed — lane glow provides enough feedback
             }
         }
     }

@@ -13,6 +13,8 @@ struct HandData {
     let y: Double
     let spread: Double
     let pinch: Double
+    let pinchX: Double  // midpoint of thumb tip + index tip
+    let pinchY: Double
     let fist: Double
     let rotation: Double
     let thumbCurl: Double
@@ -189,9 +191,14 @@ final class HandTrackingManager: NSObject, ObservableObject {
         let dy = landmarks[9].y - landmarks[0].y
         let rotation = (atan2(dy, dx) / .pi + 1) / 2
 
+        // Pinch point: midpoint of thumb tip (4) and index tip (8)
+        let pinchPointX = (landmarks[4].x + landmarks[8].x) / 2
+        let pinchPointY = (landmarks[4].y + landmarks[8].y) / 2
+
         return HandData(
             x: wristX, y: wristY, spread: spread,
-            pinch: pinch, fist: fist, rotation: rotation,
+            pinch: pinch, pinchX: pinchPointX, pinchY: pinchPointY,
+            fist: fist, rotation: rotation,
             thumbCurl: thumbCurl, indexCurl: indexCurl, middleCurl: middleCurl,
             ringCurl: ringCurl, pinkyCurl: pinkyCurl,
             landmarks: landmarks
