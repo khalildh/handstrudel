@@ -236,20 +236,31 @@ final class EngineController: ObservableObject {
         displayLink = link
     }
 
+    // MARK: - Tick (60fps main loop)
+
     private func tick() {
-        // Apply manual BPM if not hand-mapped
-        if !bpmIsMapped {
-            rawParams["bpm"] = manualBPM
+        updateManualOverrides()
+        ParamSmoother.smooth(target: rawParams, smoothed: &smoothed)
+
+        let isLive = playingSet.isEmpty && !trackPlaying
+        guard isLive else { return }
+
+        if gridModeEnabled {
+            tickGridMode()
+        } else if drumModeEnabled {
+            tickDrumMode()
+        } else {
+            tickMelodicMode()
         }
 
-        // Apply locked param overrides (manual values override hand tracking)
+        tickSaveGesture()
+    }
+
+    private func updateManualOverrides() {
+        if !bpmIsMapped { rawParams["bpm"] = manualBPM }
         for paramId in lockedParams {
-            if let val = manualValues[paramId] {
-                rawParams[paramId] = val
-            }
+            if let val = manualValues[paramId] { rawParams[paramId] = val }
         }
-
-        // Circle of fifths: left hand X position maps to key
         if circleOfFifthsEnabled, let leftHand = currentHands.left {
             let cofIdx = max(0, min(11, Int(leftHand.x * 12)))
             let newKey = CIRCLE_OF_FIFTHS[cofIdx]
@@ -258,179 +269,136 @@ final class EngineController: ObservableObject {
                 recomputeScaleNotes()
             }
         }
-
-        // Apply manual struct index
         structIdx = currentStructIdx
+    }
 
-        // EMA smoothing
-        ParamSmoother.smooth(target: rawParams, smoothed: &smoothed)
+    private func tickGridMode() {
+        gridModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
+        let screenBounds = UIScreen.main.bounds
+        gridModeManager.screenAspect = screenBounds.width / screenBounds.height
 
-        let isLive = playingSet.isEmpty && !trackPlaying
-
-        if isLive && gridModeEnabled {
-            // Grid mode: pinch-to-play with sustained notes
-            // Update aspect ratios for correct Y mapping
-            gridModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
-            let screenBounds = UIScreen.main.bounds
-            gridModeManager.screenAspect = screenBounds.width / screenBounds.height
-
-            // Use limited octave range for grid mode
-            let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale, baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
-            let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: gridNotes, currentBeat: 0)
-            for action in actions {
-                switch action {
-                case .noteOn(let hand, let midi, let name, let vel):
-                    strudelBridge.noteOn(hand: hand, midi: midi, waveform: selectedWaveform, velocity: vel)
-                    lastGridNote = name
-                case .noteOff(let hand):
-                    strudelBridge.noteOff(hand: hand)
-                case .slide(let hand, let midi, let name):
-                    strudelBridge.noteSlide(hand: hand, midi: midi)
-                    lastGridNote = name
-                }
-            }
-
-            // Update lane display
-            let lanes = gridModeManager.currentLanes(hands: currentHands, scaleNotes: gridNotes)
-            gridLeftLane = lanes.left
-            gridRightLane = lanes.right
-
-            // Stop continuous synth, only keep drum loops
-            let drumKey1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
-            let drumKey2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
-            let gridStructKey = "grid|\(drumKey1)|\(drumKey2)"
-            if gridStructKey != lastStructKey {
-                lastStructKey = gridStructKey
-                var parts: [String] = []
-                var drumCode1 = selectedDrumLoop.code
-                if !drumCode1.isEmpty {
-                    if drumVolume != 1.0 { drumCode1 = "(\(drumCode1)).gain(\(String(format: "%.2f", drumVolume)))" }
-                    if drumSpeed != 1.0 { drumCode1 = "(\(drumCode1)).fast(\(String(format: "%.1f", drumSpeed)))" }
-                    parts.append(drumCode1)
-                }
-                var drumCode2 = selectedDrumLoop2.code
-                if !drumCode2.isEmpty {
-                    if drumVolume2 != 1.0 { drumCode2 = "(\(drumCode2)).gain(\(String(format: "%.2f", drumVolume2)))" }
-                    if drumSpeed2 != 1.0 { drumCode2 = "(\(drumCode2)).fast(\(String(format: "%.1f", drumSpeed2)))" }
-                    parts.append(drumCode2)
-                }
-                if parts.isEmpty {
-                    // No drums — stop Strudel entirely (notes play via Web Audio)
-                    strudelBridge.evaluate("silence")
-                } else {
-                    // Only drums, no synth
-                    let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
-                    strudelBridge.evaluate(code)
-                }
-            }
-        } else if isLive && drumModeEnabled {
-            // Drum mode: detect hand velocity and trigger one-shot drum hits
-            let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
-            let hits = drumModeManager.checkHits(hands: currentHands, currentTime: elapsed)
-            for hitType in hits {
-                strudelBridge.playHit(hitType)
-                lastDrumHit = hitType
-            }
-
-            // Still handle drum loop tracks alongside drum mode
-            let drumKey1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
-            let drumKey2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
-            let drumStructKey = "drum|\(drumKey1)|\(drumKey2)"
-            if drumStructKey != lastStructKey {
-                lastStructKey = drumStructKey
-                var parts: [String] = []
-
-                var drumCode1 = selectedDrumLoop.code
-                if !drumCode1.isEmpty {
-                    if drumVolume != 1.0 { drumCode1 = "(\(drumCode1)).gain(\(String(format: "%.2f", drumVolume)))" }
-                    if drumSpeed != 1.0 { drumCode1 = "(\(drumCode1)).fast(\(String(format: "%.1f", drumSpeed)))" }
-                    parts.append(drumCode1)
-                }
-
-                var drumCode2 = selectedDrumLoop2.code
-                if !drumCode2.isEmpty {
-                    if drumVolume2 != 1.0 { drumCode2 = "(\(drumCode2)).gain(\(String(format: "%.2f", drumVolume2)))" }
-                    if drumSpeed2 != 1.0 { drumCode2 = "(\(drumCode2)).fast(\(String(format: "%.1f", drumSpeed2)))" }
-                    parts.append(drumCode2)
-                }
-
-                if !parts.isEmpty {
-                    let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
-                    strudelBridge.evaluate(code)
-                }
-            }
-        } else if isLive {
-            // Update signal params in WebView (key/scale aware)
-            let notes = cachedScaleNotes
-            if chordMode {
-                let noteCount = selectedScale.intervals.count
-                let degree = max(0, min(noteCount - 1, Int((smoothed["noteIdx"] ?? 0) / Double(NOTES.count - 1) * Double(noteCount - 1) + 0.5)))
-                let chord = chordNotes(key: selectedKey, scale: selectedScale, degree: degree)
-                strudelBridge.updateChordParams(smoothed, config: config, chordMidi: chord)
-            } else {
-                let noteIdx = max(0, min(notes.count - 1, Int((smoothed["noteIdx"] ?? 10) / Double(NOTES.count - 1) * Double(notes.count - 1) + 0.5)))
-                let midi = notes[noteIdx]
-                strudelBridge.updateScaleParams(smoothed, config: config, midi: midi)
-            }
-
-            // Harmony key for re-eval: includes key, scale, chord mode
-            let harmonyKey = "\(selectedKey.rawValue)|\(selectedScale.rawValue)|\(chordMode)"
-
-            // Re-evaluate when struct, drum loops, waveform, or harmony changes
-            let drumKey1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
-            let drumKey2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
-            let structKey = "\(structIdx)|\(drumKey1)|\(drumKey2)|\(selectedWaveform)|\(harmonyKey)"
-            if structKey != lastStructKey {
-                lastStructKey = structKey
-                recomputeScaleNotes()
-                let synthCode: String
-                if chordMode {
-                    synthCode = buildChordSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                } else {
-                    synthCode = buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                }
-
-                // Build drum codes
-                var parts = [synthCode]
-
-                var drumCode1 = selectedDrumLoop.code
-                if !drumCode1.isEmpty {
-                    if drumVolume != 1.0 { drumCode1 = "(\(drumCode1)).gain(\(String(format: "%.2f", drumVolume)))" }
-                    if drumSpeed != 1.0 { drumCode1 = "(\(drumCode1)).fast(\(String(format: "%.1f", drumSpeed)))" }
-                    parts.append(drumCode1)
-                }
-
-                var drumCode2 = selectedDrumLoop2.code
-                if !drumCode2.isEmpty {
-                    if drumVolume2 != 1.0 { drumCode2 = "(\(drumCode2)).gain(\(String(format: "%.2f", drumVolume2)))" }
-                    if drumSpeed2 != 1.0 { drumCode2 = "(\(drumCode2)).fast(\(String(format: "%.1f", drumSpeed2)))" }
-                    parts.append(drumCode2)
-                }
-
-                let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
-                strudelBridge.evaluate(code)
-            }
-
-            // Hydra visuals
-            if hydraEnabled {
-                let hydraCode = buildHydraCode(smoothed)
-                if hydraCode != lastHydraCode {
-                    lastHydraCode = hydraCode
-                    strudelBridge.evalHydra(hydraCode)
-                }
+        let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale, baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
+        let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: gridNotes, currentBeat: 0)
+        for action in actions {
+            switch action {
+            case .noteOn(let hand, let midi, let name, let vel):
+                strudelBridge.noteOn(hand: hand, midi: midi, waveform: selectedWaveform, velocity: vel)
+                lastGridNote = name
+            case .noteOff(let hand):
+                strudelBridge.noteOff(hand: hand)
+            case .slide(let hand, let midi, let name):
+                strudelBridge.noteSlide(hand: hand, midi: midi)
+                lastGridNote = name
             }
         }
 
-        // Save gesture detection
+        let lanes = gridModeManager.currentLanes(hands: currentHands, scaleNotes: gridNotes)
+        gridLeftLane = lanes.left
+        gridRightLane = lanes.right
+
+        // Only drum loops (no continuous synth)
+        evaluateDrumLoopsIfChanged(modePrefix: "grid")
+    }
+
+    private func tickDrumMode() {
+        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+        let hits = drumModeManager.checkHits(hands: currentHands, currentTime: elapsed)
+        for hitType in hits {
+            strudelBridge.playHit(hitType)
+            lastDrumHit = hitType
+        }
+        evaluateDrumLoopsIfChanged(modePrefix: "drum")
+    }
+
+    private func tickMelodicMode() {
+        // Update signal params (key/scale aware)
+        let notes = cachedScaleNotes
+        if chordMode {
+            let noteCount = selectedScale.intervals.count
+            let rawIdx: Double = smoothed["noteIdx"] ?? 0
+            let normalized: Double = rawIdx / Double(max(1, NOTES.count - 1))
+            let degree: Int = max(0, min(noteCount - 1, Int(normalized * Double(noteCount - 1) + 0.5)))
+            let chord = chordNotes(key: selectedKey, scale: selectedScale, degree: degree)
+            strudelBridge.updateChordParams(smoothed, config: config, chordMidi: chord)
+        } else if !notes.isEmpty {
+            let rawIdx: Double = smoothed["noteIdx"] ?? 10
+            let normalized: Double = rawIdx / Double(max(1, NOTES.count - 1))
+            let noteIdx: Int = max(0, min(notes.count - 1, Int(normalized * Double(notes.count - 1) + 0.5)))
+            strudelBridge.updateScaleParams(smoothed, config: config, midi: notes[noteIdx])
+        }
+
+        // Re-evaluate when config changes
+        let harmonyKey = "\(selectedKey.rawValue)|\(selectedScale.rawValue)|\(chordMode)"
+        let structKey = "melodic|\(structIdx)|\(drumStateKey)|\(selectedWaveform)|\(harmonyKey)"
+        if structKey != lastStructKey {
+            lastStructKey = structKey
+            recomputeScaleNotes()
+            let synthCode = chordMode
+                ? buildChordSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
+                : buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
+
+            var parts = [synthCode]
+            parts.append(contentsOf: buildDrumCodeParts())
+            let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
+            strudelBridge.evaluate(code)
+        }
+
+        if hydraEnabled {
+            let hydraCode = buildHydraCode(smoothed)
+            if hydraCode != lastHydraCode {
+                lastHydraCode = hydraCode
+                strudelBridge.evalHydra(hydraCode)
+            }
+        }
+    }
+
+    private func tickSaveGesture() {
+        guard !gridModeEnabled && !drumModeEnabled else { return }
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         if saveDetector.check(hands: currentHands, config: config, currentTime: elapsed) {
             let snippet = SavedSnippet(
                 code: buildCode(smoothed, structIdx: structIdx, config: config, waveform: selectedWaveform),
                 bpm: Int((smoothed["bpm"] ?? 120).rounded())
             )
-            DispatchQueue.main.async { [weak self] in
-                self?.savedSnippets.append(snippet)
-            }
+            savedSnippets.append(snippet)
+        }
+    }
+
+    // MARK: - Drum Code Helpers (shared by all modes)
+
+    private var drumStateKey: String {
+        let k1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
+        let k2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
+        return "\(k1)|\(k2)"
+    }
+
+    private func buildDrumCodeParts() -> [String] {
+        var parts: [String] = []
+        var code1 = selectedDrumLoop.code
+        if !code1.isEmpty {
+            if drumVolume != 1.0 { code1 = "(\(code1)).gain(\(String(format: "%.2f", drumVolume)))" }
+            if drumSpeed != 1.0 { code1 = "(\(code1)).fast(\(String(format: "%.1f", drumSpeed)))" }
+            parts.append(code1)
+        }
+        var code2 = selectedDrumLoop2.code
+        if !code2.isEmpty {
+            if drumVolume2 != 1.0 { code2 = "(\(code2)).gain(\(String(format: "%.2f", drumVolume2)))" }
+            if drumSpeed2 != 1.0 { code2 = "(\(code2)).fast(\(String(format: "%.1f", drumSpeed2)))" }
+            parts.append(code2)
+        }
+        return parts
+    }
+
+    private func evaluateDrumLoopsIfChanged(modePrefix: String) {
+        let key = "\(modePrefix)|\(drumStateKey)"
+        guard key != lastStructKey else { return }
+        lastStructKey = key
+        let parts = buildDrumCodeParts()
+        if parts.isEmpty {
+            strudelBridge.evaluate("silence")
+        } else {
+            let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
+            strudelBridge.evaluate(code)
         }
     }
 
