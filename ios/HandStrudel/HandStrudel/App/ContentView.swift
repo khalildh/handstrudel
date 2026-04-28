@@ -16,6 +16,8 @@ struct ContentView: View {
     @State private var showSharePicker = false
     @State private var recordedVideoURL: URL?
     @AppStorage("hideSkeletonWhenRecording") private var hideSkeletonWhenRecording = true
+    @State private var filterName: String = ""
+    @State private var showFilterName = false
 
     var body: some View {
         ZStack {
@@ -119,7 +121,41 @@ struct ContentView: View {
                 bottomControls
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
+
+                // Filter name toast
+                if showFilterName {
+                    Text(engine.selectedFilter.emoji + " " + engine.selectedFilter.name)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(Color.black.opacity(0.5)))
+                        .transition(.opacity)
+                }
             }
+            .gesture(
+                DragGesture(minimumDistance: 40)
+                    .onEnded { value in
+                        let filters = CAMERA_FILTERS.filter { !$0.isPremium || storeManager.isUnlocked($0.packId ?? "") }
+                        guard let currentIdx = filters.firstIndex(where: { $0.id == engine.selectedFilter.id }) else { return }
+
+                        let newIdx: Int
+                        if value.translation.width < 0 {
+                            // Swipe left → next filter
+                            newIdx = (currentIdx + 1) % filters.count
+                        } else {
+                            // Swipe right → previous filter
+                            newIdx = (currentIdx - 1 + filters.count) % filters.count
+                        }
+                        engine.selectedFilter = filters[newIdx]
+
+                        // Show filter name briefly
+                        withAnimation(.easeOut(duration: 0.2)) { showFilterName = true }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            withAnimation(.easeOut(duration: 0.3)) { showFilterName = false }
+                        }
+                    }
+            )
         }
         .sheet(isPresented: $showShareSheet) {
             if let url = recordedVideoURL {
