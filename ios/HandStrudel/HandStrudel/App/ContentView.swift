@@ -278,38 +278,50 @@ struct ContentView: View {
             let laneHeight = geo.size.height / CGFloat(max(1, count))
 
             ZStack {
-                // Note lane lines + labels
+                // Note lane backgrounds + labels
                 ForEach(0..<count, id: \.self) { i in
                     let noteIdx = count - 1 - i  // invert: top = high
                     let y = CGFloat(i) * laneHeight
                     let midi = notes[noteIdx]
                     let name = midiNoteName(midi)
                     let isHighlighted = engine.gridLeftLane == noteIdx || engine.gridRightLane == noteIdx
+                    let isEven = i % 2 == 0
+
+                    // Alternating lane background for visibility
+                    Rectangle()
+                        .fill(isHighlighted
+                              ? Color.green.opacity(0.15)
+                              : Color.white.opacity(isEven ? 0.04 : 0.0))
+                        .frame(height: laneHeight)
+                        .offset(y: y)
 
                     // Lane separator line
                     Rectangle()
-                        .fill(Color.white.opacity(isHighlighted ? 0.12 : 0.025))
-                        .frame(height: 0.5)
+                        .fill(Color.white.opacity(isHighlighted ? 0.3 : 0.08))
+                        .frame(height: 1)
                         .offset(y: y)
 
-                    // Note label on the left
+                    // Note label on the left with background pill
                     Text(name)
-                        .font(.system(size: isHighlighted ? 13 : 9, weight: isHighlighted ? .bold : .regular, design: .monospaced))
-                        .foregroundColor(isHighlighted ? .green : .white.opacity(0.25))
-                        .padding(.horizontal, isHighlighted ? 6 : 0)
-                        .padding(.vertical, isHighlighted ? 2 : 0)
+                        .font(.system(size: isHighlighted ? 14 : 11, weight: isHighlighted ? .black : .medium, design: .monospaced))
+                        .foregroundColor(isHighlighted ? .green : .white.opacity(0.5))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
                         .background(
-                            Capsule().fill(Color.black.opacity(isHighlighted ? 0.4 : 0))
+                            Capsule().fill(Color.black.opacity(isHighlighted ? 0.6 : 0.3))
                         )
-                        .position(x: 28, y: y + laneHeight / 2)
+                        .position(x: 32, y: y + laneHeight / 2)
 
-                    // Highlight the active lane
-                    if isHighlighted {
-                        Rectangle()
-                            .fill(Color.green.opacity(0.08))
-                            .frame(height: laneHeight)
-                            .offset(y: y)
-                    }
+                    // Note label on the right too (for right hand)
+                    Text(name)
+                        .font(.system(size: isHighlighted ? 14 : 11, weight: isHighlighted ? .black : .medium, design: .monospaced))
+                        .foregroundColor(isHighlighted ? .pink : .white.opacity(0.3))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(Color.black.opacity(isHighlighted ? 0.6 : 0.2))
+                        )
+                        .position(x: geo.size.width - 32, y: y + laneHeight / 2)
                 }
 
                 // Pinch indicators at actual hand position
