@@ -334,40 +334,49 @@ struct ContentView: View {
                     let name = midiNoteName(midi)
                     let leftActive = engine.gridLeftLane == noteIdx
                     let rightActive = engine.gridRightLane == noteIdx
-                    let isAnyActive = leftActive || rightActive
                     let isEven = i % 2 == 0
 
-                    // Alternating lane background
-                    Rectangle()
-                        .fill(Color.white.opacity(isEven ? 0.03 : 0.0))
-                        .frame(height: laneHeight)
-                        .offset(y: y)
+                    // Lane background — split left/right halves
+                    HStack(spacing: 0) {
+                        // Left half — green glow when left hand is here
+                        Rectangle()
+                            .fill(leftActive
+                                  ? Color.green.opacity(engine.gridModeManager.isLeftPinching ? 0.25 : 0.1)
+                                  : Color.white.opacity(isEven ? 0.03 : 0.0))
+                        // Right half — pink glow when right hand is here
+                        Rectangle()
+                            .fill(rightActive
+                                  ? Color.pink.opacity(engine.gridModeManager.isRightPinching ? 0.25 : 0.1)
+                                  : Color.white.opacity(isEven ? 0.03 : 0.0))
+                    }
+                    .frame(height: laneHeight)
+                    .offset(y: y)
 
                     // Lane separator line
                     Rectangle()
-                        .fill(Color.white.opacity(isAnyActive ? 0.3 : 0.08))
+                        .fill(Color.white.opacity(leftActive || rightActive ? 0.2 : 0.06))
                         .frame(height: 1)
                         .offset(y: y)
 
-                    // Left label — green only when left hand is here
+                    // Left label — green when left hand is here
                     Text(name)
                         .font(.system(size: leftActive ? 14 : 11, weight: leftActive ? .black : .medium, design: .monospaced))
                         .foregroundColor(leftActive ? .green : .white.opacity(0.5))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(
-                            Capsule().fill(Color.black.opacity(leftActive ? 0.6 : 0.3))
+                            Capsule().fill(leftActive ? Color.green.opacity(0.2) : Color.black.opacity(0.3))
                         )
                         .position(x: 32, y: y + laneHeight / 2)
 
-                    // Right label — pink only when right hand is here
+                    // Right label — pink when right hand is here
                     Text(name)
                         .font(.system(size: rightActive ? 14 : 11, weight: rightActive ? .black : .medium, design: .monospaced))
                         .foregroundColor(rightActive ? .pink : .white.opacity(0.3))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(
-                            Capsule().fill(Color.black.opacity(rightActive ? 0.6 : 0.2))
+                            Capsule().fill(rightActive ? Color.pink.opacity(0.2) : Color.black.opacity(0.2))
                         )
                         .position(x: geo.size.width - 32, y: y + laneHeight / 2)
                 }
