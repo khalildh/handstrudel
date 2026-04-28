@@ -325,6 +325,16 @@ struct ContentView: View {
             let count = notes.count
             let laneHeight = geo.size.height / CGFloat(max(1, count))
 
+            // Compute which visual lane each hand is in based on screen position
+            let leftVisualLane: Int? = engine.handsState.left.map { hand in
+                let screenY = CGFloat(hand.y) * geo.size.height
+                return max(0, min(count - 1, Int(screenY / laneHeight)))
+            }
+            let rightVisualLane: Int? = engine.handsState.right.map { hand in
+                let screenY = CGFloat(hand.y) * geo.size.height
+                return max(0, min(count - 1, Int(screenY / laneHeight)))
+            }
+
             ZStack {
                 // Note lane backgrounds + labels
                 ForEach(0..<count, id: \.self) { i in
@@ -332,8 +342,8 @@ struct ContentView: View {
                     let y = CGFloat(i) * laneHeight
                     let midi = notes[noteIdx]
                     let name = midiNoteName(midi)
-                    let leftActive = engine.gridLeftLane == noteIdx
-                    let rightActive = engine.gridRightLane == noteIdx
+                    let leftActive = leftVisualLane == i
+                    let rightActive = rightVisualLane == i
                     let isEven = i % 2 == 0
 
                     // Lane background — split left/right halves
