@@ -93,8 +93,6 @@ struct StartOverlayView: View {
                 }
 
                 VStack(spacing: 0) {
-                    Spacer()
-
                     // App title
                     VStack(spacing: 10) {
                         ZStack {
@@ -165,6 +163,7 @@ struct StartOverlayView: View {
                     .opacity(cardsAppeared ? 1 : 0)
                     .animation(.easeOut(duration: 0.4).delay(0.3), value: cardsAppeared)
 
+                    ScrollView(showsIndicators: false) {
                     LazyVGrid(columns: [
                         GridItem(.flexible(), spacing: 14),
                         GridItem(.flexible(), spacing: 14)
@@ -195,8 +194,7 @@ struct StartOverlayView: View {
                         }
                     }
                     .padding(.horizontal, 24)
-
-                    Spacer()
+                    } // end ScrollView
 
                     // Start button or status
                     if starting {
@@ -256,7 +254,7 @@ struct StartOverlayView: View {
                         }
                         .disabled(selectedPreset == nil)
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 50)
+                        .padding(.bottom, 20)
                         .onChange(of: selectedPreset?.id) { _ in
                             startPulse()
                             startButtonGlow()
