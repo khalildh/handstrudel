@@ -10,16 +10,10 @@ struct Waveform: Identifiable {
 }
 
 let WAVEFORMS: [Waveform] = [
-    Waveform(id: "sawtooth", name: "Saw", emoji: "\u{1FAB5}", isPremium: false, packId: nil),
-    Waveform(id: "square", name: "Square", emoji: "\u{25A0}", isPremium: false, packId: nil),
-    Waveform(id: "triangle", name: "Triangle", emoji: "\u{25B3}", isPremium: false, packId: nil),
-    Waveform(id: "sine", name: "Sine", emoji: "\u{223F}", isPremium: false, packId: nil),
-
-    // Premium waveforms
-    Waveform(id: "sawtooth", name: "Supersaw", emoji: "🎸", isPremium: true, packId: "analog"),
-    Waveform(id: "sine", name: "FM", emoji: "📡", isPremium: true, packId: "analog"),
-    Waveform(id: "triangle", name: "Pluck", emoji: "🪕", isPremium: true, packId: "texture"),
-    Waveform(id: "sine", name: "Pad", emoji: "☁️", isPremium: true, packId: "texture"),
+    Waveform(id: "sawtooth", name: "Saw", emoji: "🪚", isPremium: false, packId: nil),
+    Waveform(id: "square", name: "Square", emoji: "⬜", isPremium: false, packId: nil),
+    Waveform(id: "triangle", name: "Triangle", emoji: "🔺", isPremium: false, packId: nil),
+    Waveform(id: "sine", name: "Sine", emoji: "🔮", isPremium: false, packId: nil),
 ]
 
 private func debugLog(_ msg: String) {
