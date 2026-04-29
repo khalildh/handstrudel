@@ -103,6 +103,8 @@ final class EngineController: ObservableObject {
     @Published var drumSpeed: Double = 1.0
     @Published var selectedDrumLoop2: DrumLoop = DRUM_LOOPS[0]
     @Published var drumVolume2: Double = 1.0
+    @Published var drumComplexity: Double = 0.5  // 0 = simple, 1 = complex
+    @Published var drumIntensity: Double = 0.5   // 0 = soft, 1 = loud
     @Published var drumSpeed2: Double = 1.0
 
     // Harmony
@@ -484,21 +486,31 @@ final class EngineController: ObservableObject {
     private var drumStateKey: String {
         let k1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
         let k2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
-        return "\(k1)|\(k2)"
+        let ci = String(format: "%.1f|%.1f", drumComplexity, drumIntensity)
+        return "\(k1)|\(k2)|\(ci)"
     }
 
     private func buildDrumCodeParts() -> [String] {
+        // Complexity affects speed multiplier (simple=1x, complex=2-4x for hats)
+        // Intensity affects gain
+        let intensityGain = 0.3 + drumIntensity * 1.2  // 0.3 to 1.5
+        let complexitySpeed = 1.0 + drumComplexity * 2.0  // 1x to 3x
+
         var parts: [String] = []
         var code1 = selectedDrumLoop.code
         if !code1.isEmpty {
-            if drumVolume != 1.0 { code1 = "(\(code1)).gain(\(String(format: "%.2f", drumVolume)))" }
-            if drumSpeed != 1.0 { code1 = "(\(code1)).fast(\(String(format: "%.1f", drumSpeed)))" }
+            let vol = drumVolume * intensityGain
+            code1 = "(\(code1)).gain(\(String(format: "%.2f", vol)))"
+            let spd = drumSpeed * complexitySpeed
+            if spd != 1.0 { code1 = "(\(code1)).fast(\(String(format: "%.1f", spd)))" }
             parts.append(code1)
         }
         var code2 = selectedDrumLoop2.code
         if !code2.isEmpty {
-            if drumVolume2 != 1.0 { code2 = "(\(code2)).gain(\(String(format: "%.2f", drumVolume2)))" }
-            if drumSpeed2 != 1.0 { code2 = "(\(code2)).fast(\(String(format: "%.1f", drumSpeed2)))" }
+            let vol = drumVolume2 * intensityGain
+            code2 = "(\(code2)).gain(\(String(format: "%.2f", vol)))"
+            let spd = drumSpeed2 * complexitySpeed
+            if spd != 1.0 { code2 = "(\(code2)).fast(\(String(format: "%.1f", spd)))" }
             parts.append(code2)
         }
         return parts

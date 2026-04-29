@@ -188,6 +188,13 @@ struct ContentView: View {
                         .padding(.bottom, 4)
                 }
 
+                // Drum XY pad (complexity + intensity)
+                if engine.drumModeEnabled {
+                    drumXYPad
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 4)
+                }
+
                 // Bottom controls
                 bottomControls
                     .padding(.horizontal, 16)
@@ -430,6 +437,71 @@ struct ContentView: View {
                 .font(.system(size: 13, weight: .bold, design: .monospaced))
                 .foregroundColor(.white.opacity(0.5))
         }
+    }
+
+    // MARK: - Drum XY Pad
+
+    private var drumXYPad: some View {
+        GeometryReader { geo in
+            let dotX = engine.drumComplexity * geo.size.width
+            let dotY = (1 - engine.drumIntensity) * geo.size.height
+
+            ZStack {
+                // Background
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.black.opacity(0.4))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+
+                // Quadrant labels
+                VStack {
+                    HStack {
+                        Text("SOFT")
+                            .foregroundColor(.white.opacity(0.15))
+                        Spacer()
+                        Text("LOUD")
+                            .foregroundColor(.white.opacity(0.15))
+                    }
+                    Spacer()
+                    HStack {
+                        Text("SIMPLE")
+                            .foregroundColor(.white.opacity(0.15))
+                        Spacer()
+                        Text("COMPLEX")
+                            .foregroundColor(.white.opacity(0.15))
+                    }
+                }
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .padding(8)
+
+                // Crosshair lines
+                Rectangle()
+                    .fill(Color.white.opacity(0.06))
+                    .frame(width: 1)
+                Rectangle()
+                    .fill(Color.white.opacity(0.06))
+                    .frame(height: 1)
+
+                // Position dot
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 20, height: 20)
+                    .shadow(color: .green.opacity(0.5), radius: 8)
+                    .position(x: dotX, y: dotY)
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let cx: Double = value.location.x / geo.size.width
+                        let cy: Double = 1.0 - value.location.y / geo.size.height
+                        engine.drumComplexity = max(0, min(1, cx))
+                        engine.drumIntensity = max(0, min(1, cy))
+                    }
+            )
+        }
+        .frame(height: 80)
     }
 
     // MARK: - Grid Quick Bar
