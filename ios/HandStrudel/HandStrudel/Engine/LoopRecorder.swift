@@ -14,7 +14,7 @@ final class LoopRecorder {
     private var lastPlaybackCheck: Double = 0
 
     // Loop duration options (in bars at current BPM)
-    static let barOptions = [2, 4, 8]
+    static let barOptions = [2, 4, 8, 16, 32]
     var selectedBars: Int = 4
 
     /// Duration of the loop in seconds based on BPM and bar count
