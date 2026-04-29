@@ -18,6 +18,7 @@ struct ContentView: View {
     @AppStorage("hideSkeletonWhenRecording") private var hideSkeletonWhenRecording = true
     @State private var filterName: String = ""
     @State private var showFilterName = false
+    @State private var showJamAlert = false
 
     var body: some View {
         ZStack {
@@ -172,6 +173,11 @@ struct ContentView: View {
                     }
             )
         }
+        .alert("Jam Session", isPresented: $showJamAlert) {
+            Button("Got it") {}
+        } message: {
+            Text("Start a FaceTime call, then tap the people icon again. Everyone on the call who has HandStrudel can join the jam!")
+        }
         .sheet(isPresented: $showShareSheet) {
             if let url = recordedVideoURL {
                 ShareSheet(activityItems: [url])
@@ -226,6 +232,7 @@ struct ContentView: View {
                     engine.jamSession.leaveSession()
                 } else {
                     engine.jamSession.startSession()
+                    showJamAlert = true
                 }
             }) {
                 HStack(spacing: 4) {
@@ -533,26 +540,24 @@ struct ContentView: View {
     // MARK: - Bottom Controls
 
     private var bottomControls: some View {
-        ZStack {
-            // Loop record button on left
-            HStack {
-                loopRecordButton
-                Spacer()
-            }
+        HStack(spacing: 16) {
+            // Loop record button
+            loopRecordButton
 
-            // Video record button centered
+            Spacer()
+
+            // Video record button
             recordButton
 
-            // Settings button aligned right
-            HStack {
-                Spacer()
-                Button(action: { showSheet = true }) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.4))
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(Color.black.opacity(0.3)))
-                }
+            Spacer()
+
+            // Settings button
+            Button(action: { showSheet = true }) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.4))
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.black.opacity(0.3)))
             }
         }
     }
