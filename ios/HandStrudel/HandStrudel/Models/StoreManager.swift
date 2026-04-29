@@ -110,7 +110,11 @@ final class StoreManager: ObservableObject {
     // MARK: - Access Checks
 
     func isUnlocked(_ packId: String) -> Bool {
-        purchasedIds.contains(packId) || hasProAccess
+        #if DEBUG
+        return true // All premium unlocked for testing
+        #else
+        return purchasedIds.contains(packId) || hasProAccess
+        #endif
     }
 
     var hasProAccess: Bool {
