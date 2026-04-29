@@ -103,6 +103,16 @@ struct ContentView: View {
                 logoMark
                     .padding(.top, 2)
 
+                // Jam session indicator
+                if engine.jamSession.isActive && !engine.jamSession.lastReceivedEvent.isEmpty {
+                    Text(engine.jamSession.lastReceivedEvent)
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundColor(.cyan.opacity(0.8))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.cyan.opacity(0.1)))
+                }
+
                 // Floating code pill — hide in grid/drum mode
                 if !engine.gridModeEnabled && !engine.drumModeEnabled {
                     codePill
@@ -210,7 +220,32 @@ struct ContentView: View {
 
             Spacer()
 
-            // Close button — larger tap target, high z-order
+            // Jam session button
+            Button(action: {
+                if engine.jamSession.isActive {
+                    engine.jamSession.leaveSession()
+                } else {
+                    engine.jamSession.startSession()
+                }
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: engine.jamSession.isActive ? "person.2.fill" : "person.2")
+                        .font(.system(size: 12, weight: .bold))
+                    if engine.jamSession.isActive {
+                        Text("\(engine.jamSession.participants.count)")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                    }
+                }
+                .foregroundColor(engine.jamSession.isActive ? .green : .white.opacity(0.6))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(engine.jamSession.isActive ? Color.green.opacity(0.2) : Color.black.opacity(0.3))
+                )
+            }
+
+            // Close button
             Button(action: { engine.stop() }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .bold))

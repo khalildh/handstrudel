@@ -77,6 +77,9 @@ final class EngineController: ObservableObject {
     // Camera filter
     @Published var selectedFilter: CameraFilter = CAMERA_FILTERS[0]
 
+    // Jam session (SharePlay)
+    let jamSession = JamSessionManager()
+
     // Loop recording & playback
     let loopRecorder = LoopRecorder()
     @Published var isLoopRecording = false
@@ -199,6 +202,21 @@ final class EngineController: ObservableObject {
                 handTracker.startSession()
                 debugLog("camera started")
 
+                // Jam session: play remote events
+                jamSession.onRemoteEvent = { [weak self] event in
+                    guard let self else { return }
+                    switch event {
+                    case .noteOn(let midi, let waveform, let vel):
+                        self.strudelBridge.playNote(midi: midi, waveform: waveform, velocity: vel * 0.7, duration: 0.2)
+                    case .drumHit(let hitType):
+                        self.strudelBridge.playHit(hitType)
+                    case .noteOff:
+                        break
+                    case .bpmChange:
+                        break
+                    }
+                }
+
                 // Beat callback
                 strudelBridge.onBeat = { [weak self] beat in
                     DispatchQueue.main.async {
@@ -295,9 +313,11 @@ final class EngineController: ObservableObject {
                 strudelBridge.noteOn(hand: hand, midi: midi, waveform: selectedWaveform, velocity: vel)
                 lastGridNote = name
                 loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel), currentTime: elapsed)
+                jamSession.sendEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel))
             case .noteOff(let hand):
                 strudelBridge.noteOff(hand: hand)
                 loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
+                jamSession.sendEvent(.noteOff(hand: hand))
             case .slide(let hand, let midi, let name):
                 strudelBridge.noteSlide(hand: hand, midi: midi)
                 lastGridNote = name
@@ -319,6 +339,7 @@ final class EngineController: ObservableObject {
             strudelBridge.playHit(hitType)
             lastDrumHit = hitType
             loopRecorder.recordEvent(.drumHit(hitType: hitType), currentTime: elapsed)
+            jamSession.sendEvent(.drumHit(hitType: hitType))
         }
         evaluateDrumLoopsIfChanged(modePrefix: "drum")
     }
@@ -700,6 +721,8 @@ final class EngineController: ObservableObject {
 
         // Reset all state
         saveDetector.reset()
+        loopRecorder.reset()
+        jamSession.leaveSession()
         gridModeEnabled = false
         drumModeEnabled = false
         gridLeftLane = nil
