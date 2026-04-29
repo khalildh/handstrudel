@@ -55,6 +55,7 @@ final class HandTrackingManager: NSObject, ObservableObject {
 
     var previewLayer: AVCaptureVideoPreviewLayer?
     var onHandsUpdate: ((HandsState) -> Void)?
+    var onCameraError: ((String) -> Void)?
 
     @Published var isRunning = false
     var videoWidth: CGFloat = 480
@@ -81,7 +82,10 @@ final class HandTrackingManager: NSObject, ObservableObject {
             return
         case .authorized:
             setupAndStart()
-        default:
+        case .denied, .restricted:
+            onCameraError?("Camera access denied. Go to Settings → HandStrudel to enable.")
+            return
+        @unknown default:
             return
         }
     }

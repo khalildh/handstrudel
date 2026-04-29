@@ -194,7 +194,9 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     func noteOn(hand: String, midi: Int, waveform: String = "sawtooth", velocity: Double = 0.6) {
-        webView.evaluateJavaScript("noteOn('\(hand)',\(midi),'\(waveform)',\(String(format: "%.2f", velocity)))", completionHandler: nil)
+        let safeMidi = max(0, min(127, midi))
+        let safeVel = max(0, min(1, velocity))
+        webView.evaluateJavaScript("noteOn('\(hand)',\(safeMidi),'\(waveform)',\(String(format: "%.2f", safeVel)))", completionHandler: nil)
     }
 
     func noteOff(hand: String) {
@@ -206,7 +208,8 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     func playNote(midi: Int, waveform: String = "sawtooth", velocity: Double = 0.6, duration: Double = 0.3) {
-        webView.evaluateJavaScript("playNote(\(midi),'\(waveform)',\(String(format: "%.2f", velocity)),\(String(format: "%.2f", duration)))", completionHandler: nil)
+        let safeMidi = max(0, min(127, midi))
+        webView.evaluateJavaScript("playNote(\(safeMidi),'\(waveform)',\(String(format: "%.2f", velocity)),\(String(format: "%.2f", duration)))", completionHandler: nil)
     }
 
     func stop() {

@@ -392,8 +392,12 @@ final class EngineController: ObservableObject {
         }
     }
 
+    private static let maxSnippets = 50
+    private static let maxLoops = 20
+
     private func tickSaveGesture() {
         guard !gridModeEnabled && !drumModeEnabled else { return }
+        guard savedSnippets.count < Self.maxSnippets else { return }
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         if saveDetector.check(hands: currentHands, config: config, currentTime: elapsed) {
             let snippet = SavedSnippet(
@@ -440,6 +444,7 @@ final class EngineController: ObservableObject {
     }
 
     func startLoopRecording() {
+        guard savedLoops.count < Self.maxLoops else { return }
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
         loopRecorder.startRecording(currentTime: elapsed, mode: mode)
