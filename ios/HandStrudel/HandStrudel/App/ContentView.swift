@@ -562,10 +562,16 @@ struct ContentView: View {
         }
     }
 
+    @State private var showLoopSaved = false
+
     private var loopRecordButton: some View {
         Button(action: {
             if engine.isLoopRecording {
                 engine.stopLoopRecording()
+                withAnimation { showLoopSaved = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    withAnimation { showLoopSaved = false }
+                }
             } else {
                 engine.startLoopRecording()
             }
@@ -576,7 +582,6 @@ struct ContentView: View {
                     .frame(width: 44, height: 44)
 
                 if engine.isLoopRecording {
-                    // Progress ring
                     Circle()
                         .trim(from: 0, to: engine.loopRecordingProgress)
                         .stroke(Color.red, style: StrokeStyle(lineWidth: 3, lineCap: .round))
@@ -590,6 +595,28 @@ struct ContentView: View {
                         .fill(Color.red.opacity(0.8))
                         .frame(width: 18, height: 18)
                 }
+
+                // Loop count badge
+                if !engine.savedLoops.isEmpty && !engine.isLoopRecording {
+                    Text("\(engine.savedLoops.count)")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .frame(width: 18, height: 18)
+                        .background(Circle().fill(Color.green))
+                        .offset(x: 16, y: -16)
+                }
+            }
+        }
+        .overlay(alignment: .top) {
+            if showLoopSaved {
+                Text("Loop saved & playing")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(.green)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.black.opacity(0.6)))
+                    .offset(y: -30)
+                    .transition(.opacity)
             }
         }
     }
