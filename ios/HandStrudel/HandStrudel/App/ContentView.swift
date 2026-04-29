@@ -399,6 +399,8 @@ struct ContentView: View {
 
     // MARK: - Note Grid Overlay
 
+    @State private var touchedLane: Int? = nil
+
     private var noteGridOverlay: some View {
         GeometryReader { geo in
             let notes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale, baseOctave: engine.gridBaseOctave, octaveRange: engine.gridOctaveRange)
@@ -441,53 +443,69 @@ struct ContentView: View {
                     let leftActive = leftVisualLane == i
                     let rightActive = rightVisualLane == i
                     let isEven = i % 2 == 0
+                    let isTouchActive = touchedLane == i
 
                     ZStack {
-                        // Lane background — split left/right
+                        // Lane background — split left/right + touch highlight
                         HStack(spacing: 0) {
                             Rectangle()
-                                .fill(leftActive
-                                      ? Color.green.opacity(engine.gridModeManager.isLeftPinching ? 0.25 : 0.1)
+                                .fill(isTouchActive ? Color.cyan.opacity(0.3)
+                                      : leftActive ? Color.green.opacity(engine.gridModeManager.isLeftPinching ? 0.25 : 0.1)
                                       : Color.white.opacity(isEven ? 0.03 : 0.0))
                             Rectangle()
-                                .fill(rightActive
-                                      ? Color.pink.opacity(engine.gridModeManager.isRightPinching ? 0.25 : 0.1)
+                                .fill(isTouchActive ? Color.cyan.opacity(0.3)
+                                      : rightActive ? Color.pink.opacity(engine.gridModeManager.isRightPinching ? 0.25 : 0.1)
                                       : Color.white.opacity(isEven ? 0.03 : 0.0))
                         }
 
                         // Left label
                         HStack {
                             Text(name)
-                                .font(.system(size: leftActive ? 14 : 11, weight: leftActive ? .black : .medium, design: .monospaced))
-                                .foregroundColor(leftActive ? .green : .white.opacity(0.5))
+                                .font(.system(size: (leftActive || isTouchActive) ? 14 : 11, weight: (leftActive || isTouchActive) ? .black : .medium, design: .monospaced))
+                                .foregroundColor(isTouchActive ? .cyan : leftActive ? .green : .white.opacity(0.5))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(Capsule().fill(leftActive ? Color.green.opacity(0.2) : Color.black.opacity(0.3)))
+                                .background(Capsule().fill((leftActive || isTouchActive) ? Color.green.opacity(0.2) : Color.black.opacity(0.3)))
                             Spacer()
                             // Right label
                             Text(name)
-                                .font(.system(size: rightActive ? 14 : 11, weight: rightActive ? .black : .medium, design: .monospaced))
-                                .foregroundColor(rightActive ? .pink : .white.opacity(0.3))
+                                .font(.system(size: (rightActive || isTouchActive) ? 14 : 11, weight: (rightActive || isTouchActive) ? .black : .medium, design: .monospaced))
+                                .foregroundColor(isTouchActive ? .cyan : rightActive ? .pink : .white.opacity(0.3))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(Capsule().fill(rightActive ? Color.pink.opacity(0.2) : Color.black.opacity(0.2)))
+                                .background(Capsule().fill((rightActive || isTouchActive) ? Color.pink.opacity(0.2) : Color.black.opacity(0.2)))
                         }
                         .padding(.horizontal, 8)
                     }
                     .frame(height: laneHeight)
-                    // Separator line at top of each lane
                     .overlay(alignment: .top) {
                         Rectangle()
-                            .fill(Color.white.opacity(leftActive || rightActive ? 0.2 : 0.06))
+                            .fill(Color.white.opacity(leftActive || rightActive || isTouchActive ? 0.2 : 0.06))
                             .frame(height: 1)
                     }
-                    // Tap to play note (one-hand mode)
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        engine.strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.7, duration: 0.3)
-                        engine.haptics.noteTrigger()
-                        engine.lastGridNote = name
-                    }
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in
+                                if touchedLane != i {
+                                    // New touch or slid to new lane
+                                    if touchedLane == nil {
+                                        // First touch — note on
+                                        engine.strudelBridge.noteOn(hand: "touch", midi: midi, waveform: engine.selectedWaveform, velocity: 0.7)
+                                    } else {
+                                        // Slid to new lane — slide pitch
+                                        engine.strudelBridge.noteSlide(hand: "touch", midi: midi)
+                                    }
+                                    touchedLane = i
+                                    engine.haptics.noteTrigger()
+                                    engine.lastGridNote = name
+                                }
+                            }
+                            .onEnded { _ in
+                                engine.strudelBridge.noteOff(hand: "touch")
+                                touchedLane = nil
+                            }
+                    )
                 }
                 Spacer()
             }
