@@ -50,6 +50,34 @@ struct ContentView: View {
                 .allowsHitTesting(false)
         }
         .statusBarHidden(engine.isRunning)
+        .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
+            guard !engine.isRunning, let presetId = notification.object as? String else { return }
+            if let preset = PRESETS.first(where: { $0.id == presetId }) {
+                engine.start(config: preset.mapping, hydraConfig: preset.hydraMapping, advanced: false)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .siriStartMode)) { notification in
+            guard let mode = notification.object as? String else { return }
+            if !engine.isRunning {
+                // Start with default preset first
+                engine.start(config: DEFAULT_MAPPING, hydraConfig: DEFAULT_HYDRA_MAPPING, advanced: false)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                switch mode {
+                case "grid": engine.gridModeEnabled = true; engine.drumModeEnabled = false
+                case "drums": engine.drumModeEnabled = true; engine.gridModeEnabled = false
+                default: break
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleLoopRecording)) { _ in
+            guard engine.isRunning else { return }
+            if engine.isLoopRecording {
+                engine.stopLoopRecording()
+            } else {
+                engine.startLoopRecording()
+            }
+        }
     }
 
     // MARK: - Performance View
