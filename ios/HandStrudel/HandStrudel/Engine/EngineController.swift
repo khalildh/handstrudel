@@ -150,7 +150,7 @@ final class EngineController: ObservableObject {
     private var displayLink: CADisplayLink?
     private var uiTimer: Timer?
     private var structTimer: Timer?
-    private var startTime: Date?
+    private(set) var startTime: Date?
 
     func start(config: MappingConfig, hydraConfig: MappingConfig, advanced: Bool) {
         debugLog("start() called")

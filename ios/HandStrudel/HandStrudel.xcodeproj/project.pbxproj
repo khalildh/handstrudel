@@ -36,6 +36,7 @@
 		9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F66A4286F922F3805EADFE /* ParamDefs.swift */; };
 		A380AD271A6485FF679B0DCD /* HandOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */; };
 		B033D247CE64C351B3262535 /* iMessageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6755AC0E55CFA644BF8217 /* iMessageManager.swift */; };
+		B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9238181B674B4222B2F52C5A /* GridTouchView.swift */; };
 		B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D77EA18663B3717C68CAAB /* ContentView.swift */; };
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
 		BF459746DBE08887CD29CFF3 /* SaveGestureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C89256347633541234267B8 /* SaveGestureDetector.swift */; };
@@ -79,6 +80,7 @@
 		7FD4D6506C9F603EEA1B77B5 /* WatchSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSessionManager.swift; sourceTree = "<group>"; };
 		868D2939892D7ADF96F5D122 /* HandStrudelTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HandStrudelTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B7A548807FF6856B92FC423 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9238181B674B4222B2F52C5A /* GridTouchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridTouchView.swift; sourceTree = "<group>"; };
 		925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamSmoother.swift; sourceTree = "<group>"; };
 		938A00F6A5044E13D981C663 /* EngineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineController.swift; sourceTree = "<group>"; };
 		93D6C035D4A9EE1A66C31839 /* Loop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loop.swift; sourceTree = "<group>"; };
@@ -123,6 +125,7 @@
 			isa = PBXGroup;
 			children = (
 				F2C015029D54DF587EDD09DC /* CameraView.swift */,
+				9238181B674B4222B2F52C5A /* GridTouchView.swift */,
 				6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */,
 				D986625C7BF30952FBAED619 /* OnboardingView.swift */,
 				A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */,
@@ -316,6 +319,7 @@
 				1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */,
 				204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */,
 				E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */,
+				B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */,
 				195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */,
 				A380AD271A6485FF679B0DCD /* HandOverlayView.swift in Sources */,
 				D2520D85FD921167AEA6EB1C /* HandStrudelApp.swift in Sources */,

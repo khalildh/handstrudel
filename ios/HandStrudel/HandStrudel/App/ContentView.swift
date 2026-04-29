@@ -427,7 +427,8 @@ struct ContentView: View {
 
     // MARK: - Note Grid Overlay
 
-    @State private var touchedLane: Int? = nil
+    @State private var touchedLane: Int? = nil  // legacy, kept for compat
+    @State private var touchActiveLanes: Set<Int> = []
 
     private var noteGridOverlay: some View {
         GeometryReader { geo in
@@ -471,7 +472,7 @@ struct ContentView: View {
                     let leftActive = leftVisualLane == i
                     let rightActive = rightVisualLane == i
                     let isEven = i % 2 == 0
-                    let isTouchActive = touchedLane == i
+                    let isTouchActive = touchActiveLanes.contains(i)
 
                     ZStack {
                         // Lane background — split left/right + touch highlight
@@ -511,32 +512,36 @@ struct ContentView: View {
                             .fill(Color.white.opacity(leftActive || rightActive || isTouchActive ? 0.2 : 0.06))
                             .frame(height: 1)
                     }
-                    .contentShape(Rectangle())
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { _ in
-                                if touchedLane != i {
-                                    // New touch or slid to new lane
-                                    if touchedLane == nil {
-                                        // First touch — note on
-                                        engine.strudelBridge.noteOn(hand: "touch", midi: midi, waveform: engine.selectedWaveform, velocity: 0.7)
-                                    } else {
-                                        // Slid to new lane — slide pitch
-                                        engine.strudelBridge.noteSlide(hand: "touch", midi: midi)
-                                    }
-                                    touchedLane = i
-                                    engine.haptics.noteTrigger()
-                                    engine.lastGridNote = name
-                                }
-                            }
-                            .onEnded { _ in
-                                engine.strudelBridge.noteOff(hand: "touch")
-                                touchedLane = nil
-                            }
-                    )
                 }
                 Spacer()
             }
+
+            // Multitouch layer on top for two-finger play
+            GridTouchOverlay(
+                noteCount: count,
+                topPad: topPad,
+                bottomPad: bottomPad,
+                notes: notes,
+                waveform: engine.selectedWaveform,
+                onNoteOn: { voice, midi, name in
+                    engine.strudelBridge.noteOn(hand: voice, midi: midi, waveform: engine.selectedWaveform, velocity: 0.7)
+                    engine.haptics.noteTrigger()
+                    engine.lastGridNote = name
+                    let elapsed = engine.startTime.map { Date().timeIntervalSince($0) } ?? 0
+                    engine.loopRecorder.recordEvent(.noteOn(midi: midi, waveform: engine.selectedWaveform, velocity: 0.7), currentTime: elapsed)
+                },
+                onNoteOff: { voice in
+                    engine.strudelBridge.noteOff(hand: voice)
+                },
+                onNoteSlide: { voice, midi, name in
+                    engine.strudelBridge.noteSlide(hand: voice, midi: midi)
+                    engine.lastGridNote = name
+                    engine.haptics.lightTap()
+                },
+                onHaptic: { },
+                activeLanes: $touchActiveLanes
+            )
+
         }
     }
 
