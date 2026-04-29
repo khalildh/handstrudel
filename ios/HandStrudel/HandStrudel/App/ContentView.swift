@@ -623,14 +623,27 @@ struct ContentView: View {
         }
         .overlay(alignment: .top) {
             if showLoopSaved {
-                Text(loopMessage)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(.green)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.black.opacity(0.6)))
-                    .offset(y: -30)
-                    .transition(.opacity)
+                HStack(spacing: 6) {
+                    Image(systemName: loopMessage.contains("saved") ? "checkmark.circle.fill" : "info.circle.fill")
+                        .font(.system(size: 12))
+                    Text(loopMessage)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                }
+                .foregroundColor(loopMessage.contains("saved") ? .green : .orange)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.7))
+                        .overlay(
+                            Capsule().stroke(
+                                loopMessage.contains("saved") ? Color.green.opacity(0.3) : Color.orange.opacity(0.3),
+                                lineWidth: 1
+                            )
+                        )
+                )
+                .offset(y: -40)
+                .transition(.opacity)
             }
         }
     }
