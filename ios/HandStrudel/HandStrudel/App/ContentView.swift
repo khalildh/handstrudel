@@ -563,17 +563,31 @@ struct ContentView: View {
     }
 
     @State private var showLoopSaved = false
+    @State private var loopMessage = ""
 
     private var loopRecordButton: some View {
         Button(action: {
             if engine.isLoopRecording {
-                engine.stopLoopRecording()
+                let hadEvents = engine.stopLoopRecording()
+                if hadEvents {
+                    loopMessage = "Loop saved & playing"
+                } else {
+                    loopMessage = "No notes recorded"
+                }
                 withAnimation { showLoopSaved = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     withAnimation { showLoopSaved = false }
                 }
             } else {
-                engine.startLoopRecording()
+                if !engine.gridModeEnabled && !engine.drumModeEnabled {
+                    loopMessage = "Switch to Grid or Drums mode first"
+                    withAnimation { showLoopSaved = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        withAnimation { showLoopSaved = false }
+                    }
+                } else {
+                    engine.startLoopRecording()
+                }
             }
         }) {
             ZStack {
@@ -609,7 +623,7 @@ struct ContentView: View {
         }
         .overlay(alignment: .top) {
             if showLoopSaved {
-                Text("Loop saved & playing")
+                Text(loopMessage)
                     .font(.system(size: 10, weight: .bold, design: .rounded))
                     .foregroundColor(.green)
                     .padding(.horizontal, 8)

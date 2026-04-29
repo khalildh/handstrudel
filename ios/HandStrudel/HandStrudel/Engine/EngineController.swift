@@ -440,15 +440,19 @@ final class EngineController: ObservableObject {
         isLoopRecording = true
     }
 
-    func stopLoopRecording() {
+    @discardableResult
+    func stopLoopRecording() -> Bool {
         let currentBpm = smoothed["bpm"] ?? manualBPM
         if let loop = loopRecorder.stopRecording(bpm: currentBpm) {
             savedLoops.append(loop)
             let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
             loopRecorder.addLoop(loop, startTime: elapsed)
             playingLoopIds.insert(loop.id)
+            isLoopRecording = false
+            return true
         }
         isLoopRecording = false
+        return false
     }
 
     func toggleLoopPlayback(_ loopId: UUID) {
