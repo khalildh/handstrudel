@@ -103,11 +103,10 @@ struct ContentView: View {
                 .allowsHitTesting(false)
                 .opacity(isRecording && hideSkeletonWhenRecording ? 0 : 1)
 
-            // Grid mode note lanes overlay
+            // Grid mode note lanes overlay (tappable for one-hand play)
             if engine.gridModeEnabled {
                 noteGridOverlay
                     .ignoresSafeArea()
-                    .allowsHitTesting(false)
             }
 
             // Drum zone overlay (tappable pads)
@@ -481,6 +480,13 @@ struct ContentView: View {
                         Rectangle()
                             .fill(Color.white.opacity(leftActive || rightActive ? 0.2 : 0.06))
                             .frame(height: 1)
+                    }
+                    // Tap to play note (one-hand mode)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        engine.strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.7, duration: 0.3)
+                        engine.haptics.noteTrigger()
+                        engine.lastGridNote = name
                     }
                 }
                 Spacer()
