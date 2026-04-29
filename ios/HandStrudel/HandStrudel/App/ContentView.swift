@@ -181,6 +181,13 @@ struct ContentView: View {
                         .padding(.bottom, 8)
                 }
 
+                // Grid quick controls (range + octave)
+                if engine.gridModeEnabled {
+                    gridQuickBar
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 4)
+                }
+
                 // Bottom controls
                 bottomControls
                     .padding(.horizontal, 16)
@@ -423,6 +430,53 @@ struct ContentView: View {
                 .font(.system(size: 13, weight: .bold, design: .monospaced))
                 .foregroundColor(.white.opacity(0.5))
         }
+    }
+
+    // MARK: - Grid Quick Bar
+
+    private var gridQuickBar: some View {
+        HStack(spacing: 12) {
+            // Octave down/up
+            HStack(spacing: 6) {
+                Button(action: { if engine.gridBaseOctave > 1 { engine.gridBaseOctave -= 1 } }) {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.white.opacity(0.1)))
+                }
+                Text("Oct \(engine.gridBaseOctave)")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(.green)
+                Button(action: { if engine.gridBaseOctave < 6 { engine.gridBaseOctave += 1 } }) {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.white.opacity(0.1)))
+                }
+            }
+
+            Spacer()
+
+            // Range pills
+            ForEach([1, 2, 3], id: \.self) { range in
+                Button(action: { engine.gridOctaveRange = range }) {
+                    Text("\(range)")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(engine.gridOctaveRange == range ? .black : .white.opacity(0.6))
+                        .frame(width: 30, height: 30)
+                        .background(
+                            Circle().fill(engine.gridOctaveRange == range ? Color.green : Color.white.opacity(0.1))
+                        )
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            Capsule().fill(Color.black.opacity(0.5))
+        )
     }
 
     // MARK: - Note Grid Overlay
