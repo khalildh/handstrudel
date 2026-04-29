@@ -36,62 +36,94 @@ enum JamEvent: Codable {
 @MainActor
 final class JamSessionManager: ObservableObject {
     @Published var isActive = false
-    @Published var isHost = false
-    @Published var participants: [String] = []  // participant display names
+    @Published var participants: [String] = []
     @Published var lastReceivedEvent: String = ""
 
     private var session: GroupSession<HandStrudelActivity>?
     private var messenger: GroupSessionMessenger?
     private var subscriptions = Set<AnyCancellable>()
-    private var tasks = Set<Task<Void, Never>>()
+    private var sessionTask: Task<Void, Never>?
 
     let deviceId = UUID().uuidString.prefix(8).lowercased()
     var deviceName: String { UIDevice.current.name }
 
     var onRemoteEvent: ((JamEvent) -> Void)?
 
-    // MARK: - Start/Join Session
+    init() {
+        // Start listening for sessions immediately on init
+        listenForSessions()
+    }
 
-    func startSession() {
-        let activity = HandStrudelActivity()
-        Task {
-            do {
-                _ = try await activity.activate()
-            } catch {
-                debugPrint("Failed to activate activity:", error)
-            }
-        }
+    // MARK: - Listen for Sessions (runs from app launch)
 
-        // Listen for incoming sessions
-        let task = Task {
+    private func listenForSessions() {
+        sessionTask = Task {
             for await session in HandStrudelActivity.sessions() {
                 await configureSession(session)
             }
         }
-        tasks.insert(task)
+    }
+
+    // MARK: - Start Session (user presses button)
+
+    func startSession() {
+        let activity = HandStrudelActivity()
+        Task {
+            switch await activity.prepareForActivation() {
+            case .activationPreferred:
+                do {
+                    _ = try await activity.activate()
+                } catch {
+                    debugPrint("Failed to activate activity:", error)
+                }
+            case .activationDisabled:
+                debugPrint("SharePlay is disabled")
+            case .cancelled:
+                debugPrint("SharePlay activation cancelled")
+            @unknown default:
+                break
+            }
+        }
     }
 
     private func configureSession(_ session: GroupSession<HandStrudelActivity>) async {
+        // Clean up old session
+        self.session?.leave()
+        self.subscriptions.removeAll()
+
         self.session = session
         let messenger = GroupSessionMessenger(session: session)
         self.messenger = messenger
 
         // Track participants
         session.$activeParticipants
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] participants in
                 self?.participants = participants.map { $0.id.description }
-                self?.isActive = !participants.isEmpty
+                self?.isActive = participants.count > 0
+            }
+            .store(in: &subscriptions)
+
+        session.$state
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                if case .invalidated = state {
+                    self?.isActive = false
+                    self?.participants = []
+                }
             }
             .store(in: &subscriptions)
 
         // Listen for messages
-        let receiveTask = Task {
+        Task {
             for await (message, _) in messenger.messages(of: JamMessage.self) {
-                handleRemoteMessage(message)
+                await MainActor.run {
+                    handleRemoteMessage(message)
+                }
             }
         }
-        tasks.insert(receiveTask)
 
+        // Join the session
         session.join()
         isActive = true
     }
@@ -118,9 +150,7 @@ final class JamSessionManager: ObservableObject {
     // MARK: - Receive Events
 
     private func handleRemoteMessage(_ message: JamMessage) {
-        // Don't play back our own events
         guard message.senderId != String(deviceId) else { return }
-
         lastReceivedEvent = "\(message.senderName): \(eventDescription(message.event))"
         onRemoteEvent?(message.event)
     }
@@ -143,7 +173,5 @@ final class JamSessionManager: ObservableObject {
         isActive = false
         participants = []
         subscriptions.removeAll()
-        for task in tasks { task.cancel() }
-        tasks.removeAll()
     }
 }
