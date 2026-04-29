@@ -718,10 +718,14 @@ final class EngineController: ObservableObject {
         structTimer?.invalidate()
         structTimer = nil
 
-        // Audio/camera
+        // Audio/camera — kill all voices immediately
+        strudelBridge.noteOff(hand: "left")
+        strudelBridge.noteOff(hand: "right")
+        strudelBridge.noteOff(hand: "touch1")
+        strudelBridge.noteOff(hand: "touch2")
+        strudelBridge.stop()
         handTracker.stopSession()
         handTracker.onHandsUpdate = nil
-        strudelBridge.stop()
         strudelBridge.onBeat = nil
         strudelBridge.onLog = nil
 

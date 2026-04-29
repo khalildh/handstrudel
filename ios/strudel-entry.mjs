@@ -115,7 +115,13 @@ window.hydraEval = function(code) {
     catch (e) { log('hydra eval: ' + e); }
 };
 
-window.strudelStop = function() { if (_stop) _stop(); };
+window.strudelStop = function() {
+    if (_stop) _stop();
+    // Kill all active Web Audio voices
+    for (const hand of Object.keys(window._voices || {})) {
+        window.noteOff(hand);
+    }
+};
 
 // Instant one-shot drum hit via Web Audio (bypasses Strudel scheduler for zero latency)
 window.playHit = function(type) {

@@ -19545,6 +19545,9 @@ registerProcessor('${n2}', MyProcessor);
   };
   window.strudelStop = function() {
     if (_stop) _stop();
+    for (const hand of Object.keys(window._voices || {})) {
+      window.noteOff(hand);
+    }
   };
   window.playHit = function(type) {
     if (!_audioCtx) return;
