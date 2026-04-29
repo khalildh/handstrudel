@@ -490,11 +490,20 @@ final class EngineController: ObservableObject {
 
     // MARK: - Drum Code Helpers (shared by all modes)
 
+    // Cached to avoid 60fps string allocation
+    private var _cachedDrumKey = ""
+    private var _lastDrumIds = ("", "")
+    private var _lastDrumVals = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
     private var drumStateKey: String {
-        let k1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.0f", drumVolume, drumBPM))"
-        let k2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.0f", drumVolume2, drumBPM2))"
-        let ci = String(format: "%.1f|%.1f", drumComplexity, drumIntensity)
-        return "\(k1)|\(k2)|\(ci)"
+        let ids = (selectedDrumLoop.id, selectedDrumLoop2.id)
+        let vals = (drumVolume, drumBPM, drumVolume2, drumBPM2, drumComplexity, drumIntensity)
+        if ids != _lastDrumIds || vals != _lastDrumVals {
+            _lastDrumIds = ids
+            _lastDrumVals = vals
+            _cachedDrumKey = "\(ids.0)|\(vals.0)|\(vals.1)|\(ids.1)|\(vals.2)|\(vals.3)|\(vals.4)|\(vals.5)"
+        }
+        return _cachedDrumKey
     }
 
     private func buildDrumCodeParts() -> [String] {
@@ -543,7 +552,8 @@ final class EngineController: ObservableObject {
         }
 
         // UI sync at ~15fps
-        uiTimer = Timer.scheduledTimer(withTimeInterval: 0.066, repeats: true) { [weak self] _ in
+        // UI sync at ~8fps (enough for visual meters, reduces SwiftUI rebuilds)
+        uiTimer = Timer.scheduledTimer(withTimeInterval: 0.125, repeats: true) { [weak self] _ in
             guard let self else { return }
             let s = self.smoothed
             let notes = self.cachedScaleNotes

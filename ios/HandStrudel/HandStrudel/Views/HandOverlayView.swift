@@ -27,11 +27,12 @@ class HandCanvasView: UIView {
     var handsState = HandsState()
     var videoAspect: CGFloat = 0.75
 
-    // Motion trails — store recent positions for each fingertip + wrist
-    // Key: "left_4" = left hand thumb tip, "right_0" = right wrist, etc.
+    // Motion trails — fixed-size ring buffers per tracked point
     private var trails: [String: [TrailPoint]] = [:]
-    private let trailDuration: TimeInterval = 0.8  // how long trails last (seconds)
-    private let trackedPoints = [0, 4, 8, 12, 16, 20]  // wrist + 5 fingertips
+    private var trailWriteIdx: [String: Int] = [:]
+    private let trailDuration: TimeInterval = 0.8
+    private let maxTrailPoints = 48  // ~0.8s at 60fps
+    private let trackedPoints = [0, 4, 8, 12, 16, 20]
 
     private let connections: [(Int, Int)] = [
         (0, 1), (1, 2), (2, 3), (3, 4),
@@ -46,24 +47,22 @@ class HandCanvasView: UIView {
         handsState = hands
         let now = CACurrentMediaTime()
 
-        // Record trail points for each tracked landmark
+        // Record trail points using ring buffer (no pruning needed)
         for (side, hand) in [("left", hands.left), ("right", hands.right)] {
             guard let hand else { continue }
             for idx in trackedPoints where idx < hand.landmarks.count {
                 let key = "\(side)_\(idx)"
                 let lm = hand.landmarks[idx]
-                let pt = TrailPoint(
-                    position: CGPoint(x: lm.x, y: lm.y),
-                    timestamp: now
-                )
-                trails[key, default: []].append(pt)
-            }
-        }
+                let pt = TrailPoint(position: CGPoint(x: lm.x, y: lm.y), timestamp: now)
 
-        // Prune old trail points
-        let cutoff = now - trailDuration
-        for key in trails.keys {
-            trails[key]?.removeAll { $0.timestamp < cutoff }
+                if trails[key] == nil {
+                    trails[key] = Array(repeating: pt, count: maxTrailPoints)
+                    trailWriteIdx[key] = 0
+                }
+                let writePos = trailWriteIdx[key] ?? 0
+                trails[key]?[writePos] = pt
+                trailWriteIdx[key] = (writePos + 1) % maxTrailPoints
+            }
         }
 
         setNeedsDisplay()
