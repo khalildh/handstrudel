@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var filterName: String = ""
     @State private var showFilterName = false
     @State private var showJamAlert = false
+    @State private var showRandomizedToast = false
 
     var body: some View {
         ZStack {
@@ -53,8 +54,30 @@ struct ContentView: View {
 
     // MARK: - Performance View
 
+    private func randomizeSettings() {
+        let allKeys = MusicKey.allCases
+        let allScales = Scale.allCases
+        let waveformIds = WAVEFORMS.map(\.id)
+
+        engine.selectedKey = allKeys.randomElement() ?? .C
+        engine.selectedScale = allScales.randomElement() ?? .pentatonic
+        engine.selectedWaveform = waveformIds.randomElement() ?? "sawtooth"
+        engine.manualBPM = Double(Int.random(in: 80...160))
+        engine.recomputeScaleNotes()
+
+        withAnimation(.easeOut(duration: 0.2)) { showRandomizedToast = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            withAnimation(.easeOut(duration: 0.3)) { showRandomizedToast = false }
+        }
+    }
+
     private var performanceView: some View {
         ZStack {
+            // Shake-to-randomize detector
+            ShakeDetectorView { randomizeSettings() }
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+
             // Full-screen camera with filter
             ZStack {
                 CameraView(handTracker: engine.handTracker)
@@ -144,6 +167,17 @@ struct ContentView: View {
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
                         .background(Capsule().fill(Color.black.opacity(0.5)))
+                        .transition(.opacity)
+                }
+
+                // Shake-to-randomize toast
+                if showRandomizedToast {
+                    Text("\u{1F3B2} Randomized!")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(Color.purple.opacity(0.6)))
                         .transition(.opacity)
                 }
             }
@@ -1597,6 +1631,31 @@ struct ControlSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Shake Detector
+
+struct ShakeDetectorView: UIViewControllerRepresentable {
+    let onShake: () -> Void
+
+    class ShakeVC: UIViewController {
+        var onShake: (() -> Void)?
+        override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+            if motion == .motionShake { onShake?() }
+            super.motionEnded(motion, with: event)
+        }
+        override var canBecomeFirstResponder: Bool { true }
+    }
+
+    func makeUIViewController(context: Context) -> ShakeVC {
+        let vc = ShakeVC()
+        vc.onShake = onShake
+        return vc
+    }
+
+    func updateUIViewController(_ vc: ShakeVC, context: Context) {
+        vc.onShake = onShake
     }
 }
 

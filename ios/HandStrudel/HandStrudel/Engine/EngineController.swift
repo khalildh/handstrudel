@@ -38,6 +38,7 @@ private func debugLog(_ msg: String) {
 final class EngineController: ObservableObject {
     let handTracker = HandTrackingManager()
     let strudelBridge = StrudelBridge()
+    let haptics = HapticManager()
     private let saveDetector = SaveGestureDetector()
 
     // Configuration
@@ -214,7 +215,12 @@ final class EngineController: ObservableObject {
                 // Beat callback
                 strudelBridge.onBeat = { [weak self] beat in
                     DispatchQueue.main.async {
-                        self?.currentBeat = beat
+                        guard let self else { return }
+                        let oldBeat = self.currentBeat
+                        self.currentBeat = beat
+                        if beat != oldBeat {
+                            self.haptics.beatPulse(isDownbeat: beat == 0)
+                        }
                     }
                 }
 
@@ -305,6 +311,7 @@ final class EngineController: ObservableObject {
             switch action {
             case .noteOn(let hand, let midi, let name, let vel):
                 strudelBridge.noteOn(hand: hand, midi: midi, waveform: selectedWaveform, velocity: vel)
+                haptics.noteTrigger()
                 lastGridNote = name
                 loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel), currentTime: elapsed)
                 jamSession.sendEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel))
@@ -331,6 +338,7 @@ final class EngineController: ObservableObject {
         let hits = drumModeManager.checkHits(hands: currentHands, currentTime: elapsed)
         for hitType in hits {
             strudelBridge.playHit(hitType)
+            haptics.drumHit()
             lastDrumHit = hitType
             loopRecorder.recordEvent(.drumHit(hitType: hitType), currentTime: elapsed)
             jamSession.sendEvent(.drumHit(hitType: hitType))

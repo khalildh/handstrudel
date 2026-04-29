@@ -11,13 +11,16 @@
 		0AABB3564BB7F0F7CD594B81 /* strudel-bundle.js in Resources */ = {isa = PBXBuildFile; fileRef = 0566FE6FEDB28D58639FD392 /* strudel-bundle.js */; };
 		195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B0EF83FDEC95F58B860F5A /* HandMapper.swift */; };
 		1D40AE3AA1F2B1FA4B31CBB2 /* StoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15B500CE35D9D44107CDAC4 /* StoreView.swift */; };
+		1EE6860496AAB0772E65E97D /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */; };
 		1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */; };
 		204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 938A00F6A5044E13D981C663 /* EngineController.swift */; };
 		25A87740F4DA10D91C739E18 /* JamSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2105F77EC139355C8EC8FB3D /* JamSession.swift */; };
 		2FC5D55810AF0B87923E355B /* ParamSmoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */; };
+		31732217DB10380B3787DE51 /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */; };
 		375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D986625C7BF30952FBAED619 /* OnboardingView.swift */; };
 		380966C71A0162507C985C6C /* StartOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74287CD261130ADF57405FF3 /* StartOverlayView.swift */; };
 		39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */; };
+		3A9EDA3981D97A38C0BD9C52 /* MotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60006BC6A28FE1029F6097F /* MotionManager.swift */; };
 		3FDADBDC4BFF18F21A29F680 /* LoopRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EE16108C9368E03A5293FC /* LoopRecorder.swift */; };
 		467B330FAF19DF881621A97A /* MappingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */; };
 		575A0CD71B422DFD7ACB6FDF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */; };
@@ -54,6 +57,7 @@
 		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
+		11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
 		15EE16108C9368E03A5293FC /* LoopRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopRecorder.swift; sourceTree = "<group>"; };
 		18B0EF83FDEC95F58B860F5A /* HandMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandMapper.swift; sourceTree = "<group>"; };
 		2105F77EC139355C8EC8FB3D /* JamSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamSession.swift; sourceTree = "<group>"; };
@@ -75,6 +79,8 @@
 		ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HandStrudel.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE98AF54FEB607CE395267C8 /* CameraFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraFilter.swift; sourceTree = "<group>"; };
 		AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeManager.swift; sourceTree = "<group>"; };
+		B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
+		B60006BC6A28FE1029F6097F /* MotionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionManager.swift; sourceTree = "<group>"; };
 		B7C5E8B642D49636F852D200 /* hydra-synth.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "hydra-synth.js"; sourceTree = "<group>"; };
 		BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "strudel-engine.html"; sourceTree = "<group>"; };
 		C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTrackingManager.swift; sourceTree = "<group>"; };
@@ -124,8 +130,11 @@
 				F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */,
 				18B0EF83FDEC95F58B860F5A /* HandMapper.swift */,
 				C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */,
+				B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */,
 				2105F77EC139355C8EC8FB3D /* JamSession.swift */,
+				11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */,
 				15EE16108C9368E03A5293FC /* LoopRecorder.swift */,
+				B60006BC6A28FE1029F6097F /* MotionManager.swift */,
 				925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */,
 				6C89256347633541234267B8 /* SaveGestureDetector.swift */,
 				FDDA338219566335AD58643B /* StrudelBridge.swift */,
@@ -296,10 +305,13 @@
 				A380AD271A6485FF679B0DCD /* HandOverlayView.swift in Sources */,
 				D2520D85FD921167AEA6EB1C /* HandStrudelApp.swift in Sources */,
 				C9D0CB8C617776591C669A1D /* HandTrackingManager.swift in Sources */,
+				1EE6860496AAB0772E65E97D /* HapticManager.swift in Sources */,
 				25A87740F4DA10D91C739E18 /* JamSession.swift in Sources */,
+				31732217DB10380B3787DE51 /* LiveActivityManager.swift in Sources */,
 				EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */,
 				3FDADBDC4BFF18F21A29F680 /* LoopRecorder.swift in Sources */,
 				467B330FAF19DF881621A97A /* MappingConfig.swift in Sources */,
+				3A9EDA3981D97A38C0BD9C52 /* MotionManager.swift in Sources */,
 				F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */,
 				375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */,
 				9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */,
