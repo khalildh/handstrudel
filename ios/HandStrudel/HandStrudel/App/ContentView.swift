@@ -1048,7 +1048,7 @@ struct ControlSheet: View {
                     label: "DRUMS 1",
                     loop: $engine.selectedDrumLoop,
                     volume: $engine.drumVolume,
-                    speed: $engine.drumSpeed
+                    bpm: $engine.drumBPM
                 )
 
                 sectionDivider
@@ -1056,7 +1056,7 @@ struct ControlSheet: View {
                     label: "DRUMS 2",
                     loop: $engine.selectedDrumLoop2,
                     volume: $engine.drumVolume2,
-                    speed: $engine.drumSpeed2
+                    bpm: $engine.drumBPM2
                 )
 
                 sectionDivider
@@ -1393,7 +1393,7 @@ struct ControlSheet: View {
 
     // MARK: - Drums
 
-    private func drumTrackSection(label: String, loop: Binding<DrumLoop>, volume: Binding<Double>, speed: Binding<Double>) -> some View {
+    private func drumTrackSection(label: String, loop: Binding<DrumLoop>, volume: Binding<Double>, bpm: Binding<Double>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(label, icon: "drum")
 
@@ -1461,13 +1461,13 @@ struct ControlSheet: View {
                 }
 
                 HStack(spacing: 8) {
-                    Text("SPD")
+                    Text("BPM")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 28)
-                    Slider(value: speed, in: 0.25...4.0, step: 0.25)
+                    Slider(value: bpm, in: 40...240, step: 1)
                         .tint(.green)
-                    Text(String(format: "%.2gx", speed.wrappedValue))
+                    Text("\(Int(bpm.wrappedValue.rounded()))")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
                         .frame(width: 35, alignment: .trailing)

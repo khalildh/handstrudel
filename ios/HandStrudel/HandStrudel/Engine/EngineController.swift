@@ -100,12 +100,12 @@ final class EngineController: ObservableObject {
     @Published var selectedWaveform: String = "sawtooth"
     @Published var selectedDrumLoop: DrumLoop = DRUM_LOOPS[0]
     @Published var drumVolume: Double = 1.0
-    @Published var drumSpeed: Double = 1.0
+    @Published var drumBPM: Double = 120
     @Published var selectedDrumLoop2: DrumLoop = DRUM_LOOPS[0]
     @Published var drumVolume2: Double = 1.0
-    @Published var drumComplexity: Double = 0.5  // 0 = simple, 1 = complex
-    @Published var drumIntensity: Double = 0.5   // 0 = soft, 1 = loud
-    @Published var drumSpeed2: Double = 1.0
+    @Published var drumBPM2: Double = 120
+    @Published var drumComplexity: Double = 0.5
+    @Published var drumIntensity: Double = 0.5
 
     // Harmony
     @Published var selectedKey: MusicKey = .C
@@ -491,33 +491,32 @@ final class EngineController: ObservableObject {
     // MARK: - Drum Code Helpers (shared by all modes)
 
     private var drumStateKey: String {
-        let k1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.1f", drumVolume, drumSpeed))"
-        let k2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.1f", drumVolume2, drumSpeed2))"
+        let k1 = "\(selectedDrumLoop.id)|\(String(format: "%.1f|%.0f", drumVolume, drumBPM))"
+        let k2 = "\(selectedDrumLoop2.id)|\(String(format: "%.1f|%.0f", drumVolume2, drumBPM2))"
         let ci = String(format: "%.1f|%.1f", drumComplexity, drumIntensity)
         return "\(k1)|\(k2)|\(ci)"
     }
 
     private func buildDrumCodeParts() -> [String] {
-        // Complexity affects speed multiplier (simple=1x, complex=2-4x for hats)
-        // Intensity affects gain
-        let intensityGain = 0.3 + drumIntensity * 1.2  // 0.3 to 1.5
-        let complexitySpeed = 1.0 + drumComplexity * 2.0  // 1x to 3x
+        let intensityGain = 0.3 + drumIntensity * 1.2
+        let complexitySpeed = 1.0 + drumComplexity * 2.0
 
         var parts: [String] = []
         var code1 = selectedDrumLoop.code
         if !code1.isEmpty {
             let vol = drumVolume * intensityGain
             code1 = "(\(code1)).gain(\(String(format: "%.2f", vol)))"
-            let spd = drumSpeed * complexitySpeed
-            if spd != 1.0 { code1 = "(\(code1)).fast(\(String(format: "%.1f", spd)))" }
+            // BPM via cpm (cycles per minute = BPM / 4)
+            let cpm1 = drumBPM / 4.0 * complexitySpeed
+            code1 = "(\(code1)).cpm(\(String(format: "%.1f", cpm1)))"
             parts.append(code1)
         }
         var code2 = selectedDrumLoop2.code
         if !code2.isEmpty {
             let vol = drumVolume2 * intensityGain
             code2 = "(\(code2)).gain(\(String(format: "%.2f", vol)))"
-            let spd = drumSpeed2 * complexitySpeed
-            if spd != 1.0 { code2 = "(\(code2)).fast(\(String(format: "%.1f", spd)))" }
+            let cpm2 = drumBPM2 / 4.0 * complexitySpeed
+            code2 = "(\(code2)).cpm(\(String(format: "%.1f", cpm2)))"
             parts.append(code2)
         }
         return parts
