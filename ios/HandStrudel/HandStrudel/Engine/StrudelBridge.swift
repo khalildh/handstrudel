@@ -189,6 +189,10 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         webView.evaluateJavaScript("playHit('\(type)')", completionHandler: nil)
     }
 
+    func updateDrumParams(intensity: Double, complexity: Double) {
+        webView.evaluateJavaScript("_drumIntensity=\(String(format: "%.2f", intensity));_drumComplexity=\(String(format: "%.2f", complexity))", completionHandler: nil)
+    }
+
     func noteOn(hand: String, midi: Int, waveform: String = "sawtooth", velocity: Double = 0.6) {
         webView.evaluateJavaScript("noteOn('\(hand)',\(midi),'\(waveform)',\(String(format: "%.2f", velocity)))", completionHandler: nil)
     }

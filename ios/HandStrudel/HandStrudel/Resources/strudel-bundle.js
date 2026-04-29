@@ -19549,26 +19549,45 @@ registerProcessor('${n2}', MyProcessor);
       window.noteOff(hand);
     }
   };
+  window._drumIntensity = 0.5;
+  window._drumComplexity = 0.5;
   window.playHit = function(type) {
     if (!_audioCtx) return;
     const now = _audioCtx.currentTime;
+    const vol = 0.3 + window._drumIntensity * 1.2;
+    const decay = 0.8 + window._drumComplexity * 1.5;
+    const pitchVar = 1 + (window._drumComplexity - 0.5) * 0.3;
     const gain = _audioCtx.createGain();
+    if (window._drumComplexity > 0.3) {
+      const delay = _audioCtx.createDelay();
+      delay.delayTime.value = 0.08 + window._drumComplexity * 0.12;
+      const fb = _audioCtx.createGain();
+      fb.gain.value = window._drumComplexity * 0.4;
+      const wetGain = _audioCtx.createGain();
+      wetGain.gain.value = window._drumComplexity * 0.3;
+      gain.connect(delay);
+      delay.connect(fb);
+      fb.connect(delay);
+      delay.connect(wetGain);
+      wetGain.connect(_audioCtx.destination);
+    }
     gain.connect(_audioCtx.destination);
     switch (type) {
       case "kick": {
         const osc = _audioCtx.createOscillator();
         osc.type = "sine";
-        osc.frequency.setValueAtTime(150, now);
-        osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
-        gain.gain.setValueAtTime(1.2, now);
-        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.3);
+        osc.frequency.setValueAtTime(150 * pitchVar, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.15 * decay);
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.3 * decay);
         osc.connect(gain);
         osc.start(now);
-        osc.stop(now + 0.3);
+        osc.stop(now + 0.5 * decay);
         break;
       }
       case "snare": {
-        const bufSize = _audioCtx.sampleRate * 0.12;
+        const dur = 0.12 * decay;
+        const bufSize = _audioCtx.sampleRate * dur;
         const buf = _audioCtx.createBuffer(1, bufSize, _audioCtx.sampleRate);
         const data = buf.getChannelData(0);
         for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
@@ -19576,31 +19595,32 @@ registerProcessor('${n2}', MyProcessor);
         noise.buffer = buf;
         const hpf = _audioCtx.createBiquadFilter();
         hpf.type = "highpass";
-        hpf.frequency.value = 1e3;
+        hpf.frequency.value = 800 + (1 - window._drumComplexity) * 400;
         const lpf = _audioCtx.createBiquadFilter();
         lpf.type = "lowpass";
-        lpf.frequency.value = 6e3;
-        gain.gain.setValueAtTime(0.8, now);
-        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.12);
+        lpf.frequency.value = 4e3 + window._drumIntensity * 4e3;
+        gain.gain.setValueAtTime(vol * 0.7, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + dur);
         noise.connect(hpf);
         hpf.connect(lpf);
         lpf.connect(gain);
         noise.start(now);
-        noise.stop(now + 0.12);
+        noise.stop(now + dur + 0.1);
         const osc = _audioCtx.createOscillator();
         const g22 = _audioCtx.createGain();
         g22.connect(_audioCtx.destination);
         osc.type = "triangle";
-        osc.frequency.value = 160;
-        g22.gain.setValueAtTime(0.5, now);
-        g22.gain.exponentialRampToValueAtTime(1e-3, now + 0.08);
+        osc.frequency.value = 160 * pitchVar;
+        g22.gain.setValueAtTime(vol * 0.4, now);
+        g22.gain.exponentialRampToValueAtTime(1e-3, now + 0.08 * decay);
         osc.connect(g22);
         osc.start(now);
-        osc.stop(now + 0.08);
+        osc.stop(now + 0.15 * decay);
         break;
       }
       case "hihat": {
-        const bufSize = _audioCtx.sampleRate * 0.03;
+        const dur = (0.02 + window._drumComplexity * 0.08) * decay;
+        const bufSize = _audioCtx.sampleRate * dur;
         const buf = _audioCtx.createBuffer(1, bufSize, _audioCtx.sampleRate);
         const data = buf.getChannelData(0);
         for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
@@ -19608,17 +19628,18 @@ registerProcessor('${n2}', MyProcessor);
         noise.buffer = buf;
         const hpf = _audioCtx.createBiquadFilter();
         hpf.type = "highpass";
-        hpf.frequency.value = 8e3;
-        gain.gain.setValueAtTime(0.4, now);
-        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.03);
+        hpf.frequency.value = 6e3 + (1 - window._drumComplexity) * 4e3;
+        gain.gain.setValueAtTime(vol * 0.35, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + dur);
         noise.connect(hpf);
         hpf.connect(gain);
         noise.start(now);
-        noise.stop(now + 0.03);
+        noise.stop(now + dur + 0.1);
         break;
       }
       case "crash": {
-        const bufSize = _audioCtx.sampleRate * 0.2;
+        const dur = (0.15 + window._drumComplexity * 0.3) * decay;
+        const bufSize = _audioCtx.sampleRate * dur;
         const buf = _audioCtx.createBuffer(1, bufSize, _audioCtx.sampleRate);
         const data = buf.getChannelData(0);
         for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
@@ -19626,17 +19647,18 @@ registerProcessor('${n2}', MyProcessor);
         noise.buffer = buf;
         const hpf = _audioCtx.createBiquadFilter();
         hpf.type = "highpass";
-        hpf.frequency.value = 5e3;
-        gain.gain.setValueAtTime(0.5, now);
-        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.2);
+        hpf.frequency.value = 4e3;
+        gain.gain.setValueAtTime(vol * 0.5, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + dur);
         noise.connect(hpf);
         hpf.connect(gain);
         noise.start(now);
-        noise.stop(now + 0.2);
+        noise.stop(now + dur + 0.1);
         break;
       }
       case "ride": {
-        const bufSize = _audioCtx.sampleRate * 0.15;
+        const dur = (0.1 + window._drumComplexity * 0.15) * decay;
+        const bufSize = _audioCtx.sampleRate * dur;
         const buf = _audioCtx.createBuffer(1, bufSize, _audioCtx.sampleRate);
         const data = buf.getChannelData(0);
         for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
@@ -19644,26 +19666,26 @@ registerProcessor('${n2}', MyProcessor);
         noise.buffer = buf;
         const bpf = _audioCtx.createBiquadFilter();
         bpf.type = "bandpass";
-        bpf.frequency.value = 6e3;
-        bpf.Q.value = 2;
-        gain.gain.setValueAtTime(0.35, now);
-        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.15);
+        bpf.frequency.value = 5e3 + window._drumComplexity * 2e3;
+        bpf.Q.value = 1 + window._drumComplexity * 3;
+        gain.gain.setValueAtTime(vol * 0.35, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + dur);
         noise.connect(bpf);
         bpf.connect(gain);
         noise.start(now);
-        noise.stop(now + 0.15);
+        noise.stop(now + dur + 0.1);
         break;
       }
       case "tom": {
         const osc = _audioCtx.createOscillator();
         osc.type = "sine";
-        osc.frequency.setValueAtTime(100, now);
-        osc.frequency.exponentialRampToValueAtTime(50, now + 0.15);
-        gain.gain.setValueAtTime(0.9, now);
-        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.2);
+        osc.frequency.setValueAtTime(100 * pitchVar, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 0.15 * decay);
+        gain.gain.setValueAtTime(vol * 0.9, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.2 * decay);
         osc.connect(gain);
         osc.start(now);
-        osc.stop(now + 0.2);
+        osc.stop(now + 0.4 * decay);
         break;
       }
     }

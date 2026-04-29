@@ -336,6 +336,8 @@ final class EngineController: ObservableObject {
     }
 
     private func tickDrumMode() {
+        // Sync XY pad values to Web Audio
+        strudelBridge.updateDrumParams(intensity: drumIntensity, complexity: drumComplexity)
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         let hits = drumModeManager.checkHits(hands: currentHands, currentTime: elapsed)
         for hitType in hits {
