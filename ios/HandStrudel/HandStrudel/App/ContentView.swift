@@ -151,8 +151,17 @@ struct ContentView: View {
                     .padding(.top, 8)
 
                 // Logo
-                logoMark
-                    .padding(.top, 2)
+                if !engine.drumModeEnabled {
+                    logoMark
+                        .padding(.top, 2)
+                }
+
+                // Drum XY pad (top area, out of the way of drum pads)
+                if engine.drumModeEnabled {
+                    drumXYPad
+                        .padding(.horizontal, 16)
+                        .padding(.top, 2)
+                }
 
                 // Jam session indicator
                 if engine.jamSession.isActive && !engine.jamSession.lastReceivedEvent.isEmpty {
@@ -184,13 +193,6 @@ struct ContentView: View {
                 // Grid quick controls (range + octave)
                 if engine.gridModeEnabled {
                     gridQuickBar
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 4)
-                }
-
-                // Drum XY pad (complexity + intensity)
-                if engine.drumModeEnabled {
-                    drumXYPad
                         .padding(.horizontal, 16)
                         .padding(.bottom, 4)
                 }
