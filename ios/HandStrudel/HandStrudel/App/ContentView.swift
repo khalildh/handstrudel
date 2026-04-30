@@ -857,9 +857,10 @@ struct ContentView: View {
                 // Scrolling note indicators (right to left)
                 ForEach(engine.songPlayer.visibleNotes(lookAhead: lookAhead), id: \.index) { entry in
                     let relativeTime = entry.note.time - engine.songPlayer.songTime
-                    // Notes scroll from right to left
-                    let xProgress = 1.0 - (relativeTime / lookAhead)
-                    let noteX: CGFloat = hitLineX + CGFloat(xProgress) * (geo.size.width - hitLineX)
+                    // Notes start at right edge, scroll left toward hit line
+                    // relativeTime = lookAhead → right edge, relativeTime = 0 → hit line
+                    let xFraction = CGFloat(relativeTime / lookAhead)
+                    let noteX: CGFloat = hitLineX + xFraction * (geo.size.width - hitLineX)
 
                     // Find which row this note belongs to
                     let noteIdx = notes.firstIndex(of: entry.note.midi) ?? 0
