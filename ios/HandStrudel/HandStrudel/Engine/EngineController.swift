@@ -118,6 +118,47 @@ final class EngineController: ObservableObject {
     private var cachedScaleNotes: [Int] = scaleNotes(key: .C, scale: .pentatonic)
     private var lastHarmonyKey = ""
 
+    // MARK: - Persistence
+
+    init() {
+        loadPersistedState()
+    }
+
+    private func loadPersistedState() {
+        let pm = PersistenceManager.shared
+
+        // Restore settings
+        if let key = MusicKey(rawValue: pm.lastKey) {
+            selectedKey = key
+        }
+        if let scale = Scale(rawValue: pm.lastScale) {
+            selectedScale = scale
+        }
+        selectedWaveform = pm.lastWaveform
+        manualBPM = pm.lastBPM
+        gridBaseOctave = pm.lastGridBaseOctave
+        gridOctaveRange = pm.lastGridOctaveRange
+
+        // Restore mode
+        switch pm.lastMode {
+        case "grid": gridModeEnabled = true
+        case "drum": drumModeEnabled = true
+        default: break // melodic is the default
+        }
+
+        // Restore camera filter
+        if let filter = CAMERA_FILTERS.first(where: { $0.id == pm.lastFilterId }) {
+            selectedFilter = filter
+        }
+
+        // Restore saved data
+        savedLoops = pm.loadLoops()
+        savedSnippets = pm.loadSnippets()
+
+        // Recompute cached scale notes for restored key/scale
+        recomputeScaleNotes()
+    }
+
     func recomputeScaleNotes() {
         cachedScaleNotes = scaleNotes(key: selectedKey, scale: selectedScale)
     }
@@ -738,6 +779,22 @@ final class EngineController: ObservableObject {
     }
 
     func stop() {
+        // Persist state before teardown
+        let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
+        PersistenceManager.shared.saveEngineState(
+            presetId: nil,
+            mode: mode,
+            key: selectedKey.rawValue,
+            scale: selectedScale.rawValue,
+            waveform: selectedWaveform,
+            bpm: manualBPM,
+            filterId: selectedFilter.id,
+            gridBaseOctave: gridBaseOctave,
+            gridOctaveRange: gridOctaveRange
+        )
+        PersistenceManager.shared.saveLoops(savedLoops)
+        PersistenceManager.shared.saveSnippets(savedSnippets)
+
         // Timers
         displayLink?.invalidate()
         displayLink = nil
