@@ -827,7 +827,7 @@ struct ContentView: View {
                     .frame(width: 3)
                     .position(x: hitLineX, y: geo.size.height / 2)
 
-                // Lane labels + tap targets on the left
+                // Full-width tap lanes
                 VStack(spacing: 0) {
                     Spacer().frame(height: topPad)
                     ForEach(0..<laneCount, id: \.self) { i in
@@ -835,21 +835,30 @@ struct ContentView: View {
                         let midi = noteIdx < notes.count ? notes[noteIdx] : 60
                         let name = midiNoteName(midi)
 
-                        Text(name)
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.4))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                            .padding(.leading, 6)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                // Tap to hit — play the note and check score
-                                engine.strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.7, duration: 0.3)
-                                engine.haptics.noteTrigger()
-                                let hit = engine.songPlayer.checkHit(midi: midi)
-                                if hit {
-                                    engine.haptics.drumHit() // extra feedback for hits
-                                }
+                        // Check if this lane has an active note near the hit line
+                        let hasActiveNote = engine.songPlayer.visibleNotes(lookAhead: lookAhead).contains {
+                            $0.note.midi == midi && !$0.isHit && abs($0.note.time - engine.songPlayer.songTime) <= engine.songPlayer.hitWindow
+                        }
+
+                        HStack(spacing: 0) {
+                            Text(name)
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundColor(hasActiveNote ? .cyan : .white.opacity(0.3))
+                                .frame(width: 35)
+                            Rectangle()
+                                .fill(Color.white.opacity(i % 2 == 0 ? 0.02 : 0.0))
+                        }
+                        .frame(maxHeight: .infinity)
+                        .background(hasActiveNote ? Color.cyan.opacity(0.1) : Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            engine.strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.7, duration: 0.3)
+                            engine.haptics.noteTrigger()
+                            let hit = engine.songPlayer.checkHit(midi: midi)
+                            if hit {
+                                engine.haptics.drumHit()
                             }
+                        }
                     }
                     Spacer()
                 }

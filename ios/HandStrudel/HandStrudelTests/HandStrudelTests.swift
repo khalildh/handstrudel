@@ -940,3 +940,135 @@ final class DrumModeManagerTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Song Player Tests
+
+@MainActor
+final class SongPlayerTests: XCTestCase {
+
+    func testStartSong_setsInitialState() {
+        let player = SongPlayer()
+        let song = BUILT_IN_SONGS[0]
+        player.startSong(song)
+        XCTAssertTrue(player.isPlaying)
+        XCTAssertEqual(player.songTime, -2.0)
+        XCTAssertEqual(player.score, 0)
+        XCTAssertEqual(player.combo, 0)
+        XCTAssertEqual(player.totalNotes, song.notes.count)
+        XCTAssertEqual(player.hitNotes, 0)
+    }
+
+    func testTick_advancesSongTime() {
+        let player = SongPlayer()
+        player.startSong(BUILT_IN_SONGS[0])
+        let initial = player.songTime
+        player.tick(deltaTime: 0.1)
+        XCTAssertEqual(player.songTime, initial + 0.1, accuracy: 0.001)
+    }
+
+    func testTick_doesNothingWhenNotPlaying() {
+        let player = SongPlayer()
+        player.tick(deltaTime: 0.1)
+        XCTAssertEqual(player.songTime, 0)
+    }
+
+    func testCheckHit_matchesCorrectNote() {
+        let player = SongPlayer()
+        player.startSong(BUILT_IN_SONGS[0])
+        // Advance 2 seconds to songTime = 0.0
+        for _ in 0..<120 { player.tick(deltaTime: 1.0/60.0) }
+        let hit = player.checkHit(midi: 60)
+        XCTAssertTrue(hit)
+        XCTAssertEqual(player.hitNotes, 1)
+        XCTAssertEqual(player.combo, 1)
+        XCTAssertGreaterThan(player.score, 0)
+    }
+
+    func testCheckHit_wrongNoteBreaksCombo() {
+        let player = SongPlayer()
+        player.startSong(BUILT_IN_SONGS[0])
+        for _ in 0..<120 { player.tick(deltaTime: 1.0/60.0) }
+        _ = player.checkHit(midi: 60)
+        XCTAssertEqual(player.combo, 1)
+        let miss = player.checkHit(midi: 99)
+        XCTAssertFalse(miss)
+        XCTAssertEqual(player.combo, 0)
+    }
+
+    func testCheckHit_outsideWindowMisses() {
+        let player = SongPlayer()
+        player.startSong(BUILT_IN_SONGS[0])
+        // songTime = -2.0, first note at 0.0, diff = 2.0 > hitWindow
+        let hit = player.checkHit(midi: 60)
+        XCTAssertFalse(hit)
+    }
+
+    func testCheckHit_cannotHitSameNoteTwice() {
+        let player = SongPlayer()
+        player.startSong(BUILT_IN_SONGS[0])
+        for _ in 0..<120 { player.tick(deltaTime: 1.0/60.0) }
+        _ = player.checkHit(midi: 60)
+        let hit2 = player.checkHit(midi: 60)
+        XCTAssertFalse(hit2)
+        XCTAssertEqual(player.hitNotes, 1)
+    }
+
+    func testVisibleNotes_returnsUpcoming() {
+        let player = SongPlayer()
+        player.startSong(BUILT_IN_SONGS[0])
+        for _ in 0..<120 { player.tick(deltaTime: 1.0/60.0) }
+        let visible = player.visibleNotes(lookAhead: 3.0)
+        XCTAssertGreaterThan(visible.count, 0)
+    }
+
+    func testVisibleNotes_marksHit() {
+        let player = SongPlayer()
+        player.startSong(BUILT_IN_SONGS[0])
+        for _ in 0..<120 { player.tick(deltaTime: 1.0/60.0) }
+        _ = player.checkHit(midi: 60)
+        let visible = player.visibleNotes(lookAhead: 3.0)
+        let first = visible.first { $0.index == 0 }
+        XCTAssertTrue(first?.isHit ?? false)
+    }
+
+    func testSongEnds_afterLastNote() {
+        let player = SongPlayer()
+        let song = Song(id: "t", title: "T", artist: "T", key: "C", scale: "Major", bpm: 120,
+                       notes: [SongNote(midi: 60, time: 0.0, duration: 0.5)], isPremium: false)
+        player.startSong(song)
+        for _ in 0..<300 { player.tick(deltaTime: 1.0/60.0) }
+        XCTAssertFalse(player.isPlaying)
+    }
+
+    func testProgress() {
+        let player = SongPlayer()
+        let song = Song(id: "t", title: "T", artist: "T", key: "C", scale: "Major", bpm: 120,
+                       notes: [SongNote(midi: 60, time: 0.0, duration: 0.3),
+                               SongNote(midi: 62, time: 1.0, duration: 0.3)], isPremium: false)
+        player.startSong(song)
+        for _ in 0..<120 { player.tick(deltaTime: 1.0/60.0) }
+        _ = player.checkHit(midi: 60)
+        XCTAssertEqual(player.progress, 0.5, accuracy: 0.01)
+    }
+
+    func testStopSong() {
+        let player = SongPlayer()
+        player.startSong(BUILT_IN_SONGS[0])
+        player.stopSong()
+        XCTAssertFalse(player.isPlaying)
+        XCTAssertNil(player.currentSong)
+    }
+
+    func testBuiltInSongs_valid() {
+        for song in BUILT_IN_SONGS {
+            XCTAssertFalse(song.title.isEmpty)
+            XCTAssertFalse(song.notes.isEmpty)
+            XCTAssertGreaterThan(song.bpm, 0)
+            for note in song.notes {
+                XCTAssertTrue((0...127).contains(note.midi))
+                XCTAssertGreaterThanOrEqual(note.time, 0)
+                XCTAssertGreaterThan(note.duration, 0)
+            }
+        }
+    }
+}

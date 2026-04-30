@@ -15,7 +15,7 @@ final class SongPlayer: ObservableObject {
     private var hitNoteIndices = Set<Int>()
 
     // Timing window for a "hit" (seconds)
-    let hitWindow: Double = 0.3
+    let hitWindow: Double = 0.5  // generous window for casual play
 
     func startSong(_ song: Song) {
         currentSong = song
