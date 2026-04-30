@@ -793,7 +793,7 @@ struct ContentView: View {
             let lookAhead: Double = 2.5
 
             // Notes scroll from RIGHT to LEFT — tap the lane when the note reaches the left edge
-            let hitLineX = geo.size.width * 0.15
+            let hitLineX = geo.size.width * 0.45
 
             ZStack {
                 // Score and combo
