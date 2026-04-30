@@ -19,7 +19,9 @@ struct ContentView: View {
     @State private var filterName: String = ""
     @State private var showFilterName = false
     @State private var showJamAlert = false
+    @State private var watermarkView: UIView?
     @State private var showRandomizedToast = false
+    @State private var showSongResults = false
 
     var body: some View {
         ZStack {
@@ -137,6 +139,18 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
 
+            // Song mode falling notes overlay
+            if engine.songPlayer.isPlaying {
+                songOverlay
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+
+            // Song results overlay
+            if showSongResults {
+                songResultsOverlay
+            }
+
             // Drum zone overlay (tappable pads)
             if engine.drumModeEnabled {
                 drumZoneOverlay
@@ -249,6 +263,11 @@ struct ContentView: View {
                         }
                     }
             )
+        }
+        .onChange(of: engine.songPlayer.isPlaying) { playing in
+            if !playing && engine.songPlayer.totalNotes > 0 {
+                showSongResults = true
+            }
         }
         .alert("Jam Session", isPresented: $showJamAlert) {
             Button("Got it") {}
@@ -756,6 +775,192 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Song Overlay (Falling Notes)
+
+    private var songOverlay: some View {
+        GeometryReader { geo in
+            let notes = scaleNotes(
+                key: engine.selectedKey,
+                scale: engine.selectedScale,
+                baseOctave: engine.gridBaseOctave,
+                octaveRange: engine.gridOctaveRange
+            )
+            let laneCount = max(1, notes.count)
+            let hitLineY = geo.size.height * 0.85
+            let lookAhead: Double = 3.0
+
+            ZStack {
+                // Score and combo at top
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("SCORE: \(engine.songPlayer.score)")
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                        Spacer()
+                        if engine.songPlayer.combo > 1 {
+                            Text("\(engine.songPlayer.combo)x COMBO")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundColor(.yellow)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 60)
+
+                    // Progress bar
+                    GeometryReader { barGeo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.white.opacity(0.1))
+                                .frame(height: 4)
+                            Capsule()
+                                .fill(Color.green)
+                                .frame(width: barGeo.size.width * engine.songPlayer.progress, height: 4)
+                        }
+                    }
+                    .frame(height: 4)
+                    .padding(.horizontal, 16)
+
+                    Spacer()
+                }
+
+                // Hit line
+                Rectangle()
+                    .fill(Color.white.opacity(0.5))
+                    .frame(height: 2)
+                    .position(x: geo.size.width / 2, y: hitLineY)
+
+                // "HIT" label
+                Text("HIT")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.4))
+                    .position(x: 24, y: hitLineY - 10)
+
+                // Falling notes
+                ForEach(engine.songPlayer.visibleNotes(), id: \.index) { entry in
+                    let relativeTime = entry.note.time - engine.songPlayer.songTime
+                    let yFraction = 1.0 - (relativeTime / lookAhead)
+                    let noteY = yFraction * hitLineY
+
+                    // Find which grid lane this MIDI note belongs to
+                    let laneIndex = notes.firstIndex(of: entry.note.midi) ?? 0
+                    let laneWidth = geo.size.width / CGFloat(laneCount)
+                    let noteX = (CGFloat(laneIndex) + 0.5) * laneWidth
+
+                    let noteColor: Color = {
+                        if entry.isHit { return .green }
+                        if relativeTime < -0.3 { return .red.opacity(0.6) }
+                        return .white
+                    }()
+
+                    let noteHeight = max(20, CGFloat(entry.note.duration / lookAhead) * hitLineY)
+
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(noteColor.opacity(entry.isHit ? 0.4 : 0.8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(noteColor, lineWidth: 1.5)
+                        )
+                        .frame(width: max(20, laneWidth - 4), height: noteHeight)
+                        .shadow(color: noteColor.opacity(0.5), radius: entry.isHit ? 0 : 6)
+                        .position(x: noteX, y: noteY)
+                        .opacity(entry.isHit ? 0.3 : 1.0)
+                }
+            }
+        }
+    }
+
+    // MARK: - Song Results Overlay
+
+    private var songResultsOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.85)
+                .ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                // Grade
+                Text(engine.songPlayer.grade)
+                    .font(.system(size: 72, weight: .black, design: .rounded))
+                    .foregroundColor(gradeColor(engine.songPlayer.grade))
+                    .shadow(color: gradeColor(engine.songPlayer.grade).opacity(0.6), radius: 20)
+
+                if let song = engine.songPlayer.currentSong {
+                    Text(song.title)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+
+                // Stats
+                VStack(spacing: 12) {
+                    statRow(label: "Score", value: "\(engine.songPlayer.score)")
+                    statRow(label: "Notes Hit", value: "\(engine.songPlayer.hitNotes) / \(engine.songPlayer.totalNotes)")
+                    statRow(label: "Max Combo", value: "\(engine.songPlayer.maxCombo)x")
+                    statRow(label: "Accuracy", value: "\(Int(engine.songPlayer.progress * 100))%")
+                }
+                .padding(.horizontal, 40)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.06))
+                )
+
+                // Buttons
+                HStack(spacing: 16) {
+                    Button(action: {
+                        showSongResults = false
+                    }) {
+                        Text("Back")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.7))
+                            .frame(width: 120, height: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white.opacity(0.1))
+                            )
+                    }
+
+                    Button(action: {
+                        showSongResults = false
+                        if let song = engine.songPlayer.currentSong ?? BUILT_IN_SONGS.first {
+                            engine.songPlayer.startSong(song)
+                        }
+                    }) {
+                        Text("Play Again")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(.black)
+                            .frame(width: 120, height: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.green)
+                            )
+                    }
+                }
+            }
+        }
+    }
+
+    private func gradeColor(_ grade: String) -> Color {
+        switch grade {
+        case "S": return .yellow
+        case "A": return .green
+        case "B": return .cyan
+        case "C": return .orange
+        case "D": return .red
+        default: return .gray
+        }
+    }
+
+    private func statRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundColor(.white.opacity(0.5))
+            Spacer()
+            Text(value)
+                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+        }
+    }
+
     // MARK: - Bottom Controls
 
     private var bottomControls: some View {
@@ -930,10 +1135,22 @@ struct ContentView: View {
         // Audio session is already .playAndRecord so this shouldn't kill playback
         recorder.isMicrophoneEnabled = true
 
+        // Add watermark overlay for branding in recording
+        if let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene }).first?.windows.first {
+            let wm = WatermarkManager.createWatermarkView(frame: window.bounds)
+            window.addSubview(wm)
+            watermarkView = wm
+        }
+
         recorder.startRecording { error in
             if let error {
                 debugPrint("Recording failed:", error)
-                DispatchQueue.main.async { isRecording = false }
+                DispatchQueue.main.async {
+                    isRecording = false
+                    watermarkView?.removeFromSuperview()
+                    watermarkView = nil
+                }
                 return
             }
 
@@ -957,6 +1174,9 @@ struct ContentView: View {
         recorder.stopRecording(withOutput: outputURL) { error in
             DispatchQueue.main.async {
                 isRecording = false
+                // Remove watermark
+                watermarkView?.removeFromSuperview()
+                watermarkView = nil
                 if let error {
                     debugPrint("Stop recording failed:", error)
                     return
@@ -1007,6 +1227,8 @@ struct ControlSheet: View {
     @Binding var hideSkeletonWhenRecording: Bool
     @State private var showStore = false
     @State private var paywallPackId: String?
+    @State private var showAudioExport = false
+    @State private var exportedAudioURL: URL?
 
     var body: some View {
         ScrollView {
@@ -1030,6 +1252,9 @@ struct ControlSheet: View {
                 }
 
                 modeSection
+
+                sectionDivider
+                songsSection
 
                 sectionDivider
                 harmonySection
@@ -1084,6 +1309,11 @@ struct ControlSheet: View {
         }
         .sheet(isPresented: $showStore) {
             StoreView(storeManager: storeManager)
+        }
+        .sheet(isPresented: $showAudioExport) {
+            if let url = exportedAudioURL {
+                ShareSheet(activityItems: [url])
+            }
         }
         .sheet(item: $paywallPackId) { packId in
             paywallSheet(for: packId)
@@ -1247,6 +1477,79 @@ struct ControlSheet: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1.5 : 0.5)
             )
+        }
+    }
+
+    // MARK: - Songs
+
+    private var songsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("SONGS", icon: "music.note.list")
+
+            ForEach(BUILT_IN_SONGS) { song in
+                HStack(spacing: 12) {
+                    Button(action: {
+                        // Switch to grid mode with song's key/scale
+                        engine.gridModeEnabled = true
+                        engine.drumModeEnabled = false
+                        if let key = MusicKey(rawValue: song.key) {
+                            engine.selectedKey = key
+                        }
+                        if let scale = Scale(rawValue: song.scale) {
+                            engine.selectedScale = scale
+                        }
+                        engine.recomputeScaleNotes()
+                        engine.songPlayer.startSong(song)
+                    }) {
+                        Image(systemName: engine.songPlayer.isPlaying && engine.songPlayer.currentSong?.id == song.id
+                              ? "stop.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(engine.songPlayer.isPlaying && engine.songPlayer.currentSong?.id == song.id
+                                             ? .orange : .green)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(song.title)
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                .foregroundColor(.primary)
+                            if song.isPremium {
+                                Text("Premium")
+                                    .font(.system(size: 8, weight: .heavy, design: .rounded))
+                                    .foregroundColor(.yellow.opacity(0.9))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.yellow.opacity(0.15)))
+                            }
+                        }
+                        Text("\(song.artist) \u{2022} \(song.key) \(song.scale) \u{2022} \(Int(song.bpm)) BPM")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    Text("\(song.notes.count) notes")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
+
+            if engine.songPlayer.isPlaying {
+                Button(action: { engine.songPlayer.stopSong() }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 10))
+                        Text("Stop Song")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Color.red.opacity(0.12)))
+                }
+            }
         }
     }
 
@@ -1721,6 +2024,22 @@ struct ControlSheet: View {
                     }
 
                     Spacer()
+
+                    // Export audio
+                    Button(action: {
+                        Task {
+                            if let url = try? await AudioExporter.exportLoop(loop) {
+                                await MainActor.run {
+                                    exportedAudioURL = url
+                                    showAudioExport = true
+                                }
+                            }
+                        }
+                    }) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14))
+                            .foregroundColor(.green.opacity(0.6))
+                    }
 
                     // Delete
                     Button(action: { engine.deleteLoop(loop.id) }) {

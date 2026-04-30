@@ -82,6 +82,9 @@ final class EngineController: ObservableObject {
     @Published var savedLoops = [RecordedLoop]()
     @Published var playingLoopIds = Set<UUID>()
 
+    // Song mode (guided play)
+    let songPlayer = SongPlayer()
+
     // Grid mode (pinch-to-play)
     @Published var gridModeEnabled = false
     @Published var gridOctaveRange: Int = 2  // 1, 2, or 3 octaves
@@ -321,6 +324,8 @@ final class EngineController: ObservableObject {
             tickMelodicMode()
         }
 
+        songPlayer.tick(deltaTime: 1.0/60.0)
+
         tickLoopPlayback()
         tickLoopRecordingProgress()
         tickSaveGesture()
@@ -358,6 +363,7 @@ final class EngineController: ObservableObject {
                 lastGridNote = name
                 loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel), currentTime: elapsed)
                 jamSession.sendEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel))
+                _ = songPlayer.checkHit(midi: midi)
             case .noteOff(let hand):
                 strudelBridge.noteOff(hand: hand)
                 loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
