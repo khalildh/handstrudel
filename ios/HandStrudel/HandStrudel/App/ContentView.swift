@@ -786,82 +786,102 @@ struct ContentView: View {
                 octaveRange: engine.gridOctaveRange
             )
             let laneCount = max(1, notes.count)
-            let hitLineY = geo.size.height * 0.85
-            let lookAhead: Double = 3.0
+            let topPad = geo.size.height * 0.15
+            let bottomPad = geo.size.height * 0.2
+            let usableHeight = geo.size.height - topPad - bottomPad
+            let laneHeight = usableHeight / CGFloat(laneCount)
+            let lookAhead: Double = 2.5
+
+            // Notes scroll from RIGHT to LEFT — tap the lane when the note reaches the left edge
+            let hitLineX = geo.size.width * 0.15
 
             ZStack {
-                // Score and combo at top
-                VStack(spacing: 4) {
+                // Score and combo
+                VStack {
                     HStack {
-                        Text("SCORE: \(engine.songPlayer.score)")
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
+                        // Score
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(engine.songPlayer.score)")
+                                .font(.system(size: 22, weight: .black, design: .monospaced))
+                                .foregroundColor(.white)
+                            if engine.songPlayer.combo > 1 {
+                                Text("\(engine.songPlayer.combo)x")
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundColor(.yellow)
+                            }
+                        }
                         Spacer()
-                        if engine.songPlayer.combo > 1 {
-                            Text("\(engine.songPlayer.combo)x COMBO")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundColor(.yellow)
-                        }
+                        // Progress
+                        Text("\(engine.songPlayer.hitNotes)/\(engine.songPlayer.totalNotes)")
+                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .foregroundColor(.green)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 60)
-
-                    // Progress bar
-                    GeometryReader { barGeo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.white.opacity(0.1))
-                                .frame(height: 4)
-                            Capsule()
-                                .fill(Color.green)
-                                .frame(width: barGeo.size.width * engine.songPlayer.progress, height: 4)
-                        }
-                    }
-                    .frame(height: 4)
-                    .padding(.horizontal, 16)
-
+                    .padding(.top, 50)
                     Spacer()
                 }
 
-                // Hit line
+                // Hit line (vertical, on the left)
                 Rectangle()
-                    .fill(Color.white.opacity(0.5))
-                    .frame(height: 2)
-                    .position(x: geo.size.width / 2, y: hitLineY)
+                    .fill(Color.green.opacity(0.4))
+                    .frame(width: 3)
+                    .position(x: hitLineX, y: geo.size.height / 2)
 
-                // "HIT" label
-                Text("HIT")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
-                    .position(x: 24, y: hitLineY - 10)
+                // Lane labels + tap targets on the left
+                VStack(spacing: 0) {
+                    Spacer().frame(height: topPad)
+                    ForEach(0..<laneCount, id: \.self) { i in
+                        let noteIdx = laneCount - 1 - i
+                        let midi = noteIdx < notes.count ? notes[noteIdx] : 60
+                        let name = midiNoteName(midi)
 
-                // Falling notes
-                ForEach(engine.songPlayer.visibleNotes(), id: \.index) { entry in
+                        Text(name)
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.4))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                            .padding(.leading, 6)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                // Tap to hit — play the note and check score
+                                engine.strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.7, duration: 0.3)
+                                engine.haptics.noteTrigger()
+                                let hit = engine.songPlayer.checkHit(midi: midi)
+                                if hit {
+                                    engine.haptics.drumHit() // extra feedback for hits
+                                }
+                            }
+                    }
+                    Spacer()
+                }
+
+                // Scrolling note indicators (right to left)
+                ForEach(engine.songPlayer.visibleNotes(lookAhead: lookAhead), id: \.index) { entry in
                     let relativeTime = entry.note.time - engine.songPlayer.songTime
-                    let yFraction = 1.0 - (relativeTime / lookAhead)
-                    let noteY = yFraction * hitLineY
+                    // Notes scroll from right to left
+                    let xProgress = 1.0 - (relativeTime / lookAhead)
+                    let noteX: CGFloat = hitLineX + CGFloat(xProgress) * (geo.size.width - hitLineX)
 
-                    // Find which grid lane this MIDI note belongs to
-                    let laneIndex = notes.firstIndex(of: entry.note.midi) ?? 0
-                    let laneWidth = geo.size.width / CGFloat(laneCount)
-                    let noteX = (CGFloat(laneIndex) + 0.5) * laneWidth
+                    // Find which row this note belongs to
+                    let noteIdx = notes.firstIndex(of: entry.note.midi) ?? 0
+                    let rowIdx = laneCount - 1 - noteIdx // invert: high notes at top
+                    let noteY: CGFloat = topPad + CGFloat(rowIdx) * laneHeight + laneHeight / 2
 
                     let noteColor: Color = {
                         if entry.isHit { return .green }
-                        if relativeTime < -0.3 { return .red.opacity(0.6) }
-                        return .white
+                        if relativeTime < -0.3 { return .red.opacity(0.5) }
+                        return .cyan
                     }()
 
-                    let noteHeight = max(20, CGFloat(entry.note.duration / lookAhead) * hitLineY)
+                    let noteWidth = max(20, CGFloat(entry.note.duration / lookAhead) * (geo.size.width - hitLineX))
 
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(noteColor.opacity(entry.isHit ? 0.4 : 0.8))
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(noteColor.opacity(entry.isHit ? 0.2 : 0.7))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(noteColor, lineWidth: 1.5)
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(noteColor, lineWidth: entry.isHit ? 0.5 : 1.5)
                         )
-                        .frame(width: max(20, laneWidth - 4), height: noteHeight)
-                        .shadow(color: noteColor.opacity(0.5), radius: entry.isHit ? 0 : 6)
+                        .frame(width: noteWidth, height: laneHeight * 0.7)
+                        .shadow(color: noteColor.opacity(0.4), radius: entry.isHit ? 0 : 4)
                         .position(x: noteX, y: noteY)
                         .opacity(entry.isHit ? 0.3 : 1.0)
                 }
