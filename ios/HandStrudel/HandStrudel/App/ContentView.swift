@@ -21,7 +21,7 @@ struct ContentView: View {
     @State private var showJamAlert = false
     @State private var watermarkView: UIView?
     @State private var showRandomizedToast = false
-    @State private var showSongResults = false
+    // Song mode removed
 
     var body: some View {
         ZStack {
@@ -139,18 +139,6 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
 
-            // Song mode falling notes overlay
-            if engine.songPlayer.isPlaying {
-                songOverlay
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
-
-            // Song results overlay
-            if showSongResults {
-                songResultsOverlay
-            }
-
             // Drum zone overlay (tappable pads)
             if engine.drumModeEnabled {
                 drumZoneOverlay
@@ -263,11 +251,6 @@ struct ContentView: View {
                         }
                     }
             )
-        }
-        .onChange(of: engine.songPlayer.isPlaying) { playing in
-            if !playing && engine.songPlayer.totalNotes > 0 {
-                showSongResults = true
-            }
         }
         .alert("Jam Session", isPresented: $showJamAlert) {
             Button("Got it") {}
@@ -775,222 +758,6 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Song Overlay (Falling Notes)
-
-    private var songOverlay: some View {
-        GeometryReader { geo in
-            let notes = scaleNotes(
-                key: engine.selectedKey,
-                scale: engine.selectedScale,
-                baseOctave: engine.gridBaseOctave,
-                octaveRange: engine.gridOctaveRange
-            )
-            let laneCount = max(1, notes.count)
-            let topPad = geo.size.height * 0.15
-            let bottomPad = geo.size.height * 0.2
-            let usableHeight = geo.size.height - topPad - bottomPad
-            let laneHeight = usableHeight / CGFloat(laneCount)
-            let lookAhead: Double = 2.5
-
-            // Notes scroll from RIGHT to LEFT — tap the lane when the note reaches the left edge
-            let hitLineX = geo.size.width * 0.45
-
-            ZStack {
-                // Score and combo
-                VStack {
-                    HStack {
-                        // Score
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(engine.songPlayer.score)")
-                                .font(.system(size: 22, weight: .black, design: .monospaced))
-                                .foregroundColor(.white)
-                            if engine.songPlayer.combo > 1 {
-                                Text("\(engine.songPlayer.combo)x")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundColor(.yellow)
-                            }
-                        }
-                        Spacer()
-                        // Progress
-                        Text("\(engine.songPlayer.hitNotes)/\(engine.songPlayer.totalNotes)")
-                            .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 50)
-                    Spacer()
-                }
-
-                // Hit line (vertical, on the left)
-                Rectangle()
-                    .fill(Color.green.opacity(0.4))
-                    .frame(width: 3)
-                    .position(x: hitLineX, y: geo.size.height / 2)
-
-                // Full-width tap lanes
-                VStack(spacing: 0) {
-                    Spacer().frame(height: topPad)
-                    ForEach(0..<laneCount, id: \.self) { i in
-                        let noteIdx = laneCount - 1 - i
-                        let midi = noteIdx < notes.count ? notes[noteIdx] : 60
-                        let name = midiNoteName(midi)
-
-                        // Check if this lane has an active note near the hit line
-                        let hasActiveNote = engine.songPlayer.visibleNotes(lookAhead: lookAhead).contains {
-                            $0.note.midi == midi && !$0.isHit && abs($0.note.time - engine.songPlayer.songTime) <= engine.songPlayer.hitWindow
-                        }
-
-                        HStack(spacing: 0) {
-                            Text(name)
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .foregroundColor(hasActiveNote ? .cyan : .white.opacity(0.3))
-                                .frame(width: 35)
-                            Rectangle()
-                                .fill(Color.white.opacity(i % 2 == 0 ? 0.02 : 0.0))
-                        }
-                        .frame(maxHeight: .infinity)
-                        .background(hasActiveNote ? Color.cyan.opacity(0.1) : Color.clear)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            engine.strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.7, duration: 0.3)
-                            engine.haptics.noteTrigger()
-                            let hit = engine.songPlayer.checkHit(midi: midi)
-                            if hit {
-                                engine.haptics.drumHit()
-                            }
-                        }
-                    }
-                    Spacer()
-                }
-
-                // Scrolling note indicators (right to left)
-                ForEach(engine.songPlayer.visibleNotes(lookAhead: lookAhead), id: \.index) { entry in
-                    let relativeTime = entry.note.time - engine.songPlayer.songTime
-                    // Notes start at right edge, scroll left toward hit line
-                    // relativeTime = lookAhead → right edge, relativeTime = 0 → hit line
-                    let xFraction = CGFloat(relativeTime / lookAhead)
-                    let noteX: CGFloat = hitLineX + xFraction * (geo.size.width - hitLineX)
-
-                    // Find which row this note belongs to
-                    let noteIdx = notes.firstIndex(of: entry.note.midi) ?? 0
-                    let rowIdx = laneCount - 1 - noteIdx // invert: high notes at top
-                    let noteY: CGFloat = topPad + CGFloat(rowIdx) * laneHeight + laneHeight / 2
-
-                    let noteColor: Color = {
-                        if entry.isHit { return .green }
-                        if relativeTime < -0.3 { return .red.opacity(0.5) }
-                        return .cyan
-                    }()
-
-                    let noteWidth = max(20, CGFloat(entry.note.duration / lookAhead) * (geo.size.width - hitLineX))
-
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(noteColor.opacity(entry.isHit ? 0.2 : 0.7))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(noteColor, lineWidth: entry.isHit ? 0.5 : 1.5)
-                        )
-                        .frame(width: noteWidth, height: laneHeight * 0.7)
-                        .shadow(color: noteColor.opacity(0.4), radius: entry.isHit ? 0 : 4)
-                        .position(x: noteX, y: noteY)
-                        .opacity(entry.isHit ? 0.3 : 1.0)
-                }
-            }
-        }
-    }
-
-    // MARK: - Song Results Overlay
-
-    private var songResultsOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.85)
-                .ignoresSafeArea()
-
-            VStack(spacing: 20) {
-                // Grade
-                Text(engine.songPlayer.grade)
-                    .font(.system(size: 72, weight: .black, design: .rounded))
-                    .foregroundColor(gradeColor(engine.songPlayer.grade))
-                    .shadow(color: gradeColor(engine.songPlayer.grade).opacity(0.6), radius: 20)
-
-                if let song = engine.songPlayer.currentSong {
-                    Text(song.title)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.7))
-                }
-
-                // Stats
-                VStack(spacing: 12) {
-                    statRow(label: "Score", value: "\(engine.songPlayer.score)")
-                    statRow(label: "Notes Hit", value: "\(engine.songPlayer.hitNotes) / \(engine.songPlayer.totalNotes)")
-                    statRow(label: "Max Combo", value: "\(engine.songPlayer.maxCombo)x")
-                    statRow(label: "Accuracy", value: "\(Int(engine.songPlayer.progress * 100))%")
-                }
-                .padding(.horizontal, 40)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white.opacity(0.06))
-                )
-
-                // Buttons
-                HStack(spacing: 16) {
-                    Button(action: {
-                        showSongResults = false
-                    }) {
-                        Text("Back")
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.7))
-                            .frame(width: 120, height: 44)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white.opacity(0.1))
-                            )
-                    }
-
-                    Button(action: {
-                        showSongResults = false
-                        if let song = engine.songPlayer.currentSong ?? BUILT_IN_SONGS.first {
-                            engine.songPlayer.startSong(song)
-                        }
-                    }) {
-                        Text("Play Again")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(.black)
-                            .frame(width: 120, height: 44)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.green)
-                            )
-                    }
-                }
-            }
-        }
-    }
-
-    private func gradeColor(_ grade: String) -> Color {
-        switch grade {
-        case "S": return .yellow
-        case "A": return .green
-        case "B": return .cyan
-        case "C": return .orange
-        case "D": return .red
-        default: return .gray
-        }
-    }
-
-    private func statRow(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.5))
-            Spacer()
-            Text(value)
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
-                .foregroundColor(.white)
-        }
-    }
-
     // MARK: - Bottom Controls
 
     private var bottomControls: some View {
@@ -1282,10 +1049,6 @@ struct ControlSheet: View {
                 }
 
                 modeSection
-
-                sectionDivider
-                songsSection
-
                 sectionDivider
                 harmonySection
 
@@ -1510,78 +1273,6 @@ struct ControlSheet: View {
         }
     }
 
-    // MARK: - Songs
-
-    private var songsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("SONGS", icon: "music.note.list")
-
-            ForEach(BUILT_IN_SONGS) { song in
-                HStack(spacing: 12) {
-                    Button(action: {
-                        // Switch to grid mode with song's key/scale
-                        engine.gridModeEnabled = true
-                        engine.drumModeEnabled = false
-                        if let key = MusicKey(rawValue: song.key) {
-                            engine.selectedKey = key
-                        }
-                        if let scale = Scale(rawValue: song.scale) {
-                            engine.selectedScale = scale
-                        }
-                        engine.recomputeScaleNotes()
-                        engine.songPlayer.startSong(song)
-                    }) {
-                        Image(systemName: engine.songPlayer.isPlaying && engine.songPlayer.currentSong?.id == song.id
-                              ? "stop.circle.fill" : "play.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(engine.songPlayer.isPlaying && engine.songPlayer.currentSong?.id == song.id
-                                             ? .orange : .green)
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(song.title)
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundColor(.primary)
-                            if song.isPremium {
-                                Text("Premium")
-                                    .font(.system(size: 8, weight: .heavy, design: .rounded))
-                                    .foregroundColor(.yellow.opacity(0.9))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.yellow.opacity(0.15)))
-                            }
-                        }
-                        Text("\(song.artist) \u{2022} \(song.key) \(song.scale) \u{2022} \(Int(song.bpm)) BPM")
-                            .font(.system(size: 10, design: .rounded))
-                            .foregroundColor(.secondary)
-                    }
-
-                    Spacer()
-
-                    Text("\(song.notes.count) notes")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 4)
-            }
-
-            if engine.songPlayer.isPlaying {
-                Button(action: { engine.songPlayer.stopSong() }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "stop.fill")
-                            .font(.system(size: 10))
-                        Text("Stop Song")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    }
-                    .foregroundColor(.red)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Color.red.opacity(0.12)))
-                }
-            }
-        }
-    }
 
     // MARK: - Harmony
 
