@@ -121,6 +121,9 @@ export default function HandStrudel() {
   const [recordingAspect, setRecordingAspect] = useState<AspectRatio>("16:9");
   const [canRecord, setCanRecord] = useState(false);
 
+  // Mobile sidebar drawer
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   // DOM refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -444,7 +447,7 @@ export default function HandStrudel() {
   }, []);
 
   return (
-    <div id="app">
+    <div id="app" className={sidebarOpen ? "sidebar-open" : undefined}>
       <Header
         status={status}
         canRecord={canRecord}
@@ -453,6 +456,8 @@ export default function HandStrudel() {
         recordingAspect={recordingAspect}
         onToggleRecording={handleToggleRecording}
         onAspectChange={setRecordingAspect}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={overlay === "hidden" ? () => setSidebarOpen((v) => !v) : undefined}
       />
       <CameraView videoRef={videoRef} canvasRef={canvasRef}>
         {overlay !== "hidden" && (

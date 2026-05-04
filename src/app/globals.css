@@ -20,11 +20,15 @@ html,
 body {
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
   overflow: hidden;
   user-select: none;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
 
 #app {
@@ -32,6 +36,7 @@ body {
   grid-template-rows: 36px 1fr;
   grid-template-columns: 1fr 310px;
   height: 100vh;
+  height: 100dvh;
 }
 
 /* ── Header ──────────────────────────────────────────── */
@@ -165,6 +170,32 @@ body {
 @keyframes rec-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+
+/* ── Sidebar Toggle (mobile only) ────────────────────── */
+.sidebar-toggle {
+  display: none;
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 32px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 8px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.sidebar-toggle:hover {
+  color: var(--bright);
+  border-color: var(--dim);
 }
 
 /* ── Camera ──────────────────────────────────────────── */
@@ -996,4 +1027,318 @@ body {
   font-size: 9px;
   color: var(--dim);
   letter-spacing: 2px;
+}
+
+/* ── Mobile / Tablet ─────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Single column: camera fills the screen, sidebar slides up as a drawer */
+  #app {
+    grid-template-rows: 44px 1fr;
+    grid-template-columns: 1fr;
+  }
+
+  /* Header: bigger touch targets */
+  #header {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .logo {
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  .sep {
+    display: none;
+  }
+
+  #status {
+    font-size: 9px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #beat-row {
+    margin-left: 0;
+  }
+
+  .sidebar-toggle {
+    display: inline-flex;
+  }
+
+  /* Recording controls: compact on mobile */
+  #rec-controls {
+    gap: 4px;
+  }
+
+  .rec-btn {
+    padding: 6px 8px;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  .rec-aspect {
+    padding: 5px 4px;
+    font-size: 10px;
+  }
+
+  /* Sidebar: slide-up bottom drawer */
+  #sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 44px;
+    z-index: 30;
+    transform: translateY(100%);
+    transition: transform 0.25s ease-out;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+  }
+
+  #app.sidebar-open #sidebar {
+    transform: translateY(0);
+  }
+
+  /* Hydra canvas spans full width on mobile */
+  #hydra-canvas {
+    width: 100% !important;
+    height: calc(100dvh - 44px) !important;
+    top: 44px !important;
+  }
+
+  /* Start overlay: scrollable, vertical layout */
+  #start {
+    padding: 16px 12px;
+    gap: 14px;
+    justify-content: flex-start;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #start h1 {
+    font-size: 14px;
+    letter-spacing: 6px;
+    margin-top: 8px;
+  }
+
+  .config-grid {
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .config-grid-advanced {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .config-col {
+    gap: 8px;
+    width: 100%;
+  }
+
+  .config-row {
+    gap: 8px;
+    width: 100%;
+  }
+
+  .config-select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .config-select-hydra {
+    flex: 0 0 90px;
+    width: 90px;
+    padding: 10px 6px;
+  }
+
+  .config-row-compact .config-select {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .advanced-toggle {
+    padding: 9px 22px;
+    font-size: 11px;
+  }
+
+  .preset-btn {
+    padding: 8px 14px;
+    font-size: 10px;
+  }
+
+  #start-btn {
+    padding: 14px 36px;
+    font-size: 13px;
+  }
+
+  .hint {
+    font-size: 10px;
+    padding: 0 12px;
+  }
+
+  /* Sidebar contents: roomier on mobile */
+  #code-wrap {
+    font-size: 12px;
+    padding: 12px 14px;
+  }
+
+  #hydra-code-wrap {
+    font-size: 11px;
+    max-height: 110px;
+  }
+
+  .hydra-toggle {
+    padding: 10px 14px;
+  }
+
+  .hydra-btn {
+    padding: 6px 12px;
+    font-size: 10px;
+  }
+
+  .saved-list {
+    padding: 10px 14px;
+    max-height: 160px;
+  }
+
+  .saved-title,
+  .track-title,
+  .hpanel-title,
+  .hydra-label {
+    font-size: 9px;
+  }
+
+  .saved-io-btn {
+    padding: 5px 10px;
+    font-size: 9px;
+  }
+
+  .saved-item {
+    padding: 6px;
+    gap: 10px;
+  }
+
+  .saved-play,
+  .track-play {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .saved-add-track {
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+  }
+
+  .saved-bpm {
+    font-size: 10px;
+    width: 28px;
+  }
+
+  .saved-code {
+    font-size: 11px;
+  }
+
+  .track-builder {
+    padding: 10px 14px;
+  }
+
+  .track-slot {
+    width: 32px;
+    height: 28px;
+  }
+
+  .track-slot-num {
+    font-size: 11px;
+  }
+
+  .track-speed {
+    height: 4px;
+  }
+
+  .track-speed::-webkit-slider-thumb {
+    width: 16px;
+    height: 16px;
+  }
+
+  .hpanel {
+    padding: 10px 14px;
+  }
+
+  .plabel,
+  .pval {
+    font-size: 10px;
+    width: 56px;
+  }
+
+  .hpanel-compact .plabel,
+  .hpanel-compact .pval {
+    font-size: 9px;
+    width: 48px;
+  }
+
+  #cur-note {
+    font-size: 32px;
+    min-height: 40px;
+  }
+
+  #cur-bpm {
+    font-size: 11px;
+  }
+}
+
+/* Very small screens (older / narrower phones) */
+@media (max-width: 380px) {
+  .logo {
+    display: none;
+  }
+
+  .config-grid {
+    gap: 12px;
+  }
+
+  #start h1 {
+    font-size: 12px;
+    letter-spacing: 4px;
+  }
+}
+
+/* Mobile landscape: keep camera full but constrain start overlay */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  #start {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  #start h1 {
+    font-size: 11px;
+    margin-top: 0;
+  }
+
+  .config-grid {
+    flex-direction: row;
+    gap: 16px;
+    max-width: none;
+  }
+
+  .config-col {
+    gap: 4px;
+  }
+
+  .config-select {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
 }
