@@ -15,6 +15,15 @@ export const metadata: Metadata = {
     "A browser-based hand-tracking musical instrument powered by Strudel and MediaPipe",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover" as const,
+  themeColor: "#05050a",
+};
+
 export default function RootLayout({
   children,
 }: {

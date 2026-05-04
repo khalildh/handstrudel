@@ -10,6 +10,8 @@ interface HeaderProps {
   recordingAspect: AspectRatio;
   onToggleRecording: () => void;
   onAspectChange: (aspect: AspectRatio) => void;
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -32,6 +34,8 @@ export default function Header({
   recordingAspect,
   onToggleRecording,
   onAspectChange,
+  sidebarOpen,
+  onToggleSidebar,
 }: HeaderProps) {
   return (
     <div id="header">
@@ -72,6 +76,17 @@ export default function Header({
         <div className="bd" id="bd2" />
         <div className="bd" id="bd3" />
       </div>
+
+      {onToggleSidebar && (
+        <button
+          className="sidebar-toggle"
+          onClick={onToggleSidebar}
+          aria-label={sidebarOpen ? "Hide panel" : "Show panel"}
+          aria-expanded={sidebarOpen}
+        >
+          {sidebarOpen ? "×" : "≡"}
+        </button>
+      )}
     </div>
   );
 }
