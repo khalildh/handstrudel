@@ -24,6 +24,18 @@ struct HandData {
     let pinkyCurl: Double
     let landmarks: [HandLandmark]
 
+    /// Count of extended fingers (curl > 0.6 = up)
+    var fingersUp: Int {
+        let threshold = 0.6
+        var count = 0
+        if thumbCurl > threshold { count += 1 }
+        if indexCurl > threshold { count += 1 }
+        if middleCurl > threshold { count += 1 }
+        if ringCurl > threshold { count += 1 }
+        if pinkyCurl > threshold { count += 1 }
+        return count
+    }
+
     func value(for axisKey: String) -> Double? {
         switch axisKey {
         case "x": return x

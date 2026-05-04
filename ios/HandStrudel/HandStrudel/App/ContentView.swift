@@ -511,37 +511,60 @@ struct ContentView: View {
     // MARK: - Grid Quick Bar
 
     private var gridQuickBar: some View {
-        HStack(spacing: 12) {
-            // Octave down/up
-            HStack(spacing: 6) {
+        HStack(spacing: 10) {
+            // Finger count indicator (when finger octave is enabled)
+            if engine.fingerOctaveEnabled {
+                HStack(spacing: 3) {
+                    // Show finger count visually
+                    ForEach(1...5, id: \.self) { i in
+                        Circle()
+                            .fill(i <= engine.currentFingerCount ? Color.green : Color.white.opacity(0.15))
+                            .frame(width: 8, height: 8)
+                    }
+                }
+            }
+
+            // Octave display
+            Text("Oct \(engine.gridBaseOctave)")
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundColor(.green)
+
+            // Manual octave controls (when finger control is off)
+            if !engine.fingerOctaveEnabled {
                 Button(action: { if engine.gridBaseOctave > 1 { engine.gridBaseOctave -= 1 } }) {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white.opacity(0.7))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 26)
                         .background(Circle().fill(Color.white.opacity(0.1)))
                 }
-                Text("Oct \(engine.gridBaseOctave)")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(.green)
                 Button(action: { if engine.gridBaseOctave < 6 { engine.gridBaseOctave += 1 } }) {
                     Image(systemName: "chevron.up")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white.opacity(0.7))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 26)
                         .background(Circle().fill(Color.white.opacity(0.1)))
                 }
             }
 
             Spacer()
 
+            // Finger octave toggle
+            Button(action: { engine.fingerOctaveEnabled.toggle() }) {
+                Image(systemName: engine.fingerOctaveEnabled ? "hand.raised.fingers.spread" : "hand.raised.slash")
+                    .font(.system(size: 12))
+                    .foregroundColor(engine.fingerOctaveEnabled ? .green : .white.opacity(0.5))
+                    .frame(width: 26, height: 26)
+                    .background(Circle().fill(engine.fingerOctaveEnabled ? Color.green.opacity(0.15) : Color.white.opacity(0.1)))
+            }
+
             // Range pills
             ForEach([1, 2, 3], id: \.self) { range in
                 Button(action: { engine.gridOctaveRange = range }) {
                     Text("\(range)")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundColor(engine.gridOctaveRange == range ? .black : .white.opacity(0.6))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 26)
                         .background(
                             Circle().fill(engine.gridOctaveRange == range ? Color.green : Color.white.opacity(0.1))
                         )

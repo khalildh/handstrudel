@@ -345,10 +345,45 @@ final class EngineController: ObservableObject {
         structIdx = currentStructIdx
     }
 
+    @Published var fingerOctaveEnabled = true
+    @Published var currentFingerCount: Int = 0
+
     private func tickGridMode() {
         gridModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
         let screenBounds = UIScreen.main.bounds
         gridModeManager.screenAspect = screenBounds.width / screenBounds.height
+
+        // Finger count octave: non-pinching hand's fingers set the octave
+        if fingerOctaveEnabled {
+            // Check which hand is NOT pinching and use its finger count
+            let leftPinching = gridModeManager.isLeftPinching
+            let rightPinching = gridModeManager.isRightPinching
+
+            let fingerHand: HandData?
+            if leftPinching && !rightPinching {
+                fingerHand = currentHands.right // right hand controls octave
+            } else if rightPinching && !leftPinching {
+                fingerHand = currentHands.left  // left hand controls octave
+            } else if !leftPinching && !rightPinching {
+                // Neither pinching — use whichever hand has more fingers up
+                let leftFingers = currentHands.left?.fingersUp ?? 0
+                let rightFingers = currentHands.right?.fingersUp ?? 0
+                fingerHand = leftFingers >= rightFingers ? currentHands.left : currentHands.right
+            } else {
+                fingerHand = nil // both pinching, don't change
+            }
+
+            if let hand = fingerHand {
+                let fingers = hand.fingersUp
+                currentFingerCount = fingers
+                if fingers >= 1 && fingers <= 5 {
+                    let newOctave = fingers + 1 // 1 finger = octave 2, 5 fingers = octave 6
+                    if newOctave != gridBaseOctave {
+                        gridBaseOctave = newOctave
+                    }
+                }
+            }
+        }
 
         let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale, baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
         let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: gridNotes, currentBeat: 0)
