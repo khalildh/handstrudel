@@ -345,7 +345,7 @@ final class EngineController: ObservableObject {
         structIdx = currentStructIdx
     }
 
-    @Published var fingerOctaveEnabled = true
+    @Published var fingerOctaveEnabled = false
     @Published var currentFingerCount: Int = 0
 
     private func tickGridMode() {
