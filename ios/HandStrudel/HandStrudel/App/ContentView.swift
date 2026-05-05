@@ -229,7 +229,8 @@ struct ContentView: View {
             .simultaneousGesture(
                 DragGesture(minimumDistance: 50)
                     .onEnded { value in
-                        // Only handle horizontal swipes (not vertical scrolls or taps near buttons)
+                        // Don't swipe filters while using drum XY pad or grid
+                        guard !engine.drumModeEnabled && !engine.gridModeEnabled else { return }
                         guard abs(value.translation.width) > abs(value.translation.height) else { return }
                         let filters = CAMERA_FILTERS.filter { !$0.isPremium || storeManager.isUnlocked($0.packId ?? "") }
                         guard let currentIdx = filters.firstIndex(where: { $0.id == engine.selectedFilter.id }) else { return }
