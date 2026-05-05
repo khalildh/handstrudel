@@ -723,6 +723,8 @@ struct ContentView: View {
         GeometryReader { geo in
             let topPad = geo.size.height * 0.15
             let bottomPad = geo.size.height * 0.20
+            let usableHeight = geo.size.height - topPad - bottomPad
+            let laneHeight = usableHeight / CGFloat(drumLanes.count)
 
         VStack(spacing: 0) {
             Spacer().frame(height: topPad)
@@ -805,7 +807,7 @@ struct ContentView: View {
                             }
                     )
                 }
-                .frame(maxHeight: .infinity)
+                .frame(height: laneHeight)
                 .overlay(alignment: .top) {
                     Rectangle()
                         .fill(Color.white.opacity(leftActive || rightActive ? 0.15 : 0.04))
