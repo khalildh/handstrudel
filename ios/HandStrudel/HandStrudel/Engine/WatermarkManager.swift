@@ -2,7 +2,6 @@ import UIKit
 import CoreImage
 
 final class WatermarkManager {
-    /// Generate a QR code image for the App Store URL
     static func generateQR(for urlString: String = "https://handstrudel.com", size: CGFloat = 60) -> UIImage? {
         guard let data = urlString.data(using: .utf8),
               let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
@@ -17,33 +16,42 @@ final class WatermarkManager {
         return UIImage(ciImage: scaledImage)
     }
 
-    /// Create a watermark overlay view that can be added during recording
+    /// Create a watermark overlay — positioned in the safe zone that Instagram won't crop
     static func createWatermarkView(frame: CGRect) -> UIView {
-        let container = UIView(frame: CGRect(x: frame.width - 140, y: frame.height - 80, width: 130, height: 70))
-        container.backgroundColor = UIColor.black.withAlphaComponent(0.4)
-        container.layer.cornerRadius = 10
+        // Position: right side, 30% from top — safe from Instagram's top/bottom crop
+        let w: CGFloat = 140
+        let h: CGFloat = 50
+        let container = UIView(frame: CGRect(
+            x: frame.width - w - 16,
+            y: frame.height * 0.30,
+            width: w,
+            height: h
+        ))
+        container.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        container.layer.cornerRadius = 12
 
         // QR code
-        if let qrImage = generateQR(size: 40) {
+        if let qrImage = generateQR(size: 34) {
             let qrView = UIImageView(image: qrImage)
-            qrView.frame = CGRect(x: 8, y: 15, width: 40, height: 40)
-            qrView.tintColor = .white
+            qrView.frame = CGRect(x: 8, y: 8, width: 34, height: 34)
+            qrView.backgroundColor = .white
+            qrView.layer.cornerRadius = 4
             container.addSubview(qrView)
         }
 
-        // Text
+        // Text stack
         let label = UILabel()
         label.text = "handstrudel"
-        label.font = UIFont.monospacedSystemFont(ofSize: 9, weight: .bold)
-        label.textColor = UIColor.green
-        label.frame = CGRect(x: 52, y: 18, width: 75, height: 14)
+        label.font = UIFont.monospacedSystemFont(ofSize: 11, weight: .bold)
+        label.textColor = UIColor(red: 0, green: 1, blue: 0.62, alpha: 1)
+        label.frame = CGRect(x: 48, y: 10, width: 88, height: 16)
         container.addSubview(label)
 
         let sublabel = UILabel()
-        sublabel.text = "scan to play"
-        sublabel.font = UIFont.systemFont(ofSize: 8, weight: .medium)
-        sublabel.textColor = UIColor.white.withAlphaComponent(0.6)
-        sublabel.frame = CGRect(x: 52, y: 34, width: 75, height: 12)
+        sublabel.text = "scan to play 🎵"
+        sublabel.font = UIFont.systemFont(ofSize: 9, weight: .medium)
+        sublabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        sublabel.frame = CGRect(x: 48, y: 27, width: 88, height: 14)
         container.addSubview(sublabel)
 
         return container
