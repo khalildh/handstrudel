@@ -720,8 +720,12 @@ struct ContentView: View {
     ]
 
     private var drumZoneOverlay: some View {
+        GeometryReader { geo in
+            let topPad = geo.size.height * 0.15
+            let bottomPad = geo.size.height * 0.20
+
         VStack(spacing: 0) {
-            Spacer().frame(height: 90)
+            Spacer().frame(height: topPad)
 
             ForEach(Array(drumLanes.enumerated()), id: \.element.id) { idx, lane in
                 let leftTouched = activeDrumLanes.contains("L_\(lane.id)")
@@ -811,7 +815,8 @@ struct ContentView: View {
                 .animation(.easeOut(duration: 0.08), value: rightActive)
             }
 
-            Spacer().frame(height: 90)
+            Spacer()
+        }
         }
     }
 

@@ -55,9 +55,9 @@ final class DrumModeManager {
     func checkHits(hands: HandsState, currentTime: TimeInterval) -> [DrumHit] {
         var hits: [DrumHit] = []
 
-        // Left hand
+        // Left hand — use pinchY (midpoint of thumb+index) for position
         if let left = hands.left {
-            let drumIdx = yToDrumIndex(y: left.y)
+            let drumIdx = yToDrumIndex(y: left.pinchY)
             leftLane = drumIdx
             let drum = Self.allDrums[drumIdx]
             let isPinching = left.pinch > pinchThreshold
@@ -82,9 +82,9 @@ final class DrumModeManager {
             leftLane = nil
         }
 
-        // Right hand
+        // Right hand — use pinchY
         if let right = hands.right {
-            let drumIdx = yToDrumIndex(y: right.y)
+            let drumIdx = yToDrumIndex(y: right.pinchY)
             rightLane = drumIdx
             let drum = Self.allDrums[drumIdx]
             let isPinching = right.pinch > pinchThreshold
