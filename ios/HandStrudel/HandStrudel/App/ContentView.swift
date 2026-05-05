@@ -698,99 +698,111 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Drum Pad Overlay
+    // MARK: - Drum Lane Overlay
 
-    @State private var activePads = Set<String>()
+    @State private var activeDrumLanes = Set<String>()
 
-    private struct DrumPad {
+    private struct DrumLane: Identifiable {
+        let id: String
         let name: String
         let hitType: String
         let emoji: String
         let color: Color
     }
 
-    private let drumPads: [[DrumPad]] = [
-        // Top row: cymbals
-        [
-            DrumPad(name: "HAT", hitType: "hihat", emoji: "🔔", color: .cyan),
-            DrumPad(name: "CRASH", hitType: "crash", emoji: "💥", color: .yellow),
-        ],
-        // Middle row: snare + clap
-        [
-            DrumPad(name: "SNARE", hitType: "snare", emoji: "🥁", color: .orange),
-            DrumPad(name: "RIDE", hitType: "ride", emoji: "🛎️", color: .pink),
-        ],
-        // Bottom row: kick + tom
-        [
-            DrumPad(name: "KICK", hitType: "kick", emoji: "🦶", color: .red),
-            DrumPad(name: "TOM", hitType: "tom", emoji: "🪘", color: .purple),
-        ],
+    private let drumLanes: [DrumLane] = [
+        DrumLane(id: "crash", name: "CRASH", hitType: "crash", emoji: "💥", color: .yellow),
+        DrumLane(id: "hihat", name: "HI-HAT", hitType: "hihat", emoji: "🔔", color: .cyan),
+        DrumLane(id: "snare", name: "SNARE", hitType: "snare", emoji: "🥁", color: .orange),
+        DrumLane(id: "ride", name: "RIDE", hitType: "ride", emoji: "🛎️", color: .pink),
+        DrumLane(id: "tom", name: "TOM", hitType: "tom", emoji: "🪘", color: .purple),
+        DrumLane(id: "kick", name: "KICK", hitType: "kick", emoji: "🦶", color: .red),
     ]
 
     private var drumZoneOverlay: some View {
-        VStack(spacing: 6) {
-            Spacer().frame(height: 100) // space for top UI
+        VStack(spacing: 0) {
+            Spacer().frame(height: 90)
 
-            ForEach(0..<drumPads.count, id: \.self) { row in
-                HStack(spacing: 6) {
-                    ForEach(0..<drumPads[row].count, id: \.self) { col in
-                        let pad = drumPads[row][col]
-                        let isActive = activePads.contains(pad.hitType)
+            ForEach(drumLanes) { lane in
+                let leftActive = activeDrumLanes.contains("L_\(lane.id)")
+                let rightActive = activeDrumLanes.contains("R_\(lane.id)")
 
-                        Button(action: {}) {
-                            ZStack {
-                                // Ripple effect on hit
-                                if isActive {
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(pad.color.opacity(0.3))
-                                        .scaleEffect(1.05)
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(pad.color, lineWidth: 2)
-                                        .scaleEffect(1.1)
-                                        .opacity(0.5)
-                                }
+                HStack(spacing: 0) {
+                    // Left hand pad
+                    ZStack {
+                        Rectangle()
+                            .fill(leftActive ? lane.color.opacity(0.35) : Color.white.opacity(0.03))
 
-                                // Pad background
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(
-                                        isActive
-                                            ? pad.color.opacity(0.35)
-                                            : Color.white.opacity(0.06)
-                                    )
-
-                                // Content
-                                VStack(spacing: 6) {
-                                    Text(pad.emoji)
-                                        .font(.system(size: 32))
-                                    Text(pad.name)
-                                        .font(.system(size: 13, weight: .black, design: .rounded))
-                                        .foregroundColor(isActive ? pad.color : .white.opacity(0.6))
+                        HStack(spacing: 6) {
+                            Text(lane.emoji)
+                                .font(.system(size: 20))
+                            Text(lane.name)
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundColor(leftActive ? lane.color : .white.opacity(0.4))
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in
+                                let key = "L_\(lane.id)"
+                                if !activeDrumLanes.contains(key) {
+                                    activeDrumLanes.insert(key)
+                                    engine.strudelBridge.playHit(lane.hitType)
+                                    engine.haptics.drumHit()
                                 }
                             }
+                            .onEnded { _ in
+                                activeDrumLanes.remove("L_\(lane.id)")
+                            }
+                    )
+
+                    // Divider
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 1)
+
+                    // Right hand pad
+                    ZStack {
+                        Rectangle()
+                            .fill(rightActive ? lane.color.opacity(0.35) : Color.white.opacity(0.0))
+
+                        HStack(spacing: 6) {
+                            Text(lane.name)
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundColor(rightActive ? lane.color : .white.opacity(0.4))
+                            Text(lane.emoji)
+                                .font(.system(size: 20))
                         }
-                        .buttonStyle(.plain)
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { _ in
-                                    if !activePads.contains(pad.hitType) {
-                                        activePads.insert(pad.hitType)
-                                        engine.strudelBridge.playHit(pad.hitType)
-                                        engine.haptics.drumHit()
-                                    }
-                                }
-                                .onEnded { _ in
-                                    activePads.remove(pad.hitType)
-                                }
-                        )
-                        .scaleEffect(isActive ? 0.95 : 1.0)
-                        .animation(.spring(response: 0.15, dampingFraction: 0.5), value: isActive)
                     }
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in
+                                let key = "R_\(lane.id)"
+                                if !activeDrumLanes.contains(key) {
+                                    activeDrumLanes.insert(key)
+                                    engine.strudelBridge.playHit(lane.hitType)
+                                    engine.haptics.drumHit()
+                                }
+                            }
+                            .onEnded { _ in
+                                activeDrumLanes.remove("R_\(lane.id)")
+                            }
+                    )
                 }
+                .frame(maxHeight: .infinity)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(Color.white.opacity(leftActive || rightActive ? 0.15 : 0.04))
+                        .frame(height: 1)
+                }
+                .animation(.easeOut(duration: 0.08), value: leftActive)
+                .animation(.easeOut(duration: 0.08), value: rightActive)
             }
 
-            Spacer().frame(height: 100) // space for bottom UI
+            Spacer().frame(height: 90)
         }
-        .padding(.horizontal, 12)
     }
 
     // MARK: - Bottom Controls
