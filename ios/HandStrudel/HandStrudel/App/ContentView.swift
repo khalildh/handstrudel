@@ -698,87 +698,99 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Drum Zone Overlay
+    // MARK: - Drum Pad Overlay
 
-    @State private var flashingPad: String? = nil
+    @State private var activePads = Set<String>()
+
+    private struct DrumPad {
+        let name: String
+        let hitType: String
+        let emoji: String
+        let color: Color
+    }
+
+    private let drumPads: [[DrumPad]] = [
+        // Top row: cymbals
+        [
+            DrumPad(name: "HAT", hitType: "hihat", emoji: "🔔", color: .cyan),
+            DrumPad(name: "CRASH", hitType: "crash", emoji: "💥", color: .yellow),
+        ],
+        // Middle row: snare + clap
+        [
+            DrumPad(name: "SNARE", hitType: "snare", emoji: "🥁", color: .orange),
+            DrumPad(name: "RIDE", hitType: "ride", emoji: "🛎️", color: .pink),
+        ],
+        // Bottom row: kick + tom
+        [
+            DrumPad(name: "KICK", hitType: "kick", emoji: "🦶", color: .red),
+            DrumPad(name: "TOM", hitType: "tom", emoji: "🪘", color: .purple),
+        ],
+    ]
 
     private var drumZoneOverlay: some View {
-        VStack(spacing: 0) {
-            // Hand zone labels at top
-            HStack {
-                Text("L hand")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(.green.opacity(0.5))
-                Spacer()
-                Text("R hand")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(.pink.opacity(0.5))
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+        VStack(spacing: 6) {
+            Spacer().frame(height: 100) // space for top UI
 
-            Spacer()
+            ForEach(0..<drumPads.count, id: \.self) { row in
+                HStack(spacing: 6) {
+                    ForEach(0..<drumPads[row].count, id: \.self) { col in
+                        let pad = drumPads[row][col]
+                        let isActive = activePads.contains(pad.hitType)
 
-            // Tap-to-play drum pad grid
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 1),
-                GridItem(.flexible(), spacing: 1),
-                GridItem(.flexible(), spacing: 1)
-            ], spacing: 1) {
-                let allZones = DrumModeManager.leftZones + DrumModeManager.rightZones
-                ForEach(Array(allZones.enumerated()), id: \.offset) { idx, zone in
-                    Button(action: {
-                        engine.strudelBridge.playHit(zone.hitType)
-                        flashingPad = zone.name
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            if flashingPad == zone.name { flashingPad = nil }
-                        }
-                    }) {
-                        VStack(spacing: 4) {
-                            Text(padEmoji(for: zone.name))
-                                .font(.system(size: 24))
-                            Text(zone.name)
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 70)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(
-                                    LinearGradient(
-                                        colors: flashingPad == zone.name
-                                            ? [Color.green.opacity(0.5), Color.green.opacity(0.2)]
-                                            : [Color.white.opacity(0.1), Color.white.opacity(0.04)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
+                        Button(action: {}) {
+                            ZStack {
+                                // Ripple effect on hit
+                                if isActive {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(pad.color.opacity(0.3))
+                                        .scaleEffect(1.05)
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(pad.color, lineWidth: 2)
+                                        .scaleEffect(1.1)
+                                        .opacity(0.5)
+                                }
+
+                                // Pad background
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(
+                                        isActive
+                                            ? pad.color.opacity(0.35)
+                                            : Color.white.opacity(0.06)
                                     )
-                                )
+
+                                // Content
+                                VStack(spacing: 6) {
+                                    Text(pad.emoji)
+                                        .font(.system(size: 32))
+                                    Text(pad.name)
+                                        .font(.system(size: 13, weight: .black, design: .rounded))
+                                        .foregroundColor(isActive ? pad.color : .white.opacity(0.6))
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { _ in
+                                    if !activePads.contains(pad.hitType) {
+                                        activePads.insert(pad.hitType)
+                                        engine.strudelBridge.playHit(pad.hitType)
+                                        engine.haptics.drumHit()
+                                    }
+                                }
+                                .onEnded { _ in
+                                    activePads.remove(pad.hitType)
+                                }
                         )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
-                        )
-                        .scaleEffect(flashingPad == zone.name ? 0.9 : 1.0)
-                        .animation(.spring(response: 0.2, dampingFraction: 0.5), value: flashingPad)
+                        .scaleEffect(isActive ? 0.95 : 1.0)
+                        .animation(.spring(response: 0.15, dampingFraction: 0.5), value: isActive)
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 120) // space for bottom controls
-        }
-    }
 
-    private func padEmoji(for name: String) -> String {
-        switch name {
-        case "Crash": return "💥"
-        case "Hi-Hat": return "🔔"
-        case "Kick": return "🦶"
-        case "Ride": return "🛎️"
-        case "Snare": return "🥁"
-        case "Tom": return "🪘"
-        default: return "🎵"
+            Spacer().frame(height: 100) // space for bottom UI
         }
+        .padding(.horizontal, 12)
     }
 
     // MARK: - Bottom Controls
