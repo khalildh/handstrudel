@@ -2,61 +2,119 @@ import Foundation
 
 struct DrumZone {
     let name: String
-    let hitType: String  // matches playHit() JS function parameter
+    let hitType: String
     let color: String
 }
 
 final class DrumModeManager {
-    static let leftZones: [DrumZone] = [
+    // All 6 drums in order from top to bottom (matching the UI lanes)
+    static let allDrums: [DrumZone] = [
         DrumZone(name: "Crash", hitType: "crash", color: "yellow"),
         DrumZone(name: "Hi-Hat", hitType: "hihat", color: "cyan"),
+        DrumZone(name: "Snare", hitType: "snare", color: "orange"),
+        DrumZone(name: "Ride", hitType: "ride", color: "pink"),
+        DrumZone(name: "Tom", hitType: "tom", color: "purple"),
         DrumZone(name: "Kick", hitType: "kick", color: "red"),
     ]
 
-    static let rightZones: [DrumZone] = [
-        DrumZone(name: "Ride", hitType: "ride", color: "gold"),
-        DrumZone(name: "Snare", hitType: "snare", color: "orange"),
-        DrumZone(name: "Tom", hitType: "tom", color: "purple"),
-    ]
+    // Keep old statics for backward compat
+    static let leftZones = allDrums
+    static let rightZones = allDrums
 
-    // Track previous Y positions to detect velocity
-    private var prevLeftY: Double = 0.5
-    private var prevRightY: Double = 0.5
-    private var leftCooldown: TimeInterval = 0
-    private var rightCooldown: TimeInterval = 0
-    private let cooldownDuration: TimeInterval = 0.1
+    // Pinch detection (same as GridModeManager)
+    private var leftPinching = false
+    private var rightPinching = false
+    private let pinchThreshold: Double = 0.7
+    private let releaseThreshold: Double = 0.4
 
-    // Returns hit type strings for playHit() JS function
-    func checkHits(hands: HandsState, currentTime: TimeInterval) -> [String] {
-        var hits: [String] = []
+    // Track which drum each hand last triggered (prevent re-trigger)
+    private var leftLastDrum: String? = nil
+    private var rightLastDrum: String? = nil
 
+    // Published lane indices for UI highlighting
+    var leftLane: Int? = nil
+    var rightLane: Int? = nil
+    var isLeftPinching: Bool { leftPinching }
+    var isRightPinching: Bool { rightPinching }
+
+    struct DrumHit {
+        let hand: String
+        let hitType: String
+    }
+
+    /// Map hand Y to drum index (0 = top/crash, 5 = bottom/kick)
+    func yToDrumIndex(y: Double) -> Int {
+        let topPad = 0.15
+        let bottomPad = 0.20
+        let usable = 1.0 - topPad - bottomPad
+        let normalized = max(0, min(1, (y - topPad) / usable))
+        return max(0, min(Self.allDrums.count - 1, Int(normalized * Double(Self.allDrums.count))))
+    }
+
+    /// Check for pinch-based drum hits. Returns list of hits to play.
+    func checkHits(hands: HandsState, currentTime: TimeInterval) -> [DrumHit] {
+        var hits: [DrumHit] = []
+
+        // Left hand
         if let left = hands.left {
-            let velocity = abs(left.y - prevLeftY)
-            if velocity > 0.04 && currentTime > leftCooldown {
-                let zoneIdx = min(2, Int(left.y * 3))
-                hits.append(Self.leftZones[zoneIdx].hitType)
-                leftCooldown = currentTime + cooldownDuration
+            let drumIdx = yToDrumIndex(y: left.y)
+            leftLane = drumIdx
+            let drum = Self.allDrums[drumIdx]
+            let isPinching = left.pinch > pinchThreshold
+
+            if isPinching && !leftPinching {
+                leftPinching = true
+                leftLastDrum = drum.hitType
+                hits.append(DrumHit(hand: "left", hitType: drum.hitType))
+            } else if isPinching && leftPinching {
+                // Still pinching — retrigger if moved to new drum
+                if drum.hitType != leftLastDrum {
+                    leftLastDrum = drum.hitType
+                    hits.append(DrumHit(hand: "left", hitType: drum.hitType))
+                }
+            } else if left.pinch < releaseThreshold {
+                leftPinching = false
+                leftLastDrum = nil
             }
-            prevLeftY = left.y
+        } else {
+            leftPinching = false
+            leftLastDrum = nil
+            leftLane = nil
         }
 
+        // Right hand
         if let right = hands.right {
-            let velocity = abs(right.y - prevRightY)
-            if velocity > 0.04 && currentTime > rightCooldown {
-                let zoneIdx = min(2, Int(right.y * 3))
-                hits.append(Self.rightZones[zoneIdx].hitType)
-                rightCooldown = currentTime + cooldownDuration
+            let drumIdx = yToDrumIndex(y: right.y)
+            rightLane = drumIdx
+            let drum = Self.allDrums[drumIdx]
+            let isPinching = right.pinch > pinchThreshold
+
+            if isPinching && !rightPinching {
+                rightPinching = true
+                rightLastDrum = drum.hitType
+                hits.append(DrumHit(hand: "right", hitType: drum.hitType))
+            } else if isPinching && rightPinching {
+                if drum.hitType != rightLastDrum {
+                    rightLastDrum = drum.hitType
+                    hits.append(DrumHit(hand: "right", hitType: drum.hitType))
+                }
+            } else if right.pinch < releaseThreshold {
+                rightPinching = false
+                rightLastDrum = nil
             }
-            prevRightY = right.y
+        } else {
+            rightPinching = false
+            rightLastDrum = nil
+            rightLane = nil
         }
 
         return hits
     }
 
-    // Get current zone names for display
+    // Legacy compat
     func currentZones(hands: HandsState) -> (left: String?, right: String?) {
-        let leftZone = hands.left.map { min(2, Int($0.y * 3)) }.map { Self.leftZones[$0].name }
-        let rightZone = hands.right.map { min(2, Int($0.y * 3)) }.map { Self.rightZones[$0].name }
+        let leftZone = leftLane.map { Self.allDrums[$0].name }
+        let rightZone = rightLane.map { Self.allDrums[$0].name }
         return (leftZone, rightZone)
     }
 }

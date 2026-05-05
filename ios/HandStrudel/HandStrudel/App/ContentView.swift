@@ -723,15 +723,23 @@ struct ContentView: View {
         VStack(spacing: 0) {
             Spacer().frame(height: 90)
 
-            ForEach(drumLanes) { lane in
-                let leftActive = activeDrumLanes.contains("L_\(lane.id)")
-                let rightActive = activeDrumLanes.contains("R_\(lane.id)")
+            ForEach(Array(drumLanes.enumerated()), id: \.element.id) { idx, lane in
+                let leftTouched = activeDrumLanes.contains("L_\(lane.id)")
+                let rightTouched = activeDrumLanes.contains("R_\(lane.id)")
+                let leftHand = engine.drumLeftLane == idx
+                let rightHand = engine.drumRightLane == idx
+                let leftPinch = leftHand && engine.drumModeManager.isLeftPinching
+                let rightPinch = rightHand && engine.drumModeManager.isRightPinching
+                let leftActive = leftTouched || leftPinch
+                let rightActive = rightTouched || rightPinch
 
                 HStack(spacing: 0) {
                     // Left hand pad
                     ZStack {
                         Rectangle()
-                            .fill(leftActive ? lane.color.opacity(0.35) : Color.white.opacity(0.03))
+                            .fill(leftActive ? lane.color.opacity(0.35)
+                                  : leftHand ? lane.color.opacity(0.1)
+                                  : Color.white.opacity(0.03))
 
                         HStack(spacing: 6) {
                             Text(lane.emoji)
@@ -765,7 +773,9 @@ struct ContentView: View {
                     // Right hand pad
                     ZStack {
                         Rectangle()
-                            .fill(rightActive ? lane.color.opacity(0.35) : Color.white.opacity(0.0))
+                            .fill(rightActive ? lane.color.opacity(0.35)
+                                  : rightHand ? lane.color.opacity(0.1)
+                                  : Color.white.opacity(0.0))
 
                         HStack(spacing: 6) {
                             Text(lane.name)

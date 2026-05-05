@@ -66,7 +66,7 @@ final class EngineController: ObservableObject {
 
     // Drum mode
     @Published var drumModeEnabled = false
-    private let drumModeManager = DrumModeManager()
+    let drumModeManager = DrumModeManager()
     @Published var lastDrumHit: String = ""
 
     // Camera filter
@@ -414,18 +414,26 @@ final class EngineController: ObservableObject {
         evaluateDrumLoopsIfChanged(modePrefix: "grid")
     }
 
+    // Drum hand lane tracking for UI
+    @Published var drumLeftLane: Int? = nil
+    @Published var drumRightLane: Int? = nil
+
     private func tickDrumMode() {
-        // Sync XY pad values to Web Audio
         strudelBridge.updateDrumParams(intensity: drumIntensity, complexity: drumComplexity)
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         let hits = drumModeManager.checkHits(hands: currentHands, currentTime: elapsed)
-        for hitType in hits {
-            strudelBridge.playHit(hitType)
+        for hit in hits {
+            strudelBridge.playHit(hit.hitType)
             haptics.drumHit()
-            lastDrumHit = hitType
-            loopRecorder.recordEvent(.drumHit(hitType: hitType), currentTime: elapsed)
-            jamSession.sendEvent(.drumHit(hitType: hitType))
+            lastDrumHit = hit.hitType
+            loopRecorder.recordEvent(.drumHit(hitType: hit.hitType), currentTime: elapsed)
+            jamSession.sendEvent(.drumHit(hitType: hit.hitType))
         }
+
+        // Update lane display for UI
+        drumLeftLane = drumModeManager.leftLane
+        drumRightLane = drumModeManager.rightLane
+
         evaluateDrumLoopsIfChanged(modePrefix: "drum")
     }
 
