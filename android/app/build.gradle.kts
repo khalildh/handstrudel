@@ -58,9 +58,6 @@ dependencies {
     // ML Kit Hand Landmarks
     implementation("com.google.mediapipe:tasks-vision:0.10.18")
 
-    // WebView
-    implementation("androidx.webkit:webkit:1.12.1")
-
     // Core
     implementation("androidx.core:core-ktx:1.15.0")
 }

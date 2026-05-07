@@ -33,6 +33,13 @@ val NOTES = listOf(
     "c5", "d5", "e5",
 )
 
+val MIDI_NOTES = listOf(
+    36, 38, 40, 43, 45,
+    48, 50, 52, 55, 57,
+    60, 62, 64, 67, 69,
+    72, 74, 76,
+)
+
 val STRUCTS = listOf(
     "x ~ x ~ x ~ x ~",
     "x ~ ~ x ~ ~ x ~",

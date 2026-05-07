@@ -1,12 +1,16 @@
 package com.handstrudel.engine
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import com.handstrudel.engine.synth.Oscillator
+import com.handstrudel.engine.synth.SynthEngine
 import com.handstrudel.models.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 class EngineController(context: Context) {
-    val strudelBridge = StrudelBridge(context)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    val synthEngine = SynthEngine()
     val handTracker = HandTrackingManager(context)
     private val gridManager = GridModeManager()
     private val drumManager = DrumModeManager()
@@ -48,19 +52,20 @@ class EngineController(context: Context) {
     private val smoothedParams = mutableMapOf<String, Double>()
     private val alpha = 0.1
 
-    // Last evaluated code (avoid re-eval)
-    private var lastCode = ""
+    // Struct rotation
     private var structIdx = 0
     private var structTimer = 0L
 
     init {
-        strudelBridge.onBeat = { beat ->
-            currentBeat.value = beat
+        synthEngine.onBeat = { beat ->
+            mainHandler.post { currentBeat.value = beat }
         }
 
         handTracker.onHandsDetected = { hands ->
-            handsState.value = hands
-            tick(hands)
+            mainHandler.post {
+                handsState.value = hands
+                tick(hands)
+            }
         }
 
         recomputeScaleNotes()
@@ -68,12 +73,12 @@ class EngineController(context: Context) {
 
     fun start(preset: Preset) {
         selectedPreset = preset
-        strudelBridge.initialize()
+        synthEngine.start()
         isRunning.value = true
     }
 
     fun stop() {
-        strudelBridge.stop()
+        synthEngine.stop()
         isRunning.value = false
     }
 
@@ -85,10 +90,10 @@ class EngineController(context: Context) {
         if (!isRunning.value) return
 
         val now = System.currentTimeMillis()
-        // Rotate struct every 8 seconds
         if (now - structTimer > 8000) {
             structTimer = now
             structIdx = (structIdx + 1) % STRUCTS.size
+            synthEngine.updateStructPattern(STRUCTS[structIdx])
         }
 
         when {
@@ -122,36 +127,23 @@ class EngineController(context: Context) {
             smoothedParams[id] = prev + alpha * (raw - prev)
         }
 
-        // Build Strudel code
+        // Update synth engine directly
         val noteIdx = smoothedParams["noteIdx"]?.toInt()?.coerceIn(0, NOTES.size - 1) ?: 10
-        val note = NOTES[noteIdx]
-        val bpm = smoothedParams["bpm"] ?: manualBPM
-        val cpm = String.format("%.1f", bpm / 4)
-        val st = STRUCTS[structIdx]
+        val midiNote = MIDI_NOTES.getOrElse(noteIdx) { 60 }
 
-        var code = "note(\"$note\").s(\"$selectedWaveform\").struct(\"$st\").cpm($cpm)"
-
-        val extraIds = preset.leftMapping.values + preset.rightMapping.values
-        for (id in extraIds.toSet()) {
-            if (id == "noteIdx" || id == "bpm" || id == "none") continue
-            val def = PARAM_MAP[id] ?: continue
-            val v = smoothedParams[id] ?: def.defaultValue
-            code += ".${def.strudelKey}(${String.format("%.2f", v)})"
-        }
-
-        if (code != lastCode) {
-            lastCode = code
-            strudelBridge.evaluate(code)
-        }
-
-        // Update __hp for signal-based params
-        val hpParams = mutableMapOf<String, Double>()
-        hpParams["_cpm"] = (bpm) / 4
-        hpParams["_midi"] = (48 + noteIdx * 2).toDouble()
-        for ((id, v) in smoothedParams) {
-            hpParams[id] = v
-        }
-        strudelBridge.updateParams(hpParams)
+        synthEngine.melodicMidi = midiNote
+        synthEngine.melodicWaveform = selectedWaveform
+        synthEngine.bpm = (smoothedParams["bpm"] ?: manualBPM).toFloat()
+        synthEngine.gain = (smoothedParams["gain"] ?: 0.55).toFloat()
+        synthEngine.lpfCutoff = (smoothedParams["lpf"] ?: 3000.0).toFloat()
+        synthEngine.hpfCutoff = (smoothedParams["hpf"] ?: 20.0).toFloat()
+        synthEngine.reverbMix = (smoothedParams["reverb"] ?: 0.2).toFloat()
+        synthEngine.delayTime = (smoothedParams["delay"] ?: 0.12).toFloat()
+        synthEngine.panValue = (smoothedParams["pan"] ?: 0.5).toFloat()
+        synthEngine.crushBits = (smoothedParams["crush"] ?: 16.0).toFloat()
+        synthEngine.shapeAmount = (smoothedParams["shape"] ?: 0.0).toFloat()
+        synthEngine.attackTime = (smoothedParams["attack"] ?: 0.01).toFloat()
+        synthEngine.releaseTime = (smoothedParams["release"] ?: 0.1).toFloat()
     }
 
     private fun tickGridMode(hands: HandsState) {
@@ -163,9 +155,9 @@ class EngineController(context: Context) {
 
         for (event in events) {
             when (event.action) {
-                NoteAction.NOTE_ON -> strudelBridge.noteOn(event.hand, event.midi, selectedWaveform, event.velocity)
-                NoteAction.NOTE_OFF -> strudelBridge.noteOff(event.hand)
-                NoteAction.SLIDE -> strudelBridge.noteSlide(event.hand, event.midi)
+                NoteAction.NOTE_ON -> synthEngine.noteOn(event.hand, event.midi, selectedWaveform, event.velocity.toFloat())
+                NoteAction.NOTE_OFF -> synthEngine.noteOff(event.hand)
+                NoteAction.SLIDE -> synthEngine.noteSlide(event.hand, event.midi)
             }
         }
     }
@@ -177,16 +169,17 @@ class EngineController(context: Context) {
         drumLeftPinching.value = drumManager.isLeftPinching
         drumRightPinching.value = drumManager.isRightPinching
 
-        strudelBridge.setDrumParams(drumIntensity, drumComplexity)
+        synthEngine.drumSynth.intensity = drumIntensity.toFloat()
+        synthEngine.drumSynth.complexity = drumComplexity.toFloat()
 
         for (hit in hits) {
-            strudelBridge.playHit(hit.hitType)
+            synthEngine.playHit(hit.hitType)
         }
     }
 
     private fun axisValue(hand: HandData, axis: String): Double {
         return when (axis) {
-            "y" -> 1.0 - hand.y // Invert: top = high
+            "y" -> 1.0 - hand.y
             "x" -> hand.x
             "spread" -> hand.spread
             "pinch" -> hand.pinch

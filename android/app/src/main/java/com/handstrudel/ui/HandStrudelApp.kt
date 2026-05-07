@@ -19,12 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.handstrudel.engine.EngineController
 import com.handstrudel.engine.HandsState
 import com.handstrudel.models.PRESETS
 import com.handstrudel.models.Preset
-import com.handstrudel.models.midiNoteName
 
 @Composable
 fun HandStrudelApp() {
@@ -32,15 +30,17 @@ fun HandStrudelApp() {
     var isRunning by remember { mutableStateOf(false) }
     val engine = remember { EngineController(context) }
 
-    if (!isRunning) {
-        StartScreen(
-            onStart = { preset ->
-                engine.start(preset)
-                isRunning = true
-            }
-        )
-    } else {
-        PerformanceScreen(engine = engine)
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (!isRunning) {
+            StartScreen(
+                onStart = { preset ->
+                    engine.start(preset)
+                    isRunning = true
+                }
+            )
+        } else {
+            PerformanceScreen(engine = engine)
+        }
     }
 }
 
@@ -60,12 +60,6 @@ fun PerformanceScreen(engine: EngineController) {
         HandOverlay(
             handsState = handsState,
             modifier = Modifier.fillMaxSize()
-        )
-
-        // WebView (hidden, just for audio)
-        AndroidView(
-            factory = { engine.strudelBridge.getWebView() },
-            modifier = Modifier.size(1.dp).offset(x = (-100).dp)
         )
 
         // Top bar — logo + mode indicator

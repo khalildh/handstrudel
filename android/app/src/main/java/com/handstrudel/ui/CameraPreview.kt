@@ -1,7 +1,5 @@
 package com.handstrudel.ui
 
-import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
@@ -83,14 +81,14 @@ fun CameraPreview(
 }
 
 private fun processFrame(imageProxy: ImageProxy, handTracker: HandTrackingManager) {
-    val bitmap = imageProxy.toBitmap()
-
-    // Mirror the bitmap for front camera
-    val matrix = Matrix().apply { preScale(-1f, 1f) }
-    val mirrored = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-
-    handTracker.detectAsync(mirrored, imageProxy.imageInfo.timestamp / 1_000_000)
-
-    if (mirrored !== bitmap) mirrored.recycle()
-    imageProxy.close()
+    try {
+        // No mirroring needed — HandTrackingManager already flips X and swaps chirality
+        val bitmap = imageProxy.toBitmap()
+        handTracker.detectAsync(bitmap, imageProxy.imageInfo.timestamp / 1_000_000)
+        bitmap.recycle()
+    } catch (e: Exception) {
+        Log.e("CameraPreview", "Frame processing error: $e")
+    } finally {
+        imageProxy.close()
+    }
 }
