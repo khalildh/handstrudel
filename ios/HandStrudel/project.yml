@@ -5,6 +5,19 @@ options:
     iOS: "16.0"
   xcodeVersion: "16.0"
 
+schemes:
+  HandStrudel:
+    build:
+      targets:
+        HandStrudel: all
+    run:
+      config: Debug
+      storeKitConfiguration: HandStrudel.storekit
+    test:
+      config: Debug
+      targets:
+        - HandStrudelTests
+
 targets:
   HandStrudel:
     type: application
