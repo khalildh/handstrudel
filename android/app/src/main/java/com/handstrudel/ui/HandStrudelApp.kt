@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,37 +14,131 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.handstrudel.engine.EngineController
+import com.handstrudel.engine.HandsState
 import com.handstrudel.models.PRESETS
 import com.handstrudel.models.Preset
+import com.handstrudel.models.midiNoteName
 
 @Composable
 fun HandStrudelApp() {
+    val context = LocalContext.current
     var isRunning by remember { mutableStateOf(false) }
-    var selectedPreset by remember { mutableStateOf<Preset?>(null) }
+    val engine = remember { EngineController(context) }
 
     if (!isRunning) {
         StartScreen(
             onStart = { preset ->
-                selectedPreset = preset
+                engine.start(preset)
                 isRunning = true
             }
         )
     } else {
-        // TODO: PerformanceScreen with camera + hand tracking
-        Box(
+        PerformanceScreen(engine = engine)
+    }
+}
+
+@Composable
+fun PerformanceScreen(engine: EngineController) {
+    val handsState by engine.handsState.collectAsState()
+    val beat by engine.currentBeat.collectAsState()
+
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        // Camera preview (full screen)
+        CameraPreview(
+            modifier = Modifier.fillMaxSize(),
+            handTracker = engine.handTracker
+        )
+
+        // Hand skeleton overlay
+        HandOverlay(
+            handsState = handsState,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // WebView (hidden, just for audio)
+        AndroidView(
+            factory = { engine.strudelBridge.getWebView() },
+            modifier = Modifier.size(1.dp).offset(x = (-100).dp)
+        )
+
+        // Top bar — logo + mode indicator
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(top = 50.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "Playing: ${selectedPreset?.name ?: "?"}",
-                color = Color.White,
-                fontSize = 20.sp
+                "handstrudel",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+
+            // Beat dots
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                for (i in 0..3) {
+                    Box(
+                        modifier = Modifier
+                            .size(if (i == beat) 10.dp else 6.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (i == beat) Color(0xFF00FF9E)
+                                else Color.White.copy(alpha = 0.2f)
+                            )
+                    )
+                }
+            }
+        }
+
+        // Bottom controls
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 40.dp, start = 20.dp, end = 20.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Mode indicator
+            val modeText = when {
+                engine.gridModeEnabled -> "GRID"
+                engine.drumModeEnabled -> "DRUMS"
+                else -> "MELODIC"
+            }
+            Text(
+                modeText,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF00FF9E),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF00FF9E).copy(alpha = 0.15f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+
+            // BPM
+            Text(
+                "${engine.manualBPM.toInt()}",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF00FF9E)
+            )
+
+            // Preset name
+            Text(
+                engine.selectedPreset?.emoji ?: "",
+                fontSize = 24.sp
             )
         }
     }
@@ -129,7 +224,6 @@ fun StartScreen(onStart: (Preset) -> Unit) {
 
 @Composable
 fun PresetCard(preset: Preset, isSelected: Boolean, onTap: () -> Unit) {
-    val borderColor = if (isSelected) Color(0xFF00FF9E) else Color.White.copy(alpha = 0.06f)
     val bgColor = if (isSelected) Color(0xFF00FF9E).copy(alpha = 0.08f) else Color.White.copy(alpha = 0.04f)
 
     Box(
