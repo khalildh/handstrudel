@@ -127,7 +127,8 @@ struct ContentView: View {
             // Hand skeleton overlay with glow (aspect-corrected)
             HandOverlayView(
                 handsState: engine.handsState,
-                videoAspect: engine.handTracker.videoWidth / engine.handTracker.videoHeight
+                videoAspect: engine.handTracker.videoWidth / engine.handTracker.videoHeight,
+                theme: engine.selectedHandTheme
             )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
@@ -153,17 +154,8 @@ struct ContentView: View {
                     .padding(.top, 8)
 
                 // Logo
-                if !engine.drumModeEnabled {
-                    logoMark
-                        .padding(.top, 2)
-                }
-
-                // Drum XY pad (top area, out of the way of drum pads)
-                if engine.drumModeEnabled {
-                    drumXYPad
-                        .padding(.horizontal, 16)
-                        .padding(.top, 2)
-                }
+                logoMark
+                    .padding(.top, 2)
 
                 // Jam session indicator
                 if engine.jamSession.isActive && !engine.jamSession.lastReceivedEvent.isEmpty {
@@ -195,6 +187,13 @@ struct ContentView: View {
                 // Grid quick controls (range + octave)
                 if engine.gridModeEnabled {
                     gridQuickBar
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 4)
+                }
+
+                // Drum XY pad (bottom area, below drum lanes)
+                if engine.drumModeEnabled {
+                    drumXYPad
                         .padding(.horizontal, 16)
                         .padding(.bottom, 4)
                 }
@@ -1145,6 +1144,9 @@ struct ControlSheet: View {
                 sectionDivider
                 filterSection
 
+                sectionDivider
+                handThemeSection
+
                 if !engine.savedLoops.isEmpty {
                     sectionDivider
                     loopsSection
@@ -1162,6 +1164,9 @@ struct ControlSheet: View {
                     sectionDivider
                     trackSection
                 }
+
+                sectionDivider
+                restorePurchasesSection
             }
             .padding(20)
         }
@@ -1218,16 +1223,13 @@ struct ControlSheet: View {
     }
 
     private func packInfo(for packId: String) -> (name: String, description: String, items: [String]) {
-        switch packId {
-        case StoreManager.studioPack: return ("Studio Pack", "Professional studio presets", ["Studio preset", "Cinematic preset"])
-        case StoreManager.partyPack: return ("Party Pack", "High-energy party presets", ["Party preset", "Rave preset"])
-        case StoreManager.experimentalPack: return ("Experimental Pack", "Experimental sound presets", ["Glitch preset", "Ambient preset"])
-        case StoreManager.analogPack: return ("Analog Pack", "Warm analog-style waveforms", ["FM synth", "Supersaw", "Pulse"])
-        case StoreManager.texturePack: return ("Texture Pack", "Textural sound sources", ["Noise", "Metallic", "Pad"])
-        case StoreManager.vocalPack: return ("Vocal Pack", "Vocal synthesis sounds", ["Choir", "Formant", "Whisper"])
-        case StoreManager.kit808: return ("808 Kit", "Classic 808 drum machine", ["808 kick", "808 snare", "808 hat patterns"])
-        case StoreManager.kitElectronic: return ("Electronic Kit", "Modern electronic drums", ["Electro kick", "Glitch snare", "Digital hat patterns"])
-        case StoreManager.kitWorld: return ("World Kit", "World percussion drums", ["Djembe", "Tabla", "World percussion patterns"])
+        let resolved = StoreManager.productId(for: packId)
+        switch resolved {
+        case StoreManager.studioPack: return ("Studio Pack", "7 professional studio presets", ["Tape", "Glass", "Deep", "Foggy", "Pulse", "Cosmic", "Glitch"])
+        case StoreManager.partyPack: return ("Party Pack", "9 high-energy party presets", ["EDM", "DnB", "Dubstep", "Rave", "Reggaeton", "Future Bass", "Techno", "Garage", "Phonk"])
+        case StoreManager.kit808: return ("808 Kit", "8 hip-hop & urban drum patterns", ["Boom Bap", "Drill", "Lo-Fi Hip Hop", "R&B", "Afrobeat", "Bounce", "Jersey Club", "Memphis"])
+        case StoreManager.kitElectronic: return ("Electronic Kit", "8 electronic drum patterns", ["Techno", "Breakbeat", "IDM", "Jungle", "Ambient", "Industrial", "2-Step", "Synthwave"])
+        case StoreManager.pro: return ("Pro Upgrade", "Unlock everything: 10 scales, 13 filters, 5 hand themes, watermark removal", ["Premium scales", "Camera filters", "Hand themes", "Remove watermark"])
         default: return ("Pack", "Premium content", [])
         }
     }
@@ -1375,9 +1377,14 @@ struct ControlSheet: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(Scale.allCases) { scale in
+                        let locked = scale.isPremium && !storeManager.isUnlocked(scale.packId ?? "")
                         Button(action: {
-                            engine.selectedScale = scale
-                            engine.recomputeScaleNotes()
+                            if locked, let packId = scale.packId {
+                                paywallPackId = packId
+                            } else {
+                                engine.selectedScale = scale
+                                engine.recomputeScaleNotes()
+                            }
                         }) {
                             Text(scale.rawValue)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
@@ -1392,6 +1399,18 @@ struct ControlSheet: View {
                                     Capsule()
                                         .stroke(engine.selectedScale == scale ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
                                 )
+                                .overlay(alignment: .topTrailing) {
+                                    if locked {
+                                        Text("PRO")
+                                            .font(.system(size: 6, weight: .bold, design: .rounded))
+                                            .foregroundColor(.white.opacity(0.8))
+                                            .padding(.horizontal, 3)
+                                            .padding(.vertical, 1)
+                                            .background(Capsule().fill(Color.white.opacity(0.15)))
+                                            .offset(x: 4, y: -4)
+                                    }
+                                }
+                                .opacity(locked ? 0.5 : 1.0)
                         }
                     }
                 }
@@ -1739,6 +1758,80 @@ struct ControlSheet: View {
                 }
             }
         }
+    }
+
+    // MARK: - Hand Theme
+
+    private var handThemeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("HAND THEME", icon: "hand.raised")
+
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ], spacing: 8) {
+                ForEach(HAND_THEMES) { theme in
+                    let locked = theme.isPremium && !storeManager.isUnlocked(theme.packId ?? "")
+                    let isSelected = engine.selectedHandTheme.id == theme.id
+                    Button(action: {
+                        if locked, let packId = theme.packId {
+                            paywallPackId = packId
+                        } else {
+                            engine.selectedHandTheme = theme
+                        }
+                    }) {
+                        VStack(spacing: 2) {
+                            Text(theme.emoji)
+                                .font(.system(size: 18))
+                            Text(theme.name)
+                                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                                .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(isSelected ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(isSelected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                        )
+                        .overlay(alignment: .topTrailing) {
+                            if locked {
+                                Text("PRO")
+                                    .font(.system(size: 7, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.white.opacity(0.15)))
+                                    .padding(4)
+                            }
+                        }
+                        .opacity(locked ? 0.5 : 1.0)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Restore Purchases
+
+    private var restorePurchasesSection: some View {
+        VStack(spacing: 12) {
+            Button(action: {
+                Task { await storeManager.restorePurchases() }
+            }) {
+                Text("Restore Purchases")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
     }
 
     // MARK: - Loops

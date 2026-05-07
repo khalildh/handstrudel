@@ -31,15 +31,48 @@ enum Scale: String, CaseIterable, Identifiable {
     case dorian = "Dorian"
     case pentatonic = "Pentatonic"
     case blues = "Blues"
+    case harmonicMinor = "Harmonic Minor"
+    case melodicMinor = "Melodic Minor"
+    case phrygian = "Phrygian"
+    case lydian = "Lydian"
+    case mixolydian = "Mixolydian"
+    case locrian = "Locrian"
+    case wholeTone = "Whole Tone"
+    case chromatic = "Chromatic"
+    case hungarianMinor = "Hungarian Minor"
+    case hirajoshi = "Hirajoshi"
+
     var id: String { rawValue }
+
     var intervals: [Int] {
         switch self {
-        case .major:      return [0, 2, 4, 5, 7, 9, 11]
-        case .minor:      return [0, 2, 3, 5, 7, 8, 10]
-        case .dorian:     return [0, 2, 3, 5, 7, 9, 10]
-        case .pentatonic: return [0, 2, 4, 7, 9]
-        case .blues:      return [0, 3, 5, 6, 7, 10]
+        case .major:          return [0, 2, 4, 5, 7, 9, 11]
+        case .minor:          return [0, 2, 3, 5, 7, 8, 10]
+        case .dorian:         return [0, 2, 3, 5, 7, 9, 10]
+        case .pentatonic:     return [0, 2, 4, 7, 9]
+        case .blues:          return [0, 3, 5, 6, 7, 10]
+        case .harmonicMinor:  return [0, 2, 3, 5, 7, 8, 11]
+        case .melodicMinor:   return [0, 2, 3, 5, 7, 9, 11]
+        case .phrygian:       return [0, 1, 3, 5, 7, 8, 10]
+        case .lydian:         return [0, 2, 4, 6, 7, 9, 11]
+        case .mixolydian:     return [0, 2, 4, 5, 7, 9, 10]
+        case .locrian:        return [0, 1, 3, 5, 6, 8, 10]
+        case .wholeTone:      return [0, 2, 4, 6, 8, 10]
+        case .chromatic:      return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        case .hungarianMinor: return [0, 2, 3, 6, 7, 8, 11]
+        case .hirajoshi:      return [0, 2, 3, 7, 8]
         }
+    }
+
+    var isPremium: Bool {
+        switch self {
+        case .major, .minor, .dorian, .pentatonic, .blues: return false
+        default: return true
+        }
+    }
+
+    var packId: String? {
+        isPremium ? "pro" : nil
     }
 }
 

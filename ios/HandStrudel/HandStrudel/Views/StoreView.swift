@@ -21,46 +21,15 @@ struct StoreView: View {
                     id: StoreManager.studioPack,
                     name: "Studio Pack",
                     emoji: "🎛️",
-                    contents: ["Studio preset", "Cinematic preset"],
-                    description: "Professional studio presets"
+                    contents: ["Tape", "Glass", "Deep", "Foggy", "Pulse", "Cosmic", "Glitch"],
+                    description: "7 professional studio presets"
                 )
                 packRow(
                     id: StoreManager.partyPack,
                     name: "Party Pack",
                     emoji: "🎉",
-                    contents: ["Party preset", "Rave preset"],
-                    description: "High-energy party presets"
-                )
-                packRow(
-                    id: StoreManager.experimentalPack,
-                    name: "Experimental Pack",
-                    emoji: "🧪",
-                    contents: ["Glitch preset", "Ambient preset"],
-                    description: "Experimental sound presets"
-                )
-
-                // Sound Packs
-                sectionHeader("SOUND PACKS")
-                packRow(
-                    id: StoreManager.analogPack,
-                    name: "Analog Pack",
-                    emoji: "📻",
-                    contents: ["FM synth", "Supersaw", "Pulse"],
-                    description: "Warm analog-style waveforms"
-                )
-                packRow(
-                    id: StoreManager.texturePack,
-                    name: "Texture Pack",
-                    emoji: "🌊",
-                    contents: ["Noise", "Metallic", "Pad"],
-                    description: "Textural sound sources"
-                )
-                packRow(
-                    id: StoreManager.vocalPack,
-                    name: "Vocal Pack",
-                    emoji: "🎤",
-                    contents: ["Choir", "Formant", "Whisper"],
-                    description: "Vocal synthesis sounds"
+                    contents: ["EDM", "DnB", "Dubstep", "Rave", "Reggaeton", "Future Bass", "Techno", "Garage", "Phonk"],
+                    description: "9 high-energy party presets"
                 )
 
                 // Drum Kits
@@ -69,22 +38,15 @@ struct StoreView: View {
                     id: StoreManager.kit808,
                     name: "808 Kit",
                     emoji: "🥁",
-                    contents: ["808 kick", "808 snare", "808 hat patterns"],
-                    description: "Classic 808 drum machine"
+                    contents: ["Boom Bap", "Drill", "Lo-Fi Hip Hop", "R&B", "Afrobeat", "Bounce", "Jersey Club", "Memphis", "Bossa Nova", "Reggae"],
+                    description: "10 hip-hop, urban & world drum patterns"
                 )
                 packRow(
                     id: StoreManager.kitElectronic,
                     name: "Electronic Kit",
                     emoji: "⚡",
-                    contents: ["Electro kick", "Glitch snare", "Digital hat patterns"],
-                    description: "Modern electronic drums"
-                )
-                packRow(
-                    id: StoreManager.kitWorld,
-                    name: "World Kit",
-                    emoji: "🌍",
-                    contents: ["Djembe", "Tabla", "World percussion patterns"],
-                    description: "World percussion drums"
+                    contents: ["Techno", "Breakbeat", "IDM", "Jungle", "Ambient", "Industrial", "2-Step", "Synthwave"],
+                    description: "8 electronic drum patterns"
                 )
 
                 // Pro

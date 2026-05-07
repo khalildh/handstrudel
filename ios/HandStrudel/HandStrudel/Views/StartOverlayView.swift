@@ -295,10 +295,11 @@ struct StartOverlayView: View {
     }
 
     private func paywallInfo(for packId: String) -> (name: String, description: String, items: [String]) {
-        switch packId {
-        case StoreManager.studioPack: return ("Studio Pack", "Professional studio presets", ["Studio preset", "Cinematic preset"])
-        case StoreManager.partyPack: return ("Party Pack", "High-energy party presets", ["Party preset", "Rave preset"])
-        case StoreManager.experimentalPack: return ("Experimental Pack", "Experimental sound presets", ["Glitch preset", "Ambient preset"])
+        let resolved = StoreManager.productId(for: packId)
+        switch resolved {
+        case StoreManager.studioPack: return ("Studio Pack", "7 professional studio presets", ["Tape", "Glass", "Deep", "Foggy", "Pulse", "Cosmic", "Glitch"])
+        case StoreManager.partyPack: return ("Party Pack", "9 high-energy party presets", ["EDM", "DnB", "Dubstep", "Rave", "Reggaeton", "Future Bass", "Techno", "Garage", "Phonk"])
+        case StoreManager.pro: return ("Pro Upgrade", "Unlock everything", ["Premium scales", "Camera filters", "Hand themes"])
         default: return ("Pack", "Premium content", [])
         }
     }

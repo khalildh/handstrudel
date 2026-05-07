@@ -111,4 +111,29 @@ let CAMERA_FILTERS: [CameraFilter] = [
                  isPremium: true, packId: "filter_pack",
                  saturation: 0.1, contrast: 1.4, brightness: 0.05, hueRotation: 0,
                  overlayColor: Color(red: 0.8, green: 0.85, blue: 0.9), overlayOpacity: 0.1, blendMode: .softLight),
+
+    CameraFilter(id: "thermal", name: "Thermal", emoji: "🌡️",
+                 isPremium: true, packId: "filter_pack",
+                 saturation: 1.3, contrast: 1.4, brightness: 0, hueRotation: 30,
+                 overlayColor: Color(red: 1, green: 0.5, blue: 0), overlayOpacity: 0.15, blendMode: .screen),
+
+    CameraFilter(id: "vhs", name: "VHS", emoji: "📹",
+                 isPremium: true, packId: "filter_pack",
+                 saturation: 0.8, contrast: 1.3, brightness: 0.04, hueRotation: 0,
+                 overlayColor: Color(red: 0.8, green: 0.2, blue: 0.3), overlayOpacity: 0.08, blendMode: .screen),
+
+    CameraFilter(id: "matrix_filter", name: "Matrix", emoji: "💻",
+                 isPremium: true, packId: "filter_pack",
+                 saturation: 0.3, contrast: 1.3, brightness: -0.02, hueRotation: 100,
+                 overlayColor: Color(red: 0, green: 1, blue: 0.3), overlayOpacity: 0.12, blendMode: .screen),
+
+    CameraFilter(id: "infrared", name: "Infrared", emoji: "👁️",
+                 isPremium: true, packId: "filter_pack",
+                 saturation: 1.5, contrast: 1.2, brightness: 0.03, hueRotation: 300,
+                 overlayColor: Color(red: 0.8, green: 0, blue: 0.3), overlayOpacity: 0.1, blendMode: .softLight),
+
+    CameraFilter(id: "hologram", name: "Hologram", emoji: "🔮",
+                 isPremium: true, packId: "filter_pack",
+                 saturation: 1.8, contrast: 1.1, brightness: 0.06, hueRotation: 200,
+                 overlayColor: Color(red: 0.3, green: 0.8, blue: 1.0), overlayOpacity: 0.15, blendMode: .screen),
 ]

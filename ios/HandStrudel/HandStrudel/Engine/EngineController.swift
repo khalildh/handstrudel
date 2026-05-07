@@ -72,6 +72,9 @@ final class EngineController: ObservableObject {
     // Camera filter
     @Published var selectedFilter: CameraFilter = CAMERA_FILTERS[0]
 
+    // Hand skeleton theme
+    @Published var selectedHandTheme: HandTheme = HAND_THEMES[0]
+
     // Jam session (SharePlay)
     let jamSession = JamSessionManager()
 

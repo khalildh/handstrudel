@@ -148,7 +148,7 @@ let PRESETS: [Preset] = [
             right: ["y": "gain", "x": "hpf", "spread": "delay"]
         ),
         hydraMapping: DEFAULT_HYDRA_MAPPING,
-        isPremium: true, packId: "experimental"
+        isPremium: true, packId: "studio"
     ),
     Preset(
         id: "edm", name: "EDM", emoji: "⚡",
@@ -182,6 +182,141 @@ let PRESETS: [Preset] = [
         ),
         hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
+    ),
+    Preset(
+        id: "rave", name: "Rave", emoji: "🪩",
+        description: "Euphoric dancefloor energy",
+        color: (1.0, 0.0, 1.0),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "crush"],
+            right: ["y": "bpm", "x": "gain", "spread": "hpf"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "party"
+    ),
+    Preset(
+        id: "reggaeton", name: "Reggaeton", emoji: "🌴",
+        description: "Latin bounce & bass",
+        color: (1.0, 0.7, 0.0),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "shape"],
+            right: ["y": "gain", "x": "bpm", "spread": "pan"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "party"
+    ),
+    Preset(
+        id: "futurebass", name: "Future Bass", emoji: "🌌",
+        description: "Lush supersaws & drops",
+        color: (0.4, 0.2, 1.0),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "reverb"],
+            right: ["y": "gain", "x": "bpm", "spread": "crush"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "party"
+    ),
+    Preset(
+        id: "techno2", name: "Techno", emoji: "🏭",
+        description: "Dark industrial pulse",
+        color: (0.3, 0.3, 0.3),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "hpf", "spread": "shape"],
+            right: ["y": "bpm", "x": "gain", "spread": "crush"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "party"
+    ),
+    Preset(
+        id: "garage", name: "Garage", emoji: "🇬🇧",
+        description: "Skippy 2-step swing",
+        color: (0.0, 0.6, 0.8),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "delay"],
+            right: ["y": "gain", "x": "bpm", "spread": "reverb"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "party"
+    ),
+    Preset(
+        id: "phonk", name: "Phonk", emoji: "🚗",
+        description: "Cowbell drift vibes",
+        color: (0.5, 0.0, 0.0),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
+            right: ["y": "gain", "x": "hpf", "spread": "delay"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "party"
+    ),
+
+    // MARK: - Studio Pack
+
+    Preset(
+        id: "tape", name: "Tape", emoji: "📼",
+        description: "Warm analog saturation",
+        color: (0.7, 0.5, 0.3),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "shape"],
+            right: ["y": "gain", "x": "crush", "spread": "reverb"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
+    Preset(
+        id: "glass", name: "Glass", emoji: "🪟",
+        description: "Crystal clear highs",
+        color: (0.6, 0.9, 1.0),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "hpf", "spread": "delay"],
+            right: ["y": "gain", "x": "pan", "spread": "attack"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
+    Preset(
+        id: "deep", name: "Deep", emoji: "🕳️",
+        description: "Subterranean bass",
+        color: (0.2, 0.1, 0.4),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "reverb"],
+            right: ["y": "gain", "x": "shape", "spread": "release"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
+    Preset(
+        id: "foggy", name: "Foggy", emoji: "🌫️",
+        description: "Hazy & muted",
+        color: (0.6, 0.6, 0.7),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "attack"],
+            right: ["y": "gain", "x": "reverb", "spread": "release"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
+    Preset(
+        id: "pulse", name: "Pulse", emoji: "💓",
+        description: "Rhythmic & driving",
+        color: (0.9, 0.2, 0.3),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "bpm", "spread": "shape"],
+            right: ["y": "gain", "x": "lpf", "spread": "delay"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
+    Preset(
+        id: "cosmic", name: "Cosmic", emoji: "🪐",
+        description: "Vast space echoes",
+        color: (0.3, 0.2, 0.8),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "pan", "spread": "reverb"],
+            right: ["y": "gain", "x": "delay", "spread": "hpf"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
     ),
 ]
 

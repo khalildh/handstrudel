@@ -349,12 +349,72 @@ let DRUM_LOOPS: [DrumLoop] = [
     // Bossa Nova — syncopated light kick, rim on offbeats, shaker 16ths
     DrumLoop(id: "bossanova", name: "Bossa Nova", emoji: "🌴",
              code: "stack(\(_houseKick).struct(\"x ~ ~ x ~ ~ x ~\").gain(0.9), \(_rimshot).struct(\"~ ~ x ~ ~ x ~ x\"), \(_tinyHat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\").gain(0.3))",
-             isPremium: true, packId: "kit_world"),
+             isPremium: true, packId: "kit_808"),
 
     // Reggae — one-drop kick on 3, rim on 2&4, offbeat clicks
     DrumLoop(id: "reggae", name: "Reggae", emoji: "🟢",
              code: "stack(\(_deepKick).struct(\"~ ~ x ~\").gain(1.2), \(_rimshot).struct(\"~ x ~ x\"), \(_clave).struct(\"~ x ~ x ~ x ~ x\").gain(0.4))",
-             isPremium: true, packId: "kit_world"),
+             isPremium: true, packId: "kit_808"),
+
+    // Lo-Fi Hip Hop — lazy sparse kick, late snare, ghost rimshot
+    DrumLoop(id: "lofi_hiphop", name: "Lo-Fi Hip Hop", emoji: "☕",
+             code: "stack(\(_deepKick).struct(\"x ~ ~ ~ x ~ ~ ~\"), \(_snare).struct(\"~ ~ ~ ~ ~ ~ x ~\"), \(_closedHat).struct(\"x ~ x ~ x ~ x ~\"), \(_rimshot).struct(\"~ ~ ~ x ~ ~ ~ ~\"))",
+             isPremium: true, packId: "kit_808"),
+
+    // R&B — bouncy kick, clap on 3, 16th hats, open hat tail
+    DrumLoop(id: "rnb", name: "R&B", emoji: "💜",
+             code: "stack(\(_deepKick).struct(\"x ~ ~ x ~ ~ ~ ~\"), \(_clap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_closedHat).struct(\"[x x] [x x] [x x] [x x]\"), \(_openHat).struct(\"~ ~ ~ ~ ~ ~ ~ x\"))",
+             isPremium: true, packId: "kit_808"),
+
+    // Afrobeat — syncopated kick, double snare, triplet hats, clave
+    DrumLoop(id: "afrobeat", name: "Afrobeat", emoji: "🌍",
+             code: "stack(\(_houseKick).struct(\"x ~ x ~ ~ x ~ ~\"), \(_snare).struct(\"~ ~ ~ ~ x ~ ~ x\"), \(_closedHat).struct(\"[x x x] [x x x] [x x x] [x x x]\"), \(_clave).struct(\"x ~ ~ x ~ ~ x ~\"))",
+             isPremium: true, packId: "kit_808"),
+
+    // Bounce — steady bounce kick, big clap, skippy hats
+    DrumLoop(id: "bounce", name: "Bounce", emoji: "🏀",
+             code: "stack(\(_deepKick).struct(\"x ~ x ~ x ~ x ~\").gain(1.5), \(_hardClap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_closedHat).struct(\"[x x] ~ [x x] ~ [x x] ~ [x x] ~\"), \(_openHat).struct(\"~ ~ ~ ~ ~ ~ [~ x] ~\"))",
+             isPremium: true, packId: "kit_808"),
+
+    // Jersey Club — double kicks, off-beat claps, rapid 16th hats
+    DrumLoop(id: "jersey", name: "Jersey Club", emoji: "🏙️",
+             code: "stack(\(_punchKick).struct(\"[x x] ~ ~ ~ [x x] ~ ~ ~\"), \(_hardClap).struct(\"~ ~ x ~ ~ ~ x ~\"), \(_closedHat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"), \(_tinyHat).struct(\"~ x ~ x ~ x ~ x\"))",
+             isPremium: true, packId: "kit_808"),
+
+    // Memphis — sparse heavy kick, crack clap, triplet hats, constant rimshot
+    DrumLoop(id: "memphis", name: "Memphis", emoji: "🎪",
+             code: "stack(\(_deepKick).struct(\"x ~ ~ ~ ~ ~ x ~\").gain(1.6), \(_clap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_closedHat).struct(\"[x x x] [x x x] [x x x] [x x x]\"), \(_rimshot).struct(\"x ~ x ~ x ~ x ~\"))",
+             isPremium: true, packId: "kit_808"),
+
+    // IDM — irregular kick, broken snare, glitchy hats, sparse rimshot
+    DrumLoop(id: "idm", name: "IDM", emoji: "🧠",
+             code: "stack(\(_punchKick).struct(\"x ~ ~ x ~ x ~ ~\"), \(_snare).struct(\"~ ~ x ~ ~ ~ [x x] ~\"), \(_tinyHat).struct(\"[x x x] ~ [x x] ~ x ~ [x x x] ~\"), \(_rimshot).struct(\"~ x ~ ~ ~ x ~ ~\"))",
+             isPremium: true, packId: "kit_electronic"),
+
+    // Jungle — half-time kick, breakbeat snare, frantic hats, open hat accents
+    DrumLoop(id: "jungle", name: "Jungle", emoji: "🌿",
+             code: "stack(\(_punchKick).struct(\"x ~ ~ ~ x ~ ~ ~\"), \(_snare).struct(\"~ ~ ~ ~ x ~ [x x] ~\"), \(_closedHat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\"), \(_openHat).struct(\"~ ~ x ~ ~ ~ x ~\"))",
+             isPremium: true, packId: "kit_electronic"),
+
+    // Ambient — very sparse, ghost notes, delicate
+    DrumLoop(id: "ambient_beat", name: "Ambient", emoji: "🫧",
+             code: "stack(\(_houseKick).struct(\"x ~ ~ ~ ~ ~ ~ ~\").gain(0.8), \(_rimshot).struct(\"~ ~ ~ x ~ ~ ~ ~\").gain(0.4), \(_tinyHat).struct(\"~ ~ x ~ ~ ~ x ~\").gain(0.3), \(_clave).struct(\"~ ~ ~ ~ ~ x ~ ~\").gain(0.3))",
+             isPremium: true, packId: "kit_electronic"),
+
+    // Industrial — relentless kick, hard clap, mechanical hats, metallic rimshot
+    DrumLoop(id: "industrial", name: "Industrial", emoji: "⚙️",
+             code: "stack(\(_punchKick).struct(\"x x ~ x x x ~ x\").gain(1.4), \(_hardClap).struct(\"~ ~ x ~ ~ ~ x ~\"), \(_closedHat).struct(\"[x x] [x x] [x x] [x x]\"), \(_rimshot).struct(\"x ~ x ~ x ~ x ~\"))",
+             isPremium: true, packId: "kit_electronic"),
+
+    // 2-Step — skippy kick, clap on 3, shuffle hats, tail open hat
+    DrumLoop(id: "garage_beat", name: "2-Step", emoji: "👟",
+             code: "stack(\(_houseKick).struct(\"x ~ ~ ~ ~ ~ x ~\"), \(_clap).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_closedHat).struct(\"[x x] x [x x] x [x x] x [x x] x\"), \(_openHat).struct(\"~ ~ ~ ~ ~ ~ ~ x\"))",
+             isPremium: true, packId: "kit_electronic"),
+
+    // Synthwave — steady kick, big backbeat snare, straight 8ths, offbeat open hat
+    DrumLoop(id: "synthwave", name: "Synthwave", emoji: "🌆",
+             code: "stack(\(_houseKick).struct(\"x ~ ~ ~ x ~ ~ ~\"), \(_snare).struct(\"~ ~ ~ ~ x ~ ~ ~\"), \(_closedHat).struct(\"x ~ x ~ x ~ x ~\"), \(_openHat).struct(\"~ x ~ x ~ x ~ x\").gain(0.4))",
+             isPremium: true, packId: "kit_electronic"),
 ]
 
 extension Array {

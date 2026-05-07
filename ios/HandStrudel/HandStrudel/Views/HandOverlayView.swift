@@ -3,6 +3,7 @@ import SwiftUI
 struct HandOverlayView: UIViewRepresentable {
     let handsState: HandsState
     var videoAspect: CGFloat = 0.75
+    var theme: HandTheme = HAND_THEMES[0]
 
     func makeUIView(context: Context) -> HandCanvasView {
         let view = HandCanvasView()
@@ -13,6 +14,10 @@ struct HandOverlayView: UIViewRepresentable {
 
     func updateUIView(_ uiView: HandCanvasView, context: Context) {
         uiView.videoAspect = videoAspect
+        uiView.leftColor = theme.leftColor
+        uiView.rightColor = theme.rightColor
+        uiView.glowIntensity = theme.glowIntensity
+        uiView.trailDuration = theme.trailLength
         uiView.updateHands(handsState)
     }
 }
@@ -26,11 +31,14 @@ private struct TrailPoint {
 class HandCanvasView: UIView {
     var handsState = HandsState()
     var videoAspect: CGFloat = 0.75
+    var leftColor: UIColor = UIColor(red: 0, green: 1, blue: 0.62, alpha: 1)
+    var rightColor: UIColor = UIColor(red: 1, green: 0.18, blue: 0.42, alpha: 1)
+    var glowIntensity: CGFloat = 1.0
+    var trailDuration: TimeInterval = 0.8
 
     // Motion trails — fixed-size ring buffers per tracked point
     private var trails: [String: [TrailPoint]] = [:]
     private var trailWriteIdx: [String: Int] = [:]
-    private let trailDuration: TimeInterval = 0.8
     private let maxTrailPoints = 48  // ~0.8s at 60fps
     private let trackedPoints = [0, 4, 8, 12, 16, 20]
 
@@ -88,19 +96,15 @@ class HandCanvasView: UIView {
         let now = CACurrentMediaTime()
 
         // Draw motion trails first (behind hands)
-        drawTrails(ctx: ctx, side: "left",
-                   color: UIColor(red: 0, green: 1, blue: 0.62, alpha: 1), W: W, H: H, now: now)
-        drawTrails(ctx: ctx, side: "right",
-                   color: UIColor(red: 1, green: 0.18, blue: 0.42, alpha: 1), W: W, H: H, now: now)
+        drawTrails(ctx: ctx, side: "left", color: leftColor, W: W, H: H, now: now)
+        drawTrails(ctx: ctx, side: "right", color: rightColor, W: W, H: H, now: now)
 
         // Draw hands on top
         if let left = handsState.left {
-            drawHand(ctx: ctx, landmarks: left.landmarks,
-                     color: UIColor(red: 0, green: 1, blue: 0.62, alpha: 1), W: W, H: H)
+            drawHand(ctx: ctx, landmarks: left.landmarks, color: leftColor, W: W, H: H)
         }
         if let right = handsState.right {
-            drawHand(ctx: ctx, landmarks: right.landmarks,
-                     color: UIColor(red: 1, green: 0.18, blue: 0.42, alpha: 1), W: W, H: H)
+            drawHand(ctx: ctx, landmarks: right.landmarks, color: rightColor, W: W, H: H)
         }
     }
 
@@ -160,7 +164,7 @@ class HandCanvasView: UIView {
 
         // Glow layer
         ctx.saveGState()
-        ctx.setShadow(offset: .zero, blur: 12, color: color.withAlphaComponent(0.5).cgColor)
+        ctx.setShadow(offset: .zero, blur: 12 * glowIntensity, color: color.withAlphaComponent(0.5).cgColor)
         ctx.setStrokeColor(color.withAlphaComponent(0.4).cgColor)
         ctx.setLineWidth(4)
         ctx.beginPath()
@@ -187,7 +191,7 @@ class HandCanvasView: UIView {
         if !landmarks.isEmpty {
             let p = pt(0)
             ctx.saveGState()
-            ctx.setShadow(offset: .zero, blur: 10, color: color.cgColor)
+            ctx.setShadow(offset: .zero, blur: 10 * glowIntensity, color: color.cgColor)
             ctx.setFillColor(color.cgColor)
             ctx.fillEllipse(in: CGRect(x: p.x - 6, y: p.y - 6, width: 12, height: 12))
             ctx.restoreGState()
@@ -196,7 +200,7 @@ class HandCanvasView: UIView {
         // Fingertip dots
         let tips = [4, 8, 12, 16, 20]
         ctx.saveGState()
-        ctx.setShadow(offset: .zero, blur: 8, color: color.cgColor)
+        ctx.setShadow(offset: .zero, blur: 8 * glowIntensity, color: color.cgColor)
         ctx.setFillColor(color.withAlphaComponent(0.9).cgColor)
         for i in tips where i < landmarks.count {
             let p = pt(i)

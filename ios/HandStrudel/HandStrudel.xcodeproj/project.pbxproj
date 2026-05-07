@@ -9,11 +9,13 @@
 /* Begin PBXBuildFile section */
 		043BBAAF12C3D3188CF3823F /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C015029D54DF587EDD09DC /* CameraView.swift */; };
 		0AABB3564BB7F0F7CD594B81 /* strudel-bundle.js in Resources */ = {isa = PBXBuildFile; fileRef = 0566FE6FEDB28D58639FD392 /* strudel-bundle.js */; };
+		0E415FF3DE2770E464D4B6BB /* CameraFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 859E2C859C653F058FAEBDD3 /* CameraFilterTests.swift */; };
 		195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B0EF83FDEC95F58B860F5A /* HandMapper.swift */; };
 		1D40AE3AA1F2B1FA4B31CBB2 /* StoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15B500CE35D9D44107CDAC4 /* StoreView.swift */; };
 		1EE6860496AAB0772E65E97D /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */; };
 		1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */; };
 		204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 938A00F6A5044E13D981C663 /* EngineController.swift */; };
+		22BEC592D38D4260A28EA96C /* StoreManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */; };
 		25A87740F4DA10D91C739E18 /* JamSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2105F77EC139355C8EC8FB3D /* JamSession.swift */; };
 		2FC5D55810AF0B87923E355B /* ParamSmoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */; };
 		30EEA2665C3FBD9C4CD3A32A /* SpatialAudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D6E49EC2BD40C4448C835E /* SpatialAudioManager.swift */; };
@@ -23,11 +25,14 @@
 		39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */; };
 		3A9EDA3981D97A38C0BD9C52 /* MotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60006BC6A28FE1029F6097F /* MotionManager.swift */; };
 		3FDADBDC4BFF18F21A29F680 /* LoopRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EE16108C9368E03A5293FC /* LoopRecorder.swift */; };
+		40B3E422911CF13AF402CDCE /* HandTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 962D341307D9F8B90BCD5454 /* HandTheme.swift */; };
 		467B330FAF19DF881621A97A /* MappingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */; };
 		4EC81DC9ACA61F24040592D2 /* AudioExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9531420BA306B5BC2AB859A6 /* AudioExporter.swift */; };
 		575A0CD71B422DFD7ACB6FDF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */; };
+		5953AA2B7EEB3B9102EEBCD1 /* ParamDefsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */; };
 		61F3ED12A7BAB424D09491E8 /* Snippet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */; };
 		6342A972BB06049F9B3999BC /* CameraFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE98AF54FEB607CE395267C8 /* CameraFilter.swift */; };
+		65072B9A79F5C9E6E72B0F9A /* GridModeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */; };
 		701DC3F0F0B8477FAC156842 /* PaywallOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */; };
 		74F628FCEDF7DEEC0324931E /* SiriShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 292584639B51D092EEC802F1 /* SiriShortcuts.swift */; };
 		757E1A695C82940900C8E980 /* LoopSharingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7D7F4F5C7AF55B5D8BD8F6 /* LoopSharingManager.swift */; };
@@ -37,6 +42,7 @@
 		9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F66A4286F922F3805EADFE /* ParamDefs.swift */; };
 		A380AD271A6485FF679B0DCD /* HandOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */; };
 		B033D247CE64C351B3262535 /* iMessageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6755AC0E55CFA644BF8217 /* iMessageManager.swift */; };
+		B59B82967BBF79A13E8EC3E6 /* DrumModeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */; };
 		B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9238181B674B4222B2F52C5A /* GridTouchView.swift */; };
 		B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D77EA18663B3717C68CAAB /* ContentView.swift */; };
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
@@ -45,9 +51,11 @@
 		D2520D85FD921167AEA6EB1C /* HandStrudelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */; };
 		D75E25A96408DCA1BE5AA284 /* StrudelBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDA338219566335AD58643B /* StrudelBridge.swift */; };
 		D7B11BD41E8E91900E18989A /* WatchSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD4D6506C9F603EEA1B77B5 /* WatchSessionManager.swift */; };
+		DB9DE9A3806A7D566AAF5B0F /* MappingConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8778B02D6298E0F0D25105B /* MappingConfigTests.swift */; };
 		E1B4E6E7F7AA5E7E64ED69D0 /* PersistenceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C110717C5437516659E169B3 /* PersistenceManager.swift */; };
 		E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */; };
 		EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D6C035D4A9EE1A66C31839 /* Loop.swift */; };
+		F1E2FAD696F5D1BAD3542162 /* MusicTheoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */; };
 		F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F505B00217A74555C8E226 /* MusicTheory.swift */; };
 		F7E93C2DB10D88C64280E374 /* WatermarkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8857B4C9E8825F7E480DAED0 /* WatermarkManager.swift */; };
 /* End PBXBuildFile section */
@@ -64,6 +72,7 @@
 
 /* Begin PBXFileReference section */
 		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
+		05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeManagerTests.swift; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
 		11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
@@ -75,12 +84,14 @@
 		2D6755AC0E55CFA644BF8217 /* iMessageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iMessageManager.swift; sourceTree = "<group>"; };
 		3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelTests.swift; sourceTree = "<group>"; };
 		5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingConfig.swift; sourceTree = "<group>"; };
+		564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreManagerTests.swift; sourceTree = "<group>"; };
 		6B7D7F4F5C7AF55B5D8BD8F6 /* LoopSharingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopSharingManager.swift; sourceTree = "<group>"; };
 		6C89256347633541234267B8 /* SaveGestureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGestureDetector.swift; sourceTree = "<group>"; };
 		6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverlayView.swift; sourceTree = "<group>"; };
 		74287CD261130ADF57405FF3 /* StartOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartOverlayView.swift; sourceTree = "<group>"; };
 		7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelApp.swift; sourceTree = "<group>"; };
 		7FD4D6506C9F603EEA1B77B5 /* WatchSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSessionManager.swift; sourceTree = "<group>"; };
+		859E2C859C653F058FAEBDD3 /* CameraFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraFilterTests.swift; sourceTree = "<group>"; };
 		868D2939892D7ADF96F5D122 /* HandStrudelTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HandStrudelTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8857B4C9E8825F7E480DAED0 /* WatermarkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkManager.swift; sourceTree = "<group>"; };
 		8B7A548807FF6856B92FC423 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -90,6 +101,8 @@
 		93D6C035D4A9EE1A66C31839 /* Loop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loop.swift; sourceTree = "<group>"; };
 		9531420BA306B5BC2AB859A6 /* AudioExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioExporter.swift; sourceTree = "<group>"; };
 		953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		962D341307D9F8B90BCD5454 /* HandTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTheme.swift; sourceTree = "<group>"; };
+		9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheoryTests.swift; sourceTree = "<group>"; };
 		A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallOverlay.swift; sourceTree = "<group>"; };
 		A4D6E49EC2BD40C4448C835E /* SpatialAudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAudioManager.swift; sourceTree = "<group>"; };
 		A9F505B00217A74555C8E226 /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
@@ -99,15 +112,18 @@
 		B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 		B60006BC6A28FE1029F6097F /* MotionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionManager.swift; sourceTree = "<group>"; };
 		B7C5E8B642D49636F852D200 /* hydra-synth.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "hydra-synth.js"; sourceTree = "<group>"; };
+		B8778B02D6298E0F0D25105B /* MappingConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingConfigTests.swift; sourceTree = "<group>"; };
 		BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "strudel-engine.html"; sourceTree = "<group>"; };
 		C110717C5437516659E169B3 /* PersistenceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceManager.swift; sourceTree = "<group>"; };
 		C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTrackingManager.swift; sourceTree = "<group>"; };
 		CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D986625C7BF30952FBAED619 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeManagerTests.swift; sourceTree = "<group>"; };
 		F15B500CE35D9D44107CDAC4 /* StoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreView.swift; sourceTree = "<group>"; };
 		F2C015029D54DF587EDD09DC /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeManager.swift; sourceTree = "<group>"; };
 		F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snippet.swift; sourceTree = "<group>"; };
+		F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefsTests.swift; sourceTree = "<group>"; };
 		FDDA338219566335AD58643B /* StrudelBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrudelBridge.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -191,6 +207,7 @@
 			isa = PBXGroup;
 			children = (
 				AE98AF54FEB607CE395267C8 /* CameraFilter.swift */,
+				962D341307D9F8B90BCD5454 /* HandTheme.swift */,
 				93D6C035D4A9EE1A66C31839 /* Loop.swift */,
 				5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */,
 				A9F505B00217A74555C8E226 /* MusicTheory.swift */,
@@ -223,7 +240,14 @@
 		E4178A89ACBF1EB624EC830E /* HandStrudelTests */ = {
 			isa = PBXGroup;
 			children = (
+				859E2C859C653F058FAEBDD3 /* CameraFilterTests.swift */,
+				E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */,
+				05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */,
 				3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */,
+				B8778B02D6298E0F0D25105B /* MappingConfigTests.swift */,
+				9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */,
+				F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */,
+				564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */,
 			);
 			path = HandStrudelTests;
 			sourceTree = "<group>";
@@ -333,6 +357,7 @@
 				195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */,
 				A380AD271A6485FF679B0DCD /* HandOverlayView.swift in Sources */,
 				D2520D85FD921167AEA6EB1C /* HandStrudelApp.swift in Sources */,
+				40B3E422911CF13AF402CDCE /* HandTheme.swift in Sources */,
 				C9D0CB8C617776591C669A1D /* HandTrackingManager.swift in Sources */,
 				1EE6860496AAB0772E65E97D /* HapticManager.swift in Sources */,
 				25A87740F4DA10D91C739E18 /* JamSession.swift in Sources */,
@@ -366,7 +391,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0E415FF3DE2770E464D4B6BB /* CameraFilterTests.swift in Sources */,
+				B59B82967BBF79A13E8EC3E6 /* DrumModeManagerTests.swift in Sources */,
+				65072B9A79F5C9E6E72B0F9A /* GridModeManagerTests.swift in Sources */,
 				39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */,
+				DB9DE9A3806A7D566AAF5B0F /* MappingConfigTests.swift in Sources */,
+				F1E2FAD696F5D1BAD3542162 /* MusicTheoryTests.swift in Sources */,
+				5953AA2B7EEB3B9102EEBCD1 /* ParamDefsTests.swift in Sources */,
+				22BEC592D38D4260A28EA96C /* StoreManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -405,7 +437,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = TVAG3T3Y65;
 				INFOPLIST_FILE = HandStrudel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -563,7 +595,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = TVAG3T3Y65;
 				INFOPLIST_FILE = HandStrudel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
