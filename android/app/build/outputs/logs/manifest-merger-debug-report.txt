@@ -1,0 +1,461 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:2:1-30:12
+INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:2:1-30:12
+INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:2:1-30:12
+INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:2:1-30:12
+MERGED from [androidx.camera:camera-video:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/de1f3373465b6cbfa42058d825d01db9/transformed/camera-video-1.4.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.camera:camera-view:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/76b4f9c7b02539987c043c2b6df184cb/transformed/camera-view-1.4.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.camera:camera-lifecycle:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/bcf771ed5db1686e3b16fbf88f2155cb/transformed/camera-lifecycle-1.4.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:17:1-36:12
+MERGED from [androidx.camera:camera-core:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c51dadff3e586f3bc18d7b1909ec64b/transformed/camera-core-1.4.0/AndroidManifest.xml:17:1-36:12
+MERGED from [androidx.appcompat:appcompat:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/616f36e4484328406f0382c1b818b13e/transformed/appcompat-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.fragment:fragment:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/c85efdd3fd11b725d5b342a2e9a306ec/transformed/fragment-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.activity:activity:1.9.3] /Users/loveofdoing/.gradle/caches/8.9/transforms/8510d397dbf1686e8726ff61c84f76af/transformed/activity-1.9.3/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.material3:material3-android:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/9e89b0f6fd4e70ec00d3511577b41ab8/transformed/material3-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/ee60e26dfebdacc5e28cdc9bb4e0ec4e/transformed/savedstate-ktx-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.savedstate:savedstate:1.2.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/093981d4afc6817132e29843dc4bff8d/transformed/savedstate-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.webkit:webkit:1.12.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/f22bf03dc7a3ef6e76b12fae8a15a29a/transformed/webkit-1.12.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/cff9d2d7f64c64b15605695f8c980e7c/transformed/customview-poolingcontainer-1.0.0/AndroidManifest.xml:17:1-23:12
+MERGED from [androidx.core:core-ktx:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/ca860fa79c9b7fc3c02d3426b0c90bd9/transformed/core-ktx-1.15.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.appcompat:appcompat-resources:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/17041868dbee5939de44c84a594c495c/transformed/appcompat-resources-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/7af169511db484ac02ad819cd986a51c/transformed/drawerlayout-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.autofill:autofill:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/9ccefce5a822f0440f8640550b615490/transformed/autofill-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.viewpager:viewpager:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f678a3842a4860cfa76072400cb3402f/transformed/viewpager-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.loader:loader:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/6ad9ba9a9de965fd739e6661726b79be/transformed/loader-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/95b4b5821c87021ccf60d15bd709c446/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/e4889bd4e04270ab08c046468e77a3f7/transformed/vectordrawable-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.customview:customview:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/10513891370a36769189d40cabcc16eb/transformed/customview-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.animation:animation-core-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/03883682af0214b8f9f4571b5f4534be/transformed/animation-core-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.material:material-ripple-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/576f06d45ef9767c266f673ef0e07360/transformed/material-ripple-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.animation:animation-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/fda62c00e5cdcba8a872d89ca163fc62/transformed/animation-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/9008518a1bc423f1d98021773192a086/transformed/foundation-layout-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/a4fa9180e6920933acf3583863b3188a/transformed/foundation-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-unit-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/b8f4abb1e84d4b4ebee0a98e61d32a7b/transformed/ui-unit-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-graphics-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/972f87f94b5c8a74d698905d765d630d/transformed/ui-graphics-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-geometry-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/aa707980851a90218e74d800975a95a1/transformed/ui-geometry-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-util-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c7467bce3cf0da5055d6175af8b4394/transformed/ui-util-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/b6aad27a2bf7ba97d0af3737982b849d/transformed/ui-tooling-preview-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.ui:ui-text-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/712c7e8c8923a92f4bfbcaa716f81e9c/transformed/ui-text-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.graphics:graphics-path:1.0.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/bfa0fe68109abe8212264ce609b14bf8/transformed/graphics-path-1.0.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:17:1-30:12
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/9f71d5221e6075bfc82d6d70a2936f35/transformed/lifecycle-runtime-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/0a02545ebab80c1ddd984a15da865b61/transformed/lifecycle-runtime-ktx-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/874136bb5068e42f2e1e736ba98db56d/transformed/lifecycle-viewmodel-2.8.7/AndroidManifest.xml:2:1-5:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/7f56dafe50e5c452e217c7ecc82414ba/transformed/lifecycle-viewmodel-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core-ktx:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/f01cc0ff98ba5ff4f23a899dcd5dc0ec/transformed/lifecycle-livedata-core-ktx-2.8.7/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/c561453fdb89b54c8a2d43c351f12a55/transformed/lifecycle-livedata-core-2.8.7/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/145e00a9153c84b9b9df6a3c773da13e/transformed/lifecycle-viewmodel-savedstate-2.8.7/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/d589479dd1ffbe415f859f01d78e243f/transformed/lifecycle-viewmodel-ktx-2.8.7/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/79eebb8a7f3edc439275bcd6940a700e/transformed/lifecycle-livedata-2.8.7/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-compose-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/140727bf9ec0a5cc3b90b4f3e7c16a27/transformed/lifecycle-runtime-compose-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/eea7a2d42a1a9bb43caad94ff648a9d9/transformed/lifecycle-viewmodel-compose-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.material:material-icons-core-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/24d122c3291d0abe09703a9c8663744e/transformed/material-icons-core-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/b4c0c5dff438e55e76c24aa6fa0cddfb/transformed/ui-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.activity:activity-ktx:1.9.3] /Users/loveofdoing/.gradle/caches/8.9/transforms/d446d08fafa49bdb3723ea5763ead968/transformed/activity-ktx-1.9.3/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.activity:activity-compose:1.9.3] /Users/loveofdoing/.gradle/caches/8.9/transforms/015e8e5457cd5ed8f147aca4685bf592/transformed/activity-compose-1.9.3/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6627228c12ad6b1580b208b53e6d15d/transformed/runtime-saveable-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.runtime:runtime-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/51755d59d300144b5f5694c7b101cf8b/transformed/runtime-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.annotation:annotation-experimental:1.4.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c02673e495736a109a757b40baf0e458/transformed/annotation-experimental-1.4.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:17:1-55:12
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/722e557d30bb97db92c1b45004a83641/transformed/startup-runtime-1.1.1/AndroidManifest.xml:17:1-33:12
+MERGED from [androidx.tracing:tracing:1.2.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7df3dd725fb17b3c4aa7af8902c1822/transformed/tracing-1.2.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.tracing:tracing-ktx:1.2.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a38a97aaccc2e0d39ced46fdab41adc2/transformed/tracing-ktx-1.2.0/AndroidManifest.xml:17:1-22:12
+MERGED from [com.google.mediapipe:tasks-vision:0.10.18] /Users/loveofdoing/.gradle/caches/8.9/transforms/446fd0fa8bf27de745f0f12d0606c0f5/transformed/tasks-vision-0.10.18/AndroidManifest.xml:2:1-9:12
+MERGED from [androidx.exifinterface:exifinterface:1.3.2] /Users/loveofdoing/.gradle/caches/8.9/transforms/9ca8c1be7ca99df2e928d65e34d46ee7/transformed/exifinterface-1.3.2/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/03e3ae2d5e04056307d887259467b5b5/transformed/cursoradapter-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [com.google.mediapipe:tasks-core:0.10.18] /Users/loveofdoing/.gradle/caches/8.9/transforms/6e9e694db46df218a6eada5697ec07ac/transformed/tasks-core-0.10.18/AndroidManifest.xml:2:1-9:12
+MERGED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:15:1-38:12
+MERGED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:15:1-41:12
+MERGED from [com.google.android.datatransport:transport-api:3.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/0bd00a78efaa3ae240c9816327588890/transformed/transport-api-3.0.0/AndroidManifest.xml:15:1-22:12
+MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/e3a7061e30fe7d69bc7b0b2107d28a19/transformed/interpolator-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c69a99b04858966d10d3876c2d39dcb/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:17:1-27:12
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d134c230d9f7a400dcf6b9a730a18f45/transformed/core-runtime-2.2.0/AndroidManifest.xml:17:1-22:12
+MERGED from [com.google.firebase:firebase-encoders-json:18.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/0eb3d8aaa003544276878a3e7f50d2aa/transformed/firebase-encoders-json-18.0.0/AndroidManifest.xml:15:1-23:12
+	package
+		INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml
+	android:versionName
+		INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml
+	android:versionCode
+		INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:2:11-69
+uses-permission#android.permission.CAMERA
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:4:5-65
+	android:name
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:4:22-62
+uses-permission#android.permission.RECORD_AUDIO
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:5:5-71
+	android:name
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:5:22-68
+uses-permission#android.permission.INTERNET
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:6:5-67
+MERGED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:26:5-67
+MERGED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:26:5-67
+	android:name
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:6:22-64
+uses-feature#android.hardware.camera
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:8:5-84
+	android:required
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:8:58-81
+	android:name
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:8:19-57
+uses-feature#android.hardware.camera.front
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:9:5-90
+	android:required
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:9:64-87
+	android:name
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:9:19-63
+application
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:11:5-29:19
+INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:11:5-29:19
+MERGED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:23:5-34:19
+MERGED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:23:5-34:19
+MERGED from [androidx.camera:camera-core:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c51dadff3e586f3bc18d7b1909ec64b/transformed/camera-core-1.4.0/AndroidManifest.xml:23:5-34:19
+MERGED from [androidx.camera:camera-core:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c51dadff3e586f3bc18d7b1909ec64b/transformed/camera-core-1.4.0/AndroidManifest.xml:23:5-34:19
+MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:28:5-89
+MERGED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:28:5-89
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/722e557d30bb97db92c1b45004a83641/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/722e557d30bb97db92c1b45004a83641/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:28:5-36:19
+MERGED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:28:5-36:19
+MERGED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:25:5-39:19
+MERGED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:25:5-39:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c69a99b04858966d10d3876c2d39dcb/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c69a99b04858966d10d3876c2d39dcb/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+	android:extractNativeLibs
+		INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml
+	android:appComponentFactory
+		ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:28:18-86
+	android:supportsRtl
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:15:9-35
+	android:label
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:14:9-36
+	android:icon
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:13:9-43
+	android:allowBackup
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:12:9-35
+	android:theme
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:16:9-49
+activity#com.handstrudel.ui.MainActivity
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:18:9-28:20
+	android:screenOrientation
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:21:13-49
+	android:windowSoftInputMode
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:23:13-55
+	android:exported
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:20:13-36
+	android:configChanges
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:22:13-59
+	android:name
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:19:13-44
+intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:24:13-27:29
+action#android.intent.action.MAIN
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:25:17-69
+	android:name
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:25:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:26:17-77
+	android:name
+		ADDED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml:26:27-74
+uses-sdk
+INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml
+INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml
+MERGED from [androidx.camera:camera-video:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/de1f3373465b6cbfa42058d825d01db9/transformed/camera-video-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-video:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/de1f3373465b6cbfa42058d825d01db9/transformed/camera-video-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-view:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/76b4f9c7b02539987c043c2b6df184cb/transformed/camera-view-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-view:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/76b4f9c7b02539987c043c2b6df184cb/transformed/camera-view-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-lifecycle:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/bcf771ed5db1686e3b16fbf88f2155cb/transformed/camera-lifecycle-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-lifecycle:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/bcf771ed5db1686e3b16fbf88f2155cb/transformed/camera-lifecycle-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.camera:camera-core:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c51dadff3e586f3bc18d7b1909ec64b/transformed/camera-core-1.4.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.camera:camera-core:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c51dadff3e586f3bc18d7b1909ec64b/transformed/camera-core-1.4.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.appcompat:appcompat:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/616f36e4484328406f0382c1b818b13e/transformed/appcompat-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.appcompat:appcompat:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/616f36e4484328406f0382c1b818b13e/transformed/appcompat-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/c85efdd3fd11b725d5b342a2e9a306ec/transformed/fragment-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/c85efdd3fd11b725d5b342a2e9a306ec/transformed/fragment-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.activity:activity:1.9.3] /Users/loveofdoing/.gradle/caches/8.9/transforms/8510d397dbf1686e8726ff61c84f76af/transformed/activity-1.9.3/AndroidManifest.xml:20:5-44
+MERGED from [androidx.activity:activity:1.9.3] /Users/loveofdoing/.gradle/caches/8.9/transforms/8510d397dbf1686e8726ff61c84f76af/transformed/activity-1.9.3/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.material3:material3-android:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/9e89b0f6fd4e70ec00d3511577b41ab8/transformed/material3-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.material3:material3-android:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/9e89b0f6fd4e70ec00d3511577b41ab8/transformed/material3-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/ee60e26dfebdacc5e28cdc9bb4e0ec4e/transformed/savedstate-ktx-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/ee60e26dfebdacc5e28cdc9bb4e0ec4e/transformed/savedstate-ktx-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/093981d4afc6817132e29843dc4bff8d/transformed/savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/093981d4afc6817132e29843dc4bff8d/transformed/savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.webkit:webkit:1.12.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/f22bf03dc7a3ef6e76b12fae8a15a29a/transformed/webkit-1.12.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.webkit:webkit:1.12.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/f22bf03dc7a3ef6e76b12fae8a15a29a/transformed/webkit-1.12.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/cff9d2d7f64c64b15605695f8c980e7c/transformed/customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/cff9d2d7f64c64b15605695f8c980e7c/transformed/customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.core:core-ktx:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/ca860fa79c9b7fc3c02d3426b0c90bd9/transformed/core-ktx-1.15.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core-ktx:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/ca860fa79c9b7fc3c02d3426b0c90bd9/transformed/core-ktx-1.15.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/17041868dbee5939de44c84a594c495c/transformed/appcompat-resources-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.appcompat:appcompat-resources:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/17041868dbee5939de44c84a594c495c/transformed/appcompat-resources-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/7af169511db484ac02ad819cd986a51c/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/7af169511db484ac02ad819cd986a51c/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.autofill:autofill:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/9ccefce5a822f0440f8640550b615490/transformed/autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.autofill:autofill:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/9ccefce5a822f0440f8640550b615490/transformed/autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.viewpager:viewpager:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f678a3842a4860cfa76072400cb3402f/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f678a3842a4860cfa76072400cb3402f/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/6ad9ba9a9de965fd739e6661726b79be/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/6ad9ba9a9de965fd739e6661726b79be/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/95b4b5821c87021ccf60d15bd709c446/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/95b4b5821c87021ccf60d15bd709c446/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/e4889bd4e04270ab08c046468e77a3f7/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/e4889bd4e04270ab08c046468e77a3f7/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.customview:customview:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/10513891370a36769189d40cabcc16eb/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/10513891370a36769189d40cabcc16eb/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.animation:animation-core-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/03883682af0214b8f9f4571b5f4534be/transformed/animation-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-core-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/03883682af0214b8f9f4571b5f4534be/transformed/animation-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-ripple-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/576f06d45ef9767c266f673ef0e07360/transformed/material-ripple-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-ripple-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/576f06d45ef9767c266f673ef0e07360/transformed/material-ripple-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/fda62c00e5cdcba8a872d89ca163fc62/transformed/animation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/fda62c00e5cdcba8a872d89ca163fc62/transformed/animation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/9008518a1bc423f1d98021773192a086/transformed/foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/9008518a1bc423f1d98021773192a086/transformed/foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/a4fa9180e6920933acf3583863b3188a/transformed/foundation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/a4fa9180e6920933acf3583863b3188a/transformed/foundation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-unit-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/b8f4abb1e84d4b4ebee0a98e61d32a7b/transformed/ui-unit-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-unit-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/b8f4abb1e84d4b4ebee0a98e61d32a7b/transformed/ui-unit-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-graphics-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/972f87f94b5c8a74d698905d765d630d/transformed/ui-graphics-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-graphics-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/972f87f94b5c8a74d698905d765d630d/transformed/ui-graphics-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-geometry-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/aa707980851a90218e74d800975a95a1/transformed/ui-geometry-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-geometry-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/aa707980851a90218e74d800975a95a1/transformed/ui-geometry-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-util-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c7467bce3cf0da5055d6175af8b4394/transformed/ui-util-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-util-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c7467bce3cf0da5055d6175af8b4394/transformed/ui-util-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/b6aad27a2bf7ba97d0af3737982b849d/transformed/ui-tooling-preview-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/b6aad27a2bf7ba97d0af3737982b849d/transformed/ui-tooling-preview-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-text-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/712c7e8c8923a92f4bfbcaa716f81e9c/transformed/ui-text-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-text-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/712c7e8c8923a92f4bfbcaa716f81e9c/transformed/ui-text-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.graphics:graphics-path:1.0.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/bfa0fe68109abe8212264ce609b14bf8/transformed/graphics-path-1.0.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.graphics:graphics-path:1.0.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/bfa0fe68109abe8212264ce609b14bf8/transformed/graphics-path-1.0.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/9f71d5221e6075bfc82d6d70a2936f35/transformed/lifecycle-runtime-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/9f71d5221e6075bfc82d6d70a2936f35/transformed/lifecycle-runtime-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/0a02545ebab80c1ddd984a15da865b61/transformed/lifecycle-runtime-ktx-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/0a02545ebab80c1ddd984a15da865b61/transformed/lifecycle-runtime-ktx-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/874136bb5068e42f2e1e736ba98db56d/transformed/lifecycle-viewmodel-2.8.7/AndroidManifest.xml:4:5-43
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/874136bb5068e42f2e1e736ba98db56d/transformed/lifecycle-viewmodel-2.8.7/AndroidManifest.xml:4:5-43
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/7f56dafe50e5c452e217c7ecc82414ba/transformed/lifecycle-viewmodel-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/7f56dafe50e5c452e217c7ecc82414ba/transformed/lifecycle-viewmodel-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core-ktx:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/f01cc0ff98ba5ff4f23a899dcd5dc0ec/transformed/lifecycle-livedata-core-ktx-2.8.7/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core-ktx:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/f01cc0ff98ba5ff4f23a899dcd5dc0ec/transformed/lifecycle-livedata-core-ktx-2.8.7/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/c561453fdb89b54c8a2d43c351f12a55/transformed/lifecycle-livedata-core-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/c561453fdb89b54c8a2d43c351f12a55/transformed/lifecycle-livedata-core-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/145e00a9153c84b9b9df6a3c773da13e/transformed/lifecycle-viewmodel-savedstate-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/145e00a9153c84b9b9df6a3c773da13e/transformed/lifecycle-viewmodel-savedstate-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/d589479dd1ffbe415f859f01d78e243f/transformed/lifecycle-viewmodel-ktx-2.8.7/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/d589479dd1ffbe415f859f01d78e243f/transformed/lifecycle-viewmodel-ktx-2.8.7/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/79eebb8a7f3edc439275bcd6940a700e/transformed/lifecycle-livedata-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/79eebb8a7f3edc439275bcd6940a700e/transformed/lifecycle-livedata-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-compose-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/140727bf9ec0a5cc3b90b4f3e7c16a27/transformed/lifecycle-runtime-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-compose-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/140727bf9ec0a5cc3b90b4f3e7c16a27/transformed/lifecycle-runtime-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/eea7a2d42a1a9bb43caad94ff648a9d9/transformed/lifecycle-viewmodel-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose-android:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/eea7a2d42a1a9bb43caad94ff648a9d9/transformed/lifecycle-viewmodel-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-core-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/24d122c3291d0abe09703a9c8663744e/transformed/material-icons-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-core-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/24d122c3291d0abe09703a9c8663744e/transformed/material-icons-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/b4c0c5dff438e55e76c24aa6fa0cddfb/transformed/ui-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/b4c0c5dff438e55e76c24aa6fa0cddfb/transformed/ui-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-ktx:1.9.3] /Users/loveofdoing/.gradle/caches/8.9/transforms/d446d08fafa49bdb3723ea5763ead968/transformed/activity-ktx-1.9.3/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-ktx:1.9.3] /Users/loveofdoing/.gradle/caches/8.9/transforms/d446d08fafa49bdb3723ea5763ead968/transformed/activity-ktx-1.9.3/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-compose:1.9.3] /Users/loveofdoing/.gradle/caches/8.9/transforms/015e8e5457cd5ed8f147aca4685bf592/transformed/activity-compose-1.9.3/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-compose:1.9.3] /Users/loveofdoing/.gradle/caches/8.9/transforms/015e8e5457cd5ed8f147aca4685bf592/transformed/activity-compose-1.9.3/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6627228c12ad6b1580b208b53e6d15d/transformed/runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6627228c12ad6b1580b208b53e6d15d/transformed/runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/51755d59d300144b5f5694c7b101cf8b/transformed/runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.7.4] /Users/loveofdoing/.gradle/caches/8.9/transforms/51755d59d300144b5f5694c7b101cf8b/transformed/runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.4.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c02673e495736a109a757b40baf0e458/transformed/annotation-experimental-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.4.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c02673e495736a109a757b40baf0e458/transformed/annotation-experimental-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/722e557d30bb97db92c1b45004a83641/transformed/startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/722e557d30bb97db92c1b45004a83641/transformed/startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.tracing:tracing:1.2.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7df3dd725fb17b3c4aa7af8902c1822/transformed/tracing-1.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.tracing:tracing:1.2.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7df3dd725fb17b3c4aa7af8902c1822/transformed/tracing-1.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.tracing:tracing-ktx:1.2.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a38a97aaccc2e0d39ced46fdab41adc2/transformed/tracing-ktx-1.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.tracing:tracing-ktx:1.2.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a38a97aaccc2e0d39ced46fdab41adc2/transformed/tracing-ktx-1.2.0/AndroidManifest.xml:20:5-44
+MERGED from [com.google.mediapipe:tasks-vision:0.10.18] /Users/loveofdoing/.gradle/caches/8.9/transforms/446fd0fa8bf27de745f0f12d0606c0f5/transformed/tasks-vision-0.10.18/AndroidManifest.xml:5:5-7:41
+MERGED from [com.google.mediapipe:tasks-vision:0.10.18] /Users/loveofdoing/.gradle/caches/8.9/transforms/446fd0fa8bf27de745f0f12d0606c0f5/transformed/tasks-vision-0.10.18/AndroidManifest.xml:5:5-7:41
+MERGED from [androidx.exifinterface:exifinterface:1.3.2] /Users/loveofdoing/.gradle/caches/8.9/transforms/9ca8c1be7ca99df2e928d65e34d46ee7/transformed/exifinterface-1.3.2/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.exifinterface:exifinterface:1.3.2] /Users/loveofdoing/.gradle/caches/8.9/transforms/9ca8c1be7ca99df2e928d65e34d46ee7/transformed/exifinterface-1.3.2/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/03e3ae2d5e04056307d887259467b5b5/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/03e3ae2d5e04056307d887259467b5b5/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [com.google.mediapipe:tasks-core:0.10.18] /Users/loveofdoing/.gradle/caches/8.9/transforms/6e9e694db46df218a6eada5697ec07ac/transformed/tasks-core-0.10.18/AndroidManifest.xml:5:5-7:41
+MERGED from [com.google.mediapipe:tasks-core:0.10.18] /Users/loveofdoing/.gradle/caches/8.9/transforms/6e9e694db46df218a6eada5697ec07ac/transformed/tasks-core-0.10.18/AndroidManifest.xml:5:5-7:41
+MERGED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:19:5-21:41
+MERGED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:19:5-21:41
+MERGED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:18:5-20:41
+MERGED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:18:5-20:41
+MERGED from [com.google.android.datatransport:transport-api:3.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/0bd00a78efaa3ae240c9816327588890/transformed/transport-api-3.0.0/AndroidManifest.xml:18:5-20:41
+MERGED from [com.google.android.datatransport:transport-api:3.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/0bd00a78efaa3ae240c9816327588890/transformed/transport-api-3.0.0/AndroidManifest.xml:18:5-20:41
+MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/e3a7061e30fe7d69bc7b0b2107d28a19/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/e3a7061e30fe7d69bc7b0b2107d28a19/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c69a99b04858966d10d3876c2d39dcb/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c69a99b04858966d10d3876c2d39dcb/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d134c230d9f7a400dcf6b9a730a18f45/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d134c230d9f7a400dcf6b9a730a18f45/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [com.google.firebase:firebase-encoders-json:18.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/0eb3d8aaa003544276878a3e7f50d2aa/transformed/firebase-encoders-json-18.0.0/AndroidManifest.xml:19:5-21:41
+MERGED from [com.google.firebase:firebase-encoders-json:18.0.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/0eb3d8aaa003544276878a3e7f50d2aa/transformed/firebase-encoders-json-18.0.0/AndroidManifest.xml:19:5-21:41
+	android:targetSdkVersion
+		INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /Volumes/PRO-G40/Code/handstrudel/android/app/src/main/AndroidManifest.xml
+service#androidx.camera.core.impl.MetadataHolderService
+ADDED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:24:9-33:19
+MERGED from [androidx.camera:camera-core:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c51dadff3e586f3bc18d7b1909ec64b/transformed/camera-core-1.4.0/AndroidManifest.xml:29:9-33:78
+MERGED from [androidx.camera:camera-core:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/4c51dadff3e586f3bc18d7b1909ec64b/transformed/camera-core-1.4.0/AndroidManifest.xml:29:9-33:78
+	tools:node
+		ADDED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:29:13-31
+	android:enabled
+		ADDED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:26:13-36
+	android:exported
+		ADDED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:27:13-37
+	tools:ignore
+		ADDED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:28:13-75
+	android:name
+		ADDED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:25:13-75
+meta-data#androidx.camera.core.impl.MetadataHolderService.DEFAULT_CONFIG_PROVIDER
+ADDED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:30:13-32:89
+	android:value
+		ADDED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:32:17-86
+	android:name
+		ADDED from [androidx.camera:camera-camera2:1.4.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5e7047e55f55ec548135990a0b1bb0de/transformed/camera-camera2-1.4.0/AndroidManifest.xml:31:17-103
+provider#androidx.startup.InitializationProvider
+ADDED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/722e557d30bb97db92c1b45004a83641/transformed/startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/722e557d30bb97db92c1b45004a83641/transformed/startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+	tools:node
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:28:13-31
+	android:authorities
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:26:13-68
+	android:exported
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:27:13-37
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:25:13-67
+meta-data#androidx.emoji2.text.EmojiCompatInitializer
+ADDED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/a14553a80c9f634a51172bb29b200ef2/transformed/emoji2-1.3.0/AndroidManifest.xml:30:17-75
+permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:23:9-81
+permission#com.handstrudel.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:23:9-81
+uses-permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:26:22-94
+uses-permission#com.handstrudel.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.15.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/f7172dc4f39c6194bdda1a3f5580eb07/transformed/core-1.15.0/AndroidManifest.xml:26:22-94
+meta-data#androidx.lifecycle.ProcessLifecycleInitializer
+ADDED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c40a200c2c8b4715dbc70866ba2b553/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:30:17-78
+meta-data#androidx.profileinstaller.ProfileInstallerInitializer
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:30:17-85
+receiver#androidx.profileinstaller.ProfileInstallReceiver
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:34:9-52:20
+	android:enabled
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:37:13-35
+	android:exported
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:38:13-36
+	android:permission
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:39:13-57
+	android:directBootAware
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:36:13-44
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:35:13-76
+intent-filter#action:name:androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:40:13-42:29
+action#androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:17-91
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:25-88
+intent-filter#action:name:androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:43:13-45:29
+action#androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:17-85
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:25-82
+intent-filter#action:name:androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:46:13-48:29
+action#androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:17-88
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:25-85
+intent-filter#action:name:androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:49:13-51:29
+action#androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:17-95
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/loveofdoing/.gradle/caches/8.9/transforms/c4edf433de5f9a0f752fd3f70ffd5a6f/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:25-92
+uses-permission#android.permission.ACCESS_NETWORK_STATE
+ADDED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:25:5-79
+MERGED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:22:5-79
+MERGED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:22:5-79
+	android:name
+		ADDED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:25:22-76
+service#com.google.android.datatransport.runtime.backends.TransportBackendDiscovery
+ADDED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:29:9-35:19
+MERGED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:36:9-38:40
+MERGED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:36:9-38:40
+	android:exported
+		ADDED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:31:13-37
+	android:name
+		ADDED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:30:13-103
+meta-data#backend:com.google.android.datatransport.cct.CctBackendFactory
+ADDED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:32:13-34:39
+	android:value
+		ADDED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:34:17-36
+	android:name
+		ADDED from [com.google.android.datatransport:transport-backend-cct:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/d6234b0b96c624b76486197bb97f28fc/transformed/transport-backend-cct-3.1.0/AndroidManifest.xml:33:17-94
+service#com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService
+ADDED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:26:9-30:19
+	android:exported
+		ADDED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:28:13-37
+	android:permission
+		ADDED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:29:13-69
+	android:name
+		ADDED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:27:13-117
+receiver#com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver
+ADDED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:32:9-34:40
+	android:exported
+		ADDED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:34:13-37
+	android:name
+		ADDED from [com.google.android.datatransport:transport-runtime:3.1.0] /Users/loveofdoing/.gradle/caches/8.9/transforms/5c9bd883365b2b8e2af4dc5e09780b2c/transformed/transport-runtime-3.1.0/AndroidManifest.xml:33:13-132
