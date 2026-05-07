@@ -872,6 +872,11 @@ struct ContentView: View {
                     }
                 } else {
                     engine.startLoopRecording()
+                    loopMessage = "Recording loop — play notes, tap again to stop"
+                    withAnimation { showLoopSaved = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        withAnimation { showLoopSaved = false }
+                    }
                 }
             }
         }) {
@@ -909,12 +914,12 @@ struct ContentView: View {
         .overlay(alignment: .top) {
             if showLoopSaved {
                 HStack(spacing: 6) {
-                    Image(systemName: loopMessage.contains("saved") ? "checkmark.circle.fill" : "info.circle.fill")
+                    Image(systemName: loopMessage.contains("saved") ? "checkmark.circle.fill" : loopMessage.contains("Recording") ? "record.circle" : "info.circle.fill")
                         .font(.system(size: 12))
                     Text(loopMessage)
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                 }
-                .foregroundColor(loopMessage.contains("saved") ? .green : .orange)
+                .foregroundColor(loopMessage.contains("saved") ? .green : loopMessage.contains("Recording") ? .red : .orange)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
@@ -1211,7 +1216,8 @@ struct ControlSheet: View {
 
     private func paywallSheet(for packId: String) -> some View {
         let info = packInfo(for: packId)
-        let product = storeManager.products.first(where: { $0.id == packId })
+        let resolvedId = StoreManager.productId(for: packId)
+        let product = storeManager.products.first(where: { $0.id == resolvedId })
         return PaywallOverlay(
             packId: packId,
             packName: info.name,
@@ -1255,7 +1261,7 @@ struct ControlSheet: View {
             HStack(spacing: 8) {
                 modeButton("Melodic", icon: "pianokeys", mode: .melodic)
                 modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
-                modeButton("Drums", icon: "drum.fill", mode: .drums)
+                modeButton("Drums", icon: "beats.headphones", mode: .drums)
             }
 
             if currentMode == .grid {
@@ -1503,7 +1509,7 @@ struct ControlSheet: View {
 
     private func drumTrackSection(label: String, loop: Binding<DrumLoop>, volume: Binding<Double>, bpm: Binding<Double>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(label, icon: "drum")
+            sectionHeader(label, icon: "beats.headphones")
 
             LazyVGrid(columns: [
                 GridItem(.flexible(), spacing: 8),

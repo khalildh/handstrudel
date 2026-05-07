@@ -52,10 +52,18 @@ final class StoreManager: ObservableObject {
     func loadProducts() async {
         isLoading = true
         defer { isLoading = false }
+        print("[StoreManager] Loading products for IDs: \(Self.allProductIds)")
         do {
             products = try await Product.products(for: Self.allProductIds)
+            print("[StoreManager] Loaded \(products.count) products:")
+            for p in products {
+                print("  - \(p.id): \(p.displayName) \(p.displayPrice)")
+            }
+            if products.isEmpty {
+                print("[StoreManager] WARNING: No products returned. Check StoreKit config is selected in scheme.")
+            }
         } catch {
-            debugPrint("[StoreManager] Failed to load products:", error)
+            print("[StoreManager] Failed to load products: \(error)")
         }
     }
 
@@ -118,12 +126,8 @@ final class StoreManager: ObservableObject {
     }
 
     func isUnlocked(_ packId: String) -> Bool {
-        #if DEBUG
-        return true // All premium unlocked for testing
-        #else
         let productId = Self.productId(for: packId)
         return purchasedIds.contains(productId) || hasProAccess
-        #endif
     }
 
     var hasProAccess: Bool {

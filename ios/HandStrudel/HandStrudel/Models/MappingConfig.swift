@@ -115,41 +115,8 @@ let PRESETS: [Preset] = [
         isPremium: false, packId: nil
     ),
 
-    // MARK: - Premium Presets
+    // MARK: - Party Pack
 
-    Preset(
-        id: "lofi", name: "Lo-Fi", emoji: "📻",
-        description: "Slow, warm & dusty",
-        color: (0.8, 0.6, 0.4),
-        mapping: MappingConfig(
-            left:  ["y": "noteIdx", "x": "lpf", "spread": "reverb"],
-            right: ["y": "gain", "x": "delay", "spread": "crush"]
-        ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
-        isPremium: true, packId: "studio"
-    ),
-    Preset(
-        id: "ambient", name: "Ambient", emoji: "🌊",
-        description: "Spacious & ethereal",
-        color: (0.4, 0.6, 0.9),
-        mapping: MappingConfig(
-            left:  ["y": "noteIdx", "x": "reverb", "spread": "pan"],
-            right: ["y": "gain", "x": "attack", "spread": "release"]
-        ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
-        isPremium: true, packId: "studio"
-    ),
-    Preset(
-        id: "glitch", name: "Glitch", emoji: "👾",
-        description: "Broken & digital",
-        color: (0.0, 1.0, 0.6),
-        mapping: MappingConfig(
-            left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
-            right: ["y": "gain", "x": "hpf", "spread": "delay"]
-        ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
-        isPremium: true, packId: "studio"
-    ),
     Preset(
         id: "edm", name: "EDM", emoji: "⚡",
         description: "High energy dancefloor",
@@ -252,6 +219,39 @@ let PRESETS: [Preset] = [
 
     // MARK: - Studio Pack
 
+    Preset(
+        id: "lofi", name: "Lo-Fi", emoji: "📻",
+        description: "Slow, warm & dusty",
+        color: (0.8, 0.6, 0.4),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "lpf", "spread": "reverb"],
+            right: ["y": "gain", "x": "delay", "spread": "crush"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
+    Preset(
+        id: "ambient", name: "Ambient", emoji: "🌊",
+        description: "Spacious & ethereal",
+        color: (0.4, 0.6, 0.9),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "reverb", "spread": "pan"],
+            right: ["y": "gain", "x": "attack", "spread": "release"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
+    Preset(
+        id: "glitch", name: "Glitch", emoji: "👾",
+        description: "Broken & digital",
+        color: (0.0, 1.0, 0.6),
+        mapping: MappingConfig(
+            left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
+            right: ["y": "gain", "x": "hpf", "spread": "delay"]
+        ),
+        hydraMapping: DEFAULT_HYDRA_MAPPING,
+        isPremium: true, packId: "studio"
+    ),
     Preset(
         id: "tape", name: "Tape", emoji: "📼",
         description: "Warm analog saturation",

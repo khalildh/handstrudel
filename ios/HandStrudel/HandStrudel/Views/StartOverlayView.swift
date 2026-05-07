@@ -283,9 +283,10 @@ struct StartOverlayView: View {
 
     private func paywallSheet(for packId: String) -> some View {
         let info = paywallInfo(for: packId)
-        let product = storeManager.products.first(where: { $0.id == packId })
+        let resolvedId = StoreManager.productId(for: packId)
+        let product = storeManager.products.first(where: { $0.id == resolvedId })
         return PaywallOverlay(
-            packId: packId,
+            packId: resolvedId,
             packName: info.name,
             packDescription: info.description,
             price: product?.displayPrice ?? "---",

@@ -18,6 +18,9 @@ schemes:
       targets:
         - HandStrudelTests
 
+fileGroups:
+  - HandStrudel.storekit
+
 targets:
   HandStrudel:
     type: application

@@ -95,7 +95,7 @@ struct HandStrudelSiriShortcuts: AppShortcutsProvider {
             intent: StartDrumModeIntent(),
             phrases: ["Start drums in \(.applicationName)", "Play drums in \(.applicationName)"],
             shortTitle: "Drums",
-            systemImageName: "drum"
+            systemImageName: "beats.headphones"
         )
         AppShortcut(
             intent: ToggleLoopRecordingIntent(),

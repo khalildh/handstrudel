@@ -98,7 +98,8 @@ struct PaywallOverlay: View {
     }
 
     private func purchaseTapped() {
-        guard let product = storeManager.products.first(where: { $0.id == packId }) else { return }
+        let resolvedId = StoreManager.productId(for: packId)
+        guard let product = storeManager.products.first(where: { $0.id == resolvedId }) else { return }
         purchasing = true
         errorMessage = nil
         Task {
