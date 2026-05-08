@@ -158,13 +158,18 @@ struct ContentView: View {
                     .padding(.top, 2)
 
                 // Jam session indicator
-                if engine.jamSession.isActive && !engine.jamSession.lastReceivedEvent.isEmpty {
-                    Text(engine.jamSession.lastReceivedEvent)
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundColor(.cyan.opacity(0.8))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.cyan.opacity(0.1)))
+                if engine.jamSession.isActive {
+                    let text = engine.jamSession.lastReceivedEvent.isEmpty
+                        ? engine.jamSession.statusMessage
+                        : engine.jamSession.lastReceivedEvent
+                    if !text.isEmpty {
+                        Text(text)
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(.cyan.opacity(0.8))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.cyan.opacity(0.1)))
+                    }
                 }
 
                 // Floating code pill — hide in grid/drum mode

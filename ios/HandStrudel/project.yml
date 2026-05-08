@@ -30,6 +30,10 @@ targets:
       - path: HandStrudel/Assets.xcassets
       - path: HandStrudel/Resources
       - path: HandStrudel/PrivacyInfo.xcprivacy
+    entitlements:
+      path: HandStrudel/HandStrudel.entitlements
+      properties:
+        com.apple.developer.group-session: true
     info:
       path: HandStrudel/Info.plist
       properties:
@@ -40,6 +44,8 @@ targets:
         UIRequiresFullScreen: true
         NSCameraUsageDescription: "HandStrudel uses the camera to track your hand gestures and convert them into music."
         NSMicrophoneUsageDescription: "HandStrudel needs microphone access for audio processing."
+        NSBonjourServices:
+          - "_groupactivities._tcp"
         LSApplicationQueriesSchemes:
           - instagram-stories
           - instagram

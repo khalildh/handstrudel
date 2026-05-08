@@ -94,6 +94,7 @@
 		74287CD261130ADF57405FF3 /* StartOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartOverlayView.swift; sourceTree = "<group>"; };
 		7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelApp.swift; sourceTree = "<group>"; };
 		7FD4D6506C9F603EEA1B77B5 /* WatchSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSessionManager.swift; sourceTree = "<group>"; };
+		852A794A228073601B3D9322 /* HandStrudel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HandStrudel.entitlements; sourceTree = "<group>"; };
 		859E2C859C653F058FAEBDD3 /* CameraFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraFilterTests.swift; sourceTree = "<group>"; };
 		868D2939892D7ADF96F5D122 /* HandStrudelTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HandStrudelTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8857B4C9E8825F7E480DAED0 /* WatermarkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkManager.swift; sourceTree = "<group>"; };
@@ -136,6 +137,7 @@
 			isa = PBXGroup;
 			children = (
 				CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */,
+				852A794A228073601B3D9322 /* HandStrudel.entitlements */,
 				2E3A4C0D73CA4CA64494F9A1 /* HandStrudel.storekit */,
 				8B7A548807FF6856B92FC423 /* Info.plist */,
 				953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */,
@@ -443,6 +445,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = HandStrudel/HandStrudel.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 6;
@@ -601,6 +604,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = HandStrudel/HandStrudel.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 6;
