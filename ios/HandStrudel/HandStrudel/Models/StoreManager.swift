@@ -126,8 +126,12 @@ final class StoreManager: ObservableObject {
     }
 
     func isUnlocked(_ packId: String) -> Bool {
+        #if DEBUG
+        return true
+        #else
         let productId = Self.productId(for: packId)
         return purchasedIds.contains(productId) || hasProAccess
+        #endif
     }
 
     var hasProAccess: Bool {

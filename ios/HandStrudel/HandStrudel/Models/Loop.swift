@@ -9,6 +9,7 @@ struct LoopEvent: Codable {
         case noteOn(midi: Int, waveform: String, velocity: Double)
         case noteOff(hand: String)
         case drumHit(hitType: String)
+        case codeSnapshot(code: String)  // melodic mode: full Strudel code at this moment
     }
 }
 

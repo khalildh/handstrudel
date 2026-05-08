@@ -79,6 +79,8 @@ final class AudioExporter {
 
             case .noteOff:
                 break
+            case .codeSnapshot:
+                break // code snapshots are for live playback, not audio export
             }
         }
 

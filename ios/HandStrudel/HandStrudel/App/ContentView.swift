@@ -864,19 +864,12 @@ struct ContentView: View {
                     withAnimation { showLoopSaved = false }
                 }
             } else {
-                if !engine.gridModeEnabled && !engine.drumModeEnabled {
-                    loopMessage = "Switch to Grid or Drums mode first"
-                    withAnimation { showLoopSaved = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        withAnimation { showLoopSaved = false }
-                    }
-                } else {
-                    engine.startLoopRecording()
-                    loopMessage = "Recording loop — play notes, tap again to stop"
-                    withAnimation { showLoopSaved = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                        withAnimation { showLoopSaved = false }
-                    }
+                engine.startLoopRecording()
+                let modeHint = engine.gridModeEnabled ? "play notes" : engine.drumModeEnabled ? "play drums" : "move your hands"
+                loopMessage = "Recording loop — \(modeHint), tap again to stop"
+                withAnimation { showLoopSaved = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    withAnimation { showLoopSaved = false }
                 }
             }
         }) {

@@ -440,7 +440,23 @@ final class EngineController: ObservableObject {
         evaluateDrumLoopsIfChanged(modePrefix: "drum")
     }
 
+    private var lastMelodicSnapshotTime: Double = 0
+
     private func tickMelodicMode() {
+        // Record code snapshots for loop recording in melodic mode (~10fps)
+        if loopRecorder.isRecording {
+            let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+            if elapsed - lastMelodicSnapshotTime > 0.1 {
+                lastMelodicSnapshotTime = elapsed
+                let code = chordMode
+                    ? buildChordSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
+                    : buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
+                // Build a static code string with current param values baked in
+                let staticCode = buildCode(smoothed, structIdx: structIdx, config: config, waveform: selectedWaveform)
+                loopRecorder.recordEvent(.codeSnapshot(code: staticCode), currentTime: elapsed)
+            }
+        }
+
         // Update signal params (key/scale aware)
         let notes = cachedScaleNotes
         if chordMode {
@@ -511,6 +527,8 @@ final class EngineController: ObservableObject {
                 strudelBridge.playHit(hitType)
             case .noteOff:
                 break // one-shot playback, no sustained notes in loops
+            case .codeSnapshot(let code):
+                strudelBridge.evaluate(code)
             }
         }
     }
