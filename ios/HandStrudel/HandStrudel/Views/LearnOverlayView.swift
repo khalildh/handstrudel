@@ -12,6 +12,8 @@ struct LearnOverlayView: View {
     let rightLane: Int?
     let leftPinching: Bool
     let rightPinching: Bool
+    let countdownValue: Int
+    let isCountingDown: Bool
     var onPlayAgain: () -> Void
     var onPickSong: () -> Void
 
@@ -157,6 +159,17 @@ struct LearnOverlayView: View {
                 .padding(.trailing, 16)
                 .padding(.top, topPad + 8)
 
+                // MARK: - Countdown
+                if isCountingDown && countdownValue > 0 {
+                    Text("\(countdownValue)")
+                        .font(.system(size: 120, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+                        .shadow(color: .cyan, radius: 20)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.scale.combined(with: .opacity))
+                        .animation(.easeOut(duration: 0.3), value: countdownValue)
+                }
+
                 // MARK: - Song Complete Overlay
                 if songComplete {
                     SongCompleteCard(
@@ -168,7 +181,7 @@ struct LearnOverlayView: View {
                 }
             }
         }
-        .allowsHitTesting(songComplete) // only intercept taps when complete card is shown
+        .allowsHitTesting(songComplete)
     }
 
     // MARK: - Note Colors

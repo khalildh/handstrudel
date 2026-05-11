@@ -163,6 +163,8 @@ struct ContentView: View {
                     rightLane: engine.gridRightLane,
                     leftPinching: engine.gridModeManager.isLeftPinching,
                     rightPinching: engine.gridModeManager.isRightPinching,
+                    countdownValue: engine.learnModeManager.countdownValue,
+                    isCountingDown: engine.learnModeManager.isCountingDown,
                     onPlayAgain: {
                         if let song = engine.currentLearnSong { engine.loadLearnSong(song) }
                     },

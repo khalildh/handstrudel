@@ -13,6 +13,11 @@ final class LearnModeManager {
     // Scrolling config
     let scrollLeadBeats: Double = 4.0      // notes appear 4 beats ahead
     let hitLineX: Double = 0.25            // 25% from left edge
+    let countdownBeats: Double = 4.0       // 4 beats of countdown before first note
+
+    // Countdown state
+    private(set) var countdownValue: Int = 0  // 3, 2, 1, 0 (0 = playing)
+    private(set) var isCountingDown = false
 
     // Hit detection windows (seconds)
     let hitWindowPerfect: Double = 0.100
@@ -60,6 +65,8 @@ final class LearnModeManager {
         songStartTime = 0
         firstTick = true
         songComplete = false
+        isCountingDown = true
+        countdownValue = 3
         consumedNoteIds.removeAll()
         consumedStates.removeAll()
         score = LearnScore()
@@ -79,14 +86,25 @@ final class LearnModeManager {
     ) -> [(midi: Int, laneIndex: Int)] {
         guard currentSong != nil, !resolvedNotes.isEmpty else { return [] }
 
-        // Set songStartTime on first call
+        // Set songStartTime on first call (with countdown offset)
         if firstTick {
-            songStartTime = elapsed
+            songStartTime = elapsed + countdownBeats * (60.0 / songBPM)
             firstTick = false
         }
 
         let secondsPerBeat = 60.0 / songBPM
         let currentBeat = (elapsed - songStartTime) / secondsPerBeat
+
+        // Handle countdown
+        if currentBeat < 0 {
+            let beatsUntilStart = -currentBeat
+            countdownValue = max(0, min(3, Int(ceil(beatsUntilStart))))
+            isCountingDown = true
+            // Still show upcoming notes scrolling in during countdown
+        } else if isCountingDown {
+            isCountingDown = false
+            countdownValue = 0
+        }
 
         // Visible beat range: 1 beat behind hit line to scrollLeadBeats ahead
         let visibleStart = currentBeat - 1

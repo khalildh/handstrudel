@@ -43,6 +43,8 @@ struct LearnSong: Identifiable {
     let bpm: Double
     let degreeNotes: [LearnDegreeNote]
     let category: SongCategory
+    let suggestedScale: Scale
+    let suggestedKey: MusicKey
 
     enum SongCategory: String, CaseIterable {
         case melody = "Melodies"
@@ -50,13 +52,32 @@ struct LearnSong: Identifiable {
         case imported = "Imported"
     }
 
-    init(name: String, emoji: String, bpm: Double, degreeNotes: [LearnDegreeNote], category: SongCategory = .melody) {
+    init(name: String, emoji: String, bpm: Double, degreeNotes: [LearnDegreeNote], category: SongCategory = .melody, suggestedScale: Scale = .major, suggestedKey: MusicKey = .C) {
         self.id = UUID()
         self.name = name
         self.emoji = emoji
         self.bpm = bpm
         self.degreeNotes = degreeNotes
         self.category = category
+        self.suggestedScale = suggestedScale
+        self.suggestedKey = suggestedKey
+    }
+
+    /// Create a longer version by repeating the melody
+    func repeated(_ times: Int) -> LearnSong {
+        var allNotes = [LearnDegreeNote]()
+        let lastBeat = degreeNotes.last.map { $0.startBeat + $0.durationBeats } ?? 0
+        for rep in 0..<times {
+            let offset = Double(rep) * (lastBeat + 1) // 1 beat gap between repeats
+            for note in degreeNotes {
+                allNotes.append(LearnDegreeNote(
+                    degree: note.degree,
+                    startBeat: note.startBeat + offset,
+                    durationBeats: note.durationBeats
+                ))
+            }
+        }
+        return LearnSong(name: name, emoji: emoji, bpm: bpm, degreeNotes: allNotes, category: category, suggestedScale: suggestedScale, suggestedKey: suggestedKey)
     }
 
     /// Resolve degree notes to actual MIDI using current scale
@@ -142,8 +163,6 @@ private func buildNotes(_ pairs: [(Int, Double)]) -> [LearnDegreeNote] {
 
 let BUNDLED_SONGS: [LearnSong] = [
     // 1. Twinkle Twinkle Little Star
-    // C C G G A A G - F F E E D D C
-    // degrees: 0,0,4,4,5,5,4 (half), 3,3,2,2,1,1,0 (half)
     LearnSong(
         name: "Twinkle Twinkle",
         emoji: "\u{2B50}",
@@ -151,12 +170,11 @@ let BUNDLED_SONGS: [LearnSong] = [
         degreeNotes: buildNotes([
             (0, 1), (0, 1), (4, 1), (4, 1), (5, 1), (5, 1), (4, 2),
             (3, 1), (3, 1), (2, 1), (2, 1), (1, 1), (1, 1), (0, 2),
-        ])
-    ),
+        ]),
+        suggestedScale: .major, suggestedKey: .C
+    ).repeated(3),
 
     // 2. Ode to Joy
-    // E E F G G F E D C C D E E D D
-    // degrees: 2,2,3,4,4,3,2,1,0,0,1,2,2(half),1,1(half)
     LearnSong(
         name: "Ode to Joy",
         emoji: "\u{1F3B5}",
@@ -164,12 +182,11 @@ let BUNDLED_SONGS: [LearnSong] = [
         degreeNotes: buildNotes([
             (2, 1), (2, 1), (3, 1), (4, 1), (4, 1), (3, 1), (2, 1), (1, 1),
             (0, 1), (0, 1), (1, 1), (2, 1), (2, 1.5), (1, 0.5), (1, 2),
-        ])
-    ),
+        ]),
+        suggestedScale: .major, suggestedKey: .C
+    ).repeated(3),
 
     // 3. Mary Had a Little Lamb
-    // E D C D E E E - D D D - E G G
-    // degrees: 2,1,0,1,2,2,2(half), 1,1,1(half), 2,4,4(half)
     LearnSong(
         name: "Mary Had a Little Lamb",
         emoji: "\u{1F411}",
@@ -178,13 +195,11 @@ let BUNDLED_SONGS: [LearnSong] = [
             (2, 1), (1, 1), (0, 1), (1, 1), (2, 1), (2, 1), (2, 2),
             (1, 1), (1, 1), (1, 2),
             (2, 1), (4, 1), (4, 2),
-        ])
-    ),
+        ]),
+        suggestedScale: .major, suggestedKey: .C
+    ).repeated(4),
 
-    // 4. When the Saints Go Marching In
-    // C E F G - C E F G - C E F G E C E D
-    // degrees: 0,2,3,4, 0,2,3,4, 0,2,3,4,2,0,2,1
-    // Mix of quarter and half notes
+    // 4. When the Saints
     LearnSong(
         name: "When the Saints",
         emoji: "\u{1F3BA}",
@@ -193,12 +208,11 @@ let BUNDLED_SONGS: [LearnSong] = [
             (0, 1), (2, 1), (3, 1), (4, 2),
             (0, 1), (2, 1), (3, 1), (4, 2),
             (0, 1), (2, 1), (3, 1), (4, 1), (2, 1), (0, 1), (2, 1), (1, 2),
-        ])
-    ),
+        ]),
+        suggestedScale: .major, suggestedKey: .C
+    ).repeated(3),
 
     // 5. Amazing Grace
-    // pickup G, then C E C E D C A G
-    // degrees: 4,0,2,0,2,1,0 with wider spacing, half and quarter notes
     LearnSong(
         name: "Amazing Grace",
         emoji: "\u{1F54A}\u{FE0F}",
@@ -207,12 +221,11 @@ let BUNDLED_SONGS: [LearnSong] = [
             (4, 1),
             (7, 2), (9, 1), (7, 2), (9, 2), (7, 2),
             (5, 2), (4, 2), (2, 2), (4, 1), (4, 2),
-        ])
-    ),
+        ]),
+        suggestedScale: .major, suggestedKey: .C
+    ).repeated(3),
 
-    // 6. Frere Jacques (Are You Sleeping)
-    // C D E C  C D E C  E F G  E F G
-    // degrees: 0,1,2,0, 0,1,2,0, 2,3,4, 2,3,4
+    // 6. Frere Jacques
     LearnSong(
         name: "Frere Jacques",
         emoji: "\u{1F514}",
@@ -222,26 +235,24 @@ let BUNDLED_SONGS: [LearnSong] = [
             (0, 1), (1, 1), (2, 1), (0, 1),
             (2, 1), (3, 1), (4, 2),
             (2, 1), (3, 1), (4, 2),
-        ])
-    ),
+        ]),
+        suggestedScale: .major, suggestedKey: .C
+    ).repeated(3),
 
-    // 7. Jingle Bells (chorus)
-    // E E E  E E E  E G C D E
-    // degrees: 2,2,2, 2,2,2, 2,4,0,1,2
+    // 7. Jingle Bells
     LearnSong(
         name: "Jingle Bells",
-        emoji: "\u{1F514}",
+        emoji: "\u{1F384}",
         bpm: 130,
         degreeNotes: buildNotes([
             (2, 1), (2, 1), (2, 2),
             (2, 1), (2, 1), (2, 2),
             (2, 1), (4, 1), (0, 1.5), (1, 0.5), (2, 2),
-        ])
-    ),
+        ]),
+        suggestedScale: .major, suggestedKey: .C
+    ).repeated(3),
 
     // 8. Scarborough Fair
-    // A A E A B A G E
-    // degrees: 5,5,2,5,6,5,4,2 - half and quarter notes
     LearnSong(
         name: "Scarborough Fair",
         emoji: "\u{1F33F}",
@@ -250,6 +261,7 @@ let BUNDLED_SONGS: [LearnSong] = [
             (5, 2), (5, 1), (5, 1), (2, 2),
             (5, 1), (6, 1), (5, 2),
             (4, 2), (2, 2),
-        ])
-    ),
+        ]),
+        suggestedScale: .minor, suggestedKey: .A
+    ).repeated(4),
 ]

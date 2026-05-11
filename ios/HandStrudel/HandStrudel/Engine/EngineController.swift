@@ -492,9 +492,15 @@ final class EngineController: ObservableObject {
     }
 
     func loadLearnSong(_ song: LearnSong) {
+        // Auto-set key and scale to match the song
+        selectedKey = song.suggestedKey
+        selectedScale = song.suggestedScale
+        recomputeScaleNotes()
+
         let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale,
                                    baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
-        learnModeManager.loadSong(song, scaleNotes: gridNotes, bpm: manualBPM)
+        learnModeManager.loadSong(song, scaleNotes: gridNotes, bpm: song.bpm)
+        manualBPM = song.bpm
         currentLearnSong = song
         learnSongComplete = false
     }
