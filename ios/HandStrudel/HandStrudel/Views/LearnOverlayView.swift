@@ -8,10 +8,11 @@ struct LearnOverlayView: View {
     let score: LearnScore
     let songComplete: Bool
     let songName: String
-    let leftLane: Int?
-    let rightLane: Int?
+    let leftPinchY: Double?
+    let rightPinchY: Double?
     let leftPinching: Bool
     let rightPinching: Bool
+    let videoAspect: CGFloat
     let countdownValue: Int
     let isCountingDown: Bool
     var onPlayAgain: () -> Void
@@ -24,6 +25,27 @@ struct LearnOverlayView: View {
             let usableHeight = geo.size.height - topPad - bottomPad
             let laneHeight = usableHeight / CGFloat(max(1, noteCount))
             let hitLineX = geo.size.width * 0.25
+
+            // Aspect fill correction (same as grid overlay)
+            let scrAspect = geo.size.width / geo.size.height
+            let correctedY: (Double) -> CGFloat = { vy in
+                if videoAspect > scrAspect {
+                    return CGFloat(vy) * geo.size.height
+                } else {
+                    let vis = videoAspect / scrAspect
+                    let off = (1 - vis) / 2
+                    return (CGFloat(vy) - off) / vis * geo.size.height
+                }
+            }
+
+            let leftLane: Int? = leftPinchY.map { py in
+                let screenY = correctedY(py) - topPad
+                return max(0, min(noteCount - 1, Int(screenY / laneHeight)))
+            }
+            let rightLane: Int? = rightPinchY.map { py in
+                let screenY = correctedY(py) - topPad
+                return max(0, min(noteCount - 1, Int(screenY / laneHeight)))
+            }
 
             ZStack {
                 // MARK: - Lane Backgrounds
