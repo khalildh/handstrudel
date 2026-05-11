@@ -11,6 +11,7 @@
 		0AABB3564BB7F0F7CD594B81 /* strudel-bundle.js in Resources */ = {isa = PBXBuildFile; fileRef = 0566FE6FEDB28D58639FD392 /* strudel-bundle.js */; };
 		0E415FF3DE2770E464D4B6BB /* CameraFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 859E2C859C653F058FAEBDD3 /* CameraFilterTests.swift */; };
 		195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B0EF83FDEC95F58B860F5A /* HandMapper.swift */; };
+		1999B0662EA1CB86F3EF0FFE /* LearnModeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55E91BE8AD32AC69E4F4A3BA /* LearnModeManagerTests.swift */; };
 		1D40AE3AA1F2B1FA4B31CBB2 /* StoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15B500CE35D9D44107CDAC4 /* StoreView.swift */; };
 		1EE6860496AAB0772E65E97D /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */; };
 		1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */; };
@@ -52,6 +53,7 @@
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
 		BF459746DBE08887CD29CFF3 /* SaveGestureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C89256347633541234267B8 /* SaveGestureDetector.swift */; };
 		C9D0CB8C617776591C669A1D /* HandTrackingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */; };
+		D07E059A67BBBA11346FB42B /* LearnSongTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2777760AE87651C57AD36E38 /* LearnSongTests.swift */; };
 		D2520D85FD921167AEA6EB1C /* HandStrudelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */; };
 		D4C3C43238961610E6ACFCAD /* HandStrudel.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2E3A4C0D73CA4CA64494F9A1 /* HandStrudel.storekit */; };
 		D75E25A96408DCA1BE5AA284 /* StrudelBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDA338219566335AD58643B /* StrudelBridge.swift */; };
@@ -88,12 +90,14 @@
 		1C85B4858D833EF68AAD427C /* LearnSongPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSongPicker.swift; sourceTree = "<group>"; };
 		2105F77EC139355C8EC8FB3D /* JamSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamSession.swift; sourceTree = "<group>"; };
 		21E972CF1E53A24CA899C1A5 /* StoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreManager.swift; sourceTree = "<group>"; };
+		2777760AE87651C57AD36E38 /* LearnSongTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSongTests.swift; sourceTree = "<group>"; };
 		292584639B51D092EEC802F1 /* SiriShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriShortcuts.swift; sourceTree = "<group>"; };
 		2D6755AC0E55CFA644BF8217 /* iMessageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iMessageManager.swift; sourceTree = "<group>"; };
 		2E3A4C0D73CA4CA64494F9A1 /* HandStrudel.storekit */ = {isa = PBXFileReference; path = HandStrudel.storekit; sourceTree = "<group>"; };
 		352AD3F7189E1B79D0315D59 /* LearnModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnModeManager.swift; sourceTree = "<group>"; };
 		3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelTests.swift; sourceTree = "<group>"; };
 		5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingConfig.swift; sourceTree = "<group>"; };
+		55E91BE8AD32AC69E4F4A3BA /* LearnModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnModeManagerTests.swift; sourceTree = "<group>"; };
 		564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreManagerTests.swift; sourceTree = "<group>"; };
 		6B7D7F4F5C7AF55B5D8BD8F6 /* LoopSharingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopSharingManager.swift; sourceTree = "<group>"; };
 		6C89256347633541234267B8 /* SaveGestureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGestureDetector.swift; sourceTree = "<group>"; };
@@ -264,6 +268,8 @@
 				E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */,
 				05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */,
 				3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */,
+				55E91BE8AD32AC69E4F4A3BA /* LearnModeManagerTests.swift */,
+				2777760AE87651C57AD36E38 /* LearnSongTests.swift */,
 				B8778B02D6298E0F0D25105B /* MappingConfigTests.swift */,
 				9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */,
 				F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */,
@@ -421,6 +427,8 @@
 				B59B82967BBF79A13E8EC3E6 /* DrumModeManagerTests.swift in Sources */,
 				65072B9A79F5C9E6E72B0F9A /* GridModeManagerTests.swift in Sources */,
 				39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */,
+				1999B0662EA1CB86F3EF0FFE /* LearnModeManagerTests.swift in Sources */,
+				D07E059A67BBBA11346FB42B /* LearnSongTests.swift in Sources */,
 				DB9DE9A3806A7D566AAF5B0F /* MappingConfigTests.swift in Sources */,
 				F1E2FAD696F5D1BAD3542162 /* MusicTheoryTests.swift in Sources */,
 				5953AA2B7EEB3B9102EEBCD1 /* ParamDefsTests.swift in Sources */,
