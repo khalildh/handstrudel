@@ -85,7 +85,14 @@ final class EngineController: ObservableObject {
     @Published var savedLoops = [RecordedLoop]()
     @Published var playingLoopIds = Set<UUID>()
 
-    // Song mode (guided play)
+    // Learn mode (Guitar Hero-style guided play)
+    @Published var learnModeEnabled = false
+    let learnModeManager = LearnModeManager()
+    @Published var learnScore = LearnScore()
+    @Published var learnVisibleNotes: [LearnModeManager.VisibleNote] = []
+    @Published var learnHitEffects: [LearnModeManager.HitEffect] = []
+    @Published var learnSongComplete = false
+    @Published var currentLearnSong: LearnSong? = nil
 
     // Grid mode (pinch-to-play)
     @Published var gridModeEnabled = false
@@ -318,7 +325,9 @@ final class EngineController: ObservableObject {
         let isLive = playingSet.isEmpty && !trackPlaying
         guard isLive else { return }
 
-        if gridModeEnabled {
+        if learnModeEnabled {
+            tickLearnMode()
+        } else if gridModeEnabled {
             tickGridMode()
         } else if drumModeEnabled {
             tickDrumMode()
@@ -439,6 +448,58 @@ final class EngineController: ObservableObject {
 
         evaluateDrumLoopsIfChanged(modePrefix: "drum")
     }
+
+    // MARK: - Learn Mode
+
+    private func tickLearnMode() {
+        // Use same grid infrastructure for lane detection
+        let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale,
+                                   baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
+        guard !gridNotes.isEmpty else { return }
+
+        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+
+        // Get current pinch/lane state from grid manager
+        let leftHand = currentHands.left
+        let rightHand = currentHands.right
+        let leftLane = leftHand.map { gridModeManager.yToNoteIndex(y: $0.pinchY, noteCount: gridNotes.count) }
+        let rightLane = rightHand.map { gridModeManager.yToNoteIndex(y: $0.pinchY, noteCount: gridNotes.count) }
+        let leftPinching = (leftHand?.pinch ?? 0) > 0.8
+        let rightPinching = (rightHand?.pinch ?? 0) > 0.8
+
+        gridLeftLane = leftLane
+        gridRightLane = rightLane
+
+        let hitNotes = learnModeManager.tick(
+            elapsed: elapsed,
+            leftLane: leftLane,
+            rightLane: rightLane,
+            leftPinching: leftPinching,
+            rightPinching: rightPinching
+        )
+
+        // Play sound for hit notes
+        for hit in hitNotes {
+            strudelBridge.playNote(midi: hit.midi, waveform: selectedWaveform, velocity: 0.7, duration: 0.3)
+            haptics.learnPerfectHit()
+        }
+
+        // Sync visual state to published properties (at UI timer rate)
+        learnScore = learnModeManager.score
+        learnVisibleNotes = learnModeManager.visibleNotes
+        learnHitEffects = learnModeManager.hitEffects
+        learnSongComplete = learnModeManager.songComplete
+    }
+
+    func loadLearnSong(_ song: LearnSong) {
+        let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale,
+                                   baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
+        learnModeManager.loadSong(song, scaleNotes: gridNotes, bpm: manualBPM)
+        currentLearnSong = song
+        learnSongComplete = false
+    }
+
+    // MARK: - Melodic Mode
 
     private var lastMelodicSnapshotTime: Double = 0
 

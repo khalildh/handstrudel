@@ -144,6 +144,24 @@ func midiNoteName(_ midi: Int) -> String {
     return "\(name)\(octave)"
 }
 
+/// Find the lane index (into scaleNotes) closest to a given MIDI value
+func midiToLaneIndex(_ midi: Int, scaleNotes: [Int]) -> Int {
+    guard !scaleNotes.isEmpty else { return 0 }
+    var bestIdx = 0
+    var bestDist = Int.max
+    for (i, sn) in scaleNotes.enumerated() {
+        let dist = abs(sn - midi)
+        if dist < bestDist { bestDist = dist; bestIdx = i }
+    }
+    return bestIdx
+}
+
+/// Quantize a MIDI note to the nearest note in the scale
+func quantizeToScale(_ midi: Int, scaleNotes: [Int]) -> Int {
+    guard !scaleNotes.isEmpty else { return midi }
+    return scaleNotes.min(by: { abs($0 - midi) < abs($1 - midi) }) ?? midi
+}
+
 /// Strudel note name (lowercase) from MIDI
 func midiToStrudelNote(_ midi: Int) -> String {
     let names = ["c", "db", "d", "eb", "e", "f", "gb", "g", "ab", "a", "bb", "b"]

@@ -41,6 +41,30 @@ final class HapticManager {
         playPattern([event])
     }
 
+    // Learn mode: strong positive for perfect hit
+    func learnPerfectHit() {
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.9)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.3)
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+        playPattern([event])
+    }
+
+    // Learn mode: medium for good hit
+    func learnGoodHit() {
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+        playPattern([event])
+    }
+
+    // Learn mode: short buzz for miss
+    func learnMiss() {
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+        playPattern([event])
+    }
+
     // Gentle feedback for UI interactions
     func lightTap() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()

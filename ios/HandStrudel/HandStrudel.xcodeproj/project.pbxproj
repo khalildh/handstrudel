@@ -30,10 +30,13 @@
 		4EC81DC9ACA61F24040592D2 /* AudioExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9531420BA306B5BC2AB859A6 /* AudioExporter.swift */; };
 		575A0CD71B422DFD7ACB6FDF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */; };
 		5953AA2B7EEB3B9102EEBCD1 /* ParamDefsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */; };
+		5AE2A6CDB62709D4B83A5C89 /* LearnModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352AD3F7189E1B79D0315D59 /* LearnModeManager.swift */; };
 		61F3ED12A7BAB424D09491E8 /* Snippet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */; };
 		6342A972BB06049F9B3999BC /* CameraFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE98AF54FEB607CE395267C8 /* CameraFilter.swift */; };
 		65072B9A79F5C9E6E72B0F9A /* GridModeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */; };
+		6871AA438EAC5767702D188F /* LearnSong.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CB456251F49E8C1FE668CC2 /* LearnSong.swift */; };
 		701DC3F0F0B8477FAC156842 /* PaywallOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */; };
+		73E81C762C77D3DB08064674 /* LearnSongPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C85B4858D833EF68AAD427C /* LearnSongPicker.swift */; };
 		74F628FCEDF7DEEC0324931E /* SiriShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 292584639B51D092EEC802F1 /* SiriShortcuts.swift */; };
 		757E1A695C82940900C8E980 /* LoopSharingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7D7F4F5C7AF55B5D8BD8F6 /* LoopSharingManager.swift */; };
 		8590BD09D74A051C39590A4D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */; };
@@ -58,6 +61,7 @@
 		E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */; };
 		EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D6C035D4A9EE1A66C31839 /* Loop.swift */; };
 		F1E2FAD696F5D1BAD3542162 /* MusicTheoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */; };
+		F29562634D40D21DF434DF6C /* LearnOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB44B1EB04F4196CFA4C8AD6 /* LearnOverlayView.swift */; };
 		F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F505B00217A74555C8E226 /* MusicTheory.swift */; };
 		F7E93C2DB10D88C64280E374 /* WatermarkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8857B4C9E8825F7E480DAED0 /* WatermarkManager.swift */; };
 /* End PBXBuildFile section */
@@ -76,15 +80,18 @@
 		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
 		05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeManagerTests.swift; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		0CB456251F49E8C1FE668CC2 /* LearnSong.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSong.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
 		11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
 		15EE16108C9368E03A5293FC /* LoopRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopRecorder.swift; sourceTree = "<group>"; };
 		18B0EF83FDEC95F58B860F5A /* HandMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandMapper.swift; sourceTree = "<group>"; };
+		1C85B4858D833EF68AAD427C /* LearnSongPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSongPicker.swift; sourceTree = "<group>"; };
 		2105F77EC139355C8EC8FB3D /* JamSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamSession.swift; sourceTree = "<group>"; };
 		21E972CF1E53A24CA899C1A5 /* StoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreManager.swift; sourceTree = "<group>"; };
 		292584639B51D092EEC802F1 /* SiriShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriShortcuts.swift; sourceTree = "<group>"; };
 		2D6755AC0E55CFA644BF8217 /* iMessageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iMessageManager.swift; sourceTree = "<group>"; };
 		2E3A4C0D73CA4CA64494F9A1 /* HandStrudel.storekit */ = {isa = PBXFileReference; path = HandStrudel.storekit; sourceTree = "<group>"; };
+		352AD3F7189E1B79D0315D59 /* LearnModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnModeManager.swift; sourceTree = "<group>"; };
 		3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelTests.swift; sourceTree = "<group>"; };
 		5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingConfig.swift; sourceTree = "<group>"; };
 		564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreManagerTests.swift; sourceTree = "<group>"; };
@@ -120,6 +127,7 @@
 		BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "strudel-engine.html"; sourceTree = "<group>"; };
 		C110717C5437516659E169B3 /* PersistenceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceManager.swift; sourceTree = "<group>"; };
 		C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTrackingManager.swift; sourceTree = "<group>"; };
+		CB44B1EB04F4196CFA4C8AD6 /* LearnOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnOverlayView.swift; sourceTree = "<group>"; };
 		CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D986625C7BF30952FBAED619 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeManagerTests.swift; sourceTree = "<group>"; };
@@ -156,6 +164,8 @@
 				F2C015029D54DF587EDD09DC /* CameraView.swift */,
 				9238181B674B4222B2F52C5A /* GridTouchView.swift */,
 				6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */,
+				CB44B1EB04F4196CFA4C8AD6 /* LearnOverlayView.swift */,
+				1C85B4858D833EF68AAD427C /* LearnSongPicker.swift */,
 				D986625C7BF30952FBAED619 /* OnboardingView.swift */,
 				A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */,
 				74287CD261130ADF57405FF3 /* StartOverlayView.swift */,
@@ -177,6 +187,7 @@
 				B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */,
 				2D6755AC0E55CFA644BF8217 /* iMessageManager.swift */,
 				2105F77EC139355C8EC8FB3D /* JamSession.swift */,
+				352AD3F7189E1B79D0315D59 /* LearnModeManager.swift */,
 				11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */,
 				15EE16108C9368E03A5293FC /* LoopRecorder.swift */,
 				6B7D7F4F5C7AF55B5D8BD8F6 /* LoopSharingManager.swift */,
@@ -216,6 +227,7 @@
 			children = (
 				AE98AF54FEB607CE395267C8 /* CameraFilter.swift */,
 				962D341307D9F8B90BCD5454 /* HandTheme.swift */,
+				0CB456251F49E8C1FE668CC2 /* LearnSong.swift */,
 				93D6C035D4A9EE1A66C31839 /* Loop.swift */,
 				5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */,
 				A9F505B00217A74555C8E226 /* MusicTheory.swift */,
@@ -371,6 +383,10 @@
 				C9D0CB8C617776591C669A1D /* HandTrackingManager.swift in Sources */,
 				1EE6860496AAB0772E65E97D /* HapticManager.swift in Sources */,
 				25A87740F4DA10D91C739E18 /* JamSession.swift in Sources */,
+				5AE2A6CDB62709D4B83A5C89 /* LearnModeManager.swift in Sources */,
+				F29562634D40D21DF434DF6C /* LearnOverlayView.swift in Sources */,
+				6871AA438EAC5767702D188F /* LearnSong.swift in Sources */,
+				73E81C762C77D3DB08064674 /* LearnSongPicker.swift in Sources */,
 				31732217DB10380B3787DE51 /* LiveActivityManager.swift in Sources */,
 				EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */,
 				3FDADBDC4BFF18F21A29F680 /* LoopRecorder.swift in Sources */,

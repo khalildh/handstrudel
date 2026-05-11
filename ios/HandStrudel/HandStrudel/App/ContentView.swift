@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var filterName: String = ""
     @State private var showFilterName = false
     @State private var showJamAlert = false
+    @State private var showLearnPicker = false
     @State private var watermarkView: UIView?
     @State private var showRandomizedToast = false
     // Song mode removed
@@ -146,6 +147,30 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
 
+            // Learn mode overlay (Guitar Hero scrolling notes)
+            if engine.learnModeEnabled {
+                let gridNotes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale,
+                                          baseOctave: engine.gridBaseOctave, octaveRange: engine.gridOctaveRange)
+                LearnOverlayView(
+                    noteCount: gridNotes.count,
+                    scaleNotes: gridNotes,
+                    visibleNotes: engine.learnVisibleNotes,
+                    hitEffects: engine.learnHitEffects,
+                    score: engine.learnScore,
+                    songComplete: engine.learnSongComplete,
+                    songName: engine.currentLearnSong?.name ?? "",
+                    leftLane: engine.gridLeftLane,
+                    rightLane: engine.gridRightLane,
+                    leftPinching: engine.gridModeManager.isLeftPinching,
+                    rightPinching: engine.gridModeManager.isRightPinching,
+                    onPlayAgain: {
+                        if let song = engine.currentLearnSong { engine.loadLearnSong(song) }
+                    },
+                    onPickSong: { showLearnPicker = true }
+                )
+                .ignoresSafeArea()
+            }
+
             // Floating UI overlays
             VStack {
                 // Top bar: close button + beat dots
@@ -265,6 +290,12 @@ struct ContentView: View {
         .sheet(isPresented: $showShareSheet) {
             if let url = recordedVideoURL {
                 ShareSheet(activityItems: [url])
+            }
+        }
+        .sheet(isPresented: $showLearnPicker) {
+            LearnSongPicker { song in
+                engine.loadLearnSong(song)
+                showLearnPicker = false
             }
         }
         .confirmationDialog("Share to", isPresented: $showSharePicker, titleVisibility: .visible) {
@@ -1090,6 +1121,7 @@ struct ControlSheet: View {
     @ObservedObject var storeManager: StoreManager
     @Binding var hideSkeletonWhenRecording: Bool
     @State private var showStore = false
+    @State private var showLearnPicker = false
     @State private var paywallPackId: String?
     @State private var showAudioExport = false
     @State private var exportedAudioURL: URL?
@@ -1176,6 +1208,12 @@ struct ControlSheet: View {
         .sheet(isPresented: $showStore) {
             StoreView(storeManager: storeManager)
         }
+        .sheet(isPresented: $showLearnPicker) {
+            LearnSongPicker { song in
+                engine.loadLearnSong(song)
+                showLearnPicker = false
+            }
+        }
         .sheet(isPresented: $showAudioExport) {
             if let url = exportedAudioURL {
                 ShareSheet(activityItems: [url])
@@ -1240,16 +1278,21 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, grid, drums }
+    private enum AppMode: String { case melodic, grid, drums, learn }
     private var currentMode: AppMode {
+        if engine.learnModeEnabled { return .learn }
         if engine.gridModeEnabled { return .grid }
         if engine.drumModeEnabled { return .drums }
         return .melodic
     }
 
     private func setMode(_ mode: AppMode) {
+        engine.learnModeEnabled = mode == .learn
         engine.gridModeEnabled = mode == .grid
         engine.drumModeEnabled = mode == .drums
+        if mode == .learn && engine.currentLearnSong == nil {
+            showLearnPicker = true
+        }
     }
 
     private var modeSection: some View {
@@ -1260,6 +1303,7 @@ struct ControlSheet: View {
                 modeButton("Melodic", icon: "pianokeys", mode: .melodic)
                 modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
                 modeButton("Drums", icon: "beats.headphones", mode: .drums)
+                modeButton("Learn", icon: "music.note.list", mode: .learn)
             }
 
             if currentMode == .grid {
