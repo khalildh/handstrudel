@@ -228,6 +228,13 @@ struct StoreView: View {
                         .fill(Color.white.opacity(0.06))
                 )
 
+                // Subscription details (required by App Store)
+                Text(plusToggle == .monthly
+                    ? "Billed \(monthlyProduct?.displayPrice ?? "$2.99") per month. Cancel anytime."
+                    : "Billed \(yearlyProduct?.displayPrice ?? "$19.99") per year. Save 44%. Cancel anytime.")
+                    .font(.system(size: 10, design: .rounded))
+                    .foregroundColor(.white.opacity(0.4))
+
                 Button(action: {
                     let product = plusToggle == .monthly ? monthlyProduct : yearlyProduct
                     guard let product else { return }
@@ -241,7 +248,22 @@ struct StoreView: View {
                         .background(Color.green)
                         .cornerRadius(12)
                 }
+
+                Text("Subscription auto-renews. Cancel anytime in Settings > Subscriptions.")
+                    .font(.system(size: 9, design: .rounded))
+                    .foregroundColor(.white.opacity(0.3))
             }
+
+            // Required links
+            HStack(spacing: 16) {
+                Link("Privacy Policy", destination: URL(string: "https://handstrudel.com/privacy")!)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.4))
+                Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .padding(.top, 4)
         }
         .padding(16)
         .background(
