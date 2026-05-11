@@ -52,6 +52,11 @@ struct ContentView: View {
                 .opacity(0.01)
                 .allowsHitTesting(false)
         }
+        .onAppear {
+            if ProcessInfo.processInfo.arguments.contains("--reset-onboarding") {
+                hasSeenOnboarding = false
+            }
+        }
         .statusBarHidden(engine.isRunning)
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
             guard !engine.isRunning, let presetId = notification.object as? String else { return }
@@ -381,6 +386,7 @@ struct ContentView: View {
                     .background(Color.black.opacity(0.4))
                     .clipShape(Circle())
             }
+            .accessibilityIdentifier("close-button")
         }
     }
 
@@ -885,6 +891,7 @@ struct ContentView: View {
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(Color.black.opacity(0.3)))
             }
+            .accessibilityIdentifier("settings-button")
         }
     }
 
@@ -1019,6 +1026,7 @@ struct ContentView: View {
                 }
             }
             .disabled(isRecording)
+            .accessibilityIdentifier("record-button")
     }
 
     // MARK: - Recording
@@ -1389,6 +1397,7 @@ struct ControlSheet: View {
                     .stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1.5 : 0.5)
             )
         }
+        .accessibilityIdentifier("mode-\(mode.rawValue)")
     }
 
 

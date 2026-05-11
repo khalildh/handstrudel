@@ -26,6 +26,8 @@ struct LearnSongPicker: View {
                                 onSelect(song)
                                 dismiss()
                             }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("song-\(song.name)")
                     }
                 }
 
@@ -135,6 +137,7 @@ struct LearnSongPicker: View {
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(Color.green.opacity(0.3), lineWidth: 1)
             )
+            .accessibilityIdentifier("practice-\(label.lowercased())")
         }
     }
 }

@@ -191,6 +191,8 @@ struct StartOverlayView: View {
                                     }
                                 }
                             }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("preset-\(preset.name)")
                         }
                     }
                     .padding(.horizontal, 24)
@@ -253,6 +255,7 @@ struct StartOverlayView: View {
                                 )
                         }
                         .disabled(selectedPreset == nil)
+                        .accessibilityIdentifier("lets-go-button")
                         .padding(.horizontal, 24)
                         .padding(.bottom, 20)
                         .onChange(of: selectedPreset?.id) { _ in

@@ -66,10 +66,18 @@
 		F29562634D40D21DF434DF6C /* LearnOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB44B1EB04F4196CFA4C8AD6 /* LearnOverlayView.swift */; };
 		F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F505B00217A74555C8E226 /* MusicTheory.swift */; };
 		F7E93C2DB10D88C64280E374 /* WatermarkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8857B4C9E8825F7E480DAED0 /* WatermarkManager.swift */; };
+		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		ADA4C0F1828ED0110F74525A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B0BCD6C2162A67C8FB0F5866 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EB6C91B49BB8F9A04096CC97;
+			remoteInfo = HandStrudel;
+		};
+		1122334455667788AABBCCDD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B0BCD6C2162A67C8FB0F5866 /* Project object */;
 			proxyType = 1;
@@ -142,6 +150,8 @@
 		F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snippet.swift; sourceTree = "<group>"; };
 		F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefsTests.swift; sourceTree = "<group>"; };
 		FDDA338219566335AD58643B /* StrudelBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrudelBridge.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelUITests.swift; sourceTree = "<group>"; };
+		CC33DD44EE55FF66AA11BB22 /* HandStrudelUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HandStrudelUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -213,6 +223,7 @@
 			children = (
 				ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */,
 				868D2939892D7ADF96F5D122 /* HandStrudelTests.xctest */,
+				CC33DD44EE55FF66AA11BB22 /* HandStrudelUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -247,6 +258,7 @@
 			children = (
 				15D4EC6E1A58084378B10F32 /* HandStrudel */,
 				E4178A89ACBF1EB624EC830E /* HandStrudelTests */,
+				DD44EE55FF66AA11BB22CC33 /* HandStrudelUITests */,
 				4D2345EC9B39CE8C21A6B162 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -276,6 +288,14 @@
 				564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */,
 			);
 			path = HandStrudelTests;
+			sourceTree = "<group>";
+		};
+		DD44EE55FF66AA11BB22CC33 /* HandStrudelUITests */ = {
+			isa = PBXGroup;
+			children = (
+				AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */,
+			);
+			path = HandStrudelUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -317,6 +337,24 @@
 			productReference = ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */;
 			productType = "com.apple.product-type.application";
 		};
+		EE55FF66AA11BB22CC33DD44 /* HandStrudelUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5566778899001122AABBCCDD /* Build configuration list for PBXNativeTarget "HandStrudelUITests" */;
+			buildPhases = (
+				FF66AA11BB22CC33DD44EE55 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2233445566778899AABBCCDD /* PBXTargetDependency */,
+			);
+			name = HandStrudelUITests;
+			packageProductDependencies = (
+			);
+			productName = HandStrudelUITests;
+			productReference = CC33DD44EE55FF66AA11BB22 /* HandStrudelUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -348,6 +386,7 @@
 			targets = (
 				EB6C91B49BB8F9A04096CC97 /* HandStrudel */,
 				DF7A3978895A25A5E6C0C33A /* HandStrudelTests */,
+				EE55FF66AA11BB22CC33DD44 /* HandStrudelUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -436,6 +475,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FF66AA11BB22CC33DD44EE55 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -443,6 +490,11 @@
 			isa = PBXTargetDependency;
 			target = EB6C91B49BB8F9A04096CC97 /* HandStrudel */;
 			targetProxy = ADA4C0F1828ED0110F74525A /* PBXContainerItemProxy */;
+		};
+		2233445566778899AABBCCDD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EB6C91B49BB8F9A04096CC97 /* HandStrudel */;
+			targetProxy = 1122334455667788AABBCCDD /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -646,6 +698,40 @@
 			};
 			name = Release;
 		};
+		3344556677889900AABBCCDD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.handstrudel.HandStrudelUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = HandStrudel;
+			};
+			name = Debug;
+		};
+		4455667788990011AABBCCDD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.handstrudel.HandStrudelUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = HandStrudel;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -672,6 +758,15 @@
 			buildConfigurations = (
 				C9E7094DFC487A1AEA36150C /* Debug */,
 				58DE74DF20A1FDC6036C7910 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5566778899001122AABBCCDD /* Build configuration list for PBXNativeTarget "HandStrudelUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3344556677889900AABBCCDD /* Debug */,
+				4455667788990011AABBCCDD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

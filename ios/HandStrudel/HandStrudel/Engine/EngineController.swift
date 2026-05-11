@@ -221,6 +221,12 @@ final class EngineController: ObservableObject {
         rawParams = defs
         smoothed = defs
 
+        // UITesting bypass: skip audio/camera, just show the UI
+        if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            isRunning = true
+            return
+        }
+
         status = "initialising strudel..."
         debugLog("status set to initialising")
 
