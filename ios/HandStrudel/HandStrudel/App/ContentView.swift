@@ -321,6 +321,8 @@ struct ContentView: View {
             ControlSheet(engine: engine, storeManager: storeManager, hideSkeletonWhenRecording: $hideSkeletonWhenRecording)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                .onAppear { engine.pause() }
+                .onDisappear { engine.resume() }
         }
     }
 
@@ -1289,9 +1291,7 @@ struct ControlSheet: View {
     }
 
     private func setMode(_ mode: AppMode) {
-        engine.learnModeEnabled = mode == .learn
-        engine.gridModeEnabled = mode == .grid
-        engine.drumModeEnabled = mode == .drums
+        engine.switchMode(grid: mode == .grid, drums: mode == .drums, learn: mode == .learn)
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
         }

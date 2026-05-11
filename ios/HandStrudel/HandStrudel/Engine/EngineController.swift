@@ -46,6 +46,7 @@ final class EngineController: ObservableObject {
     @Published var hydraConfig = DEFAULT_HYDRA_MAPPING
     @Published var advanced = false
     @Published var isRunning = false
+    @Published var isPaused = false  // true when control sheet is open
     @Published var status = "tap start"
 
     // UI state (updated at ~15fps)
@@ -323,7 +324,7 @@ final class EngineController: ObservableObject {
         ParamSmoother.smooth(target: rawParams, smoothed: &smoothed)
 
         let isLive = playingSet.isEmpty && !trackPlaying
-        guard isLive else { return }
+        guard isLive, !isPaused else { return }
 
         if learnModeEnabled {
             tickLearnMode()
@@ -912,6 +913,35 @@ final class EngineController: ObservableObject {
         }
     }
 
+    /// Kill all active sounds without stopping the engine
+    func silenceAll() {
+        strudelBridge.noteOff(hand: "left")
+        strudelBridge.noteOff(hand: "right")
+        strudelBridge.noteOff(hand: "touch1")
+        strudelBridge.noteOff(hand: "touch2")
+        strudelBridge.stop()
+        lastStructKey = "" // force re-eval when resuming
+    }
+
+    /// Pause audio (control sheet open)
+    func pause() {
+        isPaused = true
+        silenceAll()
+    }
+
+    /// Resume audio (control sheet closed)
+    func resume() {
+        isPaused = false
+    }
+
+    /// Call when switching modes to stop lingering sounds
+    func switchMode(grid: Bool, drums: Bool, learn: Bool) {
+        silenceAll()
+        gridModeEnabled = grid
+        drumModeEnabled = drums
+        learnModeEnabled = learn
+    }
+
     func stop() {
         // Persist state before teardown
         let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
@@ -938,10 +968,7 @@ final class EngineController: ObservableObject {
         structTimer = nil
 
         // Audio/camera — kill all voices immediately
-        strudelBridge.noteOff(hand: "left")
-        strudelBridge.noteOff(hand: "right")
-        strudelBridge.noteOff(hand: "touch1")
-        strudelBridge.noteOff(hand: "touch2")
+        silenceAll()
         strudelBridge.stop()
         handTracker.stopSession()
         handTracker.onHandsUpdate = nil
