@@ -1,53 +1,69 @@
 # HandStrudel
 
-A browser-based hand-tracking musical instrument. Wave your hands in front of your webcam to control a live-coded synthesizer in real time.
+A hand-tracking musical instrument for web and iOS. Wave your hands to control a live synthesizer in real time.
 
-**[Live Demo](https://khalildh.github.io/handstrudel/)**
+**[handstrudel.com](https://handstrudel.com)** — try it now in your browser
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/01_start_screen.png" width="250" alt="Start Screen" />
+  <img src="docs/screenshots/02_onboarding.png" width="250" alt="Onboarding" />
+  <img src="docs/screenshots/03_performance.png" width="250" alt="Performance" />
+</p>
 
 ## How It Works
 
-HandStrudel uses your webcam and [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands) to track both hands in real time. Hand gestures are mapped to synthesizer parameters powered by [Strudel](https://strudel.cc/).
+HandStrudel uses your camera and hand tracking to detect both hands in real time. Hand gestures are mapped to synthesizer parameters powered by [Strudel](https://strudel.cc/).
 
-### Configurable Mapping
+### iOS App
+- Native SwiftUI app with Apple Vision hand tracking
+- Full-screen portrait camera with glowing neon hand skeleton + motion trails
+- 3 modes: **Melodic** (continuous), **Grid** (pinch-to-play), **Drums** (air drumming)
+- Key/scale selection with chord mode and circle of fifths
+- 10 presets: Dreamy, Gritty, Bouncy, Chill + 6 premium
+- 8 synth waveforms (4 free + 4 premium)
+- 12 drum loops with dual tracks, volume, and speed control
+- 7-second screen recording with Instagram Stories/Reels sharing
+- In-app purchases for premium content
+- Music theory: key, scale, chord mode, circle of fifths
 
-Before starting, a config screen lets you assign any hand axis to any music parameter for each hand:
-
-- **Basic axes** — vertical position, horizontal position, finger spread
-- **Advanced axes** — pinch, fist, rotation, thumb/index/middle/ring/pinky curl
-
-Available parameters include note selection, low-pass filter, reverb, volume, tempo, delay, distortion, pan, vowel filter, octave, pattern density, chord size, and more.
-
-### Save & Playback
-
-Any axis can be mapped to a **save gesture** — when the gesture crosses a threshold, the current Strudel code is snapshotted. Saved snippets appear in the sidebar with play/pause buttons to replay them independently of live hand control. Multiple snippets can be stacked (played simultaneously).
-
-### Track Sequencer
-
-Saved snippets can be arranged into a **track** — an ordered timeline that plays snippets one after another using Strudel's `slowcat`. Add snippets to the track with the "+" button, reorder by adding/removing, and control playback speed from 0.25× to 4×. Starting the track automatically stops individual snippet playback and vice versa.
-
-A step sequencer cycles through rhythmic patterns every 8 seconds, triggering notes based on the current parameters. The generated Strudel code is displayed live in the sidebar.
+### Web App
+- Works in any modern browser with a webcam
+- [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands) for hand tracking
+- Configurable axis-to-parameter mapping
+- Save gesture snapshots, stack snippets, and arrange tracks
 
 ## Tech Stack
 
-- **[Strudel](https://strudel.cc/)** — live-coded music patterns via `@strudel/core`, `@strudel/mini`, `@strudel/tonal`, `@strudel/webaudio`
-- **[MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands)** — real-time hand landmark detection (loaded via CDN)
-- **[Next.js](https://nextjs.org/)** — React framework with static export for GitHub Pages
-- **TypeScript** — type-safe throughout
+**iOS:**
+- SwiftUI + Apple Vision framework
+- WKWebView running Strudel (hybrid architecture)
+- Web Audio API for real-time drum/note hits
+- AVCaptureSession + CADisplayLink (60fps)
+- StoreKit 2 for in-app purchases
+- ReplayKit for screen recording
+
+**Web:**
+- [Strudel](https://strudel.cc/) — live-coded music patterns
+- [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands) — hand landmark detection
+- [Next.js](https://nextjs.org/) — static export
+- TypeScript
 
 ## Development
 
 ```bash
+# Web
 npm install
 npm run dev
+
+# iOS
+cd ios/HandStrudel
+xcodegen generate
+open HandStrudel.xcodeproj
 ```
 
-Open [http://localhost:3000](http://localhost:3000), grant camera access, and wave your hands.
+## Links
 
-## Build & Deploy
-
-```bash
-npm run build    # outputs to out/
-npx serve out    # preview the static build locally
-```
-
-Pushing to `main` triggers GitHub Actions to build and deploy to GitHub Pages automatically.
+- **Web:** [handstrudel.com](https://handstrudel.com)
+- **GitHub:** [github.com/khalildh/handstrudel](https://github.com/khalildh/handstrudel)

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { margin: 0; background: black; overflow: hidden; }
+        #hydra-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            display: none;
+        }
+    </style>
+    <script>
+        // Force Strudel to use setInterval fallback instead of SharedWorker
+        delete window.SharedWorker;
+
+        // Catch any uncaught errors from module scripts
+        window.addEventListener('error', function(e) {
+            window._lastError = e.message + ' at ' + e.filename + ':' + e.lineno;
+            window.webkit?.messageHandlers?.strudelBridge?.postMessage({
+                log: 'UNCAUGHT ERROR: ' + e.message + ' at ' + e.filename + ':' + e.lineno
+            });
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            window._lastError = 'Unhandled rejection: ' + e.reason;
+            window.webkit?.messageHandlers?.strudelBridge?.postMessage({
+                log: 'UNHANDLED REJECTION: ' + e.reason
+            });
+        });
+    </script>
+</head>
+<body>
+    <canvas id="hydra-canvas"></canvas>
+
+    <script src="hydra-synth.js"></script>
+
+    <script src="strudel-bundle.js"></script>
+</body>
+</html>
