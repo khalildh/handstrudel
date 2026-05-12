@@ -45,7 +45,7 @@ fun CameraPreview(
                     .also { it.surfaceProvider = previewView.surfaceProvider }
 
                 val imageAnalysis = ImageAnalysis.Builder()
-                    .setTargetResolution(Size(640, 480))
+                    .setTargetResolution(Size(480, 640))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .build()
@@ -74,20 +74,17 @@ fun CameraPreview(
     )
 
     DisposableEffect(Unit) {
-        onDispose {
-            executor.shutdown()
-        }
+        onDispose { executor.shutdown() }
     }
 }
 
 private fun processFrame(imageProxy: ImageProxy, handTracker: HandTrackingManager) {
     try {
-        // No mirroring needed — HandTrackingManager already flips X and swaps chirality
+        // Pass raw bitmap + rotation to MediaPipe — no bitmap manipulation needed
         val bitmap = imageProxy.toBitmap()
-        handTracker.detectAsync(bitmap, imageProxy.imageInfo.timestamp / 1_000_000)
+        val rotation = imageProxy.imageInfo.rotationDegrees
+        handTracker.detectAsync(bitmap, rotation, imageProxy.imageInfo.timestamp / 1_000_000)
         bitmap.recycle()
-    } catch (e: Exception) {
-        Log.e("CameraPreview", "Frame processing error: $e")
     } finally {
         imageProxy.close()
     }
