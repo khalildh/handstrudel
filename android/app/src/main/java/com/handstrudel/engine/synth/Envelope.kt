@@ -3,8 +3,8 @@ package com.handstrudel.engine.synth
 enum class EnvelopeState { OFF, ATTACK, SUSTAIN, RELEASE }
 
 class Envelope(private val sampleRate: Int = 44100) {
-    var attackTime: Float = 0.01f  // seconds
-    var releaseTime: Float = 0.05f // seconds
+    var attackTime: Float = 0.01f
+    var releaseTime: Float = 0.08f
     var sustainLevel: Float = 1.0f
 
     private var state = EnvelopeState.OFF
@@ -25,10 +25,10 @@ class Envelope(private val sampleRate: Int = 44100) {
         when (state) {
             EnvelopeState.OFF -> return 0f
             EnvelopeState.ATTACK -> {
-                val attackSamples = (attackTime * sampleRate).coerceAtLeast(1f)
-                level += 1f / attackSamples
-                if (level >= 1f) {
-                    level = 1f
+                val rate = 1f / (attackTime * sampleRate).coerceAtLeast(1f)
+                level += rate
+                if (level >= sustainLevel) {
+                    level = sustainLevel
                     state = EnvelopeState.SUSTAIN
                 }
             }
@@ -36,9 +36,10 @@ class Envelope(private val sampleRate: Int = 44100) {
                 level = sustainLevel
             }
             EnvelopeState.RELEASE -> {
-                val releaseSamples = (releaseTime * sampleRate).coerceAtLeast(1f)
-                level -= level / releaseSamples
-                if (level < 0.001f) {
+                // Exponential decay for smooth release
+                val rate = 1f / (releaseTime * sampleRate).coerceAtLeast(1f)
+                level *= (1f - rate * 3f) // exponential-ish decay
+                if (level < 0.0005f) {
                     level = 0f
                     state = EnvelopeState.OFF
                 }

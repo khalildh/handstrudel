@@ -164,7 +164,9 @@ struct ContentView: View {
                     score: engine.learnScore,
                     songComplete: engine.learnSongComplete,
                     songName: engine.currentLearnSong?.name ?? "",
+                    leftPinchX: engine.handsState.left?.pinchX,
                     leftPinchY: engine.handsState.left?.pinchY,
+                    rightPinchX: engine.handsState.right?.pinchX,
                     rightPinchY: engine.handsState.right?.pinchY,
                     leftPinching: (engine.handsState.left?.pinch ?? 0) > 0.8,
                     rightPinching: (engine.handsState.right?.pinch ?? 0) > 0.8,
@@ -205,8 +207,8 @@ struct ContentView: View {
                     }
                 }
 
-                // Floating code pill — hide in grid/drum mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled {
+                // Floating code pill — hide in grid/drum/learn mode
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled {
                     codePill
                         .padding(.horizontal, 20)
                         .padding(.top, 2)
@@ -214,8 +216,8 @@ struct ContentView: View {
 
                 Spacer()
 
-                // Note badge — hide in grid/drum mode (grid has lane labels, drums have pad labels)
-                if !engine.gridModeEnabled && !engine.drumModeEnabled {
+                // Note badge — hide in grid/drum/learn mode
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled {
                     noteBadge
 
                     beatRing

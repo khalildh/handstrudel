@@ -8,7 +8,9 @@ struct LearnOverlayView: View {
     let score: LearnScore
     let songComplete: Bool
     let songName: String
+    let leftPinchX: Double?
     let leftPinchY: Double?
+    let rightPinchX: Double?
     let rightPinchY: Double?
     let leftPinching: Bool
     let rightPinching: Bool
@@ -35,6 +37,15 @@ struct LearnOverlayView: View {
                     let vis = videoAspect / scrAspect
                     let off = (1 - vis) / 2
                     return (CGFloat(vy) - off) / vis * geo.size.height
+                }
+            }
+            let correctedX: (Double) -> CGFloat = { vx in
+                if videoAspect > scrAspect {
+                    let vis = scrAspect / videoAspect
+                    let off = (1 - vis) / 2
+                    return (CGFloat(vx) - off) / vis * geo.size.width
+                } else {
+                    return CGFloat(vx) * geo.size.width
                 }
             }
 
@@ -96,9 +107,8 @@ struct LearnOverlayView: View {
                 // MARK: - Hit Line (vertical glowing cyan line)
                 Rectangle()
                     .fill(Color.cyan)
-                    .frame(width: 2)
+                    .frame(width: 2, height: usableHeight)
                     .position(x: hitLineX, y: topPad + usableHeight / 2)
-                    .frame(height: usableHeight)
                     .shadow(color: .cyan.opacity(0.6), radius: 8)
                     .shadow(color: .cyan.opacity(0.3), radius: 16)
 
@@ -132,6 +142,26 @@ struct LearnOverlayView: View {
                         y: effectY,
                         laneHeight: laneHeight
                     )
+                }
+
+                // MARK: - Hand Position Indicators (vertical lines)
+                if let px = leftPinchX {
+                    let handX = correctedX(px)
+                    Rectangle()
+                        .fill(Color.green)
+                        .frame(width: leftPinching ? 2 : 1, height: usableHeight)
+                        .position(x: handX, y: topPad + usableHeight / 2)
+                        .opacity(leftPinching ? 0.7 : 0.25)
+                        .shadow(color: .green.opacity(leftPinching ? 0.5 : 0), radius: 6)
+                }
+                if let px = rightPinchX {
+                    let handX = correctedX(px)
+                    Rectangle()
+                        .fill(Color.pink)
+                        .frame(width: rightPinching ? 2 : 1, height: usableHeight)
+                        .position(x: handX, y: topPad + usableHeight / 2)
+                        .opacity(rightPinching ? 0.7 : 0.25)
+                        .shadow(color: .pink.opacity(rightPinching ? 0.5 : 0), radius: 6)
                 }
 
                 // MARK: - Score HUD (top-right corner)

@@ -3,6 +3,7 @@ package com.handstrudel.engine
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.handstrudel.engine.synth.Oscillator
 import com.handstrudel.engine.synth.SynthEngine
 import com.handstrudel.models.*
@@ -103,8 +104,17 @@ class EngineController(context: Context) {
         }
     }
 
+    private var logCounter = 0
+
     private fun tickMelodicMode(hands: HandsState) {
         val preset = selectedPreset ?: return
+
+        // Debug log hand positions every 30 frames
+        if (logCounter++ % 30 == 0) {
+            hands.left?.let { Log.d("Engine", "LEFT y=${String.format("%.2f", it.y)} x=${String.format("%.2f", it.x)} pinch=${String.format("%.2f", it.pinch)}") }
+            hands.right?.let { Log.d("Engine", "RIGHT y=${String.format("%.2f", it.y)} x=${String.format("%.2f", it.x)} pinch=${String.format("%.2f", it.pinch)}") }
+        }
+
         val rawParams = mutableMapOf<String, Double>()
 
         // Map hand axes to params
@@ -131,6 +141,7 @@ class EngineController(context: Context) {
         val noteIdx = smoothedParams["noteIdx"]?.toInt()?.coerceIn(0, NOTES.size - 1) ?: 10
         val midiNote = MIDI_NOTES.getOrElse(noteIdx) { 60 }
 
+        synthEngine.melodicActive = hands.left != null || hands.right != null
         synthEngine.melodicMidi = midiNote
         synthEngine.melodicWaveform = selectedWaveform
         synthEngine.bpm = (smoothedParams["bpm"] ?: manualBPM).toFloat()

@@ -1,10 +1,8 @@
 import SwiftUI
+import StoreKit
 
 struct StoreView: View {
     @ObservedObject var storeManager: StoreManager
-    @State private var plusToggle: PlusPeriod = .monthly
-
-    enum PlusPeriod { case monthly, yearly }
 
     var body: some View {
         ScrollView {
@@ -57,17 +55,7 @@ struct StoreView: View {
                 sectionHeader("HANDSTRUDEL+")
                 subscriptionRow
 
-                // Restore
-                Button(action: {
-                    Task { await storeManager.restorePurchases() }
-                }) {
-                    Text("Restore Purchases")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.4))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                }
-                .padding(.bottom, 20)
+                Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
         }
@@ -191,70 +179,82 @@ struct StoreView: View {
         )
     }
 
+    @ViewBuilder
     private var subscriptionRow: some View {
-        let subscribed = storeManager.hasSubscription
-        let monthlyProduct = storeManager.products.first(where: { $0.id == StoreManager.plusMonthly })
-        let yearlyProduct = storeManager.products.first(where: { $0.id == StoreManager.plusYearly })
-
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("✨")
-                    .font(.system(size: 28))
-                Text("HandStrudel+")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                Spacer()
-                if subscribed {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(.green)
-                }
-            }
-
+        VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 featureItem("Everything in Pro")
                 featureItem("Early access to new content")
                 featureItem("Exclusive presets & sounds")
             }
 
-            if !subscribed {
-                // Period toggle
-                HStack(spacing: 0) {
-                    periodButton("Monthly", period: .monthly, price: monthlyProduct?.displayPrice)
-                    periodButton("Yearly", period: .yearly, price: yearlyProduct?.displayPrice)
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white.opacity(0.06))
-                )
+            if #available(iOS 17.0, *) {
+                SubscriptionStoreView(groupID: "22073648")
+                    .subscriptionStoreButtonLabel(.multiline)
+                    .storeButton(.visible, for: .restorePurchases)
+                    .subscriptionStorePolicyDestination(url: URL(string: "https://handstrudel.com/privacy")!, for: .privacyPolicy)
+                    .subscriptionStorePolicyDestination(url: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!, for: .termsOfService)
+                    .frame(minHeight: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            } else {
+                subscriptionFallback
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(storeManager.hasSubscription ? Color.green.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
+        )
+    }
 
-                // Subscription details (required by App Store)
-                Text(plusToggle == .monthly
-                    ? "Billed \(monthlyProduct?.displayPrice ?? "$2.99") per month. Cancel anytime."
-                    : "Billed \(yearlyProduct?.displayPrice ?? "$19.99") per year. Save 44%. Cancel anytime.")
-                    .font(.system(size: 10, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
+    /// Fallback subscription UI for iOS 16
+    private var subscriptionFallback: some View {
+        let monthlyProduct = storeManager.products.first(where: { $0.id == StoreManager.plusMonthly })
+        let yearlyProduct = storeManager.products.first(where: { $0.id == StoreManager.plusYearly })
 
+        return VStack(spacing: 10) {
+            if !storeManager.hasSubscription {
                 Button(action: {
-                    let product = plusToggle == .monthly ? monthlyProduct : yearlyProduct
-                    guard let product else { return }
+                    guard let product = monthlyProduct else { return }
                     Task { try? await storeManager.purchase(product) }
                 }) {
-                    Text("SUBSCRIBE")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Color.green)
-                        .cornerRadius(12)
+                    VStack(spacing: 2) {
+                        Text("Monthly — \(monthlyProduct?.displayPrice ?? "$2.99")/mo")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                        Text("Auto-renews monthly. Cancel anytime.")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundColor(.black.opacity(0.6))
+                    }
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Color.green)
+                    .cornerRadius(12)
                 }
 
-                Text("Subscription auto-renews. Cancel anytime in Settings > Subscriptions.")
-                    .font(.system(size: 9, design: .rounded))
-                    .foregroundColor(.white.opacity(0.3))
+                Button(action: {
+                    guard let product = yearlyProduct else { return }
+                    Task { try? await storeManager.purchase(product) }
+                }) {
+                    VStack(spacing: 2) {
+                        Text("Yearly — \(yearlyProduct?.displayPrice ?? "$19.99")/yr")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                        Text("Auto-renews yearly. Save 44%. Cancel anytime.")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Color.white.opacity(0.08))
+                    .cornerRadius(12)
+                }
             }
 
-            // Required links
             HStack(spacing: 16) {
                 Link("Privacy Policy", destination: URL(string: "https://handstrudel.com/privacy")!)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
@@ -264,35 +264,6 @@ struct StoreView: View {
                     .foregroundColor(.white.opacity(0.4))
             }
             .padding(.top, 4)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(subscribed ? Color.green.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
-        )
-    }
-
-    private func periodButton(_ label: String, period: PlusPeriod, price: String?) -> some View {
-        let isActive = plusToggle == period
-        return Button(action: { plusToggle = period }) {
-            VStack(spacing: 2) {
-                Text(label)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .white.opacity(0.5))
-                Text(price ?? "---")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(isActive ? .green.opacity(0.7) : .white.opacity(0.3))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(isActive ? Color.green.opacity(0.12) : Color.clear)
-            )
         }
     }
 

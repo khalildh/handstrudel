@@ -214,6 +214,9 @@ final class EngineController: ObservableObject {
         self.hydraConfig = hydraConfig
         self.advanced = advanced
 
+        // Always start in melodic mode
+        learnModeEnabled = false
+
         // Build default params
         let musicDefs = buildDefaultParams(config)
         let hydraDefs = buildDefaultParams(hydraConfig)
@@ -517,6 +520,14 @@ final class EngineController: ObservableObject {
     private var lastMelodicSnapshotTime: Double = 0
 
     private func tickMelodicMode() {
+        // Mute when no hands detected
+        let hasHands = currentHands.left != nil || currentHands.right != nil
+        if !hasHands {
+            smoothed["gain"] = 0
+            strudelBridge.updateParams(smoothed, config: config)
+            return
+        }
+
         // Record code snapshots for loop recording in melodic mode (~10fps)
         if loopRecorder.isRecording {
             let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
