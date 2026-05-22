@@ -1,6 +1,13 @@
 // Entry point for bundling all Strudel packages into a single file
 import { repl, evalScope, reify, getTime } from '@strudel/core';
-import { webaudioOutput, initAudio, getAudioContext, registerSynthSounds } from '@strudel/webaudio';
+import {
+    webaudioOutput,
+    initAudio,
+    getAudioContext,
+    registerSynthSounds,
+    loadBuffer,
+    getCachedBuffer,
+} from '@strudel/webaudio';
 import * as strudelCore from '@strudel/core';
 import * as strudelMini from '@strudel/mini';
 import * as strudelTonal from '@strudel/tonal';
@@ -92,6 +99,16 @@ window.initStrudel = async function() {
             } catch (e2) {
                 log('globalThis samples also failed: ' + e2);
             }
+        }
+
+        // Load GM-style pitched sample instrument manifests (just JSON,
+        // ~10KB total). Audio files are fetched lazily on first use.
+        log('loading sample-instrument manifests...');
+        try {
+            await loadSampleInstrumentManifests();
+            log('sample instruments ready: ' + Object.keys(window._sampleInstruments || {}).join(','));
+        } catch (e) {
+            log('sample manifest load error: ' + e);
         }
 
         _ready = true;
@@ -274,14 +291,172 @@ window.playHit = function(type) {
     }
 };
 
+// ---------------------------------------------------------------------------
+// Sample-based pitched instruments (piano, organ, strings, etc.)
+//
+// Each "instrument" maps a string id (used as the `waveform` arg from Swift)
+// to a sample set: { notes: { midi: url } }. We pick the closest sampled
+// note to the requested pitch and use `playbackRate` to fill in the gap.
+// Audio buffers are fetched lazily on first use, then cached forever.
+// ---------------------------------------------------------------------------
+
+window._sampleInstruments = {};
+
+// Note-name -> MIDI helper. Accepts "C4", "Ds4", "F#4", "Eb3", "A#1", etc.
+const _NOTE_SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+function _noteNameToMidi(name) {
+    const m = /^([A-Ga-g])([#sb]?)(-?\d+)$/.exec(name);
+    if (!m) return null;
+    let semi = _NOTE_SEMI[m[1].toUpperCase()];
+    if (semi == null) return null;
+    if (m[2] === '#' || m[2] === 's') semi += 1;
+    if (m[2] === 'b') semi -= 1;
+    const octave = parseInt(m[3], 10);
+    // MIDI standard: C4 = 60, C-1 = 0, so midi = (octave + 1) * 12 + semi
+    return (octave + 1) * 12 + semi;
+}
+
+// Per-instrument: pick the sampled note closest to the requested midi.
+function _findClosestSampledNote(inst, midi) {
+    let best = null;
+    let bestDist = Infinity;
+    for (let i = 0; i < inst.midis.length; i++) {
+        const d = Math.abs(inst.midis[i] - midi);
+        if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return best == null ? null : { midi: inst.midis[best], url: inst.urls[best] };
+}
+
+// Build a single instrument record from a sample-map entry of shape:
+//   { _base: "...", "C4": "c4.mp3", "G4": ["g4a.mp3", "g4b.mp3"], ... }
+// Base is optional and overrides the parent base.
+function _buildInstrument(rawNotes, parentBase) {
+    const base = rawNotes._base || parentBase || '';
+    const midis = [];
+    const urls = [];
+    for (const [noteName, files] of Object.entries(rawNotes)) {
+        if (noteName === '_base') continue;
+        const midi = _noteNameToMidi(noteName);
+        if (midi == null) continue;
+        const file = Array.isArray(files) ? files[0] : files;
+        midis.push(midi);
+        urls.push(base + file);
+    }
+    if (!midis.length) return null;
+    // Sort by midi so binary searches / scans are predictable.
+    const order = midis.map((_, i) => i).sort((a, b) => midis[a] - midis[b]);
+    return {
+        midis: order.map(i => midis[i]),
+        urls: order.map(i => urls[i]),
+    };
+}
+
+// Sample-map: instrument id -> source manifest URL + key inside that manifest.
+// The Swift `Waveform.id` strings must match the keys here exactly.
+const _SAMPLE_INSTRUMENTS_CONFIG = [
+    // Acoustic grand piano (felixroos/dough-samples) — small chromatic-ish set
+    { id: 'piano',   manifest: 'https://strudel.cc/piano.json',                                           key: 'piano' },
+    // The remaining instruments come from VCSL (creative commons, see PR body)
+    { id: 'epiano',  manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'fmpiano' },
+    { id: 'organ',   manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'organ_full' },
+    { id: 'pipeorgan', manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'pipeorgan_quiet' },
+    { id: 'strings',  manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'harp' },
+    { id: 'sax',     manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'sax' },
+    { id: 'marimba', manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'marimba' },
+    { id: 'kalimba', manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'kalimba' },
+    { id: 'flute',   manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'recorder_alto_sus' },
+    { id: 'bells',   manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'glockenspiel' },
+];
+
+async function loadSampleInstrumentManifests() {
+    // Group requests per manifest URL so we only fetch each JSON once.
+    const byManifest = {};
+    for (const entry of _SAMPLE_INSTRUMENTS_CONFIG) {
+        (byManifest[entry.manifest] ||= []).push(entry);
+    }
+    await Promise.all(Object.entries(byManifest).map(async ([url, entries]) => {
+        try {
+            const res = await fetch(url);
+            const json = await res.json();
+            const parentBase = json._base || '';
+            for (const e of entries) {
+                const raw = json[e.key];
+                if (!raw || typeof raw === 'string' || Array.isArray(raw)) {
+                    log(`sample manifest "${url}" missing pitched entry for ${e.key}`);
+                    continue;
+                }
+                const inst = _buildInstrument(raw, parentBase);
+                if (inst) window._sampleInstruments[e.id] = inst;
+            }
+        } catch (err) {
+            log('manifest fetch failed for ' + url + ': ' + err);
+        }
+    }));
+}
+
+// Kick off a load for the closest sampled note — returns the AudioBuffer
+// (or null if it hasn't downloaded yet).
+function _getSampleBuffer(inst, midi) {
+    const choice = _findClosestSampledNote(inst, midi);
+    if (!choice) return null;
+    const cached = getCachedBuffer(choice.url);
+    if (cached) return { buffer: cached, sampledMidi: choice.midi };
+    // Trigger load; subsequent noteOn calls (and noteSlide) will use it.
+    loadBuffer(choice.url, _audioCtx, 'instrument').catch(e => log('loadBuffer error: ' + e));
+    return null;
+}
+
+function _isSampleInstrument(name) {
+    return !!(name && window._sampleInstruments[name]);
+}
+
+// ---------------------------------------------------------------------------
 // Sustained note system — noteOn starts, noteOff releases
 // Each hand gets its own voice (left/right) so they don't interfere
+// ---------------------------------------------------------------------------
 window._voices = {};
+
+function _startSampleVoice(hand, midi, instName, vel) {
+    const inst = window._sampleInstruments[instName];
+    if (!inst) return false;
+    const sampled = _getSampleBuffer(inst, midi);
+    if (!sampled) return true; // still report "handled" so we don't fall back to oscillator while buffer loads
+
+    const now = _audioCtx.currentTime;
+    const v = vel || 0.6;
+    const semitoneOffset = midi - sampled.sampledMidi;
+    const playbackRate = Math.pow(2, semitoneOffset / 12);
+
+    const src = _audioCtx.createBufferSource();
+    src.buffer = sampled.buffer;
+    src.playbackRate.value = playbackRate;
+
+    const gain = _audioCtx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(v * 0.6, now + 0.01);
+
+    const lpf = _audioCtx.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.frequency.value = 3000 + v * 3000;
+
+    src.connect(lpf);
+    lpf.connect(gain);
+    gain.connect(_audioCtx.destination);
+    src.start(now);
+
+    window._voices[hand] = { src, gain, midi, instName, kind: 'sample', sampledMidi: sampled.sampledMidi };
+    return true;
+}
 
 window.noteOn = function(hand, midi, waveform, vel) {
     if (!_audioCtx) return;
     // Stop any existing voice for this hand
     window.noteOff(hand);
+
+    // Sample instrument path — fall through to oscillator if not a sample id.
+    if (_isSampleInstrument(waveform)) {
+        if (_startSampleVoice(hand, midi, waveform, vel)) return;
+    }
 
     const now = _audioCtx.currentTime;
     const freq = 440 * Math.pow(2, (midi - 69) / 12);
@@ -305,7 +480,7 @@ window.noteOn = function(hand, midi, waveform, vel) {
     gain.connect(_audioCtx.destination);
     osc.start(now);
 
-    window._voices[hand] = { osc, gain, midi };
+    window._voices[hand] = { osc, gain, midi, kind: 'osc' };
 };
 
 window.noteOff = function(hand) {
@@ -316,7 +491,11 @@ window.noteOff = function(hand) {
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
     voice.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    voice.osc.stop(now + 0.06);
+    if (voice.kind === 'sample') {
+        try { voice.src.stop(now + 0.06); } catch {}
+    } else {
+        try { voice.osc.stop(now + 0.06); } catch {}
+    }
     delete window._voices[hand];
 };
 
@@ -324,6 +503,31 @@ window.noteOff = function(hand) {
 window.noteSlide = function(hand, midi) {
     const voice = window._voices[hand];
     if (!voice || voice.midi === midi) return;
+    if (voice.kind === 'sample') {
+        // Sample slide: adjust playbackRate relative to the originally chosen
+        // sampled note. Crossing into a different sample zone would require
+        // retriggering, which clicks — accept the slightly off-pitch playback
+        // up to a few semitones and only retrigger if we drift far.
+        const inst = window._sampleInstruments[voice.instName];
+        if (!inst) return;
+        const choice = _findClosestSampledNote(inst, midi);
+        // If still within a few semitones of the currently-playing sample,
+        // just adjust playbackRate. Otherwise retrigger cleanly.
+        const currentSampled = voice.sampledMidi != null ? voice.sampledMidi : (choice ? choice.midi : midi);
+        if (choice && Math.abs(choice.midi - currentSampled) <= 3) {
+            const offset = midi - currentSampled;
+            const now = _audioCtx.currentTime;
+            voice.src.playbackRate.setValueAtTime(Math.pow(2, offset / 12), now);
+            voice.midi = midi;
+            voice.sampledMidi = currentSampled;
+        } else {
+            // Far away — retrigger with the new sample.
+            const wf = voice.instName;
+            window.noteOff(hand);
+            window.noteOn(hand, midi, wf, 0.6);
+        }
+        return;
+    }
     const now = _audioCtx.currentTime;
     const freq = 440 * Math.pow(2, (midi - 69) / 12);
     voice.osc.frequency.setValueAtTime(freq, now);

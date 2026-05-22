@@ -1513,7 +1513,12 @@ struct ControlSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("SOUND", icon: "waveform")
 
-            HStack(spacing: 8) {
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ], spacing: 8) {
                 ForEach(WAVEFORMS) { wf in
                     let locked = wf.isPremium && !storeManager.isUnlocked(wf.packId ?? "")
                     Button(action: {
@@ -1529,6 +1534,8 @@ struct ControlSheet: View {
                             Text(wf.name)
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                                 .foregroundColor(engine.selectedWaveform == wf.id ? .green : .primary.opacity(0.6))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)

@@ -10,10 +10,25 @@ struct Waveform: Identifiable {
 }
 
 let WAVEFORMS: [Waveform] = [
+    // Built-in oscillators (instant, no download)
     Waveform(id: "sawtooth", name: "Saw", emoji: "🪚", isPremium: false, packId: nil),
     Waveform(id: "square", name: "Square", emoji: "⬜", isPremium: false, packId: nil),
     Waveform(id: "triangle", name: "Triangle", emoji: "🔺", isPremium: false, packId: nil),
     Waveform(id: "sine", name: "Sine", emoji: "🔮", isPremium: false, packId: nil),
+
+    // GM-style sampled instruments. IDs must match _SAMPLE_INSTRUMENTS_CONFIG
+    // in strudel-entry.mjs. Audio files stream lazily from GitHub on first
+    // use (no bundle-size impact). First note may be silent while loading.
+    Waveform(id: "piano",     name: "Piano",      emoji: "🎹", isPremium: false, packId: nil),
+    Waveform(id: "epiano",    name: "E.Piano",    emoji: "🎛️", isPremium: false, packId: nil),
+    Waveform(id: "organ",     name: "Organ",      emoji: "🎚️", isPremium: false, packId: nil),
+    Waveform(id: "pipeorgan", name: "Pipe Organ", emoji: "⛪️", isPremium: false, packId: nil),
+    Waveform(id: "strings",   name: "Strings",    emoji: "🎻", isPremium: false, packId: nil),
+    Waveform(id: "sax",       name: "Sax",        emoji: "🎷", isPremium: false, packId: nil),
+    Waveform(id: "marimba",   name: "Marimba",    emoji: "🪘", isPremium: false, packId: nil),
+    Waveform(id: "kalimba",   name: "Kalimba",    emoji: "🎼", isPremium: false, packId: nil),
+    Waveform(id: "flute",     name: "Flute",      emoji: "🎶", isPremium: false, packId: nil),
+    Waveform(id: "bells",     name: "Bells",      emoji: "🔔", isPremium: false, packId: nil),
 ]
 
 private func debugLog(_ msg: String) {
