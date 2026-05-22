@@ -34,6 +34,13 @@ final class HandStrudelUITests: XCTestCase {
         // Wait for session to appear
         let closeBtn = element("close-button")
         XCTAssertTrue(closeBtn.waitForExistence(timeout: 5), "Session should start")
+        // Dismiss onboarding overlay if it's blocking the UI (it can persist from
+        // earlier tests that used --reset-onboarding since @AppStorage survives
+        // across launches on the same simulator).
+        let gotIt = element("onboarding-got-it")
+        if gotIt.waitForExistence(timeout: 1) {
+            gotIt.tap()
+        }
     }
 
     /// Launch app with onboarding reset and start session

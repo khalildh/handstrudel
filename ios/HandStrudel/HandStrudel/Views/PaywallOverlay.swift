@@ -16,100 +16,112 @@ struct PaywallOverlay: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 8) {
-                    Text(packName)
-                        .font(.system(size: 28, weight: .black, design: .rounded))
-                        .foregroundColor(.white)
+            // Scrollable content lets the header + items breathe on any height;
+            // the action button is pinned below the scroll so it stays visible
+            // even on short sheet detents (e.g. iPad in iPhone-compat mode).
+            VStack(spacing: 0) {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        // Header
+                        VStack(spacing: 8) {
+                            Text(packName)
+                                .font(.system(size: 28, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
 
-                    Text(packDescription)
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.5))
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 32)
-
-                // Items list
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("INCLUDES")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(.secondary)
-                        .tracking(1.5)
-
-                    ForEach(items, id: \.self) { item in
-                        HStack(spacing: 10) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(.green)
-                            Text(item)
-                                .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundColor(.white.opacity(0.9))
+                            Text(packDescription)
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.5))
+                                .multilineTextAlignment(.center)
                         }
+                        .padding(.top, 24)
+                        .padding(.horizontal, 24)
+
+                        // Items list
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("INCLUDES")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundColor(.secondary)
+                                .tracking(1.5)
+
+                            ForEach(items, id: \.self) { item in
+                                HStack(spacing: 10) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.green)
+                                    Text(item)
+                                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 24)
+
+                        // Price
+                        Text(price)
+                            .font(.system(size: 22, weight: .bold, design: .monospaced))
+                            .foregroundColor(.green)
+                            .padding(.top, 8)
+                    }
+                    .padding(.bottom, 16)
+                }
+
+                // Pinned action area — always visible regardless of sheet height
+                VStack(spacing: 10) {
+                    Button(action: purchaseTapped) {
+                        Group {
+                            if purchasing {
+                                ProgressView()
+                                    .tint(.black)
+                            } else {
+                                Text("UNLOCK")
+                                    .font(.system(size: 18, weight: .black, design: .rounded))
+                            }
+                        }
+                        .foregroundColor(.black)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(Color.green)
+                        .cornerRadius(16)
+                    }
+                    .disabled(purchasing)
+                    .accessibilityIdentifier("paywall-unlock")
+
+                    Button(action: restoreTapped) {
+                        Text("Restore Purchases")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .disabled(purchasing)
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundColor(.red.opacity(0.8))
+                            .multilineTextAlignment(.center)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
-
-                Spacer()
-
-                // Price
-                Text(price)
-                    .font(.system(size: 22, weight: .bold, design: .monospaced))
-                    .foregroundColor(.green)
-
-                // Unlock button
-                Button(action: purchaseTapped) {
-                    Group {
-                        if purchasing {
-                            ProgressView()
-                                .tint(.black)
-                        } else {
-                            Text("UNLOCK")
-                                .font(.system(size: 18, weight: .black, design: .rounded))
-                        }
-                    }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(Color.green)
-                    .cornerRadius(16)
-                }
-                .disabled(purchasing)
-                .padding(.horizontal, 24)
-
-                // Restore
-                Button(action: restoreTapped) {
-                    Text("Restore Purchases")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-                .disabled(purchasing)
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.system(size: 12, design: .rounded))
-                        .foregroundColor(.red.opacity(0.8))
-                }
-
-                Spacer()
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+                .background(Color.black)
             }
         }
     }
 
     private func purchaseTapped() {
         let resolvedId = StoreManager.productId(for: packId)
-        guard let product = storeManager.products.first(where: { $0.id == resolvedId }) else { return }
         purchasing = true
         errorMessage = nil
         Task {
             do {
-                try await storeManager.purchase(product)
+                try await storeManager.purchase(productId: resolvedId)
                 if storeManager.isUnlocked(packId) {
                     dismiss()
                 }
             } catch {
-                errorMessage = "Purchase failed. Try again."
+                errorMessage = error.localizedDescription
             }
             purchasing = false
         }

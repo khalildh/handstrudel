@@ -40,6 +40,8 @@
 		73E81C762C77D3DB08064674 /* LearnSongPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C85B4858D833EF68AAD427C /* LearnSongPicker.swift */; };
 		74F628FCEDF7DEEC0324931E /* SiriShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 292584639B51D092EEC802F1 /* SiriShortcuts.swift */; };
 		757E1A695C82940900C8E980 /* LoopSharingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7D7F4F5C7AF55B5D8BD8F6 /* LoopSharingManager.swift */; };
+		770A2AC72FB50676001BDFA9 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 77A3E86B2FB4FFBB00B56DE7 /* RevenueCat */; };
+		770A2AC82FB50676001BDFA9 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 77A3E86C2FB4FFBB00B56DE7 /* RevenueCatUI */; };
 		8590BD09D74A051C39590A4D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */; };
 		8E7C01AF7723050C8C5273E3 /* hydra-synth.js in Resources */ = {isa = PBXBuildFile; fileRef = B7C5E8B642D49636F852D200 /* hydra-synth.js */; };
 		90224DD8E3719A286A3B008A /* strudel-engine.html in Resources */ = {isa = PBXBuildFile; fileRef = BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */; };
@@ -51,6 +53,7 @@
 		B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9238181B674B4222B2F52C5A /* GridTouchView.swift */; };
 		B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D77EA18663B3717C68CAAB /* ContentView.swift */; };
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
+		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
 		BF459746DBE08887CD29CFF3 /* SaveGestureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C89256347633541234267B8 /* SaveGestureDetector.swift */; };
 		C9D0CB8C617776591C669A1D /* HandTrackingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */; };
 		D07E059A67BBBA11346FB42B /* LearnSongTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2777760AE87651C57AD36E38 /* LearnSongTests.swift */; };
@@ -66,18 +69,17 @@
 		F29562634D40D21DF434DF6C /* LearnOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB44B1EB04F4196CFA4C8AD6 /* LearnOverlayView.swift */; };
 		F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F505B00217A74555C8E226 /* MusicTheory.swift */; };
 		F7E93C2DB10D88C64280E374 /* WatermarkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8857B4C9E8825F7E480DAED0 /* WatermarkManager.swift */; };
-		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		ADA4C0F1828ED0110F74525A /* PBXContainerItemProxy */ = {
+		1122334455667788AABBCCDD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B0BCD6C2162A67C8FB0F5866 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = EB6C91B49BB8F9A04096CC97;
 			remoteInfo = HandStrudel;
 		};
-		1122334455667788AABBCCDD /* PBXContainerItemProxy */ = {
+		ADA4C0F1828ED0110F74525A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B0BCD6C2162A67C8FB0F5866 /* Project object */;
 			proxyType = 1;
@@ -101,7 +103,7 @@
 		2777760AE87651C57AD36E38 /* LearnSongTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSongTests.swift; sourceTree = "<group>"; };
 		292584639B51D092EEC802F1 /* SiriShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriShortcuts.swift; sourceTree = "<group>"; };
 		2D6755AC0E55CFA644BF8217 /* iMessageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iMessageManager.swift; sourceTree = "<group>"; };
-		2E3A4C0D73CA4CA64494F9A1 /* HandStrudel.storekit */ = {isa = PBXFileReference; path = HandStrudel.storekit; sourceTree = "<group>"; };
+		2E3A4C0D73CA4CA64494F9A1 /* HandStrudel.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = HandStrudel.storekit; sourceTree = "<group>"; };
 		352AD3F7189E1B79D0315D59 /* LearnModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnModeManager.swift; sourceTree = "<group>"; };
 		3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelTests.swift; sourceTree = "<group>"; };
 		5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingConfig.swift; sourceTree = "<group>"; };
@@ -123,12 +125,13 @@
 		938A00F6A5044E13D981C663 /* EngineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineController.swift; sourceTree = "<group>"; };
 		93D6C035D4A9EE1A66C31839 /* Loop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loop.swift; sourceTree = "<group>"; };
 		9531420BA306B5BC2AB859A6 /* AudioExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioExporter.swift; sourceTree = "<group>"; };
-		953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		962D341307D9F8B90BCD5454 /* HandTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTheme.swift; sourceTree = "<group>"; };
 		9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheoryTests.swift; sourceTree = "<group>"; };
 		A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallOverlay.swift; sourceTree = "<group>"; };
 		A4D6E49EC2BD40C4448C835E /* SpatialAudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAudioManager.swift; sourceTree = "<group>"; };
 		A9F505B00217A74555C8E226 /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelUITests.swift; sourceTree = "<group>"; };
 		ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HandStrudel.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE98AF54FEB607CE395267C8 /* CameraFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraFilter.swift; sourceTree = "<group>"; };
 		AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeManager.swift; sourceTree = "<group>"; };
@@ -140,6 +143,7 @@
 		C110717C5437516659E169B3 /* PersistenceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceManager.swift; sourceTree = "<group>"; };
 		C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTrackingManager.swift; sourceTree = "<group>"; };
 		CB44B1EB04F4196CFA4C8AD6 /* LearnOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnOverlayView.swift; sourceTree = "<group>"; };
+		CC33DD44EE55FF66AA11BB22 /* HandStrudelUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HandStrudelUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D986625C7BF30952FBAED619 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeManagerTests.swift; sourceTree = "<group>"; };
@@ -150,9 +154,19 @@
 		F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snippet.swift; sourceTree = "<group>"; };
 		F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefsTests.swift; sourceTree = "<group>"; };
 		FDDA338219566335AD58643B /* StrudelBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrudelBridge.swift; sourceTree = "<group>"; };
-		AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelUITests.swift; sourceTree = "<group>"; };
-		CC33DD44EE55FF66AA11BB22 /* HandStrudelUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HandStrudelUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		772142E22FB505E60084345C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				770A2AC82FB50676001BDFA9 /* RevenueCatUI in Frameworks */,
+				770A2AC72FB50676001BDFA9 /* RevenueCat in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		15D4EC6E1A58084378B10F32 /* HandStrudel */ = {
@@ -237,6 +251,13 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		77A3E86D2FB5035500B56DE7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		B777E76E23E1B0425E948833 /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -259,6 +280,7 @@
 				15D4EC6E1A58084378B10F32 /* HandStrudel */,
 				E4178A89ACBF1EB624EC830E /* HandStrudelTests */,
 				DD44EE55FF66AA11BB22CC33 /* HandStrudelUITests */,
+				77A3E86D2FB5035500B56DE7 /* Frameworks */,
 				4D2345EC9B39CE8C21A6B162 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -271,6 +293,14 @@
 				BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		DD44EE55FF66AA11BB22CC33 /* HandStrudelUITests */ = {
+			isa = PBXGroup;
+			children = (
+				AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */,
+			);
+			path = HandStrudelUITests;
 			sourceTree = "<group>";
 		};
 		E4178A89ACBF1EB624EC830E /* HandStrudelTests */ = {
@@ -288,14 +318,6 @@
 				564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */,
 			);
 			path = HandStrudelTests;
-			sourceTree = "<group>";
-		};
-		DD44EE55FF66AA11BB22CC33 /* HandStrudelUITests */ = {
-			isa = PBXGroup;
-			children = (
-				AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */,
-			);
-			path = HandStrudelUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -325,6 +347,7 @@
 			buildPhases = (
 				22F50D0878CBAF2E7ED87D83 /* Sources */,
 				1FFC58FA990AC47D39EDA552 /* Resources */,
+				772142E22FB505E60084345C /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -332,6 +355,8 @@
 			);
 			name = HandStrudel;
 			packageProductDependencies = (
+				77A3E86B2FB4FFBB00B56DE7 /* RevenueCat */,
+				77A3E86C2FB4FFBB00B56DE7 /* RevenueCatUI */,
 			);
 			productName = HandStrudel;
 			productReference = ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */;
@@ -379,6 +404,9 @@
 			);
 			mainGroup = C9925CB2A818BF8F98D78A5F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				77A3E86A2FB4FFBB00B56DE7 /* XCRemoteSwiftPackageReference "purchases-ios" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4D2345EC9B39CE8C21A6B162 /* Products */;
 			projectDirPath = "";
@@ -486,15 +514,15 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		29394584EA0D0683045B6A81 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = EB6C91B49BB8F9A04096CC97 /* HandStrudel */;
-			targetProxy = ADA4C0F1828ED0110F74525A /* PBXContainerItemProxy */;
-		};
 		2233445566778899AABBCCDD /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = EB6C91B49BB8F9A04096CC97 /* HandStrudel */;
 			targetProxy = 1122334455667788AABBCCDD /* PBXContainerItemProxy */;
+		};
+		29394584EA0D0683045B6A81 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EB6C91B49BB8F9A04096CC97 /* HandStrudel */;
+			targetProxy = ADA4C0F1828ED0110F74525A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -517,6 +545,40 @@
 			};
 			name = Debug;
 		};
+		3344556677889900AABBCCDD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.handstrudel.HandStrudelUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = HandStrudel;
+			};
+			name = Debug;
+		};
+		4455667788990011AABBCCDD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.handstrudel.HandStrudelUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = HandStrudel;
+			};
+			name = Release;
+		};
 		5710A42F1C7A82CB77AE21C1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -524,7 +586,7 @@
 				CODE_SIGN_ENTITLEMENTS = HandStrudel/HandStrudel.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = TVAG3T3Y65;
 				INFOPLIST_FILE = HandStrudel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -683,7 +745,7 @@
 				CODE_SIGN_ENTITLEMENTS = HandStrudel/HandStrudel.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = TVAG3T3Y65;
 				INFOPLIST_FILE = HandStrudel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -698,40 +760,6 @@
 			};
 			name = Release;
 		};
-		3344556677889900AABBCCDD /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.handstrudel.HandStrudelUITests;
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = HandStrudel;
-			};
-			name = Debug;
-		};
-		4455667788990011AABBCCDD /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.handstrudel.HandStrudelUITests;
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = HandStrudel;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -740,6 +768,15 @@
 			buildConfigurations = (
 				5710A42F1C7A82CB77AE21C1 /* Debug */,
 				FDFD5E0D636B7585B52581B1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5566778899001122AABBCCDD /* Build configuration list for PBXNativeTarget "HandStrudelUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3344556677889900AABBCCDD /* Debug */,
+				4455667788990011AABBCCDD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -762,16 +799,31 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		5566778899001122AABBCCDD /* Build configuration list for PBXNativeTarget "HandStrudelUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				3344556677889900AABBCCDD /* Debug */,
-				4455667788990011AABBCCDD /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
-		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		77A3E86A2FB4FFBB00B56DE7 /* XCRemoteSwiftPackageReference "purchases-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.73.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		77A3E86B2FB4FFBB00B56DE7 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 77A3E86A2FB4FFBB00B56DE7 /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCat;
+		};
+		77A3E86C2FB4FFBB00B56DE7 /* RevenueCatUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 77A3E86A2FB4FFBB00B56DE7 /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCatUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B0BCD6C2162A67C8FB0F5866 /* Project object */;
 }

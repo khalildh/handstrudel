@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>instagram-stories</string>
@@ -29,10 +29,14 @@
 	<array>
 		<string>_groupactivities._tcp</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>HandStrudel uses the local network to discover nearby devices for SharePlay jam sessions, letting you play music together in real time.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>HandStrudel uses the camera to track your hand gestures and convert them into music.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>HandStrudel needs microphone access for audio processing.</string>
+	<string>HandStrudel records your voice along with the app's sound when you save and share a video recording of your performance.</string>
+	<key>UIDesignRequiresCompatibility</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>

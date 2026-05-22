@@ -1215,8 +1215,6 @@ struct ControlSheet: View {
                     trackSection
                 }
 
-                sectionDivider
-                restorePurchasesSection
             }
             .padding(20)
         }
@@ -1236,7 +1234,8 @@ struct ControlSheet: View {
         }
         .sheet(item: $paywallPackId) { packId in
             paywallSheet(for: packId)
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .task {
             if storeManager.products.isEmpty {
@@ -1268,12 +1267,12 @@ struct ControlSheet: View {
     private func paywallSheet(for packId: String) -> some View {
         let info = packInfo(for: packId)
         let resolvedId = StoreManager.productId(for: packId)
-        let product = storeManager.products.first(where: { $0.id == resolvedId })
+        let product = storeManager.products.first(where: { $0.productIdentifier == resolvedId })
         return PaywallOverlay(
             packId: packId,
             packName: info.name,
             packDescription: info.description,
-            price: product?.displayPrice ?? "---",
+            price: product?.localizedPriceString ?? "---",
             items: info.items,
             storeManager: storeManager
         )
@@ -1878,22 +1877,6 @@ struct ControlSheet: View {
                 }
             }
         }
-    }
-
-    // MARK: - Restore Purchases
-
-    private var restorePurchasesSection: some View {
-        VStack(spacing: 12) {
-            Button(action: {
-                Task { await storeManager.restorePurchases() }
-            }) {
-                Text("Restore Purchases")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundColor(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 8)
     }
 
     // MARK: - Loops

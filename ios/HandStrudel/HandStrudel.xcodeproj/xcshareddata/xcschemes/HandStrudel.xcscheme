@@ -48,6 +48,17 @@
                ReferencedContainer = "container:HandStrudel.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "EE55FF66AA11BB22CC33DD44"
+               BuildableName = "HandStrudelUITests.xctest"
+               BlueprintName = "HandStrudelUITests"
+               ReferencedContainer = "container:HandStrudel.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

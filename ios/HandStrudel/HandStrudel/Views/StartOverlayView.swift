@@ -275,7 +275,8 @@ struct StartOverlayView: View {
         }
         .sheet(item: $paywallPackId) { packId in
             paywallSheet(for: packId)
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .task {
             if storeManager.products.isEmpty {
@@ -287,12 +288,12 @@ struct StartOverlayView: View {
     private func paywallSheet(for packId: String) -> some View {
         let info = paywallInfo(for: packId)
         let resolvedId = StoreManager.productId(for: packId)
-        let product = storeManager.products.first(where: { $0.id == resolvedId })
+        let product = storeManager.products.first(where: { $0.productIdentifier == resolvedId })
         return PaywallOverlay(
             packId: resolvedId,
             packName: info.name,
             packDescription: info.description,
-            price: product?.displayPrice ?? "---",
+            price: product?.localizedPriceString ?? "---",
             items: info.items,
             storeManager: storeManager
         )

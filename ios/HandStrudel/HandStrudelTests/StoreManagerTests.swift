@@ -4,101 +4,7 @@ import XCTest
 @MainActor
 final class StoreManagerTests: XCTestCase {
 
-    // MARK: - isUnlocked (Release behavior)
-
-    // Note: In DEBUG builds, isUnlocked always returns true.
-    // These tests verify the logic by checking purchasedIds state.
-    // The actual isUnlocked() method behavior depends on build config.
-
-    func testIsUnlocked_purchasedPack_reflectedInPurchasedIds() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.studioPack]
-        XCTAssertTrue(store.purchasedIds.contains(StoreManager.studioPack))
-    }
-
-    func testIsUnlocked_unpurchasedPack_notInPurchasedIds() {
-        let store = StoreManager()
-        store.purchasedIds = []
-        XCTAssertFalse(store.purchasedIds.contains(StoreManager.studioPack))
-    }
-
-    func testIsUnlocked_proUnlocksEverything() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.pro]
-        XCTAssertTrue(store.hasProAccess)
-    }
-
-    func testIsUnlocked_subscriptionGrantsProAccess() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.plusMonthly]
-        XCTAssertTrue(store.hasProAccess)
-    }
-
-    // MARK: - hasProAccess
-
-    func testHasProAccess_falseByDefault() {
-        let store = StoreManager()
-        store.purchasedIds = []
-        XCTAssertFalse(store.hasProAccess)
-    }
-
-    func testHasProAccess_trueWhenProPurchased() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.pro]
-        XCTAssertTrue(store.hasProAccess)
-    }
-
-    func testHasProAccess_trueWhenMonthlySubscribed() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.plusMonthly]
-        XCTAssertTrue(store.hasProAccess)
-    }
-
-    func testHasProAccess_trueWhenYearlySubscribed() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.plusYearly]
-        XCTAssertTrue(store.hasProAccess)
-    }
-
-    func testHasProAccess_falseWithOnlyPackPurchase() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.studioPack, StoreManager.partyPack]
-        XCTAssertFalse(store.hasProAccess)
-    }
-
-    // MARK: - hasSubscription
-
-    func testHasSubscription_falseByDefault() {
-        let store = StoreManager()
-        store.purchasedIds = []
-        XCTAssertFalse(store.hasSubscription)
-    }
-
-    func testHasSubscription_trueForMonthly() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.plusMonthly]
-        XCTAssertTrue(store.hasSubscription)
-    }
-
-    func testHasSubscription_trueForYearly() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.plusYearly]
-        XCTAssertTrue(store.hasSubscription)
-    }
-
-    func testHasSubscription_falseForProOnly() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.pro]
-        XCTAssertFalse(store.hasSubscription)
-    }
-
-    func testHasSubscription_falseForPackOnly() {
-        let store = StoreManager()
-        store.purchasedIds = [StoreManager.kitElectronic]
-        XCTAssertFalse(store.hasSubscription)
-    }
-
-    // MARK: - Product IDs
+    // MARK: - Product ID constants
 
     func testAllProductIds_containsAllPacks() {
         XCTAssertTrue(StoreManager.allProductIds.contains(StoreManager.studioPack))
@@ -124,6 +30,94 @@ final class StoreManagerTests: XCTestCase {
         XCTAssertEqual(StoreManager.allProductIds.count, 7)
     }
 
+    // MARK: - Entitlement IDs (must match RevenueCat dashboard)
+
+    func testEntitlementIds_areDefined() {
+        XCTAssertEqual(StoreManager.entitlementPro, "pro")
+        XCTAssertEqual(StoreManager.entitlementPlusFeatures, "plus_features")
+        XCTAssertEqual(StoreManager.entitlementStudio, "studio_pack")
+        XCTAssertEqual(StoreManager.entitlementParty, "party_pack")
+        XCTAssertEqual(StoreManager.entitlementKit808, "kit_808")
+        XCTAssertEqual(StoreManager.entitlementKitElectronic, "kit_electronic")
+    }
+
+    // MARK: - entitlementId(for:) mapping
+
+    func testEntitlementId_studio() {
+        XCTAssertEqual(StoreManager.entitlementId(for: "studio"), StoreManager.entitlementStudio)
+        XCTAssertEqual(StoreManager.entitlementId(for: StoreManager.studioPack), StoreManager.entitlementStudio)
+    }
+
+    func testEntitlementId_party() {
+        XCTAssertEqual(StoreManager.entitlementId(for: "party"), StoreManager.entitlementParty)
+        XCTAssertEqual(StoreManager.entitlementId(for: StoreManager.partyPack), StoreManager.entitlementParty)
+    }
+
+    func testEntitlementId_kit808() {
+        XCTAssertEqual(StoreManager.entitlementId(for: "kit_808"), StoreManager.entitlementKit808)
+        XCTAssertEqual(StoreManager.entitlementId(for: StoreManager.kit808), StoreManager.entitlementKit808)
+    }
+
+    func testEntitlementId_kitElectronic() {
+        XCTAssertEqual(StoreManager.entitlementId(for: "kit_electronic"), StoreManager.entitlementKitElectronic)
+        XCTAssertEqual(StoreManager.entitlementId(for: StoreManager.kitElectronic), StoreManager.entitlementKitElectronic)
+    }
+
+    func testEntitlementId_pro() {
+        XCTAssertEqual(StoreManager.entitlementId(for: "pro"), StoreManager.entitlementPro)
+    }
+
+    func testEntitlementId_filterAndVisual_mapToPlusFeatures() {
+        XCTAssertEqual(StoreManager.entitlementId(for: "filter_pack"), StoreManager.entitlementPlusFeatures)
+        XCTAssertEqual(StoreManager.entitlementId(for: "visual_pack"), StoreManager.entitlementPlusFeatures)
+        XCTAssertEqual(StoreManager.entitlementId(for: "theme_pack"), StoreManager.entitlementPlusFeatures)
+        XCTAssertEqual(StoreManager.entitlementId(for: "scale_pack"), StoreManager.entitlementPlusFeatures)
+    }
+
+    func testEntitlementId_unknownDefaultsToPlusFeatures() {
+        XCTAssertEqual(StoreManager.entitlementId(for: "unknown_thing"), StoreManager.entitlementPlusFeatures)
+    }
+
+    // MARK: - productId(for:) legacy mapping
+
+    func testProductId_studio() {
+        XCTAssertEqual(StoreManager.productId(for: "studio"), StoreManager.studioPack)
+    }
+
+    func testProductId_party() {
+        XCTAssertEqual(StoreManager.productId(for: "party"), StoreManager.partyPack)
+    }
+
+    func testProductId_unknownDefaultsToPro() {
+        XCTAssertEqual(StoreManager.productId(for: "anything"), StoreManager.pro)
+    }
+
+    // MARK: - legacyProductId(forEntitlement:)
+
+    func testLegacyProductId_pro() {
+        XCTAssertEqual(StoreManager.legacyProductId(forEntitlement: StoreManager.entitlementPro), StoreManager.pro)
+    }
+
+    func testLegacyProductId_studio() {
+        XCTAssertEqual(StoreManager.legacyProductId(forEntitlement: StoreManager.entitlementStudio), StoreManager.studioPack)
+    }
+
+    func testLegacyProductId_party() {
+        XCTAssertEqual(StoreManager.legacyProductId(forEntitlement: StoreManager.entitlementParty), StoreManager.partyPack)
+    }
+
+    func testLegacyProductId_kit808() {
+        XCTAssertEqual(StoreManager.legacyProductId(forEntitlement: StoreManager.entitlementKit808), StoreManager.kit808)
+    }
+
+    func testLegacyProductId_kitElectronic() {
+        XCTAssertEqual(StoreManager.legacyProductId(forEntitlement: StoreManager.entitlementKitElectronic), StoreManager.kitElectronic)
+    }
+
+    func testLegacyProductId_unknownReturnsNil() {
+        XCTAssertNil(StoreManager.legacyProductId(forEntitlement: "nonexistent"))
+    }
+
     // MARK: - Initial state
 
     func testInitialState_purchasedIdsEmpty() {
@@ -141,34 +135,25 @@ final class StoreManagerTests: XCTestCase {
         XCTAssertFalse(store.isLoading)
     }
 
-    // MARK: - Multiple purchases combined
-
-    func testMultiplePurchases_tracked() {
+    func testInitialState_hasProAccessFalse() {
         let store = StoreManager()
-        store.purchasedIds = [StoreManager.studioPack, StoreManager.partyPack, StoreManager.kit808]
-        XCTAssertEqual(store.purchasedIds.count, 3)
-        XCTAssertTrue(store.purchasedIds.contains(StoreManager.studioPack))
-        XCTAssertTrue(store.purchasedIds.contains(StoreManager.partyPack))
-        XCTAssertTrue(store.purchasedIds.contains(StoreManager.kit808))
+        XCTAssertFalse(store.hasProAccess)
     }
 
-    func testProAndSubscription_bothGrantProAccess() {
+    func testInitialState_hasSubscriptionFalse() {
         let store = StoreManager()
-        store.purchasedIds = [StoreManager.pro, StoreManager.plusMonthly]
-        XCTAssertTrue(store.hasProAccess)
-        XCTAssertTrue(store.hasSubscription)
+        XCTAssertFalse(store.hasSubscription)
     }
 
-    // MARK: - isUnlocked logic (DEBUG vs RELEASE)
-
-    #if DEBUG
-    func testIsUnlocked_inDebug_alwaysTrue() {
+    func testInitialState_hasPlusFeaturesFalse() {
         let store = StoreManager()
-        store.purchasedIds = []
-        // In DEBUG, isUnlocked always returns true
-        XCTAssertTrue(store.isUnlocked("anything"))
-        XCTAssertTrue(store.isUnlocked(StoreManager.studioPack))
-        XCTAssertTrue(store.isUnlocked("nonexistent_pack"))
+        XCTAssertFalse(store.hasPlusFeatures)
     }
-    #endif
+
+    func testInitialState_isUnlockedFalse() {
+        let store = StoreManager()
+        // Without a customerInfo, isUnlocked returns false in release config
+        XCTAssertFalse(store.isUnlocked(StoreManager.studioPack))
+        XCTAssertFalse(store.isUnlocked("anything"))
+    }
 }

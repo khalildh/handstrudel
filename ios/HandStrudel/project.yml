@@ -1,9 +1,20 @@
 name: HandStrudel
+# NOTE: After adding the RevenueCat SPM package and HandStrudelUITests target
+# directly to project.pbxproj, this file is no longer the sole source of truth.
+# If you regenerate via XcodeGen, you must re-add the RevenueCat package
+# (https://github.com/RevenueCat/purchases-ios) and the UI test target manually,
+# or update this file's package + target declarations accordingly.
+
 options:
   bundleIdPrefix: com.handstrudel
   deploymentTarget:
     iOS: "16.0"
   xcodeVersion: "16.0"
+
+packages:
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios
+    from: "5.27.1"
 
 schemes:
   HandStrudel:
@@ -30,6 +41,11 @@ targets:
       - path: HandStrudel/Assets.xcassets
       - path: HandStrudel/Resources
       - path: HandStrudel/PrivacyInfo.xcprivacy
+    dependencies:
+      - package: RevenueCat
+        product: RevenueCat
+      - package: RevenueCat
+        product: RevenueCatUI
     entitlements:
       path: HandStrudel/HandStrudel.entitlements
       properties:
@@ -43,7 +59,8 @@ targets:
           - UIInterfaceOrientationPortrait
         UIRequiresFullScreen: true
         NSCameraUsageDescription: "HandStrudel uses the camera to track your hand gestures and convert them into music."
-        NSMicrophoneUsageDescription: "HandStrudel needs microphone access for audio processing."
+        NSMicrophoneUsageDescription: "HandStrudel records your voice along with the app's sound when you save and share a video recording of your performance."
+        NSLocalNetworkUsageDescription: "HandStrudel uses the local network to discover nearby devices for SharePlay jam sessions, letting you play music together in real time."
         NSBonjourServices:
           - "_groupactivities._tcp"
         LSApplicationQueriesSchemes:
@@ -53,7 +70,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.handstrudel.app
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: 7
+        CURRENT_PROJECT_VERSION: 10
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
@@ -71,3 +88,16 @@ targets:
       base:
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: true
+
+  HandStrudelUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: HandStrudelUITests
+    dependencies:
+      - target: HandStrudel
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: true
+        TEST_TARGET_NAME: HandStrudel
