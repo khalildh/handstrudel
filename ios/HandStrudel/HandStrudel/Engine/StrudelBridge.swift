@@ -235,6 +235,12 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         webView.evaluateJavaScript("noteSlide('\(hand)',\(midi))", completionHandler: nil)
     }
 
+    /// Set a single synth-side parameter on the global `__hp` object that the
+    /// Strudel patterns and noteOn voices read from (e.g. lpf, hpf, reverb).
+    func setSynthParam(_ id: String, value: Double) {
+        webView.evaluateJavaScript("__hp.\(id)=\(String(format: "%.4f", value))", completionHandler: nil)
+    }
+
     func playNote(midi: Int, waveform: String = "sawtooth", velocity: Double = 0.6, duration: Double = 0.3) {
         let safeMidi = max(0, min(127, midi))
         webView.evaluateJavaScript("playNote(\(safeMidi),'\(waveform)',\(String(format: "%.2f", velocity)),\(String(format: "%.2f", duration)))", completionHandler: nil)

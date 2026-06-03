@@ -152,6 +152,22 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
 
+            // Chord+Melody mode overlay (7 chord zones + melody lanes)
+            if engine.chordMelodyModeEnabled {
+                ChordMelodyOverlayView(
+                    zoneDegrees: engine.chordMelodyModeManager.zoneDegrees,
+                    currentChordZone: engine.chordMelodyChordHandLane,
+                    chordHandPinching: engine.chordMelodyModeManager.isChordHandPinching,
+                    currentOctaveShift: engine.chordMelodyOctaveShift,
+                    currentChordName: engine.chordMelodyCurrentChordName,
+                    melodyLane: engine.chordMelodyMelodyLane,
+                    melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
+                    melodyLaneCount: 9,
+                    swapHands: engine.chordMelodySwapHands
+                )
+                .ignoresSafeArea()
+            }
+
             // Learn mode overlay (Guitar Hero scrolling notes)
             if engine.learnModeEnabled {
                 let gridNotes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale,
@@ -208,7 +224,7 @@ struct ContentView: View {
                 }
 
                 // Floating code pill — hide in grid/drum/learn mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
                     codePill
                         .padding(.horizontal, 20)
                         .padding(.top, 2)
@@ -217,7 +233,7 @@ struct ContentView: View {
                 Spacer()
 
                 // Note badge — hide in grid/drum/learn mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
                     noteBadge
 
                     beatRing
@@ -1292,16 +1308,22 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, grid, drums, learn }
+    private enum AppMode: String { case melodic, grid, drums, learn, chordMelody }
     private var currentMode: AppMode {
         if engine.learnModeEnabled { return .learn }
+        if engine.chordMelodyModeEnabled { return .chordMelody }
         if engine.gridModeEnabled { return .grid }
         if engine.drumModeEnabled { return .drums }
         return .melodic
     }
 
     private func setMode(_ mode: AppMode) {
-        engine.switchMode(grid: mode == .grid, drums: mode == .drums, learn: mode == .learn)
+        engine.switchMode(
+            grid: mode == .grid,
+            drums: mode == .drums,
+            learn: mode == .learn,
+            chordMelody: mode == .chordMelody
+        )
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
         }
@@ -1311,11 +1333,68 @@ struct ControlSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("MODE", icon: "gamecontroller")
 
-            HStack(spacing: 8) {
-                modeButton("Melodic", icon: "pianokeys", mode: .melodic)
-                modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
-                modeButton("Drums", icon: "beats.headphones", mode: .drums)
-                modeButton("Learn", icon: "music.note.list", mode: .learn)
+            // 5 modes — wrap to 2 rows so each button still has a usable target size.
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    modeButton("Melodic", icon: "pianokeys", mode: .melodic)
+                    modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
+                    modeButton("Drums", icon: "beats.headphones", mode: .drums)
+                }
+                HStack(spacing: 8) {
+                    modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
+                    modeButton("Learn", icon: "music.note.list", mode: .learn)
+                }
+            }
+
+            if currentMode == .chordMelody {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
+                        .font(.system(size: 10, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Progression")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundColor(.primary.opacity(0.7))
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(CHORD_PROGRESSIONS) { prog in
+                                    progressionChip(prog)
+                                }
+                            }
+                        }
+                    }
+
+                    Toggle(isOn: $engine.chordMelodySwapHands) {
+                        Text("Swap hands (right = chords)")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(.primary.opacity(0.8))
+                    }
+                    .tint(.green)
+
+                    Toggle(isOn: $engine.chordMelodyAutoStrum) {
+                        Text("Auto-strum (re-articulate on each beat)")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(.primary.opacity(0.8))
+                    }
+                    .tint(.green)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Pad volume")
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundColor(.primary.opacity(0.8))
+                            Spacer()
+                            Text(String(format: "%.0f%%", engine.chordMelodyPadVolume / 0.6 * 100))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $engine.chordMelodyPadVolume, in: 0...0.6)
+                            .tint(.green)
+                    }
+                }
+                .padding(.top, 2)
             }
 
             if currentMode == .grid {
@@ -1399,6 +1478,35 @@ struct ControlSheet: View {
             )
         }
         .accessibilityIdentifier("mode-\(mode.rawValue)")
+    }
+
+    private func progressionChip(_ prog: ChordProgression) -> some View {
+        let isActive = engine.chordMelodyProgression.id == prog.id
+        return Button(action: { engine.chordMelodyProgression = prog }) {
+            HStack(spacing: 6) {
+                Text(prog.emoji)
+                    .font(.system(size: 14))
+                Text(prog.name)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(isActive ? .green : .primary.opacity(0.75))
+                Text("\(prog.degrees.count)")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(isActive ? 0.7 : 0.35))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(
+                        Capsule().fill(isActive ? Color.green.opacity(0.2) : Color.white.opacity(0.06))
+                    )
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                Capsule().fill(isActive ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+            )
+            .overlay(
+                Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
+            )
+        }
     }
 
 

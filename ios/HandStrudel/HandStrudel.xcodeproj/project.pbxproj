@@ -64,6 +64,9 @@
 		DB9DE9A3806A7D566AAF5B0F /* MappingConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8778B02D6298E0F0D25105B /* MappingConfigTests.swift */; };
 		E1B4E6E7F7AA5E7E64ED69D0 /* PersistenceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C110717C5437516659E169B3 /* PersistenceManager.swift */; };
 		E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */; };
+		CM4D9E5A8B7C40119EE3A001 /* ChordMelodyModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM4D9E5A8B7C40119EE3A002 /* ChordMelodyModeManager.swift */; };
+		CM4D9E5A8B7C40119EE3A003 /* ChordMelodyOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM4D9E5A8B7C40119EE3A004 /* ChordMelodyOverlayView.swift */; };
+		CM4D9E5A8B7C40119EE3A005 /* ChordProgression.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */; };
 		EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D6C035D4A9EE1A66C31839 /* Loop.swift */; };
 		F1E2FAD696F5D1BAD3542162 /* MusicTheoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */; };
 		F29562634D40D21DF434DF6C /* LearnOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB44B1EB04F4196CFA4C8AD6 /* LearnOverlayView.swift */; };
@@ -150,6 +153,9 @@
 		F15B500CE35D9D44107CDAC4 /* StoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreView.swift; sourceTree = "<group>"; };
 		F2C015029D54DF587EDD09DC /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeManager.swift; sourceTree = "<group>"; };
+		CM4D9E5A8B7C40119EE3A002 /* ChordMelodyModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordMelodyModeManager.swift; sourceTree = "<group>"; };
+		CM4D9E5A8B7C40119EE3A004 /* ChordMelodyOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordMelodyOverlayView.swift; sourceTree = "<group>"; };
+		CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordProgression.swift; sourceTree = "<group>"; };
 		F81CA2974F2ED11BEA62AC3F /* AudioLooper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLooper.swift; sourceTree = "<group>"; };
 		F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snippet.swift; sourceTree = "<group>"; };
 		F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefsTests.swift; sourceTree = "<group>"; };
@@ -194,6 +200,7 @@
 				9238181B674B4222B2F52C5A /* GridTouchView.swift */,
 				6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */,
 				CB44B1EB04F4196CFA4C8AD6 /* LearnOverlayView.swift */,
+				CM4D9E5A8B7C40119EE3A004 /* ChordMelodyOverlayView.swift */,
 				1C85B4858D833EF68AAD427C /* LearnSongPicker.swift */,
 				D986625C7BF30952FBAED619 /* OnboardingView.swift */,
 				A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */,
@@ -211,6 +218,7 @@
 				AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */,
 				938A00F6A5044E13D981C663 /* EngineController.swift */,
 				F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */,
+				CM4D9E5A8B7C40119EE3A002 /* ChordMelodyModeManager.swift */,
 				18B0EF83FDEC95F58B860F5A /* HandMapper.swift */,
 				C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */,
 				B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */,
@@ -265,6 +273,7 @@
 				AE98AF54FEB607CE395267C8 /* CameraFilter.swift */,
 				962D341307D9F8B90BCD5454 /* HandTheme.swift */,
 				0CB456251F49E8C1FE668CC2 /* LearnSong.swift */,
+				CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */,
 				93D6C035D4A9EE1A66C31839 /* Loop.swift */,
 				5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */,
 				A9F505B00217A74555C8E226 /* MusicTheory.swift */,
@@ -448,6 +457,7 @@
 				1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */,
 				204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */,
 				E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */,
+				CM4D9E5A8B7C40119EE3A001 /* ChordMelodyModeManager.swift in Sources */,
 				B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */,
 				195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */,
 				A380AD271A6485FF679B0DCD /* HandOverlayView.swift in Sources */,
@@ -458,6 +468,8 @@
 				25A87740F4DA10D91C739E18 /* JamSession.swift in Sources */,
 				5AE2A6CDB62709D4B83A5C89 /* LearnModeManager.swift in Sources */,
 				F29562634D40D21DF434DF6C /* LearnOverlayView.swift in Sources */,
+				CM4D9E5A8B7C40119EE3A003 /* ChordMelodyOverlayView.swift in Sources */,
+				CM4D9E5A8B7C40119EE3A005 /* ChordProgression.swift in Sources */,
 				6871AA438EAC5767702D188F /* LearnSong.swift in Sources */,
 				73E81C762C77D3DB08064674 /* LearnSongPicker.swift in Sources */,
 				31732217DB10380B3787DE51 /* LiveActivityManager.swift in Sources */,

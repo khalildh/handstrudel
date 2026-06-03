@@ -142,6 +142,25 @@ final class EngineController: ObservableObject {
     @Published var gridLeftLane: Int? = nil
     @Published var gridRightLane: Int? = nil
 
+    // Chord+Melody mode (two-hand harmony)
+    @Published var chordMelodyModeEnabled = false
+    @Published var chordMelodySwapHands = false  // left=chords by default; toggle for lefties
+    @Published var chordMelodyPadVolume: Double = 0.22  // sustained chord pad gain
+    let chordMelodyModeManager = ChordMelodyModeManager()
+    @Published var chordMelodyCurrentDegree: Int? = nil
+    @Published var chordMelodyCurrentChordName: String = ""
+    @Published var chordMelodyChordHandLane: Int? = nil   // for UI highlight on the zone strip
+    @Published var chordMelodyMelodyLane: Int? = nil
+    @Published var chordMelodyOctaveShift: Int = 0        // -1, 0, +1 from chord hand Y
+    @Published var chordMelodyAutoStrum: Bool = false     // re-articulate chord on each beat
+    private var lastChordMelodyBeat: Int = -1             // edge detection for auto-strum
+
+    /// Currently selected chord progression (subset of diatonic degrees the
+    /// chord hand cycles through). Defaults to "Free" — all 7 diatonic chords.
+    @Published var chordMelodyProgression: ChordProgression = CHORD_PROGRESSIONS.first(where: { $0.isFree }) ?? CHORD_PROGRESSIONS[0] {
+        didSet { chordMelodyModeManager.zoneDegrees = chordMelodyProgression.degrees }
+    }
+
     // Manual controls
     @Published var manualBPM: Double = 120
     @Published var currentStructIdx = 0
@@ -370,6 +389,8 @@ final class EngineController: ObservableObject {
 
         if learnModeEnabled {
             tickLearnMode()
+        } else if chordMelodyModeEnabled {
+            tickChordMelodyMode()
         } else if gridModeEnabled {
             tickGridMode()
         } else if drumModeEnabled {
@@ -467,6 +488,133 @@ final class EngineController: ObservableObject {
 
         // Only drum loops (no continuous synth)
         evaluateDrumLoopsIfChanged(modePrefix: "grid")
+    }
+
+    // MARK: - Chord+Melody mode
+
+    private func tickChordMelodyMode() {
+        chordMelodyModeManager.swapHands = chordMelodySwapHands
+        chordMelodyModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
+        let bounds = UIScreen.main.bounds
+        chordMelodyModeManager.screenAspect = bounds.width / bounds.height
+
+        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+
+        // Closure that returns the triad MIDI notes for a given scale degree —
+        // used to play the chord on the chord hand.
+        let chordTones: (Int) -> [Int] = { [weak self] degree in
+            guard let self else { return [] }
+            return chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
+        }
+
+        // Closure that returns the melody hand's snap targets: the chord tones
+        // expanded across ~2 octaves so the melody hand has 6-9 lanes to choose
+        // from. This is the "cheap version" of chord-aware snap from the
+        // implementation notes: melody can only pick chord tones, period.
+        let melodyTones: (Int) -> [Int] = { [weak self] degree in
+            guard let self else { return [] }
+            let triad = chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
+            // Expand triad up across octaves so the melody hand has multiple lanes.
+            // Each octave above the base contributes another root/third/fifth.
+            var lanes: [Int] = []
+            for octave in 0..<3 {
+                for note in triad {
+                    lanes.append(note + octave * 12)
+                }
+            }
+            return lanes.sorted()
+        }
+
+        let actions = chordMelodyModeManager.tick(
+            hands: currentHands,
+            chordTones: chordTones,
+            melodyTones: melodyTones
+        )
+
+        for action in actions {
+            switch action {
+            case .padOn(let notes, let degree):
+                let name = chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree)
+                chordMelodyCurrentChordName = name
+                chordMelodyCurrentDegree = degree
+                chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
+                // Bring up 3 sustained pad voices at low volume — the chord
+                // sits quietly under the melody so the player always hears the
+                // harmony without the right hand having to play.
+                for (i, midi) in notes.enumerated() {
+                    strudelBridge.noteOn(hand: "pad\(i)", midi: midi, waveform: "triangle", velocity: chordMelodyPadVolume)
+                }
+            case .padSlide(let notes, let degree):
+                let name = chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree)
+                chordMelodyCurrentChordName = name
+                chordMelodyCurrentDegree = degree
+                chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
+                // Glide each pad voice to the new chord tone — Strudel's
+                // noteSlide ramps pitch without re-attacking the envelope, so
+                // chord changes blend instead of clicking.
+                for (i, midi) in notes.enumerated() {
+                    strudelBridge.noteSlide(hand: "pad\(i)", midi: midi)
+                }
+            case .padOff:
+                for i in 0..<3 {
+                    strudelBridge.noteOff(hand: "pad\(i)")
+                }
+            case .chordAccent(let notes, _, let vel):
+                // Pinch on the chord hand is an additive accent — a brief
+                // chord stab on top of the existing pad. Quiet enough that
+                // it doesn't dominate the melody.
+                for midi in notes {
+                    strudelBridge.playNote(midi: midi, waveform: selectedWaveform, velocity: vel * 0.5, duration: 0.5)
+                    loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel * 0.5), currentTime: elapsed)
+                }
+                haptics.noteTrigger()
+            case .melodyOn(let hand, let midi, let name, let vel):
+                strudelBridge.noteOn(hand: hand, midi: midi, waveform: selectedWaveform, velocity: vel)
+                haptics.noteTrigger()
+                lastGridNote = name
+                loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel), currentTime: elapsed)
+            case .melodyOff(let hand):
+                strudelBridge.noteOff(hand: hand)
+                loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
+            case .melodySlide(let hand, let midi, let name):
+                strudelBridge.noteSlide(hand: hand, midi: midi)
+                lastGridNote = name
+            }
+        }
+
+        // Publish UI state.
+        let zones = chordMelodyModeManager.currentZones(hands: currentHands)
+        chordMelodyChordHandLane = zones.chordDegree
+        chordMelodyMelodyLane = zones.melodyLane
+        chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
+        if let deg = zones.chordDegree, chordMelodyCurrentDegree == nil {
+            // Preview chord name even before the user pinches.
+            chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: deg)
+        }
+
+        // Right-hand X → low-pass filter cutoff (timbre modulation).
+        // Hand left = dark/muffled, hand right = bright/open. Affects pad +
+        // melody voices since Strudel's voices read the global __hp.lpf.
+        let melodyHandData = chordMelodySwapHands ? currentHands.left : currentHands.right
+        if let mh = melodyHandData, let lpfDef = PARAM_MAP["lpf"] {
+            let mapped = lpfDef.min + max(0, min(1, mh.pinchX)) * (lpfDef.max - lpfDef.min)
+            smoothed["lpf"] = mapped
+            strudelBridge.setSynthParam("lpf", value: mapped)
+        }
+
+        // Auto-strum: re-articulate the held chord on each beat so the player
+        // doesn't have to pulse-pinch. Only fires while the chord hand is in
+        // frame and a chord is voiced.
+        if chordMelodyAutoStrum,
+           chordMelodyModeManager.currentChordMidi.isEmpty == false,
+           currentBeat != lastChordMelodyBeat {
+            lastChordMelodyBeat = currentBeat
+            for midi in chordMelodyModeManager.currentChordMidi {
+                strudelBridge.playNote(midi: midi, waveform: selectedWaveform, velocity: 0.25, duration: 0.4)
+            }
+        }
+
+        evaluateDrumLoopsIfChanged(modePrefix: "chordmelody")
     }
 
     // Drum hand lane tracking for UI
@@ -941,11 +1089,12 @@ final class EngineController: ObservableObject {
     }
 
     /// Call when switching modes to stop lingering sounds
-    func switchMode(grid: Bool, drums: Bool, learn: Bool) {
+    func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false) {
         silenceAll()
         gridModeEnabled = grid
         drumModeEnabled = drums
         learnModeEnabled = learn
+        chordMelodyModeEnabled = chordMelody
     }
 
     func stop() {
