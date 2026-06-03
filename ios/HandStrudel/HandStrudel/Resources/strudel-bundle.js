@@ -19725,8 +19725,7 @@ registerProcessor('${n2}', MyProcessor);
     let peak = v2 * 0.5;
     gain.gain.setValueAtTime(0, now);
     if (w5 === "supersaw") {
-      const detunes = [-9, 0, 9];
-      for (const d2 of detunes) {
+      for (const d2 of [-9, 0, 9]) {
         const o = ctx.createOscillator();
         o.type = "sawtooth";
         o.frequency.setValueAtTime(freq, now);

@@ -275,14 +275,11 @@ window.playHit = function(type) {
 };
 
 // Sustained note system — noteOn starts, noteOff releases.
-// Each hand gets its own voice (left/right) so they don't interfere.
-//
-// A voice can contain one or more oscillators (e.g. supersaw stacks 3 detuned
-// saws; FM uses a carrier + modulator). All oscillators in a voice share the
-// same gain + filter path so noteOff/noteSlide work uniformly.
+// A voice may contain multiple oscillators (supersaw stacks 3 detuned saws;
+// FM uses a carrier + modulator). All share one gain + filter path so
+// noteOff/noteSlide work uniformly.
 window._voices = {};
 
-// Cached PeriodicWave for the 25%-duty pulse synth — chiptune-ish square.
 window._pulseWave = null;
 function getPulseWave() {
     if (!_audioCtx) return null;
@@ -322,9 +319,7 @@ window.noteOn = function(hand, midi, waveform, vel) {
     gain.gain.setValueAtTime(0, now);
 
     if (w === 'supersaw') {
-        // 3 detuned saws stacked — wide, lush lead.
-        const detunes = [-9, 0, 9];
-        for (const d of detunes) {
+        for (const d of [-9, 0, 9]) {
             const o = ctx.createOscillator();
             o.type = 'sawtooth';
             o.frequency.setValueAtTime(freq, now);
@@ -335,7 +330,6 @@ window.noteOn = function(hand, midi, waveform, vel) {
         }
         peak = v * 0.35;
     } else if (w === 'pulse') {
-        // 25% duty pulse — chiptune timbre.
         const o = ctx.createOscillator();
         const pw = getPulseWave();
         if (pw) o.setPeriodicWave(pw); else o.type = 'square';
@@ -344,37 +338,29 @@ window.noteOn = function(hand, midi, waveform, vel) {
         o.start(now);
         oscs.push(o);
     } else if (w === 'fm') {
-        // Two-operator FM with a 3:2 modulator ratio — bell / electric piano.
         const carrier = ctx.createOscillator();
         carrier.type = 'sine';
         carrier.frequency.setValueAtTime(freq, now);
-
         const modulator = ctx.createOscillator();
         modulator.type = 'sine';
         modulator.frequency.setValueAtTime(freq * 1.5, now);
-
         const modGain = ctx.createGain();
         modGain.gain.setValueAtTime(freq * 1.2, now);
         modGain.gain.exponentialRampToValueAtTime(Math.max(0.001, freq * 0.05), now + 0.6);
-
         modulator.connect(modGain);
         modGain.connect(carrier.frequency);
         carrier.connect(lpf);
-
         modulator.start(now);
         carrier.start(now);
         oscs.push(carrier);
         auxNodes.push(modulator);
     } else if (w === 'pluck') {
-        // Plucked-string-ish: triangle, fast attack, long exponential decay,
-        // and a filter sweep down for the "string" feel.
         const o = ctx.createOscillator();
         o.type = 'triangle';
         o.frequency.setValueAtTime(freq, now);
         o.connect(lpf);
         o.start(now);
         oscs.push(o);
-
         attack = 0.003;
         peak = v * 0.7;
         lpf.frequency.cancelScheduledValues(now);
@@ -383,7 +369,6 @@ window.noteOn = function(hand, midi, waveform, vel) {
         gain.gain.linearRampToValueAtTime(peak, now + attack);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
     } else {
-        // Fallback / standard oscillators (sine, sawtooth, square, triangle).
         const o = ctx.createOscillator();
         try { o.type = w; } catch (_) { o.type = 'sawtooth'; }
         o.frequency.setValueAtTime(freq, now);
