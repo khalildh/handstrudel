@@ -72,7 +72,6 @@ private func debugLog(_ msg: String) {
 final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     private var webView: WKWebView!
     @Published var isReady = false
-    @Published var hydraEnabled = false
 
     var onBeat: ((Int) -> Void)?
     var onLog: ((String) -> Void)?
@@ -175,15 +174,6 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         }
     }
 
-    func evalHydra(_ code: String) {
-        let escaped = code
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-        webView.evaluateJavaScript("hydraEval(`\(escaped)`)") { _, error in
-            if let error { debugLog("hydra eval error: \(error)") }
-        }
-    }
-
     func updateParams(_ params: MusicParams, config: MappingConfig) {
         let ni = max(0, min(NOTES.count - 1, Int((params["noteIdx"] ?? 10).rounded())))
         let midi = MIDI_NOTES[ni]
@@ -221,12 +211,6 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         }
 
         webView.evaluateJavaScript(parts.joined(separator: ";"), completionHandler: nil)
-    }
-
-    func setHydraEnabled(_ enabled: Bool) {
-        hydraEnabled = enabled
-        let js = enabled ? "showHydra()" : "hideHydra()"
-        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
     func playHit(_ type: String) {

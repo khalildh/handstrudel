@@ -19490,20 +19490,6 @@ registerProcessor('${n2}', MyProcessor);
         };
         checkBeat();
       }
-      if (typeof Hydra !== "undefined") {
-        try {
-          const canvas = document.getElementById("hydra-canvas");
-          canvas.width = window.innerWidth || 390;
-          canvas.height = window.innerHeight || 844;
-          new Hydra({ canvas, detectAudio: false, makeGlobal: true, autoLoop: true });
-          window.H = (pat) => () => d(pat).queryArc(Wy(), Wy())[0]?.value ?? 0;
-          log("hydra initialized");
-        } catch (e) {
-          log("hydra init failed: " + e);
-        }
-      } else {
-        log("hydra not available (script not loaded)");
-      }
       log("loading drum samples...");
       try {
         await _evaluate(`samples('github:tidalcycles/Dirt-Samples/master')`);
@@ -19519,12 +19505,11 @@ registerProcessor('${n2}', MyProcessor);
           log("globalThis samples also failed: " + e2);
         }
       }
-      log("loading sample-instrument manifests...");
+      log("loading bundled instruments...");
       try {
         await loadBundledInstruments();
-        log("sample instruments ready: " + Object.keys(window._sampleInstruments || {}).join(","));
       } catch (e) {
-        log("sample manifest load error: " + e);
+        log("bundled instruments load error: " + e);
       }
       _ready = true;
       log("strudel ready");
@@ -19541,13 +19526,6 @@ registerProcessor('${n2}', MyProcessor);
       } catch (e) {
         log("eval error: " + e);
       }
-    }
-  };
-  window.hydraEval = function(code) {
-    try {
-      new Function(code)();
-    } catch (e) {
-      log("hydra eval: " + e);
     }
   };
   window.strudelStop = function() {
@@ -19755,33 +19733,14 @@ registerProcessor('${n2}', MyProcessor);
   }
   window._sampleBufferCache = {};
   async function _fetchAndDecode(url) {
-    log("  \u2193 " + url);
-    let res;
-    try {
-      res = await fetch(url);
-    } catch (e) {
-      log("  \u2717 fetch threw: " + e + " (" + url + ")");
-      throw e;
-    }
-    if (!res.ok) {
-      log("  \u2717 HTTP " + res.status + " for " + url);
-      throw new Error("HTTP " + res.status + " for " + url);
-    }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
     const ab = await res.arrayBuffer();
-    log("  \u2022 got " + ab.byteLength + " bytes for " + url + ", decoding\u2026");
-    try {
-      const buf = await _audioCtx.decodeAudioData(ab);
-      log("  \u2713 decoded " + url + " (" + buf.duration.toFixed(2) + "s)");
-      return buf;
-    } catch (e) {
-      log("  \u2717 decode failed for " + url + ": " + e);
-      throw e;
-    }
+    return await _audioCtx.decodeAudioData(ab);
   }
   function _isSampleInstrument(name) {
     return !!(name && window._sampleInstruments[name]);
   }
-  window._voices = {};
   function _startSampleVoice(hand, midi2, instName, vel) {
     const inst = window._sampleInstruments[instName];
     if (!inst) return false;
@@ -19791,8 +19750,7 @@ registerProcessor('${n2}', MyProcessor);
       if (slot.cancelled) return;
       const now = _audioCtx.currentTime;
       const v2 = vel || 0.6;
-      const semitoneOffset = midi2 - sampledChoice.midi;
-      const playbackRate = Math.pow(2, semitoneOffset / 12);
+      const playbackRate = Math.pow(2, (slot.midi - sampledChoice.midi) / 12);
       const src = _audioCtx.createBufferSource();
       src.buffer = buffer;
       src.playbackRate.value = playbackRate;
@@ -19821,24 +19779,36 @@ registerProcessor('${n2}', MyProcessor);
     if (cached && cached.buffer) {
       playWhenReady(choice, cached.buffer);
     } else {
-      const ensurePromise = cached && cached.then ? cached : (() => {
-        log("sample fetch start: " + choice.url);
+      const ensure = cached && cached.then ? cached : (() => {
         const p2 = _fetchAndDecode(choice.url).then((buf) => {
-          log("sample fetch ok: " + choice.url + " (" + Math.round(buf.duration * 1e3) + "ms)");
           window._sampleBufferCache[choice.url] = { buffer: buf };
           return buf;
         }).catch((e) => {
-          log("sample decode error " + choice.url + ": " + e);
           delete window._sampleBufferCache[choice.url];
           throw e;
         });
         window._sampleBufferCache[choice.url] = p2;
         return p2;
       })();
-      ensurePromise.then((buf) => playWhenReady(choice, buf)).catch(() => {
+      ensure.then((buf) => playWhenReady(choice, buf)).catch(() => {
       });
     }
     return true;
+  }
+  window._voices = {};
+  window._pulseWave = null;
+  function getPulseWave() {
+    if (!_audioCtx) return null;
+    if (window._pulseWave) return window._pulseWave;
+    const N5 = 64;
+    const real = new Float32Array(N5);
+    const imag = new Float32Array(N5);
+    const duty = 0.25;
+    for (let i = 1; i < N5; i++) {
+      imag[i] = 1 / i * (1 - Math.cos(2 * Math.PI * i * duty));
+    }
+    window._pulseWave = _audioCtx.createPeriodicWave(real, imag, { disableNormalization: false });
+    return window._pulseWave;
   }
   window.noteOn = function(hand, midi2, waveform, vel) {
     if (!_audioCtx) return;
@@ -19846,23 +19816,89 @@ registerProcessor('${n2}', MyProcessor);
     if (_isSampleInstrument(waveform)) {
       if (_startSampleVoice(hand, midi2, waveform, vel)) return;
     }
-    const now = _audioCtx.currentTime;
+    const ctx = _audioCtx;
+    const now = ctx.currentTime;
     const freq = 440 * Math.pow(2, (midi2 - 69) / 12);
     const v2 = vel || 0.6;
-    const osc = _audioCtx.createOscillator();
-    osc.type = waveform || "sawtooth";
-    osc.frequency.setValueAtTime(freq, now);
-    const gain = _audioCtx.createGain();
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(v2 * 0.5, now + 0.01);
-    const lpf = _audioCtx.createBiquadFilter();
+    const w5 = waveform || "sawtooth";
+    const gain = ctx.createGain();
+    const lpf = ctx.createBiquadFilter();
     lpf.type = "lowpass";
     lpf.frequency.value = 3e3 + v2 * 3e3;
-    osc.connect(lpf);
     lpf.connect(gain);
-    gain.connect(_audioCtx.destination);
-    osc.start(now);
-    window._voices[hand] = { osc, gain, midi: midi2, kind: "osc" };
+    gain.connect(ctx.destination);
+    const oscs = [];
+    const auxNodes = [];
+    let attack = 0.01;
+    let peak = v2 * 0.5;
+    gain.gain.setValueAtTime(0, now);
+    if (w5 === "supersaw") {
+      for (const d2 of [-9, 0, 9]) {
+        const o = ctx.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.setValueAtTime(freq, now);
+        o.detune.setValueAtTime(d2, now);
+        o.connect(lpf);
+        o.start(now);
+        oscs.push(o);
+      }
+      peak = v2 * 0.35;
+    } else if (w5 === "pulse") {
+      const o = ctx.createOscillator();
+      const pw2 = getPulseWave();
+      if (pw2) o.setPeriodicWave(pw2);
+      else o.type = "square";
+      o.frequency.setValueAtTime(freq, now);
+      o.connect(lpf);
+      o.start(now);
+      oscs.push(o);
+    } else if (w5 === "fm") {
+      const carrier = ctx.createOscillator();
+      carrier.type = "sine";
+      carrier.frequency.setValueAtTime(freq, now);
+      const modulator = ctx.createOscillator();
+      modulator.type = "sine";
+      modulator.frequency.setValueAtTime(freq * 1.5, now);
+      const modGain = ctx.createGain();
+      modGain.gain.setValueAtTime(freq * 1.2, now);
+      modGain.gain.exponentialRampToValueAtTime(Math.max(1e-3, freq * 0.05), now + 0.6);
+      modulator.connect(modGain);
+      modGain.connect(carrier.frequency);
+      carrier.connect(lpf);
+      modulator.start(now);
+      carrier.start(now);
+      oscs.push(carrier);
+      auxNodes.push(modulator);
+    } else if (w5 === "pluck") {
+      const o = ctx.createOscillator();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(freq, now);
+      o.connect(lpf);
+      o.start(now);
+      oscs.push(o);
+      attack = 3e-3;
+      peak = v2 * 0.7;
+      lpf.frequency.cancelScheduledValues(now);
+      lpf.frequency.setValueAtTime(5e3 + v2 * 3e3, now);
+      lpf.frequency.exponentialRampToValueAtTime(800, now + 1.2);
+      gain.gain.linearRampToValueAtTime(peak, now + attack);
+      gain.gain.exponentialRampToValueAtTime(1e-3, now + 1.5);
+    } else {
+      const o = ctx.createOscillator();
+      try {
+        o.type = w5;
+      } catch (_5) {
+        o.type = "sawtooth";
+      }
+      o.frequency.setValueAtTime(freq, now);
+      o.connect(lpf);
+      o.start(now);
+      oscs.push(o);
+    }
+    if (w5 !== "pluck") {
+      gain.gain.linearRampToValueAtTime(peak, now + attack);
+    }
+    window._voices[hand] = { oscs, auxNodes, gain, lpf, midi: midi2, waveform: w5 };
   };
   window.noteOff = function(hand) {
     const voice = window._voices[hand];
@@ -19876,16 +19912,25 @@ registerProcessor('${n2}', MyProcessor);
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
     voice.gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.05);
+    const stopAt = now + 0.06;
     if (voice.kind === "sample") {
       try {
-        voice.src.stop(now + 0.06);
-      } catch {
+        voice.src.stop(stopAt);
+      } catch (_5) {
       }
     } else {
-      try {
-        voice.osc.stop(now + 0.06);
-      } catch {
-      }
+      (voice.oscs || []).forEach((o) => {
+        try {
+          o.stop(stopAt);
+        } catch (_5) {
+        }
+      });
+      (voice.auxNodes || []).forEach((n2) => {
+        try {
+          n2.stop(stopAt);
+        } catch (_5) {
+        }
+      });
     }
     delete window._voices[hand];
   };
@@ -19896,52 +19941,25 @@ registerProcessor('${n2}', MyProcessor);
       voice.midi = midi2;
       return;
     }
-    if (voice.kind === "sample") {
-      const inst = window._sampleInstruments[voice.instName];
-      if (!inst) return;
-      const choice = _findClosestSampledNote(inst, midi2);
-      const currentSampled = voice.sampledMidi != null ? voice.sampledMidi : choice ? choice.midi : midi2;
-      if (choice && Math.abs(choice.midi - currentSampled) <= 3) {
-        const offset = midi2 - currentSampled;
-        const now2 = _audioCtx.currentTime;
-        voice.src.playbackRate.setValueAtTime(Math.pow(2, offset / 12), now2);
-        voice.midi = midi2;
-        voice.sampledMidi = currentSampled;
-      } else {
-        const wf2 = voice.instName;
-        window.noteOff(hand);
-        window.noteOn(hand, midi2, wf2, 0.6);
-      }
-      return;
-    }
     const now = _audioCtx.currentTime;
     const freq = 440 * Math.pow(2, (midi2 - 69) / 12);
-    voice.osc.frequency.setValueAtTime(freq, now);
+    if (voice.kind === "sample") {
+      const offset = midi2 - (voice.sampledMidi != null ? voice.sampledMidi : midi2);
+      voice.src.playbackRate.setValueAtTime(Math.pow(2, offset / 12), now);
+    } else if (voice.waveform === "fm") {
+      (voice.oscs || []).forEach((o) => o.frequency.setValueAtTime(freq, now));
+      (voice.auxNodes || []).forEach((n2) => {
+        if (n2.frequency) n2.frequency.setValueAtTime(freq * 1.5, now);
+      });
+    } else {
+      (voice.oscs || []).forEach((o) => o.frequency.setValueAtTime(freq, now));
+    }
     voice.midi = midi2;
   };
   window.playNote = function(midi2, waveform, vel, duration) {
     window.noteOn("oneshot", midi2, waveform, vel);
     setTimeout(() => window.noteOff("oneshot"), (duration || 0.3) * 1e3);
   };
-  window.showHydra = function() {
-    const c3 = document.getElementById("hydra-canvas");
-    if (c3) c3.style.display = "";
-  };
-  window.hideHydra = function() {
-    const c3 = document.getElementById("hydra-canvas");
-    if (c3) c3.style.display = "none";
-    try {
-      new Function("solid(0,0,0,0).out()")();
-    } catch {
-    }
-  };
-  window.addEventListener("resize", () => {
-    const c3 = document.getElementById("hydra-canvas");
-    if (c3) {
-      c3.width = window.innerWidth;
-      c3.height = window.innerHeight;
-    }
-  });
   window._moduleReady = true;
   log("module ready");
   window.webkit?.messageHandlers?.strudelBridge?.postMessage({ ready: true });

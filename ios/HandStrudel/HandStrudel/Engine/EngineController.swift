@@ -7,55 +7,54 @@ struct Waveform: Identifiable {
     let emoji: String
     let isPremium: Bool
     let packId: String?
-    /// `true` if the audio either ships in the app bundle (sampled instruments)
-    /// or is synthesized at runtime (oscillators). `false` means the audio is
-    /// downloaded on first use — the picker shows a download icon / spinner.
-    let isInstant: Bool
 }
 
 let WAVEFORMS: [Waveform] = [
     // Built-in oscillators — synthesized at runtime, no audio data needed.
-    Waveform(id: "sawtooth", name: "Saw",      emoji: "🪚", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "square",   name: "Square",   emoji: "⬜", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "triangle", name: "Triangle", emoji: "🔺", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "sine",     name: "Sine",     emoji: "🔮", isPremium: false, packId: nil, isInstant: true),
+    Waveform(id: "sawtooth", name: "Saw",      emoji: "🪚", isPremium: false, packId: nil),
+    Waveform(id: "square",   name: "Square",   emoji: "⬜", isPremium: false, packId: nil),
+    Waveform(id: "triangle", name: "Triangle", emoji: "🔺", isPremium: false, packId: nil),
+    Waveform(id: "sine",     name: "Sine",     emoji: "🔮", isPremium: false, packId: nil),
 
-    // Bundled GM-style sampled instruments — audio ships in the app bundle
-    // (~19 MB). IDs must match `bundled-instruments.json` exactly.
-    Waveform(id: "piano",     name: "Piano",      emoji: "🎹", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "epiano",    name: "E.Piano",    emoji: "🎛️", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "organ",     name: "Organ",      emoji: "🎚️", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "pipeorgan", name: "Pipe Organ", emoji: "⛪️", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "strings",   name: "Strings",    emoji: "🎻", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "sax",       name: "Sax",        emoji: "🎷", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "marimba",   name: "Marimba",    emoji: "🪘", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "kalimba",   name: "Kalimba",    emoji: "🎼", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "flute",     name: "Flute",      emoji: "🎶", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "bells",     name: "Bells",      emoji: "🔔", isPremium: false, packId: nil, isInstant: true),
+    // Multi-oscillator / custom-shape synths — implemented in strudel-entry.mjs.
+    Waveform(id: "pluck",    name: "Pluck",    emoji: "🪕", isPremium: false, packId: nil),
+    Waveform(id: "supersaw", name: "Supersaw", emoji: "🌊", isPremium: false, packId: nil),
+    Waveform(id: "pulse",    name: "Pulse",    emoji: "👾", isPremium: false, packId: nil),
+    Waveform(id: "fm",       name: "FM Bell",  emoji: "🔔", isPremium: false, packId: nil),
 
-    // Lazy-download instruments. IDs must match `LAZY_INSTRUMENTS` in
-    // strudel-entry.mjs. Samples stream from felixroos/dough-samples on first
-    // selection (typically <1s) and are cached for the session.
-    Waveform(id: "steinway",         name: "Steinway",     emoji: "🎹", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "folkharp",         name: "Folk Harp",    emoji: "🪕", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "clavisynth",       name: "Clavinet",     emoji: "⚡️", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "organ8",           name: "Organ 8'",     emoji: "🎹", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "pipeorgan_loud",   name: "Pipe Loud",    emoji: "⛪️", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "harmonica",        name: "Harmonica",    emoji: "🪗", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "vibraphone",       name: "Vibraphone",   emoji: "🔔", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "tubularbells",     name: "Tubular",      emoji: "🛎️", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "xylophone",        name: "Xylophone",    emoji: "🪵", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "balafon",          name: "Balafon",      emoji: "🪘", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "handchimes",       name: "Handchimes",   emoji: "🔔", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "dantranh",         name: "Đàn Tranh",    emoji: "🪕", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "ocarina",          name: "Ocarina",      emoji: "🪈", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "recorder_soprano", name: "Recorder S",   emoji: "🪈", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "recorder_tenor",   name: "Recorder T",   emoji: "🪈", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "recorder_bass",    name: "Recorder B",   emoji: "🪈", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "saxello",          name: "Saxello",      emoji: "🎷", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "sax_vib",          name: "Sax Vibrato",  emoji: "🎷", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "psaltery",         name: "Psaltery",     emoji: "🪕", isPremium: false, packId: nil, isInstant: true),
-    Waveform(id: "kalimba2",         name: "Kalimba 2",    emoji: "🎼", isPremium: false, packId: nil, isInstant: true),
+    // Bundled GM-style sampled instruments — MP3 audio ships in the app
+    // bundle under Resources/instrument-samples. IDs must match
+    // `bundled-instruments.json` exactly.
+    Waveform(id: "piano",            name: "Piano",       emoji: "🎹", isPremium: false, packId: nil),
+    Waveform(id: "epiano",           name: "E.Piano",     emoji: "🎛️", isPremium: false, packId: nil),
+    Waveform(id: "organ",            name: "Organ",       emoji: "🎚️", isPremium: false, packId: nil),
+    Waveform(id: "pipeorgan",        name: "Pipe Organ",  emoji: "⛪️", isPremium: false, packId: nil),
+    Waveform(id: "strings",          name: "Strings",     emoji: "🎻", isPremium: false, packId: nil),
+    Waveform(id: "sax",              name: "Sax",         emoji: "🎷", isPremium: false, packId: nil),
+    Waveform(id: "marimba",          name: "Marimba",     emoji: "🪘", isPremium: false, packId: nil),
+    Waveform(id: "kalimba",          name: "Kalimba",     emoji: "🎼", isPremium: false, packId: nil),
+    Waveform(id: "flute",            name: "Flute",       emoji: "🎶", isPremium: false, packId: nil),
+    Waveform(id: "bells",            name: "Bells",       emoji: "🔔", isPremium: false, packId: nil),
+    Waveform(id: "steinway",         name: "Steinway",    emoji: "🎹", isPremium: false, packId: nil),
+    Waveform(id: "folkharp",         name: "Folk Harp",   emoji: "🪕", isPremium: false, packId: nil),
+    Waveform(id: "clavisynth",       name: "Clavinet",    emoji: "⚡️", isPremium: false, packId: nil),
+    Waveform(id: "organ8",           name: "Organ 8'",    emoji: "🎹", isPremium: false, packId: nil),
+    Waveform(id: "pipeorgan_loud",   name: "Pipe Loud",   emoji: "⛪️", isPremium: false, packId: nil),
+    Waveform(id: "harmonica",        name: "Harmonica",   emoji: "🪗", isPremium: false, packId: nil),
+    Waveform(id: "vibraphone",       name: "Vibraphone",  emoji: "🔔", isPremium: false, packId: nil),
+    Waveform(id: "tubularbells",     name: "Tubular",     emoji: "🛎️", isPremium: false, packId: nil),
+    Waveform(id: "xylophone",        name: "Xylophone",   emoji: "🪵", isPremium: false, packId: nil),
+    Waveform(id: "balafon",          name: "Balafon",     emoji: "🪘", isPremium: false, packId: nil),
+    Waveform(id: "handchimes",       name: "Handchimes",  emoji: "🔔", isPremium: false, packId: nil),
+    Waveform(id: "dantranh",         name: "Đàn Tranh",   emoji: "🪕", isPremium: false, packId: nil),
+    Waveform(id: "ocarina",          name: "Ocarina",     emoji: "🪈", isPremium: false, packId: nil),
+    Waveform(id: "recorder_soprano", name: "Recorder S",  emoji: "🪈", isPremium: false, packId: nil),
+    Waveform(id: "recorder_tenor",   name: "Recorder T",  emoji: "🪈", isPremium: false, packId: nil),
+    Waveform(id: "recorder_bass",    name: "Recorder B",  emoji: "🪈", isPremium: false, packId: nil),
+    Waveform(id: "saxello",          name: "Saxello",     emoji: "🎷", isPremium: false, packId: nil),
+    Waveform(id: "sax_vib",          name: "Sax Vibrato", emoji: "🎷", isPremium: false, packId: nil),
+    Waveform(id: "psaltery",         name: "Psaltery",    emoji: "🪕", isPremium: false, packId: nil),
+    Waveform(id: "kalimba2",         name: "Kalimba 2",   emoji: "🎼", isPremium: false, packId: nil),
 ]
 
 private func debugLog(_ msg: String) {
@@ -85,7 +84,6 @@ final class EngineController: ObservableObject {
 
     // Configuration
     @Published var config = DEFAULT_MAPPING
-    @Published var hydraConfig = DEFAULT_HYDRA_MAPPING
     @Published var advanced = false
     @Published var isRunning = false
     @Published var isPaused = false  // true when control sheet is open
@@ -95,7 +93,6 @@ final class EngineController: ObservableObject {
     @Published var handsState = HandsState()
     @Published var smoothedParams = MusicParams()
     @Published var codeDisplay = ""
-    @Published var hydraCodeDisplay = ""
     @Published var noteDisplay = ""
     @Published var bpm: Double = 120
     @Published var currentBeat = 0
@@ -105,7 +102,6 @@ final class EngineController: ObservableObject {
     @Published var playingSet = Set<Int>()
     @Published var track = (slots: [Int](), speed: 1.0)
     @Published var trackPlaying = false
-    @Published var hydraEnabled = false
 
     // Drum mode
     @Published var drumModeEnabled = false
@@ -244,25 +240,21 @@ final class EngineController: ObservableObject {
     private var currentHands = HandsState()
     private var structIdx = 0
     private var lastStructKey = ""
-    private var lastHydraCode = ""
     private var displayLink: CADisplayLink?
     private var uiTimer: Timer?
     private var structTimer: Timer?
     private(set) var startTime: Date?
 
-    func start(config: MappingConfig, hydraConfig: MappingConfig, advanced: Bool) {
+    func start(config: MappingConfig, advanced: Bool) {
         debugLog("start() called")
         self.config = config
-        self.hydraConfig = hydraConfig
         self.advanced = advanced
 
         // Always start in melodic mode
         learnModeEnabled = false
 
         // Build default params
-        let musicDefs = buildDefaultParams(config)
-        let hydraDefs = buildDefaultParams(hydraConfig)
-        let defs = musicDefs.merging(hydraDefs) { _, new in new }
+        let defs = buildDefaultParams(config)
         rawParams = defs
         smoothed = defs
 
@@ -354,7 +346,6 @@ final class EngineController: ObservableObject {
             // Skip param mapping in grid/drum mode — hands control notes/hits, not synth params
             if !self.gridModeEnabled && !self.drumModeEnabled {
                 HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.config)
-                HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.hydraConfig)
             }
         }
     }
@@ -616,13 +607,6 @@ final class EngineController: ObservableObject {
             strudelBridge.evaluate(code)
         }
 
-        if hydraEnabled {
-            let hydraCode = buildHydraCode(smoothed)
-            if hydraCode != lastHydraCode {
-                lastHydraCode = hydraCode
-                strudelBridge.evalHydra(hydraCode)
-            }
-        }
     }
 
     private static let maxSnippets = 50
@@ -826,9 +810,6 @@ final class EngineController: ObservableObject {
                 if !self.gridModeEnabled {
                     self.codeDisplay = self.buildDisplayCode(s)
                 }
-                if self.hydraEnabled {
-                    self.hydraCodeDisplay = self.buildHydraDisplayCode(s)
-                }
             }
         }
     }
@@ -866,32 +847,6 @@ final class EngineController: ObservableObject {
             lines.append("  .\(def.strudelKey)(\(def.toCode(p[id] ?? def.defaultValue)))")
         }
 
-        return lines.joined(separator: "\n")
-    }
-
-    private func buildHydraDisplayCode(_ p: MusicParams) -> String {
-        let freq = p["hFreq"] ?? 10
-        let sync = p["hSync"] ?? 0.1
-        let kaleid = Int((p["hKaleid"] ?? 3).rounded())
-        let rot = p["hRotate"] ?? 0
-        let colorama = p["hColorama"] ?? 0.05
-        let bright = p["hBright"] ?? 1
-        let pixel = Int((p["hPixel"] ?? 200).rounded())
-        let mod = p["hModulate"] ?? 0.02
-        let scale = p["hScale"] ?? 1
-        let sat = p["hSaturate"] ?? 1
-
-        var lines = ["osc(\(String(format: "%.1f", freq)),\(String(format: "%.2f", sync)),1.5)"]
-        if kaleid > 1 { lines.append("  .kaleid(\(kaleid))") }
-        if rot > 0.01 { lines.append("  .rotate(\(String(format: "%.3f", rot)))") }
-        if scale != 1 { lines.append("  .scale(\(String(format: "%.2f", scale)))") }
-        if pixel < 190 { lines.append("  .pixelate(\(pixel),\(pixel))") }
-        lines.append("  .color(1,1,1)")
-        if bright != 1 { lines.append("  .brightness(\(String(format: "%.2f", bright)))") }
-        if sat != 1 { lines.append("  .saturate(\(String(format: "%.2f", sat)))") }
-        if colorama > 0.01 { lines.append("  .colorama(\(String(format: "%.3f", colorama)))") }
-        if mod > 0.005 { lines.append("  .modulate(noise(3),\(String(format: "%.3f", mod)))") }
-        lines.append("  .out()")
         return lines.joined(separator: "\n")
     }
 
@@ -961,14 +916,6 @@ final class EngineController: ObservableObject {
             if let code = buildTrackCode(slots: track.slots, speed: track.speed, snippets: savedSnippets) {
                 strudelBridge.evaluate(code)
             }
-        }
-    }
-
-    func toggleHydra() {
-        hydraEnabled.toggle()
-        strudelBridge.setHydraEnabled(hydraEnabled)
-        if !hydraEnabled {
-            lastHydraCode = ""
         }
     }
 

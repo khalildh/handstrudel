@@ -94,18 +94,6 @@ final class ParamDefsTests: XCTestCase {
         XCTAssertFalse(extras.contains("save"))
     }
 
-    func testExtraParamIds_excludesHydraIds() {
-        let config = MappingConfig(
-            left:  ["y": "hFreq", "x": "hSync"],
-            right: ["y": "gain", "x": "lpf"]
-        )
-        let extras = extraParamIds(config)
-        XCTAssertFalse(extras.contains("hFreq"))
-        XCTAssertFalse(extras.contains("hSync"))
-        XCTAssertTrue(extras.contains("gain"))
-        XCTAssertTrue(extras.contains("lpf"))
-    }
-
     func testExtraParamIds_isSorted() {
         let extras = extraParamIds(DEFAULT_MAPPING)
         XCTAssertEqual(extras, extras.sorted())
@@ -386,27 +374,6 @@ final class ParamDefsTests: XCTestCase {
         }
     }
 
-    // MARK: - HYDRA_PARAM_DEFS validation
-
-    func testHydraParamDefs_allHaveUniqueIds() {
-        let ids = HYDRA_PARAM_DEFS.map(\.id)
-        XCTAssertEqual(Set(ids).count, ids.count, "HYDRA_PARAM_DEFS should have unique IDs")
-    }
-
-    func testHydraParamDefs_eachDefaultWithinRange() {
-        for def in HYDRA_PARAM_DEFS {
-            XCTAssertTrue(def.defaultValue >= def.min && def.defaultValue <= def.max,
-                          "\(def.id): default (\(def.defaultValue)) not in [\(def.min), \(def.max)]")
-        }
-    }
-
-    func testHydraIds_matchesHydraParamDefs() {
-        XCTAssertEqual(HYDRA_IDS.count, HYDRA_PARAM_DEFS.count)
-        for def in HYDRA_PARAM_DEFS {
-            XCTAssertTrue(HYDRA_IDS.contains(def.id))
-        }
-    }
-
     // MARK: - PARAM_MAP
 
     func testParamMap_containsAllParamDefs() {
@@ -415,14 +382,8 @@ final class ParamDefsTests: XCTestCase {
         }
     }
 
-    func testParamMap_containsAllHydraParamDefs() {
-        for def in HYDRA_PARAM_DEFS {
-            XCTAssertNotNil(PARAM_MAP[def.id], "PARAM_MAP should contain \(def.id)")
-        }
-    }
-
     func testParamMap_totalCount() {
-        XCTAssertEqual(PARAM_MAP.count, PARAM_DEFS.count + HYDRA_PARAM_DEFS.count)
+        XCTAssertEqual(PARAM_MAP.count, PARAM_DEFS.count)
     }
 
     // MARK: - buildTrackCode
@@ -458,42 +419,6 @@ final class ParamDefsTests: XCTestCase {
         let code = buildTrackCode(slots: [5], speed: 1.0, snippets: snippets)
         // Index 5 is out of bounds, compactMap returns nil for it
         XCTAssertNil(code)
-    }
-
-    // MARK: - buildHydraCode
-
-    func testBuildHydraCode_alwaysContainsOscAndOut() {
-        let code = buildHydraCode([:])
-        XCTAssertTrue(code.contains("osc("))
-        XCTAssertTrue(code.contains(".out()"))
-    }
-
-    func testBuildHydraCode_usesDefaultValues() {
-        let code = buildHydraCode([:])
-        // Default hFreq=10, hSync=0.1
-        XCTAssertTrue(code.contains("osc(10.0,0.10"))
-    }
-
-    func testBuildHydraCode_kaleidOnlyWhenAbove1() {
-        let code1 = buildHydraCode(["hKaleid": 1])
-        XCTAssertFalse(code1.contains(".kaleid("))
-
-        let code3 = buildHydraCode(["hKaleid": 3])
-        XCTAssertTrue(code3.contains(".kaleid(3)"))
-    }
-
-    // MARK: - hasHydraMapping
-
-    func testHasHydraMapping_defaultMapping_returnsFalse() {
-        XCTAssertFalse(hasHydraMapping(DEFAULT_MAPPING))
-    }
-
-    func testHasHydraMapping_withHydraParam_returnsTrue() {
-        let config = MappingConfig(
-            left:  ["y": "hFreq"],
-            right: ["x": "gain"]
-        )
-        XCTAssertTrue(hasHydraMapping(config))
     }
 
     // MARK: - Array safe subscript
