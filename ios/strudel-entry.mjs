@@ -274,59 +274,142 @@ window.playHit = function(type) {
     }
 };
 
-// Sustained note system — noteOn starts, noteOff releases
-// Each hand gets its own voice (left/right) so they don't interfere
+// Sustained note system — noteOn starts, noteOff releases.
+// A voice may contain multiple oscillators (supersaw stacks 3 detuned saws;
+// FM uses a carrier + modulator). All share one gain + filter path so
+// noteOff/noteSlide work uniformly.
 window._voices = {};
+
+window._pulseWave = null;
+function getPulseWave() {
+    if (!_audioCtx) return null;
+    if (window._pulseWave) return window._pulseWave;
+    const N = 64;
+    const real = new Float32Array(N);
+    const imag = new Float32Array(N);
+    const duty = 0.25;
+    for (let i = 1; i < N; i++) {
+        imag[i] = (1 / i) * (1 - Math.cos(2 * Math.PI * i * duty));
+    }
+    window._pulseWave = _audioCtx.createPeriodicWave(real, imag, { disableNormalization: false });
+    return window._pulseWave;
+}
 
 window.noteOn = function(hand, midi, waveform, vel) {
     if (!_audioCtx) return;
-    // Stop any existing voice for this hand
     window.noteOff(hand);
 
-    const now = _audioCtx.currentTime;
+    const ctx = _audioCtx;
+    const now = ctx.currentTime;
     const freq = 440 * Math.pow(2, (midi - 69) / 12);
     const v = vel || 0.6;
+    const w = waveform || 'sawtooth';
 
-    const osc = _audioCtx.createOscillator();
-    osc.type = waveform || 'sawtooth';
-    osc.frequency.setValueAtTime(freq, now);
-
-    const gain = _audioCtx.createGain();
-    // Quick attack
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(v * 0.5, now + 0.01);
-
-    const lpf = _audioCtx.createBiquadFilter();
+    const gain = ctx.createGain();
+    const lpf = ctx.createBiquadFilter();
     lpf.type = 'lowpass';
     lpf.frequency.value = 3000 + v * 3000;
-
-    osc.connect(lpf);
     lpf.connect(gain);
-    gain.connect(_audioCtx.destination);
-    osc.start(now);
+    gain.connect(ctx.destination);
 
-    window._voices[hand] = { osc, gain, midi };
+    const oscs = [];
+    const auxNodes = [];
+    let attack = 0.01;
+    let peak = v * 0.5;
+    gain.gain.setValueAtTime(0, now);
+
+    if (w === 'supersaw') {
+        for (const d of [-9, 0, 9]) {
+            const o = ctx.createOscillator();
+            o.type = 'sawtooth';
+            o.frequency.setValueAtTime(freq, now);
+            o.detune.setValueAtTime(d, now);
+            o.connect(lpf);
+            o.start(now);
+            oscs.push(o);
+        }
+        peak = v * 0.35;
+    } else if (w === 'pulse') {
+        const o = ctx.createOscillator();
+        const pw = getPulseWave();
+        if (pw) o.setPeriodicWave(pw); else o.type = 'square';
+        o.frequency.setValueAtTime(freq, now);
+        o.connect(lpf);
+        o.start(now);
+        oscs.push(o);
+    } else if (w === 'fm') {
+        const carrier = ctx.createOscillator();
+        carrier.type = 'sine';
+        carrier.frequency.setValueAtTime(freq, now);
+        const modulator = ctx.createOscillator();
+        modulator.type = 'sine';
+        modulator.frequency.setValueAtTime(freq * 1.5, now);
+        const modGain = ctx.createGain();
+        modGain.gain.setValueAtTime(freq * 1.2, now);
+        modGain.gain.exponentialRampToValueAtTime(Math.max(0.001, freq * 0.05), now + 0.6);
+        modulator.connect(modGain);
+        modGain.connect(carrier.frequency);
+        carrier.connect(lpf);
+        modulator.start(now);
+        carrier.start(now);
+        oscs.push(carrier);
+        auxNodes.push(modulator);
+    } else if (w === 'pluck') {
+        const o = ctx.createOscillator();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(freq, now);
+        o.connect(lpf);
+        o.start(now);
+        oscs.push(o);
+        attack = 0.003;
+        peak = v * 0.7;
+        lpf.frequency.cancelScheduledValues(now);
+        lpf.frequency.setValueAtTime(5000 + v * 3000, now);
+        lpf.frequency.exponentialRampToValueAtTime(800, now + 1.2);
+        gain.gain.linearRampToValueAtTime(peak, now + attack);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+    } else {
+        const o = ctx.createOscillator();
+        try { o.type = w; } catch (_) { o.type = 'sawtooth'; }
+        o.frequency.setValueAtTime(freq, now);
+        o.connect(lpf);
+        o.start(now);
+        oscs.push(o);
+    }
+
+    if (w !== 'pluck') {
+        gain.gain.linearRampToValueAtTime(peak, now + attack);
+    }
+
+    window._voices[hand] = { oscs, auxNodes, gain, lpf, midi, waveform: w };
 };
 
 window.noteOff = function(hand) {
     const voice = window._voices[hand];
     if (!voice) return;
     const now = _audioCtx.currentTime;
-    // Quick release (fade out over 50ms to avoid click)
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
     voice.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    voice.osc.stop(now + 0.06);
+    const stopAt = now + 0.06;
+    (voice.oscs || []).forEach(o => { try { o.stop(stopAt); } catch (_) {} });
+    (voice.auxNodes || []).forEach(n => { try { n.stop(stopAt); } catch (_) {} });
     delete window._voices[hand];
 };
 
-// Change pitch of a held note without retriggering (for sliding between lanes)
 window.noteSlide = function(hand, midi) {
     const voice = window._voices[hand];
     if (!voice || voice.midi === midi) return;
     const now = _audioCtx.currentTime;
     const freq = 440 * Math.pow(2, (midi - 69) / 12);
-    voice.osc.frequency.setValueAtTime(freq, now);
+    if (voice.waveform === 'fm') {
+        (voice.oscs || []).forEach(o => o.frequency.setValueAtTime(freq, now));
+        (voice.auxNodes || []).forEach(n => {
+            if (n.frequency) n.frequency.setValueAtTime(freq * 1.5, now);
+        });
+    } else {
+        (voice.oscs || []).forEach(o => o.frequency.setValueAtTime(freq, now));
+    }
     voice.midi = midi;
 };
 

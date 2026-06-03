@@ -14,6 +14,11 @@ let WAVEFORMS: [Waveform] = [
     Waveform(id: "square", name: "Square", emoji: "⬜", isPremium: false, packId: nil),
     Waveform(id: "triangle", name: "Triangle", emoji: "🔺", isPremium: false, packId: nil),
     Waveform(id: "sine", name: "Sine", emoji: "🔮", isPremium: false, packId: nil),
+    // Multi-oscillator / custom-shape synths — implemented in strudel-entry.mjs.
+    Waveform(id: "pluck", name: "Pluck", emoji: "🪕", isPremium: false, packId: nil),
+    Waveform(id: "supersaw", name: "Supersaw", emoji: "🌊", isPremium: false, packId: nil),
+    Waveform(id: "pulse", name: "Pulse", emoji: "👾", isPremium: false, packId: nil),
+    Waveform(id: "fm", name: "FM Bell", emoji: "🔔", isPremium: false, packId: nil),
 ]
 
 private func debugLog(_ msg: String) {
