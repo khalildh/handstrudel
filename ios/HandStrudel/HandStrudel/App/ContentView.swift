@@ -1520,50 +1520,55 @@ struct ControlSheet: View {
                 GridItem(.flexible(), spacing: 8)
             ], spacing: 8) {
                 ForEach(WAVEFORMS) { wf in
-                    let locked = wf.isPremium && !storeManager.isUnlocked(wf.packId ?? "")
-                    Button(action: {
-                        if locked, let packId = wf.packId {
-                            paywallPackId = packId
-                        } else {
-                            engine.selectedWaveform = wf.id
-                        }
-                    }) {
-                        VStack(spacing: 5) {
-                            Text(wf.emoji)
-                                .font(.system(size: 20))
-                            Text(wf.name)
-                                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundColor(engine.selectedWaveform == wf.id ? .green : .primary.opacity(0.6))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(engine.selectedWaveform == wf.id
-                                    ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
-                                    : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(engine.selectedWaveform == wf.id ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: engine.selectedWaveform == wf.id ? 1.5 : 0.5)
-                        )
-                        .overlay(alignment: .topTrailing) {
-                            if locked {
-                                Text("PRO")
-                                    .font(.system(size: 8, weight: .heavy, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.8))
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(.ultraThinMaterial))
-                                    .padding(5)
-                            }
-                        }
-                        .opacity(locked ? 0.5 : 1.0)
-                    }
+                    waveformCard(wf)
                 }
             }
+        }
+    }
+
+    private func waveformCard(_ wf: Waveform) -> some View {
+        let locked = wf.isPremium && !storeManager.isUnlocked(wf.packId ?? "")
+        let isSelected = engine.selectedWaveform == wf.id
+        return Button(action: {
+            if locked, let packId = wf.packId {
+                paywallPackId = packId
+            } else {
+                engine.selectedWaveform = wf.id
+            }
+        }) {
+            VStack(spacing: 5) {
+                Text(wf.emoji)
+                    .font(.system(size: 20))
+                Text(wf.name)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected
+                        ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                        : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isSelected ? 1.5 : 0.5)
+            )
+            .overlay(alignment: .topTrailing) {
+                if locked {
+                    Text("PRO")
+                        .font(.system(size: 8, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white.opacity(0.8))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(.ultraThinMaterial))
+                        .padding(5)
+                }
+            }
+            .opacity(locked ? 0.5 : 1.0)
         }
     }
 

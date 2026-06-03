@@ -30,6 +30,7 @@
 		467B330FAF19DF881621A97A /* MappingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */; };
 		4EC81DC9ACA61F24040592D2 /* AudioExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9531420BA306B5BC2AB859A6 /* AudioExporter.swift */; };
 		575A0CD71B422DFD7ACB6FDF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */; };
+		ISMP1A2B3C4D5E6F7A8B9C00 /* instrument-samples in Resources */ = {isa = PBXBuildFile; fileRef = ISMP1A2B3C4D5E6F7A8B9C01 /* instrument-samples */; };
 		5953AA2B7EEB3B9102EEBCD1 /* ParamDefsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */; };
 		5AE2A6CDB62709D4B83A5C89 /* LearnModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352AD3F7189E1B79D0315D59 /* LearnModeManager.swift */; };
 		61F3ED12A7BAB424D09491E8 /* Snippet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */; };
@@ -126,6 +127,7 @@
 		93D6C035D4A9EE1A66C31839 /* Loop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loop.swift; sourceTree = "<group>"; };
 		9531420BA306B5BC2AB859A6 /* AudioExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioExporter.swift; sourceTree = "<group>"; };
 		953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		ISMP1A2B3C4D5E6F7A8B9C01 /* instrument-samples */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Resources/instrument-samples"; sourceTree = "<group>"; };
 		962D341307D9F8B90BCD5454 /* HandTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTheme.swift; sourceTree = "<group>"; };
 		9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheoryTests.swift; sourceTree = "<group>"; };
 		A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallOverlay.swift; sourceTree = "<group>"; };
@@ -177,6 +179,7 @@
 				2E3A4C0D73CA4CA64494F9A1 /* HandStrudel.storekit */,
 				8B7A548807FF6856B92FC423 /* Info.plist */,
 				953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */,
+				ISMP1A2B3C4D5E6F7A8B9C01 /* instrument-samples */,
 				6DCE005A501DEA901F3762F5 /* App */,
 				488478B1D4024AF8209C4C9C /* Engine */,
 				B777E76E23E1B0425E948833 /* Models */,
@@ -427,6 +430,7 @@
 				8590BD09D74A051C39590A4D /* Assets.xcassets in Resources */,
 				D4C3C43238961610E6ACFCAD /* HandStrudel.storekit in Resources */,
 				575A0CD71B422DFD7ACB6FDF /* PrivacyInfo.xcprivacy in Resources */,
+				ISMP1A2B3C4D5E6F7A8B9C00 /* instrument-samples in Resources */,
 				8E7C01AF7723050C8C5273E3 /* hydra-synth.js in Resources */,
 				0AABB3564BB7F0F7CD594B81 /* strudel-bundle.js in Resources */,
 				90224DD8E3719A286A3B008A /* strudel-engine.html in Resources */,

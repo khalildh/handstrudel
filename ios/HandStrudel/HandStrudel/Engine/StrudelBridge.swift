@@ -1,6 +1,56 @@
 import WebKit
 import UIKit
 
+/// Serves bundled instrument sample files (mp3 + JSON) to the JS layer.
+///
+/// WKWebView blocks `fetch()` to file:// URLs for safety reasons, so the JS
+/// can't directly load the audio files in the app's Resources folder. We
+/// register a custom scheme — `app-samples://<relative/path>` — that maps to
+/// `HandStrudel.app/instrument-samples/<relative/path>` and returns the bytes
+/// over the URL Scheme Task API. No private APIs, no file-origin overrides.
+final class SampleSchemeHandler: NSObject, WKURLSchemeHandler {
+    func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
+        guard let reqURL = urlSchemeTask.request.url else {
+            debugLog("[samples] no URL on request")
+            urlSchemeTask.didFailWithError(NSError(domain: "SampleSchemeHandler", code: 1))
+            return
+        }
+        var relative = (reqURL.host ?? "") + reqURL.path
+        if relative.hasPrefix("/") { relative.removeFirst() }
+        debugLog("[samples] req: \(reqURL.absoluteString) → host=\(reqURL.host ?? "nil") path=\(reqURL.path) relative=\(relative)")
+        guard let resBase = Bundle.main.url(forResource: "instrument-samples", withExtension: nil) else {
+            debugLog("[samples] ERROR: instrument-samples folder missing from bundle")
+            urlSchemeTask.didFailWithError(NSError(domain: "SampleSchemeHandler", code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "instrument-samples folder missing from bundle"]))
+            return
+        }
+        let fileURL = resBase.appendingPathComponent(relative)
+        guard let data = try? Data(contentsOf: fileURL) else {
+            debugLog("[samples] NOT FOUND: \(fileURL.path)")
+            urlSchemeTask.didFailWithError(NSError(domain: "SampleSchemeHandler", code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Not found: \(relative)"]))
+            return
+        }
+        debugLog("[samples] OK: \(relative) (\(data.count) bytes)")
+        let mime: String
+        if fileURL.pathExtension == "mp3" { mime = "audio/mpeg" }
+        else if fileURL.pathExtension == "json" { mime = "application/json" }
+        else { mime = "application/octet-stream" }
+        let resp = HTTPURLResponse(url: reqURL, statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: [
+                "Content-Type": mime,
+                "Content-Length": "\(data.count)",
+                "Access-Control-Allow-Origin": "*",
+            ])!
+        urlSchemeTask.didReceive(resp)
+        urlSchemeTask.didReceive(data)
+        urlSchemeTask.didFinish()
+    }
+
+    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {}
+}
+
 private func debugLog(_ msg: String) {
     #if DEBUG
     let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("debug.log")
@@ -33,6 +83,10 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
+        // Register a custom URL scheme so the JS can fetch bundled instrument
+        // samples without running into WebKit's file:// origin restrictions.
+        // `app://samples/...` resolves to files inside the app's Resources.
+        config.setURLSchemeHandler(SampleSchemeHandler(), forURLScheme: "app-samples")
 
         let contentController = WKUserContentController()
         contentController.add(self, name: "strudelBridge")

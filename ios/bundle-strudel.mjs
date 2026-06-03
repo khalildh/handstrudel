@@ -8,7 +8,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 await build({
     entryPoints: [join(__dirname, 'strudel-entry.mjs')],
     bundle: true,
-    format: 'esm',
+    // Must be IIFE — bundle is loaded via a plain <script> tag; ESM output
+    // leaks top-level helper vars to window and hangs init on iOS.
+    format: 'iife',
     outfile: join(__dirname, 'HandStrudel/HandStrudel/Resources/strudel-bundle.js'),
     platform: 'browser',
     target: 'es2020',

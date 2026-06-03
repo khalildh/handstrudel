@@ -5,8 +5,6 @@ import {
     initAudio,
     getAudioContext,
     registerSynthSounds,
-    loadBuffer,
-    getCachedBuffer,
 } from '@strudel/webaudio';
 import * as strudelCore from '@strudel/core';
 import * as strudelMini from '@strudel/mini';
@@ -105,7 +103,7 @@ window.initStrudel = async function() {
         // ~10KB total). Audio files are fetched lazily on first use.
         log('loading sample-instrument manifests...');
         try {
-            await loadSampleInstrumentManifests();
+            await loadBundledInstruments();
             log('sample instruments ready: ' + Object.keys(window._sampleInstruments || {}).join(','));
         } catch (e) {
             log('sample manifest load error: ' + e);
@@ -340,7 +338,10 @@ function _buildInstrument(rawNotes, parentBase) {
         if (midi == null) continue;
         const file = Array.isArray(files) ? files[0] : files;
         midis.push(midi);
-        urls.push(base + file);
+        // Some VCSL paths ship with literal spaces (e.g. "Concert Harp/..."),
+        // others are already encoded. Encode the path portion conservatively
+        // so % and / pass through unchanged.
+        urls.push(base + encodeURI(file).replace(/%25/g, '%'));
     }
     if (!midis.length) return null;
     // Sort by midi so binary searches / scans are predictable.
@@ -351,58 +352,85 @@ function _buildInstrument(rawNotes, parentBase) {
     };
 }
 
-// Sample-map: instrument id -> source manifest URL + key inside that manifest.
-// The Swift `Waveform.id` strings must match the keys here exactly.
-const _SAMPLE_INSTRUMENTS_CONFIG = [
-    // Acoustic grand piano (felixroos/dough-samples) — small chromatic-ish set
-    { id: 'piano',   manifest: 'https://strudel.cc/piano.json',                                           key: 'piano' },
-    // The remaining instruments come from VCSL (creative commons, see PR body)
-    { id: 'epiano',  manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'fmpiano' },
-    { id: 'organ',   manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'organ_full' },
-    { id: 'pipeorgan', manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'pipeorgan_quiet' },
-    { id: 'strings',  manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'harp' },
-    { id: 'sax',     manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'sax' },
-    { id: 'marimba', manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'marimba' },
-    { id: 'kalimba', manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'kalimba' },
-    { id: 'flute',   manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'recorder_alto_sus' },
-    { id: 'bells',   manifest: 'https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json', key: 'glockenspiel' },
-];
+// Bundled instrument manifest produced by ios/prepare-samples.py at build
+// time. Lives alongside the HTML in the app's Resources/instrument-samples
+// folder. We can't use a relative file:// URL because WebKit blocks fetch()
+// for file scheme — instead Swift registers an `app-samples://` URL scheme
+// handler that maps host+path back to the bundle path.
+const BUNDLED_MANIFEST = 'app-samples://bundled-instruments.json';
+const BUNDLED_AUDIO_BASE = 'app-samples://';
 
-async function loadSampleInstrumentManifests() {
-    // Group requests per manifest URL so we only fetch each JSON once.
-    const byManifest = {};
-    for (const entry of _SAMPLE_INSTRUMENTS_CONFIG) {
-        (byManifest[entry.manifest] ||= []).push(entry);
+
+async function loadBundledInstruments() {
+    let json;
+    try {
+        const res = await fetch(BUNDLED_MANIFEST);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        json = await res.json();
+    } catch (err) {
+        log('bundled manifest fetch failed: ' + err);
+        return;
     }
-    await Promise.all(Object.entries(byManifest).map(async ([url, entries]) => {
-        try {
-            const res = await fetch(url);
-            const json = await res.json();
-            const parentBase = json._base || '';
-            for (const e of entries) {
-                const raw = json[e.key];
-                if (!raw || typeof raw === 'string' || Array.isArray(raw)) {
-                    log(`sample manifest "${url}" missing pitched entry for ${e.key}`);
-                    continue;
-                }
-                const inst = _buildInstrument(raw, parentBase);
-                if (inst) window._sampleInstruments[e.id] = inst;
-            }
-        } catch (err) {
-            log('manifest fetch failed for ' + url + ': ' + err);
+    const audioDir = (json._audio_dir || 'audio').replace(/\/$/, '');
+    const baseDir = BUNDLED_AUDIO_BASE + audioDir + '/';
+    for (const [instId, notes] of Object.entries(json.instruments || {})) {
+        const midis = [];
+        const urls = [];
+        for (const [noteName, relPath] of Object.entries(notes)) {
+            const midi = _noteNameToMidi(noteName);
+            if (midi == null) continue;
+            midis.push(midi);
+            urls.push(baseDir + relPath);
         }
-    }));
+        if (!midis.length) continue;
+        const order = midis.map((_, i) => i).sort((a, b) => midis[a] - midis[b]);
+        window._sampleInstruments[instId] = {
+            midis: order.map(i => midis[i]),
+            urls: order.map(i => urls[i]),
+        };
+    }
+    log('bundled instruments ready: ' + Object.keys(window._sampleInstruments).join(','));
 }
 
-// Kick off a load for the closest sampled note — returns the AudioBuffer
-// (or null if it hasn't downloaded yet).
+// Buffer cache for bundled samples — key: url, value: AudioBuffer | Promise.
+window._sampleBufferCache = {};
+
+async function _fetchAndDecode(url) {
+    log('  ↓ ' + url);
+    let res;
+    try { res = await fetch(url); }
+    catch (e) { log('  ✗ fetch threw: ' + e + ' (' + url + ')'); throw e; }
+    if (!res.ok) {
+        log('  ✗ HTTP ' + res.status + ' for ' + url);
+        throw new Error('HTTP ' + res.status + ' for ' + url);
+    }
+    const ab = await res.arrayBuffer();
+    log('  • got ' + ab.byteLength + ' bytes for ' + url + ', decoding…');
+    try {
+        const buf = await _audioCtx.decodeAudioData(ab);
+        log('  ✓ decoded ' + url + ' (' + buf.duration.toFixed(2) + 's)');
+        return buf;
+    } catch (e) {
+        log('  ✗ decode failed for ' + url + ': ' + e);
+        throw e;
+    }
+}
+
 function _getSampleBuffer(inst, midi) {
     const choice = _findClosestSampledNote(inst, midi);
     if (!choice) return null;
-    const cached = getCachedBuffer(choice.url);
-    if (cached) return { buffer: cached, sampledMidi: choice.midi };
-    // Trigger load; subsequent noteOn calls (and noteSlide) will use it.
-    loadBuffer(choice.url, _audioCtx, 'instrument').catch(e => log('loadBuffer error: ' + e));
+    const cached = window._sampleBufferCache[choice.url];
+    if (cached && cached.buffer) return { buffer: cached.buffer, sampledMidi: choice.midi };
+    if (cached && cached.then) return null; // load in flight
+    log('sample fetch start: ' + choice.url);
+    const p = _fetchAndDecode(choice.url)
+        .then(buffer => {
+            log('sample fetch ok: ' + choice.url + ' (' + Math.round(buffer.duration * 1000) + 'ms)');
+            window._sampleBufferCache[choice.url] = { buffer };
+            return buffer;
+        })
+        .catch(e => { log('sample decode error ' + choice.url + ': ' + e); delete window._sampleBufferCache[choice.url]; });
+    window._sampleBufferCache[choice.url] = p;
     return null;
 }
 
@@ -419,32 +447,75 @@ window._voices = {};
 function _startSampleVoice(hand, midi, instName, vel) {
     const inst = window._sampleInstruments[instName];
     if (!inst) return false;
-    const sampled = _getSampleBuffer(inst, midi);
-    if (!sampled) return true; // still report "handled" so we don't fall back to oscillator while buffer loads
 
-    const now = _audioCtx.currentTime;
-    const v = vel || 0.6;
-    const semitoneOffset = midi - sampled.sampledMidi;
-    const playbackRate = Math.pow(2, semitoneOffset / 12);
+    // Reserve the voice slot synchronously so noteOff during the (very brief)
+    // async load knows to cancel us. The voice object is "armed" — when the
+    // buffer arrives, we attach + start; if `cancelled` is set first, drop it.
+    const slot = { hand, midi, instName, vel, kind: 'sample', armed: true, cancelled: false };
+    window._voices[hand] = slot;
 
-    const src = _audioCtx.createBufferSource();
-    src.buffer = sampled.buffer;
-    src.playbackRate.value = playbackRate;
+    const playWhenReady = (sampledChoice, buffer) => {
+        if (slot.cancelled) return;
+        const now = _audioCtx.currentTime;
+        const v = vel || 0.6;
+        const semitoneOffset = midi - sampledChoice.midi;
+        const playbackRate = Math.pow(2, semitoneOffset / 12);
 
-    const gain = _audioCtx.createGain();
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(v * 0.6, now + 0.01);
+        const src = _audioCtx.createBufferSource();
+        src.buffer = buffer;
+        src.playbackRate.value = playbackRate;
 
-    const lpf = _audioCtx.createBiquadFilter();
-    lpf.type = 'lowpass';
-    lpf.frequency.value = 3000 + v * 3000;
+        const gain = _audioCtx.createGain();
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(v * 0.6, now + 0.01);
 
-    src.connect(lpf);
-    lpf.connect(gain);
-    gain.connect(_audioCtx.destination);
-    src.start(now);
+        const lpf = _audioCtx.createBiquadFilter();
+        lpf.type = 'lowpass';
+        lpf.frequency.value = 3000 + v * 3000;
 
-    window._voices[hand] = { src, gain, midi, instName, kind: 'sample', sampledMidi: sampled.sampledMidi };
+        src.connect(lpf);
+        lpf.connect(gain);
+        gain.connect(_audioCtx.destination);
+        src.start(now);
+
+        // Promote the armed slot into a fully started voice. Preserve any
+        // mutations noteSlide may have made to slot.midi.
+        slot.armed = false;
+        slot.src = src;
+        slot.gain = gain;
+        slot.lpf = lpf;
+        slot.sampledMidi = sampledChoice.midi;
+    };
+
+    const choice = _findClosestSampledNote(inst, slot.midi);
+    if (!choice) { delete window._voices[hand]; return false; }
+
+    const cached = window._sampleBufferCache[choice.url];
+    if (cached && cached.buffer) {
+        // Hot path — buffer already decoded, play synchronously.
+        playWhenReady(choice, cached.buffer);
+    } else {
+        // Cold path — load (or join existing load) then start when ready.
+        const ensurePromise = (cached && cached.then)
+            ? cached
+            : (() => {
+                log('sample fetch start: ' + choice.url);
+                const p = _fetchAndDecode(choice.url)
+                    .then(buf => {
+                        log('sample fetch ok: ' + choice.url + ' (' + Math.round(buf.duration * 1000) + 'ms)');
+                        window._sampleBufferCache[choice.url] = { buffer: buf };
+                        return buf;
+                    })
+                    .catch(e => {
+                        log('sample decode error ' + choice.url + ': ' + e);
+                        delete window._sampleBufferCache[choice.url];
+                        throw e;
+                    });
+                window._sampleBufferCache[choice.url] = p;
+                return p;
+            })();
+        ensurePromise.then(buf => playWhenReady(choice, buf)).catch(() => {});
+    }
     return true;
 }
 
@@ -486,8 +557,13 @@ window.noteOn = function(hand, midi, waveform, vel) {
 window.noteOff = function(hand) {
     const voice = window._voices[hand];
     if (!voice) return;
+    // Armed sample voice still waiting for its buffer — just cancel.
+    if (voice.kind === 'sample' && voice.armed) {
+        voice.cancelled = true;
+        delete window._voices[hand];
+        return;
+    }
     const now = _audioCtx.currentTime;
-    // Quick release (fade out over 50ms to avoid click)
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
     voice.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
@@ -503,6 +579,12 @@ window.noteOff = function(hand) {
 window.noteSlide = function(hand, midi) {
     const voice = window._voices[hand];
     if (!voice || voice.midi === midi) return;
+    if (voice.kind === 'sample' && voice.armed) {
+        // Buffer still loading — just remember the new target pitch; the
+        // promote-to-started path uses voice.midi when wiring playbackRate.
+        voice.midi = midi;
+        return;
+    }
     if (voice.kind === 'sample') {
         // Sample slide: adjust playbackRate relative to the originally chosen
         // sampled note. Crossing into a different sample zone would require
