@@ -35,11 +35,6 @@ let DEFAULT_MAPPING = MappingConfig(
     right: ["y": "gain",    "x": "bpm",  "spread": "delay"]
 )
 
-let DEFAULT_HYDRA_MAPPING = MappingConfig(
-    left:  ["y": "none", "x": "none", "spread": "none"],
-    right: ["y": "none", "x": "none", "spread": "none"]
-)
-
 let DEFAULT_ADVANCED_MAPPING = MappingConfig(
     left: [
         "y": "noteIdx", "x": "lpf", "spread": "reverb",
@@ -64,7 +59,6 @@ struct Preset: Identifiable {
     let description: String
     let color: (Double, Double, Double) // RGB 0-1
     let mapping: MappingConfig
-    let hydraMapping: MappingConfig
     let isPremium: Bool
     let packId: String?
 }
@@ -78,7 +72,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "spread": "reverb", "x": "lpf"],
             right: ["y": "gain", "spread": "delay", "x": "pan"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: false, packId: nil
     ),
     Preset(
@@ -89,7 +82,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
             right: ["y": "gain", "x": "hpf", "spread": "bpm"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: false, packId: nil
     ),
     Preset(
@@ -100,7 +92,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "spread": "lpf", "x": "delay"],
             right: ["y": "bpm", "spread": "gain", "x": "reverb"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: false, packId: nil
     ),
     Preset(
@@ -111,7 +102,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "pan", "spread": "reverb"],
             right: ["y": "gain", "x": "attack", "spread": "release"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: false, packId: nil
     ),
 
@@ -125,7 +115,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "hpf"],
             right: ["y": "bpm", "x": "gain", "spread": "delay"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
     ),
     Preset(
@@ -136,7 +125,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "shape"],
             right: ["y": "bpm", "x": "gain", "spread": "reverb"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
     ),
     Preset(
@@ -147,7 +135,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "crush", "spread": "lpf"],
             right: ["y": "gain", "x": "shape", "spread": "delay"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
     ),
     Preset(
@@ -158,7 +145,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "crush"],
             right: ["y": "bpm", "x": "gain", "spread": "hpf"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
     ),
     Preset(
@@ -169,7 +155,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "shape"],
             right: ["y": "gain", "x": "bpm", "spread": "pan"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
     ),
     Preset(
@@ -180,7 +165,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "reverb"],
             right: ["y": "gain", "x": "bpm", "spread": "crush"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
     ),
     Preset(
@@ -191,7 +175,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "hpf", "spread": "shape"],
             right: ["y": "bpm", "x": "gain", "spread": "crush"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
     ),
     Preset(
@@ -202,7 +185,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "delay"],
             right: ["y": "gain", "x": "bpm", "spread": "reverb"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
     ),
     Preset(
@@ -213,7 +195,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
             right: ["y": "gain", "x": "hpf", "spread": "delay"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "party"
     ),
 
@@ -227,7 +208,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "reverb"],
             right: ["y": "gain", "x": "delay", "spread": "crush"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "studio"
     ),
     Preset(
@@ -238,7 +218,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "reverb", "spread": "pan"],
             right: ["y": "gain", "x": "attack", "spread": "release"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "studio"
     ),
     Preset(
@@ -249,7 +228,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "crush", "spread": "shape"],
             right: ["y": "gain", "x": "hpf", "spread": "delay"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "studio"
     ),
     Preset(
@@ -260,7 +238,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "shape"],
             right: ["y": "gain", "x": "crush", "spread": "reverb"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "studio"
     ),
     Preset(
@@ -271,7 +248,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "hpf", "spread": "delay"],
             right: ["y": "gain", "x": "pan", "spread": "attack"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "studio"
     ),
     Preset(
@@ -282,7 +258,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "reverb"],
             right: ["y": "gain", "x": "shape", "spread": "release"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "studio"
     ),
     Preset(
@@ -293,7 +268,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "lpf", "spread": "attack"],
             right: ["y": "gain", "x": "reverb", "spread": "release"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "studio"
     ),
     Preset(
@@ -304,7 +278,6 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "bpm", "spread": "shape"],
             right: ["y": "gain", "x": "lpf", "spread": "delay"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "studio"
     ),
     Preset(
@@ -315,22 +288,7 @@ let PRESETS: [Preset] = [
             left:  ["y": "noteIdx", "x": "pan", "spread": "reverb"],
             right: ["y": "gain", "x": "delay", "spread": "hpf"]
         ),
-        hydraMapping: DEFAULT_HYDRA_MAPPING,
         isPremium: true, packId: "studio"
     ),
 ]
 
-let DEFAULT_ADVANCED_HYDRA_MAPPING = MappingConfig(
-    left: [
-        "y": "none", "x": "none", "spread": "none",
-        "pinch": "none", "fist": "none", "rotation": "none",
-        "thumbCurl": "none", "indexCurl": "none", "middleCurl": "none",
-        "ringCurl": "none", "pinkyCurl": "none",
-    ],
-    right: [
-        "y": "none", "x": "none", "spread": "none",
-        "pinch": "none", "fist": "none", "rotation": "none",
-        "thumbCurl": "none", "indexCurl": "none", "middleCurl": "none",
-        "ringCurl": "none", "pinkyCurl": "none",
-    ]
-)

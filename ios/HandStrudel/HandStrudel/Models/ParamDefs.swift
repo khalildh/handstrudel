@@ -112,34 +112,7 @@ let PARAM_DEFS: [ParamDef] = [
     ),
 ]
 
-let HYDRA_PARAM_DEFS: [ParamDef] = [
-    ParamDef(id: "hFreq", label: "osc freq", strudelKey: "", min: 2, max: 60, defaultValue: 10,
-             format: { String(format: "%.1f", $0) }, toCode: { String(format: "%.1f", $0) }),
-    ParamDef(id: "hSync", label: "osc sync", strudelKey: "", min: 0, max: 1, defaultValue: 0.1,
-             format: { String(format: "%.2f", $0) }, toCode: { String(format: "%.2f", $0) }),
-    ParamDef(id: "hKaleid", label: "kaleid", strudelKey: "", min: 1, max: 12, defaultValue: 3,
-             format: { "\(Int($0.rounded()))" }, toCode: { "\(Int($0.rounded()))" }),
-    ParamDef(id: "hRotate", label: "rotate", strudelKey: "", min: 0, max: 3.14, defaultValue: 0,
-             format: { String(format: "%.2f", $0) }, toCode: { String(format: "%.2f", $0) }),
-    ParamDef(id: "hColorama", label: "colorama", strudelKey: "", min: 0, max: 0.5, defaultValue: 0.05,
-             format: { String(format: "%.3f", $0) }, toCode: { String(format: "%.3f", $0) }),
-    ParamDef(id: "hBright", label: "bright", strudelKey: "", min: 0, max: 2, defaultValue: 1,
-             format: { String(format: "%.2f", $0) }, toCode: { String(format: "%.2f", $0) }),
-    ParamDef(id: "hPixel", label: "pixelate", strudelKey: "", min: 2, max: 200, defaultValue: 200,
-             format: { "\(Int($0.rounded()))" }, toCode: { "\(Int($0.rounded()))" }),
-    ParamDef(id: "hModulate", label: "modulate", strudelKey: "", min: 0, max: 0.15, defaultValue: 0.02,
-             format: { String(format: "%.3f", $0) }, toCode: { String(format: "%.3f", $0) }),
-    ParamDef(id: "hScale", label: "scale", strudelKey: "", min: 0.5, max: 3, defaultValue: 1,
-             format: { String(format: "%.2f", $0) }, toCode: { String(format: "%.2f", $0) }),
-    ParamDef(id: "hSaturate", label: "saturate", strudelKey: "", min: 0, max: 4, defaultValue: 1,
-             format: { String(format: "%.2f", $0) }, toCode: { String(format: "%.2f", $0) }),
-]
-
-let HYDRA_IDS: Set<String> = Set(HYDRA_PARAM_DEFS.map(\.id))
-
-let ALL_PARAM_DEFS: [ParamDef] = PARAM_DEFS + HYDRA_PARAM_DEFS
-
-let PARAM_MAP: [String: ParamDef] = Dictionary(uniqueKeysWithValues: ALL_PARAM_DEFS.map { ($0.id, $0) })
+let PARAM_MAP: [String: ParamDef] = Dictionary(uniqueKeysWithValues: PARAM_DEFS.map { ($0.id, $0) })
 
 typealias MusicParams = [String: Double]
 
@@ -164,7 +137,6 @@ func extraParamIds(_ config: MappingConfig) -> [String] {
     ids.remove("bpm")
     ids.remove("none")
     ids.remove("save")
-    for hid in HYDRA_IDS { ids.remove(hid) }
     return Array(ids).sorted()
 }
 
@@ -213,38 +185,6 @@ func buildChordSignalCode(structIdx: Int, config: MappingConfig, waveform: Strin
     }
 
     return "stack(\(voice(0)), \(voice(1)), \(voice(2)))"
-}
-
-func buildHydraCode(_ p: MusicParams) -> String {
-    let freq = p["hFreq"] ?? 10
-    let sync = p["hSync"] ?? 0.1
-    let kaleid = Int((p["hKaleid"] ?? 3).rounded())
-    let rot = p["hRotate"] ?? 0
-    let colorama = p["hColorama"] ?? 0.05
-    let bright = p["hBright"] ?? 1
-    let pixel = Int((p["hPixel"] ?? 200).rounded())
-    let mod = p["hModulate"] ?? 0.02
-    let scale = p["hScale"] ?? 1
-    let sat = p["hSaturate"] ?? 1
-
-    var code = "osc(\(String(format: "%.1f", freq)),\(String(format: "%.2f", sync)),1.5)"
-    if kaleid > 1 { code += ".kaleid(\(kaleid))" }
-    if rot > 0.01 { code += ".rotate(\(String(format: "%.3f", rot)))" }
-    if scale != 1 { code += ".scale(\(String(format: "%.2f", scale)))" }
-    if pixel < 190 { code += ".pixelate(\(pixel),\(pixel))" }
-    code += ".color(1,1,1)"
-    if bright != 1 { code += ".brightness(\(String(format: "%.2f", bright)))" }
-    if sat != 1 { code += ".saturate(\(String(format: "%.2f", sat)))" }
-    if colorama > 0.01 { code += ".colorama(\(String(format: "%.3f", colorama)))" }
-    if mod > 0.005 { code += ".modulate(noise(3),\(String(format: "%.3f", mod)))" }
-    code += ".out()"
-    return code
-}
-
-func hasHydraMapping(_ config: MappingConfig) -> Bool {
-    for v in config.left.values where HYDRA_IDS.contains(v) { return true }
-    for v in config.right.values where HYDRA_IDS.contains(v) { return true }
-    return false
 }
 
 func buildTrackCode(slots: [Int], speed: Double, snippets: [SavedSnippet]) -> String? {

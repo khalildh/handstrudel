@@ -19490,20 +19490,6 @@ registerProcessor('${n2}', MyProcessor);
         };
         checkBeat();
       }
-      if (typeof Hydra !== "undefined") {
-        try {
-          const canvas = document.getElementById("hydra-canvas");
-          canvas.width = window.innerWidth || 390;
-          canvas.height = window.innerHeight || 844;
-          new Hydra({ canvas, detectAudio: false, makeGlobal: true, autoLoop: true });
-          window.H = (pat) => () => d(pat).queryArc(Wy(), Wy())[0]?.value ?? 0;
-          log("hydra initialized");
-        } catch (e) {
-          log("hydra init failed: " + e);
-        }
-      } else {
-        log("hydra not available (script not loaded)");
-      }
       log("loading drum samples...");
       try {
         await _evaluate(`samples('github:tidalcycles/Dirt-Samples/master')`);
@@ -19534,13 +19520,6 @@ registerProcessor('${n2}', MyProcessor);
       } catch (e) {
         log("eval error: " + e);
       }
-    }
-  };
-  window.hydraEval = function(code) {
-    try {
-      new Function(code)();
-    } catch (e) {
-      log("hydra eval: " + e);
     }
   };
   window.strudelStop = function() {
@@ -19833,25 +19812,6 @@ registerProcessor('${n2}', MyProcessor);
     window.noteOn("oneshot", midi2, waveform, vel);
     setTimeout(() => window.noteOff("oneshot"), (duration || 0.3) * 1e3);
   };
-  window.showHydra = function() {
-    const c3 = document.getElementById("hydra-canvas");
-    if (c3) c3.style.display = "";
-  };
-  window.hideHydra = function() {
-    const c3 = document.getElementById("hydra-canvas");
-    if (c3) c3.style.display = "none";
-    try {
-      new Function("solid(0,0,0,0).out()")();
-    } catch {
-    }
-  };
-  window.addEventListener("resize", () => {
-    const c3 = document.getElementById("hydra-canvas");
-    if (c3) {
-      c3.width = window.innerWidth;
-      c3.height = window.innerHeight;
-    }
-  });
   window._moduleReady = true;
   log("module ready");
   window.webkit?.messageHandlers?.strudelBridge?.postMessage({ ready: true });

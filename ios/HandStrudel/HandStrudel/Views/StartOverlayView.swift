@@ -41,7 +41,7 @@ struct ShimmerModifier: ViewModifier {
 struct StartOverlayView: View {
     let status: String
     @ObservedObject var storeManager: StoreManager
-    let onStart: (MappingConfig, MappingConfig, Bool) -> Void
+    let onStart: (MappingConfig, Bool) -> Void
 
     @State private var selectedPreset: Preset? = nil
     @State private var starting = false
@@ -312,7 +312,7 @@ struct StartOverlayView: View {
     private func startTapped() {
         guard let preset = selectedPreset else { return }
         starting = true
-        onStart(preset.mapping, preset.hydraMapping, false)
+        onStart(preset.mapping, false)
     }
 
     private func startPulse() {
