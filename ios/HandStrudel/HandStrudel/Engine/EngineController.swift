@@ -10,15 +10,51 @@ struct Waveform: Identifiable {
 }
 
 let WAVEFORMS: [Waveform] = [
-    Waveform(id: "sawtooth", name: "Saw", emoji: "🪚", isPremium: false, packId: nil),
-    Waveform(id: "square", name: "Square", emoji: "⬜", isPremium: false, packId: nil),
+    // Built-in oscillators — synthesized at runtime, no audio data needed.
+    Waveform(id: "sawtooth", name: "Saw",      emoji: "🪚", isPremium: false, packId: nil),
+    Waveform(id: "square",   name: "Square",   emoji: "⬜", isPremium: false, packId: nil),
     Waveform(id: "triangle", name: "Triangle", emoji: "🔺", isPremium: false, packId: nil),
-    Waveform(id: "sine", name: "Sine", emoji: "🔮", isPremium: false, packId: nil),
+    Waveform(id: "sine",     name: "Sine",     emoji: "🔮", isPremium: false, packId: nil),
+
     // Multi-oscillator / custom-shape synths — implemented in strudel-entry.mjs.
-    Waveform(id: "pluck", name: "Pluck", emoji: "🪕", isPremium: false, packId: nil),
+    Waveform(id: "pluck",    name: "Pluck",    emoji: "🪕", isPremium: false, packId: nil),
     Waveform(id: "supersaw", name: "Supersaw", emoji: "🌊", isPremium: false, packId: nil),
-    Waveform(id: "pulse", name: "Pulse", emoji: "👾", isPremium: false, packId: nil),
-    Waveform(id: "fm", name: "FM Bell", emoji: "🔔", isPremium: false, packId: nil),
+    Waveform(id: "pulse",    name: "Pulse",    emoji: "👾", isPremium: false, packId: nil),
+    Waveform(id: "fm",       name: "FM Bell",  emoji: "🔔", isPremium: false, packId: nil),
+
+    // Bundled GM-style sampled instruments — MP3 audio ships in the app
+    // bundle under Resources/instrument-samples. IDs must match
+    // `bundled-instruments.json` exactly.
+    Waveform(id: "piano",            name: "Piano",       emoji: "🎹", isPremium: false, packId: nil),
+    Waveform(id: "epiano",           name: "E.Piano",     emoji: "🎛️", isPremium: false, packId: nil),
+    Waveform(id: "organ",            name: "Organ",       emoji: "🎚️", isPremium: false, packId: nil),
+    Waveform(id: "pipeorgan",        name: "Pipe Organ",  emoji: "⛪️", isPremium: false, packId: nil),
+    Waveform(id: "strings",          name: "Strings",     emoji: "🎻", isPremium: false, packId: nil),
+    Waveform(id: "sax",              name: "Sax",         emoji: "🎷", isPremium: false, packId: nil),
+    Waveform(id: "marimba",          name: "Marimba",     emoji: "🪘", isPremium: false, packId: nil),
+    Waveform(id: "kalimba",          name: "Kalimba",     emoji: "🎼", isPremium: false, packId: nil),
+    Waveform(id: "flute",            name: "Flute",       emoji: "🎶", isPremium: false, packId: nil),
+    Waveform(id: "bells",            name: "Bells",       emoji: "🔔", isPremium: false, packId: nil),
+    Waveform(id: "steinway",         name: "Steinway",    emoji: "🎹", isPremium: false, packId: nil),
+    Waveform(id: "folkharp",         name: "Folk Harp",   emoji: "🪕", isPremium: false, packId: nil),
+    Waveform(id: "clavisynth",       name: "Clavinet",    emoji: "⚡️", isPremium: false, packId: nil),
+    Waveform(id: "organ8",           name: "Organ 8'",    emoji: "🎹", isPremium: false, packId: nil),
+    Waveform(id: "pipeorgan_loud",   name: "Pipe Loud",   emoji: "⛪️", isPremium: false, packId: nil),
+    Waveform(id: "harmonica",        name: "Harmonica",   emoji: "🪗", isPremium: false, packId: nil),
+    Waveform(id: "vibraphone",       name: "Vibraphone",  emoji: "🔔", isPremium: false, packId: nil),
+    Waveform(id: "tubularbells",     name: "Tubular",     emoji: "🛎️", isPremium: false, packId: nil),
+    Waveform(id: "xylophone",        name: "Xylophone",   emoji: "🪵", isPremium: false, packId: nil),
+    Waveform(id: "balafon",          name: "Balafon",     emoji: "🪘", isPremium: false, packId: nil),
+    Waveform(id: "handchimes",       name: "Handchimes",  emoji: "🔔", isPremium: false, packId: nil),
+    Waveform(id: "dantranh",         name: "Đàn Tranh",   emoji: "🪕", isPremium: false, packId: nil),
+    Waveform(id: "ocarina",          name: "Ocarina",     emoji: "🪈", isPremium: false, packId: nil),
+    Waveform(id: "recorder_soprano", name: "Recorder S",  emoji: "🪈", isPremium: false, packId: nil),
+    Waveform(id: "recorder_tenor",   name: "Recorder T",  emoji: "🪈", isPremium: false, packId: nil),
+    Waveform(id: "recorder_bass",    name: "Recorder B",  emoji: "🪈", isPremium: false, packId: nil),
+    Waveform(id: "saxello",          name: "Saxello",     emoji: "🎷", isPremium: false, packId: nil),
+    Waveform(id: "sax_vib",          name: "Sax Vibrato", emoji: "🎷", isPremium: false, packId: nil),
+    Waveform(id: "psaltery",         name: "Psaltery",    emoji: "🪕", isPremium: false, packId: nil),
+    Waveform(id: "kalimba2",         name: "Kalimba 2",   emoji: "🎼", isPremium: false, packId: nil),
 ]
 
 private func debugLog(_ msg: String) {

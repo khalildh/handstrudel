@@ -19505,6 +19505,12 @@ registerProcessor('${n2}', MyProcessor);
           log("globalThis samples also failed: " + e2);
         }
       }
+      log("loading bundled instruments...");
+      try {
+        await loadBundledInstruments();
+      } catch (e) {
+        log("bundled instruments load error: " + e);
+      }
       _ready = true;
       log("strudel ready");
       return "ok";
@@ -19669,6 +19675,126 @@ registerProcessor('${n2}', MyProcessor);
       }
     }
   };
+  window._sampleInstruments = {};
+  var _NOTE_SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  function _noteNameToMidi(name) {
+    const m3 = /^([A-Ga-g])([#sb]?)(-?\d+)$/.exec(name);
+    if (!m3) return null;
+    let semi = _NOTE_SEMI[m3[1].toUpperCase()];
+    if (semi == null) return null;
+    if (m3[2] === "#" || m3[2] === "s") semi += 1;
+    if (m3[2] === "b") semi -= 1;
+    const octave = parseInt(m3[3], 10);
+    return (octave + 1) * 12 + semi;
+  }
+  function _findClosestSampledNote(inst, midi2) {
+    let best = null;
+    let bestDist = Infinity;
+    for (let i = 0; i < inst.midis.length; i++) {
+      const d2 = Math.abs(inst.midis[i] - midi2);
+      if (d2 < bestDist) {
+        bestDist = d2;
+        best = i;
+      }
+    }
+    return best == null ? null : { midi: inst.midis[best], url: inst.urls[best] };
+  }
+  var BUNDLED_MANIFEST = "app-samples://bundled-instruments.json";
+  var BUNDLED_AUDIO_BASE = "app-samples://";
+  async function loadBundledInstruments() {
+    let json;
+    try {
+      const res = await fetch(BUNDLED_MANIFEST);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      json = await res.json();
+    } catch (err) {
+      log("bundled manifest fetch failed: " + err);
+      return;
+    }
+    const audioDir = (json._audio_dir || "audio").replace(/\/$/, "");
+    const baseDir = BUNDLED_AUDIO_BASE + audioDir + "/";
+    for (const [instId, notes] of Object.entries(json.instruments || {})) {
+      const midis = [];
+      const urls = [];
+      for (const [noteName, relPath] of Object.entries(notes)) {
+        const midi2 = _noteNameToMidi(noteName);
+        if (midi2 == null) continue;
+        midis.push(midi2);
+        urls.push(baseDir + relPath);
+      }
+      if (!midis.length) continue;
+      const order = midis.map((_5, i) => i).sort((a2, b2) => midis[a2] - midis[b2]);
+      window._sampleInstruments[instId] = {
+        midis: order.map((i) => midis[i]),
+        urls: order.map((i) => urls[i])
+      };
+    }
+    log("bundled instruments ready: " + Object.keys(window._sampleInstruments).join(","));
+  }
+  window._sampleBufferCache = {};
+  async function _fetchAndDecode(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+    const ab = await res.arrayBuffer();
+    return await _audioCtx.decodeAudioData(ab);
+  }
+  function _isSampleInstrument(name) {
+    return !!(name && window._sampleInstruments[name]);
+  }
+  function _startSampleVoice(hand, midi2, instName, vel) {
+    const inst = window._sampleInstruments[instName];
+    if (!inst) return false;
+    const slot = { hand, midi: midi2, instName, vel, kind: "sample", armed: true, cancelled: false };
+    window._voices[hand] = slot;
+    const playWhenReady = (sampledChoice, buffer) => {
+      if (slot.cancelled) return;
+      const now = _audioCtx.currentTime;
+      const v2 = vel || 0.6;
+      const playbackRate = Math.pow(2, (slot.midi - sampledChoice.midi) / 12);
+      const src = _audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.playbackRate.value = playbackRate;
+      const gain = _audioCtx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(v2 * 0.6, now + 0.01);
+      const lpf = _audioCtx.createBiquadFilter();
+      lpf.type = "lowpass";
+      lpf.frequency.value = 3e3 + v2 * 3e3;
+      src.connect(lpf);
+      lpf.connect(gain);
+      gain.connect(_audioCtx.destination);
+      src.start(now);
+      slot.armed = false;
+      slot.src = src;
+      slot.gain = gain;
+      slot.lpf = lpf;
+      slot.sampledMidi = sampledChoice.midi;
+    };
+    const choice = _findClosestSampledNote(inst, slot.midi);
+    if (!choice) {
+      delete window._voices[hand];
+      return false;
+    }
+    const cached = window._sampleBufferCache[choice.url];
+    if (cached && cached.buffer) {
+      playWhenReady(choice, cached.buffer);
+    } else {
+      const ensure = cached && cached.then ? cached : (() => {
+        const p2 = _fetchAndDecode(choice.url).then((buf) => {
+          window._sampleBufferCache[choice.url] = { buffer: buf };
+          return buf;
+        }).catch((e) => {
+          delete window._sampleBufferCache[choice.url];
+          throw e;
+        });
+        window._sampleBufferCache[choice.url] = p2;
+        return p2;
+      })();
+      ensure.then((buf) => playWhenReady(choice, buf)).catch(() => {
+      });
+    }
+    return true;
+  }
   window._voices = {};
   window._pulseWave = null;
   function getPulseWave() {
@@ -19687,6 +19813,9 @@ registerProcessor('${n2}', MyProcessor);
   window.noteOn = function(hand, midi2, waveform, vel) {
     if (!_audioCtx) return;
     window.noteOff(hand);
+    if (_isSampleInstrument(waveform)) {
+      if (_startSampleVoice(hand, midi2, waveform, vel)) return;
+    }
     const ctx = _audioCtx;
     const now = ctx.currentTime;
     const freq = 440 * Math.pow(2, (midi2 - 69) / 12);
@@ -19774,31 +19903,50 @@ registerProcessor('${n2}', MyProcessor);
   window.noteOff = function(hand) {
     const voice = window._voices[hand];
     if (!voice) return;
+    if (voice.kind === "sample" && voice.armed) {
+      voice.cancelled = true;
+      delete window._voices[hand];
+      return;
+    }
     const now = _audioCtx.currentTime;
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
     voice.gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.05);
     const stopAt = now + 0.06;
-    (voice.oscs || []).forEach((o) => {
+    if (voice.kind === "sample") {
       try {
-        o.stop(stopAt);
+        voice.src.stop(stopAt);
       } catch (_5) {
       }
-    });
-    (voice.auxNodes || []).forEach((n2) => {
-      try {
-        n2.stop(stopAt);
-      } catch (_5) {
-      }
-    });
+    } else {
+      (voice.oscs || []).forEach((o) => {
+        try {
+          o.stop(stopAt);
+        } catch (_5) {
+        }
+      });
+      (voice.auxNodes || []).forEach((n2) => {
+        try {
+          n2.stop(stopAt);
+        } catch (_5) {
+        }
+      });
+    }
     delete window._voices[hand];
   };
   window.noteSlide = function(hand, midi2) {
     const voice = window._voices[hand];
     if (!voice || voice.midi === midi2) return;
+    if (voice.kind === "sample" && voice.armed) {
+      voice.midi = midi2;
+      return;
+    }
     const now = _audioCtx.currentTime;
     const freq = 440 * Math.pow(2, (midi2 - 69) / 12);
-    if (voice.waveform === "fm") {
+    if (voice.kind === "sample") {
+      const offset = midi2 - (voice.sampledMidi != null ? voice.sampledMidi : midi2);
+      voice.src.playbackRate.setValueAtTime(Math.pow(2, offset / 12), now);
+    } else if (voice.waveform === "fm") {
       (voice.oscs || []).forEach((o) => o.frequency.setValueAtTime(freq, now));
       (voice.auxNodes || []).forEach((n2) => {
         if (n2.frequency) n2.frequency.setValueAtTime(freq * 1.5, now);
