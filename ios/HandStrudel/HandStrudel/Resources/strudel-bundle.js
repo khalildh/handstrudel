@@ -32,9 +32,9 @@
   ));
   var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-  // node_modules/@tonaljs/pitch-distance/node_modules/@tonaljs/pitch/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-distance/node_modules/@tonaljs/pitch/dist/index.js
   var require_dist = __commonJS({
-    "node_modules/@tonaljs/pitch-distance/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-distance/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -108,9 +108,9 @@
     }
   });
 
-  // node_modules/@tonaljs/pitch-distance/node_modules/@tonaljs/pitch-interval/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-distance/node_modules/@tonaljs/pitch-interval/dist/index.js
   var require_dist2 = __commonJS({
-    "node_modules/@tonaljs/pitch-distance/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-distance/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -243,9 +243,9 @@
     }
   });
 
-  // node_modules/@tonaljs/pitch-note/node_modules/@tonaljs/pitch/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-note/node_modules/@tonaljs/pitch/dist/index.js
   var require_dist3 = __commonJS({
-    "node_modules/@tonaljs/pitch-note/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-note/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -319,9 +319,9 @@
     }
   });
 
-  // node_modules/@tonaljs/pitch-note/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-note/dist/index.js
   var require_dist4 = __commonJS({
-    "node_modules/@tonaljs/pitch-note/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-note/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -436,9 +436,9 @@
     }
   });
 
-  // node_modules/@tonaljs/pitch-distance/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-distance/dist/index.js
   var require_dist5 = __commonJS({
-    "node_modules/@tonaljs/pitch-distance/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-distance/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -502,9 +502,9 @@
     }
   });
 
-  // node_modules/@tonaljs/abc-notation/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/abc-notation/dist/index.js
   var require_dist6 = __commonJS({
-    "node_modules/@tonaljs/abc-notation/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/abc-notation/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -583,9 +583,9 @@
     }
   });
 
-  // node_modules/@tonaljs/array/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/array/dist/index.js
   var require_dist7 = __commonJS({
-    "node_modules/@tonaljs/array/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/array/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -673,9 +673,9 @@
     }
   });
 
-  // node_modules/@tonaljs/collection/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/collection/dist/index.js
   var require_dist8 = __commonJS({
-    "node_modules/@tonaljs/collection/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/collection/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -761,9 +761,9 @@
     }
   });
 
-  // node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch/dist/index.js
   var require_dist9 = __commonJS({
-    "node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -837,9 +837,9 @@
     }
   });
 
-  // node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch-interval/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch-interval/dist/index.js
   var require_dist10 = __commonJS({
-    "node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -972,9 +972,9 @@
     }
   });
 
-  // node_modules/@tonaljs/pcset/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pcset/dist/index.js
   var require_dist11 = __commonJS({
-    "node_modules/@tonaljs/pcset/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pcset/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -1161,9 +1161,9 @@
     }
   });
 
-  // node_modules/@tonaljs/chord-detect/node_modules/@tonaljs/chord-type/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/chord-detect/node_modules/@tonaljs/chord-type/dist/index.js
   var require_dist12 = __commonJS({
-    "node_modules/@tonaljs/chord-detect/node_modules/@tonaljs/chord-type/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/chord-detect/node_modules/@tonaljs/chord-type/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -1406,9 +1406,9 @@
     }
   });
 
-  // node_modules/@tonaljs/chord-detect/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/chord-detect/dist/index.js
   var require_dist13 = __commonJS({
-    "node_modules/@tonaljs/chord-detect/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/chord-detect/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -1512,9 +1512,9 @@
     }
   });
 
-  // node_modules/@tonaljs/pitch/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch/dist/index.js
   var require_dist14 = __commonJS({
-    "node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -1588,9 +1588,9 @@
     }
   });
 
-  // node_modules/@tonaljs/pitch-interval/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-interval/dist/index.js
   var require_dist15 = __commonJS({
-    "node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -1709,9 +1709,9 @@
     }
   });
 
-  // node_modules/@tonaljs/core/node_modules/@tonaljs/pitch-note/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/core/node_modules/@tonaljs/pitch-note/dist/index.js
   var require_dist16 = __commonJS({
-    "node_modules/@tonaljs/core/node_modules/@tonaljs/pitch-note/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/core/node_modules/@tonaljs/pitch-note/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -1813,9 +1813,9 @@
     }
   });
 
-  // node_modules/@tonaljs/core/node_modules/@tonaljs/pitch-distance/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/core/node_modules/@tonaljs/pitch-distance/dist/index.js
   var require_dist17 = __commonJS({
-    "node_modules/@tonaljs/core/node_modules/@tonaljs/pitch-distance/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/core/node_modules/@tonaljs/pitch-distance/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -1880,9 +1880,9 @@
     }
   });
 
-  // node_modules/@tonaljs/core/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/core/dist/index.js
   var require_dist18 = __commonJS({
-    "node_modules/@tonaljs/core/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/core/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -1925,9 +1925,9 @@
     }
   });
 
-  // node_modules/@tonaljs/chord-type/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/chord-type/dist/index.js
   var require_dist19 = __commonJS({
-    "node_modules/@tonaljs/chord-type/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/chord-type/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -2160,9 +2160,9 @@
     }
   });
 
-  // node_modules/@tonaljs/scale-type/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/scale-type/dist/index.js
   var require_dist20 = __commonJS({
-    "node_modules/@tonaljs/scale-type/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/scale-type/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -2398,9 +2398,9 @@
     }
   });
 
-  // node_modules/@tonaljs/chord/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/chord/dist/index.js
   var require_dist21 = __commonJS({
-    "node_modules/@tonaljs/chord/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/chord/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -2564,9 +2564,9 @@
     }
   });
 
-  // node_modules/@tonaljs/duration-value/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/duration-value/dist/index.js
   var require_dist22 = __commonJS({
-    "node_modules/@tonaljs/duration-value/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/duration-value/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -2680,9 +2680,9 @@
     }
   });
 
-  // node_modules/@tonaljs/interval/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/interval/dist/index.js
   var require_dist23 = __commonJS({
-    "node_modules/@tonaljs/interval/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/interval/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -2792,9 +2792,9 @@
     }
   });
 
-  // node_modules/@tonaljs/midi/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/midi/dist/index.js
   var require_dist24 = __commonJS({
-    "node_modules/@tonaljs/midi/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/midi/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -2918,9 +2918,9 @@
     }
   });
 
-  // node_modules/@tonaljs/note/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/note/dist/index.js
   var require_dist25 = __commonJS({
-    "node_modules/@tonaljs/note/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/note/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -3100,9 +3100,9 @@
     }
   });
 
-  // node_modules/@tonaljs/roman-numeral/node_modules/@tonaljs/pitch/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/roman-numeral/node_modules/@tonaljs/pitch/dist/index.js
   var require_dist26 = __commonJS({
-    "node_modules/@tonaljs/roman-numeral/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/roman-numeral/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -3176,9 +3176,9 @@
     }
   });
 
-  // node_modules/@tonaljs/roman-numeral/node_modules/@tonaljs/pitch-interval/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/roman-numeral/node_modules/@tonaljs/pitch-interval/dist/index.js
   var require_dist27 = __commonJS({
-    "node_modules/@tonaljs/roman-numeral/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/roman-numeral/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -3311,9 +3311,9 @@
     }
   });
 
-  // node_modules/@tonaljs/roman-numeral/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/roman-numeral/dist/index.js
   var require_dist28 = __commonJS({
-    "node_modules/@tonaljs/roman-numeral/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/roman-numeral/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -3395,9 +3395,9 @@
     }
   });
 
-  // node_modules/@tonaljs/key/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/key/dist/index.js
   var require_dist29 = __commonJS({
-    "node_modules/@tonaljs/key/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/key/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -3647,9 +3647,9 @@
     }
   });
 
-  // node_modules/@tonaljs/mode/node_modules/@tonaljs/pitch/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/mode/node_modules/@tonaljs/pitch/dist/index.js
   var require_dist30 = __commonJS({
-    "node_modules/@tonaljs/mode/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/mode/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -3723,9 +3723,9 @@
     }
   });
 
-  // node_modules/@tonaljs/mode/node_modules/@tonaljs/pitch-interval/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/mode/node_modules/@tonaljs/pitch-interval/dist/index.js
   var require_dist31 = __commonJS({
-    "node_modules/@tonaljs/mode/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/mode/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -3858,9 +3858,9 @@
     }
   });
 
-  // node_modules/@tonaljs/mode/node_modules/@tonaljs/interval/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/mode/node_modules/@tonaljs/interval/dist/index.js
   var require_dist32 = __commonJS({
-    "node_modules/@tonaljs/mode/node_modules/@tonaljs/interval/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/mode/node_modules/@tonaljs/interval/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -3969,9 +3969,9 @@
     }
   });
 
-  // node_modules/@tonaljs/mode/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/mode/dist/index.js
   var require_dist33 = __commonJS({
-    "node_modules/@tonaljs/mode/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/mode/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -4105,9 +4105,9 @@
     }
   });
 
-  // node_modules/@tonaljs/progression/node_modules/@tonaljs/chord-type/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/chord-type/dist/index.js
   var require_dist34 = __commonJS({
-    "node_modules/@tonaljs/progression/node_modules/@tonaljs/chord-type/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/chord-type/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -4350,9 +4350,9 @@
     }
   });
 
-  // node_modules/@tonaljs/progression/node_modules/@tonaljs/pitch/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/pitch/dist/index.js
   var require_dist35 = __commonJS({
-    "node_modules/@tonaljs/progression/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/pitch/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -4426,9 +4426,9 @@
     }
   });
 
-  // node_modules/@tonaljs/progression/node_modules/@tonaljs/pitch-interval/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/pitch-interval/dist/index.js
   var require_dist36 = __commonJS({
-    "node_modules/@tonaljs/progression/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/pitch-interval/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -4561,9 +4561,9 @@
     }
   });
 
-  // node_modules/@tonaljs/progression/node_modules/@tonaljs/interval/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/interval/dist/index.js
   var require_dist37 = __commonJS({
-    "node_modules/@tonaljs/progression/node_modules/@tonaljs/interval/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/interval/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -4672,9 +4672,9 @@
     }
   });
 
-  // node_modules/@tonaljs/progression/node_modules/@tonaljs/chord/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/chord/dist/index.js
   var require_dist38 = __commonJS({
-    "node_modules/@tonaljs/progression/node_modules/@tonaljs/chord/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/node_modules/@tonaljs/chord/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -4870,9 +4870,9 @@
     }
   });
 
-  // node_modules/@tonaljs/progression/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/dist/index.js
   var require_dist39 = __commonJS({
-    "node_modules/@tonaljs/progression/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/progression/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -4920,9 +4920,9 @@
     }
   });
 
-  // node_modules/@tonaljs/range/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/range/dist/index.js
   var require_dist40 = __commonJS({
-    "node_modules/@tonaljs/range/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/range/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -4972,9 +4972,9 @@
     }
   });
 
-  // node_modules/@tonaljs/scale/node_modules/@tonaljs/chord-type/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/scale/node_modules/@tonaljs/chord-type/dist/index.js
   var require_dist41 = __commonJS({
-    "node_modules/@tonaljs/scale/node_modules/@tonaljs/chord-type/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/scale/node_modules/@tonaljs/chord-type/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -5217,9 +5217,9 @@
     }
   });
 
-  // node_modules/@tonaljs/scale/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/scale/dist/index.js
   var require_dist42 = __commonJS({
-    "node_modules/@tonaljs/scale/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/scale/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -5406,9 +5406,9 @@
     }
   });
 
-  // node_modules/@tonaljs/time-signature/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/time-signature/dist/index.js
   var require_dist43 = __commonJS({
-    "node_modules/@tonaljs/time-signature/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/time-signature/dist/index.js"(exports, module) {
       "use strict";
       var __defProp2 = Object.defineProperty;
       var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -5495,9 +5495,9 @@
     }
   });
 
-  // node_modules/@tonaljs/tonal/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/tonal/dist/index.js
   var require_dist44 = __commonJS({
-    "node_modules/@tonaljs/tonal/dist/index.js"(exports, module) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@tonaljs/tonal/dist/index.js"(exports, module) {
       "use strict";
       var __create2 = Object.create;
       var __defProp2 = Object.defineProperty;
@@ -5577,9 +5577,9 @@
     }
   });
 
-  // node_modules/chord-voicings/dist/getBestVoicing.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/getBestVoicing.js
   var require_getBestVoicing = __commonJS({
-    "node_modules/chord-voicings/dist/getBestVoicing.js"(exports) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/getBestVoicing.js"(exports) {
       "use strict";
       exports.__esModule = true;
       exports.getBestVoicing = void 0;
@@ -5595,9 +5595,9 @@
     }
   });
 
-  // node_modules/chord-voicings/dist/tokenizeChord.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/tokenizeChord.js
   var require_tokenizeChord = __commonJS({
-    "node_modules/chord-voicings/dist/tokenizeChord.js"(exports) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/tokenizeChord.js"(exports) {
       "use strict";
       exports.__esModule = true;
       exports.tokenizeChord = void 0;
@@ -5612,9 +5612,9 @@
     }
   });
 
-  // node_modules/chord-voicings/dist/voicingsInRange.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/voicingsInRange.js
   var require_voicingsInRange = __commonJS({
-    "node_modules/chord-voicings/dist/voicingsInRange.js"(exports) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/voicingsInRange.js"(exports) {
       "use strict";
       exports.__esModule = true;
       exports.voicingsInRange = void 0;
@@ -5660,9 +5660,9 @@
     }
   });
 
-  // node_modules/chord-voicings/dist/dictionaryVoicing.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/dictionaryVoicing.js
   var require_dictionaryVoicing = __commonJS({
-    "node_modules/chord-voicings/dist/dictionaryVoicing.js"(exports) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/dictionaryVoicing.js"(exports) {
       "use strict";
       var __assign = exports && exports.__assign || function() {
         __assign = Object.assign || function(t) {
@@ -5741,9 +5741,9 @@
     }
   });
 
-  // node_modules/chord-voicings/dist/minTopNoteDiff.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/minTopNoteDiff.js
   var require_minTopNoteDiff = __commonJS({
-    "node_modules/chord-voicings/dist/minTopNoteDiff.js"(exports) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/minTopNoteDiff.js"(exports) {
       "use strict";
       exports.__esModule = true;
       exports.minTopNoteDiff = void 0;
@@ -5763,9 +5763,9 @@
     }
   });
 
-  // node_modules/chord-voicings/dist/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/index.js
   var require_dist45 = __commonJS({
-    "node_modules/chord-voicings/dist/index.js"(exports) {
+    "../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/chord-voicings/dist/index.js"(exports) {
       "use strict";
       exports.__esModule = true;
       var dictionaryVoicing_1 = require_dictionaryVoicing();
@@ -5785,7 +5785,7 @@
     }
   });
 
-  // node_modules/@strudel/core/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@strudel/core/dist/index.mjs
   var dist_exports = {};
   __export(dist_exports, {
     ClockCollator: () => _n,
@@ -6671,7 +6671,7 @@
     zzfx: () => Sp
   });
 
-  // node_modules/fraction.js/dist/fraction.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/fraction.js/dist/fraction.mjs
   if (typeof BigInt === "undefined") BigInt = function(n2) {
     if (isNaN(n2)) throw new Error("");
     return n2;
@@ -7437,7 +7437,7 @@
     }
   };
 
-  // node_modules/@kabelsalat/web/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@kabelsalat/web/dist/index.mjs
   function W(e, t) {
     if (t || (t = "assertion failed"), !e)
       throw new Error(t);
@@ -9420,7 +9420,7 @@ When mixing down to 2 channels, the input channels are equally distributed over 
     }
   };
 
-  // node_modules/@strudel/core/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@strudel/core/dist/index.mjs
   var import_meta = {};
   var oe2 = "strudel.log";
   var Qe2 = 1e3;
@@ -13548,7 +13548,7 @@ Please check with "npm ls @strudel/core".`
   );
   globalThis._strudelLoaded = true;
 
-  // node_modules/@strudel/webaudio/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@strudel/webaudio/dist/index.mjs
   var dist_exports2 = {};
   __export(dist_exports2, {
     DEFAULT_MAX_POLYPHONY: () => $t3,
@@ -13655,10 +13655,10 @@ Please check with "npm ls @strudel/core".`
     webaudioRepl: () => Fe3
   });
 
-  // node_modules/nanostores/clean-stores/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/nanostores/clean-stores/index.js
   var clean = /* @__PURE__ */ Symbol("clean");
 
-  // node_modules/nanostores/atom/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/nanostores/atom/index.js
   var listenerQueue = [];
   var lqIndex = 0;
   var QUEUE_ITEMS_PER_LISTENER = 4;
@@ -13741,7 +13741,7 @@ Please check with "npm ls @strudel/core".`
     return $atom;
   };
 
-  // node_modules/nanostores/map/index.js
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/nanostores/map/index.js
   var map = (initial = {}) => {
     let $map = atom(initial);
     $map.setKey = function(key, value) {
@@ -13761,7 +13761,7 @@ Please check with "npm ls @strudel/core".`
     return $map;
   };
 
-  // node_modules/superdough/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/superdough/dist/index.mjs
   if (typeof DelayNode < "u") {
     class e extends DelayNode {
       constructor(n2, o, a2, c3) {
@@ -16267,14 +16267,14 @@ registerProcessor('${n2}', MyProcessor);
     window.postMessage({ time: o, dough: e.value, currentTime: t, duration: e.duration, cps: n2 });
   }
 
-  // node_modules/supradough/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/supradough/dist/index.mjs
   var H2 = "data:text/javascript;base64,dmFyIGF0PU9iamVjdC5kZWZpbmVQcm9wZXJ0eTt2YXIgaHQ9KHUsbSxmKT0+bSBpbiB1P2F0KHUsbSx7ZW51bWVyYWJsZTohMCxjb25maWd1cmFibGU6ITAsd3JpdGFibGU6ITAsdmFsdWU6Zn0pOnVbbV09Zjt2YXIgZT0odSxtLGYpPT5odCh1LHR5cGVvZiBtIT0ic3ltYm9sIj9tKyIiOm0sZik7KGZ1bmN0aW9uKCl7InVzZSBzdHJpY3QiO2NvbnN0IHU9dHlwZW9mIHNhbXBsZVJhdGU8InUiP3NhbXBsZVJhdGU6NDhlMyxtPU1hdGguUEkvdSxmPTEvdTtsZXQgVj1oPT5NYXRoLnBvdyhoLDIpO2Z1bmN0aW9uIF8oaCl7cmV0dXJuIFYoaCl9ZnVuY3Rpb24gTyhoLHMsdCl7Y29uc3QgaT1NYXRoLnNpbigoMS10KSouNSpNYXRoLlBJKSxuPU1hdGguc2luKHQqLjUqTWF0aC5QSSk7cmV0dXJuIGgqaStzKm59Y2xhc3MgZ3tjb25zdHJ1Y3Rvcigpe2UodGhpcywicGhhc2UiLDApfXVwZGF0ZShzKXtjb25zdCB0PU1hdGguc2luKHRoaXMucGhhc2UqMipNYXRoLlBJKTtyZXR1cm4gdGhpcy5waGFzZT0odGhpcy5waGFzZStzL3UpJTEsdH19Y2xhc3MgSXtjb25zdHJ1Y3Rvcigpe2UodGhpcywicGhhc2UiLDApfXVwZGF0ZShzKXtyZXR1cm4gdGhpcy5waGFzZSs9ZipzLHRoaXMucGhhc2UlMSoyLTF9fWZ1bmN0aW9uIE0oaCxzKXtyZXR1cm4gaDxzPyhoLz1zLGgraC1oKmgtMSk6aD4xLXM/KGg9KGgtMSkvcyxoKmgraCtoKzEpOjB9Y2xhc3MgU3tjb25zdHJ1Y3RvcihzPXt9KXt0aGlzLnBoYXNlPXMucGhhc2U/PzB9dXBkYXRlKHMpe2NvbnN0IHQ9cy91O2xldCBpPU0odGhpcy5waGFzZSx0KSxuPTIqdGhpcy5waGFzZS0xLWk7cmV0dXJuIHRoaXMucGhhc2UrPXQsdGhpcy5waGFzZT4xJiYodGhpcy5waGFzZS09MSksbn19ZnVuY3Rpb24gVChoLHMsdCl7cmV0dXJuIGg8Mj8wOigobixsLHIpPT5yKihsLW4pK24pKC1zKi41LHMqLjUsdC8oaC0xKSl9ZnVuY3Rpb24geihoLHMpe3JldHVybiBoKk1hdGgucG93KDIscy8xMil9Y2xhc3MgRntjb25zdHJ1Y3RvcihzPXt9KXt0aGlzLnZvaWNlcz1zLnZvaWNlcz8/NSx0aGlzLmZyZXFzcHJlYWQ9cy5mcmVxc3ByZWFkPz8uMix0aGlzLnBhbnNwcmVhZD1zLnBhbnNwcmVhZD8/LjQsdGhpcy5waGFzZT1uZXcgRmxvYXQzMkFycmF5KHRoaXMudm9pY2VzKS5tYXAoKCk9Pk1hdGgucmFuZG9tKCkpfXVwZGF0ZShzKXtjb25zdCB0PU1hdGguc3FydCgxLXRoaXMucGFuc3ByZWFkKSxpPU1hdGguc3FydCh0aGlzLnBhbnNwcmVhZCk7bGV0IG49MCxsPTA7Zm9yKGxldCByPTA7cjx0aGlzLnZvaWNlcztyKyspe2NvbnN0IGE9eihzLFQodGhpcy52b2ljZXMsdGhpcy5mcmVxc3ByZWFkLHIpKS91LGM9KHImMSk9PTE7bGV0IGQ9dDtjJiYoZD1pKTtsZXQgYj1NKHRoaXMucGhhc2Vbcl0sYSksRT0yKnRoaXMucGhhc2Vbcl0tMS1iO249bitFKmQsbD1sK0UqZCx0aGlzLnBoYXNlW3JdKz1hLHRoaXMucGhhc2Vbcl0+MSYmKHRoaXMucGhhc2Vbcl0tPTEpfXJldHVybiBuK2x9fWNsYXNzIGt7Y29uc3RydWN0b3IoKXtlKHRoaXMsInBoYXNlIiwwKX11cGRhdGUocyl7dGhpcy5waGFzZSs9ZipzO2xldCB0PXRoaXMucGhhc2UlMTtyZXR1cm4odDwuNT8yKnQ6MS0yKih0LS41KSkqMi0xfX1jbGFzcyBxe2NvbnN0cnVjdG9yKCl7ZSh0aGlzLCJzMCIsMCk7ZSh0aGlzLCJzMSIsMCl9dXBkYXRlKHMsdCxpPTApe2k9TWF0aC5tYXgoaSwwKSx0PU1hdGgubWluKHQsMmU0KTtjb25zdCBuPTIqTWF0aC5zaW4odCptKSxyPTEtTWF0aC5wb3coLjUsKGkrLjEyNSkvLjEyNSkqbjtyZXR1cm4gdGhpcy5zMD1yKnRoaXMuczAtbip0aGlzLnMxK24qcyx0aGlzLnMxPXIqdGhpcy5zMStuKnRoaXMuczAsdGhpcy5zMX19Y2xhc3MgQ3tjb25zdHJ1Y3RvcihzPTApe3RoaXMucGhhc2U9c31zYXcocyx0KXtsZXQgaT0odGhpcy5waGFzZStzKSUxLG49TShpLHQpO3JldHVybiAyKmktMS1ufXVwZGF0ZShzLHQ9LjUpe2NvbnN0IGk9cy91O2xldCBuPXRoaXMuc2F3KDAsaSktdGhpcy5zYXcodCxpKTtyZXR1cm4gdGhpcy5waGFzZT0odGhpcy5waGFzZStpKSUxLG4rdCoyLTF9fWNsYXNzIEx7Y29uc3RydWN0b3IoKXtlKHRoaXMsInBoYXNlIiwwKX11cGRhdGUocyx0PS41KXtyZXR1cm4gdGhpcy5waGFzZSs9ZipzLHRoaXMucGhhc2UlMTx0PzE6LTF9fWNsYXNzIFB7Y29uc3RydWN0b3IoKXtlKHRoaXMsInVwZGF0ZSIscz0+TWF0aC5yYW5kb20oKTxzKmY/TWF0aC5yYW5kb20oKTowKX19Y2xhc3MgTnt1cGRhdGUoKXtyZXR1cm4gTWF0aC5yYW5kb20oKSoyLTF9fWNsYXNzIEd7Y29uc3RydWN0b3IoKXt0aGlzLm91dD0wfXVwZGF0ZSgpe2xldCBzPU1hdGgucmFuZG9tKCkqMi0xO3JldHVybiB0aGlzLm91dD0odGhpcy5vdXQrLjAyKnMpLzEuMDIsdGhpcy5vdXR9fWNsYXNzIGp7Y29uc3RydWN0b3IoKXt0aGlzLmIwPTAsdGhpcy5iMT0wLHRoaXMuYjI9MCx0aGlzLmIzPTAsdGhpcy5iND0wLHRoaXMuYjU9MCx0aGlzLmI2PTB9dXBkYXRlKCl7Y29uc3Qgcz1NYXRoLnJhbmRvbSgpKjItMTt0aGlzLmIwPS45OTg4Nip0aGlzLmIwK3MqLjA1NTUxNzksdGhpcy5iMT0uOTkzMzIqdGhpcy5iMStzKi4wNzUwNzU5LHRoaXMuYjI9Ljk2OSp0aGlzLmIyK3MqLjE1Mzg1Mix0aGlzLmIzPS44NjY1KnRoaXMuYjMrcyouMzEwNDg1Nix0aGlzLmI0PS41NSp0aGlzLmI0K3MqLjUzMjk1MjIsdGhpcy5iNT0tLjc2MTYqdGhpcy5iNS1zKi4wMTY4OTg7Y29uc3QgdD10aGlzLmIwK3RoaXMuYjErdGhpcy5iMit0aGlzLmIzK3RoaXMuYjQrdGhpcy5iNSt0aGlzLmI2K3MqLjUzNjI7cmV0dXJuIHRoaXMuYjY9cyouMTE1OTI2LHQqLjExfX1jbGFzcyBCe2NvbnN0cnVjdG9yKCl7ZSh0aGlzLCJwaGFzZSIsMSl9dXBkYXRlKHMpe3RoaXMucGhhc2UrPWYqcztsZXQgdD10aGlzLnBoYXNlPj0xPzE6MDtyZXR1cm4gdGhpcy5waGFzZT10aGlzLnBoYXNlJTEsdH19ZnVuY3Rpb24gUihoLHMsdCxpPTEpe2lmKGg8PTApcmV0dXJuIHM7aWYoaD49MSlyZXR1cm4gdDtsZXQgbjtyZXR1cm4gaT09PTA/bj1oOmk+MD9uPU1hdGgucG93KGgsaSk6bj0xLU1hdGgucG93KDEtaCwtaSkscysodC1zKSpufWNsYXNzIHZ7Y29uc3RydWN0b3Iocz17fSl7dGhpcy5zdGF0ZT0ib2ZmIix0aGlzLnN0YXJ0VGltZT0wLHRoaXMuc3RhcnRWYWw9MCx0aGlzLmRlY2F5Q3VydmU9cy5kZWNheUN1cnZlPz8xfXVwZGF0ZShzLHQsaSxuLGwscil7c3dpdGNoKHRoaXMuc3RhdGUpe2Nhc2Uib2ZmIjpyZXR1cm4gdD4wJiYodGhpcy5zdGF0ZT0iYXR0YWNrIix0aGlzLnN0YXJ0VGltZT1zLHRoaXMuc3RhcnRWYWw9MCksMDtjYXNlImF0dGFjayI6e2xldCBwPXMtdGhpcy5zdGFydFRpbWU7cmV0dXJuIHA+aT8odGhpcy5zdGF0ZT0iZGVjYXkiLHRoaXMuc3RhcnRUaW1lPXMsMSk6UihwL2ksdGhpcy5zdGFydFZhbCwxLDEpfWNhc2UiZGVjYXkiOntsZXQgcD1zLXRoaXMuc3RhcnRUaW1lLGE9UihwL24sMSxsLC10aGlzLmRlY2F5Q3VydmUpO3JldHVybiB0PD0wPyh0aGlzLnN0YXRlPSJyZWxlYXNlIix0aGlzLnN0YXJ0VGltZT1zLHRoaXMuc3RhcnRWYWw9YSxhKTpwPm4/KHRoaXMuc3RhdGU9InN1c3RhaW4iLHRoaXMuc3RhcnRUaW1lPXMsbCk6YX1jYXNlInN1c3RhaW4iOnJldHVybiB0PD0wJiYodGhpcy5zdGF0ZT0icmVsZWFzZSIsdGhpcy5zdGFydFRpbWU9cyx0aGlzLnN0YXJ0VmFsPWwpLGw7Y2FzZSJyZWxlYXNlIjp7bGV0IHA9cy10aGlzLnN0YXJ0VGltZTtpZihwPnIpcmV0dXJuIHRoaXMuc3RhdGU9Im9mZiIsMDtsZXQgYT1SKHAvcix0aGlzLnN0YXJ0VmFsLDAsLXRoaXMuZGVjYXlDdXJ2ZSk7cmV0dXJuIHQ+MCYmKHRoaXMuc3RhdGU9ImF0dGFjayIsdGhpcy5zdGFydFRpbWU9cyx0aGlzLnN0YXJ0VmFsPWEpLGF9fXRocm93ImludmFsaWQgZW52ZWxvcGUgc3RhdGUifX1jb25zdCBXPTEwO2NsYXNzIHh7Y29uc3RydWN0b3IoKXtlKHRoaXMsIndyaXRlSWR4IiwwKTtlKHRoaXMsInJlYWRJZHgiLDApO2UodGhpcywiYnVmZmVyIixuZXcgRmxvYXQzMkFycmF5KFcqdSkpfXdyaXRlKHMsdCl7dGhpcy53cml0ZUlkeD0odGhpcy53cml0ZUlkeCsxKSV0aGlzLmJ1ZmZlci5sZW5ndGgsdGhpcy5idWZmZXJbdGhpcy53cml0ZUlkeF09cztsZXQgaT1NYXRoLm1pbihNYXRoLmZsb29yKHUqdCksdGhpcy5idWZmZXIubGVuZ3RoLTEpO3RoaXMucmVhZElkeD10aGlzLndyaXRlSWR4LWksdGhpcy5yZWFkSWR4PDAmJih0aGlzLnJlYWRJZHgrPXRoaXMuYnVmZmVyLmxlbmd0aCl9dXBkYXRlKHMsdCl7cmV0dXJuIHRoaXMud3JpdGUocyx0KSx0aGlzLmJ1ZmZlclt0aGlzLnJlYWRJZHhdfX1jbGFzcyBYe2NvbnN0cnVjdG9yKCl7ZSh0aGlzLCJkZWxheSIsbmV3IHgpO2UodGhpcywibW9kdWxhdG9yIixuZXcgayl9dXBkYXRlKHMsdCxpLG4sbCl7Y29uc3Qgcj10aGlzLm1vZHVsYXRvci51cGRhdGUobikqbCxwPXRoaXMuZGVsYXkudXBkYXRlKHMsaSooMStyKSk7cmV0dXJuIE8ocyxwLHQpfX1jbGFzcyAke2NvbnN0cnVjdG9yKCl7ZSh0aGlzLCJob2xkIiwwKTtlKHRoaXMsInQiLDApfXVwZGF0ZShzLHQpe3JldHVybiB0aGlzLnQrKyV0PT09MCYmKHRoaXMudD0wLHRoaXMuaG9sZD1zKSx0aGlzLmhvbGR9fWNsYXNzIFV7dXBkYXRlKHMsdCl7dD1NYXRoLm1heCgxLHQpO2NvbnN0IGk9TWF0aC5wb3coMix0LTEpO3JldHVybiBNYXRoLnJvdW5kKHMqaSkvaX19Y2xhc3MgWXt1cGRhdGUocyx0PTAsaT0xKXtpPU1hdGgubWF4KC4wMDEsTWF0aC5taW4oMSxpKSk7Y29uc3Qgbj1NYXRoLmV4cG0xKHQpO3JldHVybigxK24pKnMvKDErbipNYXRoLmFicyhzKSkqaX19Y2xhc3Mgd3tjb25zdHJ1Y3RvcihzLHQsaSl7ZSh0aGlzLCJidWZmZXIiKTtlKHRoaXMsInNhbXBsZVJhdGUiKTtlKHRoaXMsInBvcyIsMCk7ZSh0aGlzLCJzYW1wbGVGcmVxIixBKCkpO3RoaXMuYnVmZmVyPXMsdGhpcy5zYW1wbGVSYXRlPXQsdGhpcy5kdXJhdGlvbj10aGlzLmJ1ZmZlci5sZW5ndGgvdGhpcy5zYW1wbGVSYXRlLHRoaXMuc3BlZWQ9dS90aGlzLnNhbXBsZVJhdGUsaSYmKHRoaXMuc3BlZWQqPXRoaXMuZHVyYXRpb24pfXVwZGF0ZShzKXtpZih0aGlzLnBvcz49dGhpcy5idWZmZXIubGVuZ3RoKXJldHVybiAwO2NvbnN0IHQ9cy90aGlzLnNhbXBsZUZyZXEqdGhpcy5zcGVlZDtsZXQgaT10aGlzLmJ1ZmZlcltNYXRoLmZsb29yKHRoaXMucG9zKV07cmV0dXJuIHRoaXMucG9zPXRoaXMucG9zK3QsaX19ZSh3LCJzYW1wbGVzIixuZXcgTWFwKTtjb25zdCB5PShoLHM9ImxpbmVhciIsdCk9Pntjb25zdFtyLHAsYSxjXT1oO2lmKHI9PW51bGwmJnA9PW51bGwmJmE9PW51bGwmJmM9PW51bGwpcmV0dXJuIHQ/P1suMDAxLC4wMDEsMSwuMDFdO2NvbnN0IGQ9YT8/KHIhPW51bGwmJnA9PW51bGx8fHI9PW51bGwmJnA9PW51bGw/MTouMDAxKTtyZXR1cm5bTWF0aC5tYXgocj8/MCwuMDAxKSxNYXRoLm1heChwPz8wLC4wMDEpLE1hdGgubWluKGQsMSksTWF0aC5tYXgoYz8/MCwuMDEpXX07bGV0IEQ9e3NpbmU6ZyxzYXc6Uyx6YXc6SSxzYXd0b290aDpTLHphd3Rvb3RoOkksc3VwZXJzYXc6Rix0cmk6ayx0cmlhbmdsZTprLHB1bHNlOkMsc3F1YXJlOkMscHVsemU6TCxkdXN0OlAsY3JhY2tsZTpQLGltcHVsc2U6Qix3aGl0ZTpOLGJyb3duOkcscGluazpqfTtjb25zdCBaPXtjaG9ydXM6MCxub3RlOjQ4LHM6InRyaWFuZ2xlIixiYW5rOiIiLGdhaW46MSxwb3N0Z2FpbjoxLHZlbG9jaXR5OjEsZGVuc2l0eToiLjAzIixmdHlwZToiMTJkYiIsZmFuY2hvcjowLHJlc29uYW5jZTowLGhyZXNvbmFuY2U6MCxiYW5kcTowLGNoYW5uZWxzOlsxLDJdLHBoYXNlcmRlcHRoOi43NSxzaGFwZXZvbDoxLGRpc3RvcnR2b2w6MSxkZWxheTowLGJ5dGVCZWF0RXhwcmVzc2lvbjoiMCIsZGVsYXlmZWVkYmFjazouNSxkZWxheXNwZWVkOjEsZGVsYXl0aW1lOi4yNSxvcmJpdDoxLGk6MSxmZnQ6OCx6OiJ0cmlhbmdsZSIscGFuOi41LGZtaDoxLGZtZW52OjAsc3BlZWQ6MSxwdzouNX07bGV0IG89aD0+WltoXTtjb25zdCBIPXtjOjAsZDoyLGU6NCxmOjUsZzo3LGE6OSxiOjExfSxKPXsiIyI6MSxiOi0xLHM6MSxmOi0xfSxLPShoLHM9Myk9Pnt2YXIgYTtsZXRbdCxpPSIiLG49IiJdPSgoYT1TdHJpbmcoaCkubWF0Y2goL14oW2EtZ0EtR10pKFsjYnNmXSopKFswLTldKikkLykpPT1udWxsP3ZvaWQgMDphLnNsaWNlKDEpKXx8W107aWYoIXQpdGhyb3cgbmV3IEVycm9yKCdub3QgYSBub3RlOiAiJytoKyciJyk7Y29uc3QgbD1IW3QudG9Mb3dlckNhc2UoKV0scj0oaT09bnVsbD92b2lkIDA6aS5zcGxpdCgiIikucmVkdWNlKChjLGQpPT5jK0pbZF0sMCkpfHwwO3JldHVybihOdW1iZXIobnx8cykrMSkqMTIrbCtyfSxRPWg9Pk1hdGgucG93KDIsKGgtNjkpLzEyKSo0NDAsQT1oPT4oaD1ofHxvKCJub3RlIiksdHlwZW9mIGg9PSJzdHJpbmciJiYoaD1LKGgsMykpLFEoaCkpO2NsYXNzIHR0e2NvbnN0cnVjdG9yKHMpe2UodGhpcywiaWQiLDApO2UodGhpcywib3V0IixbMCwwXSk7ZSh0aGlzLCJhdHRhY2siKTtlKHRoaXMsImRlY2F5Iik7ZSh0aGlzLCJzdXN0YWluIik7ZSh0aGlzLCJyZWxlYXNlIik7ZSh0aGlzLCJfYmVnaW4iKTtlKHRoaXMsIl9kdXJhdGlvbiIpO2UodGhpcywiX3NvdW5kIik7ZSh0aGlzLCJfY2hhbm5lbHMiLDEpO2UodGhpcywiX2J1ZmZlcnMiKTtlKHRoaXMsInVuaXQiKTtlKHRoaXMsIl9wZW52Iik7ZSh0aGlzLCJwZW52Iik7ZSh0aGlzLCJwYXR0YWNrIik7ZSh0aGlzLCJwZGVjYXkiKTtlKHRoaXMsInBzdXN0YWluIik7ZSh0aGlzLCJwcmVsZWFzZSIpO2UodGhpcywidmliIik7ZSh0aGlzLCJfdmliIik7ZSh0aGlzLCJ2aWJtb2QiKTtlKHRoaXMsIl9mbSIpO2UodGhpcywiZm1oIik7ZSh0aGlzLCJmbWkiKTtlKHRoaXMsIl9mbWVudiIpO2UodGhpcywiZm1hdHRhY2siKTtlKHRoaXMsImZtZGVjYXkiKTtlKHRoaXMsImZtc3VzdGFpbiIpO2UodGhpcywiZm1yZWxlYXNlIik7ZSh0aGlzLCJfbHBlbnYiKTtlKHRoaXMsImxwZW52Iik7ZSh0aGlzLCJscGF0dGFjayIpO2UodGhpcywibHBkZWNheSIpO2UodGhpcywibHBzdXN0YWluIik7ZSh0aGlzLCJscHJlbGVhc2UiKTtlKHRoaXMsIl9ocGVudiIpO2UodGhpcywiaHBlbnYiKTtlKHRoaXMsImhwYXR0YWNrIik7ZSh0aGlzLCJocGRlY2F5Iik7ZSh0aGlzLCJocHN1c3RhaW4iKTtlKHRoaXMsImhwcmVsZWFzZSIpO2UodGhpcywiX2JwZW52Iik7ZSh0aGlzLCJicGVudiIpO2UodGhpcywiYnBhdHRhY2siKTtlKHRoaXMsImJwZGVjYXkiKTtlKHRoaXMsImJwc3VzdGFpbiIpO2UodGhpcywiYnByZWxlYXNlIik7ZSh0aGlzLCJjdXRvZmYiKTtlKHRoaXMsImhjdXRvZmYiKTtlKHRoaXMsImJhbmRmIik7ZSh0aGlzLCJjb2Fyc2UiKTtlKHRoaXMsImNydXNoIik7ZSh0aGlzLCJkaXN0b3J0Iik7ZSh0aGlzLCJmcmVxIik7ZSh0aGlzLCJub3RlIik7ZSh0aGlzLCJfbHBmIik7ZSh0aGlzLCJfaHBmIik7ZSh0aGlzLCJfYnBmIik7ZSh0aGlzLCJfY2hvcnVzIik7ZSh0aGlzLCJfY29hcnNlIik7ZSh0aGlzLCJfY3J1c2giKTtlKHRoaXMsIl9kaXN0b3J0Iik7dmFyIGksbixsLHIscCxhLGM7dGhpcy5mcmVxPz8odGhpcy5mcmVxPUEocy5ub3RlKSksdGhpcy5fYmVnaW49cy5fYmVnaW4sdGhpcy5fZHVyYXRpb249cy5fZHVyYXRpb24sdGhpcy5yZWxlYXNlPXMucmVsZWFzZT8/MDtsZXQgdD10aGlzO2lmKE9iamVjdC5hc3NpZ24odCxzKSx0LnM9dC5zPz9vKCJzIiksdC5nYWluPV8odC5nYWluPz9vKCJnYWluIikpLHQudmVsb2NpdHk9Xyh0LnZlbG9jaXR5Pz9vKCJ2ZWxvY2l0eSIpKSx0LnBvc3RnYWluPV8odC5wb3N0Z2Fpbj8/bygicG9zdGdhaW4iKSksdC5kZW5zaXR5PXQuZGVuc2l0eT8/bygiZGVuc2l0eSIpLHQuZmFuY2hvcj10LmZhbmNob3I/P28oImZhbmNob3IiKSx0LmRyaXZlPXQuZHJpdmU/Py42OSx0LnBoYXNlcmRlcHRoPXQucGhhc2VyZGVwdGg/P28oInBoYXNlcmRlcHRoIiksdC5zaGFwZXZvbD1fKHQuc2hhcGV2b2w/P28oInNoYXBldm9sIikpLHQuZGlzdG9ydHZvbD1fKHQuZGlzdG9ydHZvbD8/bygiZGlzdG9ydHZvbCIpKSx0Lmk9dC5pPz9vKCJpIiksdC5jaG9ydXM9dC5jaG9ydXM/P28oImNob3J1cyIpLHQuZmZ0PXQuZmZ0Pz9vKCJmZnQiKSx0LnBhbj10LnBhbj8/bygicGFuIiksdC5vcmJpdD10Lm9yYml0Pz9vKCJvcmJpdCIpLHQuZm1lbnY9dC5mbWVudj8/bygiZm1lbnYiKSx0LnJlc29uYW5jZT10LnJlc29uYW5jZT8/bygicmVzb25hbmNlIiksdC5ocmVzb25hbmNlPXQuaHJlc29uYW5jZT8/bygiaHJlc29uYW5jZSIpLHQuYmFuZHE9dC5iYW5kcT8/bygiYmFuZHEiKSx0LnNwZWVkPXQuc3BlZWQ/P28oInNwZWVkIiksdC5wdz10LnB3Pz9vKCJwdyIpLFt0LmF0dGFjayx0LmRlY2F5LHQuc3VzdGFpbix0LnJlbGVhc2VdPXkoW3QuYXR0YWNrLHQuZGVjYXksdC5zdXN0YWluLHQucmVsZWFzZV0pLHQuX2hvbGRFbmQ9dC5fYmVnaW4rdC5fZHVyYXRpb24sdC5fZW5kPXQuX2hvbGRFbmQrdC5yZWxlYXNlKy4wMSx0LmZtaSYmKHQucz09PSJzYXcifHx0LnM9PT0ic2F3dG9vdGgiKSYmKHQucz0iemF3IiksRFt0LnNdKXtjb25zdCBkPURbdC5zXTt0Ll9zb3VuZD1uZXcgZCx0Ll9jaGFubmVscz0xfWVsc2UgaWYody5zYW1wbGVzLmhhcyh0LnMpKXtjb25zdCBkPXcuc2FtcGxlcy5nZXQodC5zKTt0Ll9idWZmZXJzPVtdLHQuX2NoYW5uZWxzPWQuY2hhbm5lbHMubGVuZ3RoO2ZvcihsZXQgYj0wO2I8dC5fY2hhbm5lbHM7YisrKXQuX2J1ZmZlcnMucHVzaChuZXcgdyhkLmNoYW5uZWxzW2JdLGQuc2FtcGxlUmF0ZSx0LnVuaXQ9PT0iYyIpKX1lbHNlIGNvbnNvbGUud2Fybigic291bmQgbm90IGxvYWRlZCIsdC5zKTt0LnBlbnYmJih0Ll9wZW52PW5ldyB2KHtkZWNheUN1cnZlOjR9KSxbdC5wYXR0YWNrLHQucGRlY2F5LHQucHN1c3RhaW4sdC5wcmVsZWFzZV09eShbdC5wYXR0YWNrLHQucGRlY2F5LHQucHN1c3RhaW4sdC5wcmVsZWFzZV0pKSx0LnZpYiYmKHQuX3ZpYj1uZXcgZyx0LnZpYm1vZD10LnZpYm1vZD8/bygidmlibW9kIikpLHQuZm1pJiYodC5fZm09bmV3IGcsdC5mbWg9dC5mbWg/P28oImZtaCIpLHQuZm1lbnYmJih0Ll9mbWVudj1uZXcgdih7ZGVjYXlDdXJ2ZToyfSksW3QuZm1hdHRhY2ssdC5mbWRlY2F5LHQuZm1zdXN0YWluLHQuZm1yZWxlYXNlXT15KFt0LmZtYXR0YWNrLHQuZm1kZWNheSx0LmZtc3VzdGFpbix0LmZtcmVsZWFzZV0pKSksdC5fYWRzcj1uZXcgdih7ZGVjYXlDdXJ2ZToyfSksdC5kZWxheT1fKHQuZGVsYXk/P28oImRlbGF5IikpLHQuZGVsYXlmZWVkYmFjaz10LmRlbGF5ZmVlZGJhY2s/P28oImRlbGF5ZmVlZGJhY2siKSx0LmRlbGF5c3BlZWQ9dC5kZWxheXNwZWVkPz9vKCJkZWxheXNwZWVkIiksdC5kZWxheXRpbWU9dC5kZWxheXRpbWU/P28oImRlbGF5dGltZSIpLHQubHBlbnYmJih0Ll9scGVudj1uZXcgdih7ZGVjYXlDdXJ2ZTo0fSksW3QubHBhdHRhY2ssdC5scGRlY2F5LHQubHBzdXN0YWluLHQubHByZWxlYXNlXT15KFt0LmxwYXR0YWNrLHQubHBkZWNheSx0Lmxwc3VzdGFpbix0LmxwcmVsZWFzZV0pKSx0LmhwZW52JiYodC5faHBlbnY9bmV3IHYoe2RlY2F5Q3VydmU6NH0pLFt0LmhwYXR0YWNrLHQuaHBkZWNheSx0Lmhwc3VzdGFpbix0LmhwcmVsZWFzZV09eShbdC5ocGF0dGFjayx0LmhwZGVjYXksdC5ocHN1c3RhaW4sdC5ocHJlbGVhc2VdKSksdC5icGVudiYmKHQuX2JwZW52PW5ldyB2KHtkZWNheUN1cnZlOjR9KSxbdC5icGF0dGFjayx0LmJwZGVjYXksdC5icHN1c3RhaW4sdC5icHJlbGVhc2VdPXkoW3QuYnBhdHRhY2ssdC5icGRlY2F5LHQuYnBzdXN0YWluLHQuYnByZWxlYXNlXSkpLHQuX2Nob3J1cz10LmNob3J1cz9bXTpudWxsLHQuX2xwZj10LmN1dG9mZj9bXTpudWxsLHQuX2hwZj10LmhjdXRvZmY/W106bnVsbCx0Ll9icGY9dC5iYW5kZj9bXTpudWxsLHQuX2NvYXJzZT10LmNvYXJzZT9bXTpudWxsLHQuX2NydXNoPXQuY3J1c2g/W106bnVsbCx0Ll9kaXN0b3J0PXQuZGlzdG9ydD9bXTpudWxsO2ZvcihsZXQgZD0wO2Q8dGhpcy5fY2hhbm5lbHM7ZCsrKShpPXQuX2xwZik9PW51bGx8fGkucHVzaChuZXcgcSksKG49dC5faHBmKT09bnVsbHx8bi5wdXNoKG5ldyBxKSwobD10Ll9icGYpPT1udWxsfHxsLnB1c2gobmV3IHEpLChyPXQuX2Nob3J1cyk9PW51bGx8fHIucHVzaChuZXcgWCksKHA9dC5fY29hcnNlKT09bnVsbHx8cC5wdXNoKG5ldyAkKSwoYT10Ll9jcnVzaCk9PW51bGx8fGEucHVzaChuZXcgVSksKGM9dC5fZGlzdG9ydCk9PW51bGx8fGMucHVzaChuZXcgWSl9dXBkYXRlKHMpe2lmKCF0aGlzLl9zb3VuZCYmIXRoaXMuX2J1ZmZlcnMpcmV0dXJuIDA7bGV0IHQ9KyhzPj10aGlzLl9iZWdpbiYmczw9dGhpcy5faG9sZEVuZCksaT10aGlzLmZyZXEqdGhpcy5zcGVlZDtpZih0aGlzLl9mbSYmdGhpcy5mbWghPT12b2lkIDAmJnRoaXMuZm1pIT09dm9pZCAwKXtsZXQgYT10aGlzLmZtaTtpZih0aGlzLl9mbWVudil7Y29uc3QgYj10aGlzLl9mbWVudi51cGRhdGUocyx0LHRoaXMuZm1hdHRhY2ssdGhpcy5mbWRlY2F5LHRoaXMuZm1zdXN0YWluLHRoaXMuZm1yZWxlYXNlKTthPXRoaXMuZm1lbnYqYiphfWNvbnN0IGM9aSp0aGlzLmZtaCxkPWMqYTtpPWkrdGhpcy5fZm0udXBkYXRlKGMpKmR9aWYodGhpcy5fdmliJiZ0aGlzLnZpYm1vZCE9PXZvaWQgMCYmKGk9aSoyKioodGhpcy5fdmliLnVwZGF0ZSh0aGlzLnZpYikqdGhpcy52aWJtb2QvMTIpKSx0aGlzLl9wZW52JiZ0aGlzLnBlbnYhPT12b2lkIDApe2NvbnN0IGE9dGhpcy5fcGVudi51cGRhdGUocyx0LHRoaXMucGF0dGFjayx0aGlzLnBkZWNheSx0aGlzLnBzdXN0YWluLHRoaXMucHJlbGVhc2UpO2k9aSthKnRoaXMucGVudn1sZXQgbj10aGlzLmN1dG9mZjtpZihuIT09dm9pZCAwJiZ0aGlzLl9scGVudil7Y29uc3QgYT10aGlzLl9scGVudi51cGRhdGUocyx0LHRoaXMubHBhdHRhY2ssdGhpcy5scGRlY2F5LHRoaXMubHBzdXN0YWluLHRoaXMubHByZWxlYXNlKTtuPXRoaXMubHBlbnYqYSpuK259bGV0IGw9dGhpcy5oY3V0b2ZmO2lmKGwhPT12b2lkIDAmJnRoaXMuX2hwZW52JiZ0aGlzLmhwZW52IT09dm9pZCAwKXtjb25zdCBhPXRoaXMuX2hwZW52LnVwZGF0ZShzLHQsdGhpcy5ocGF0dGFjayx0aGlzLmhwZGVjYXksdGhpcy5ocHN1c3RhaW4sdGhpcy5ocHJlbGVhc2UpO2w9MioqdGhpcy5ocGVudiphKmwrbH1sZXQgcj10aGlzLmJhbmRmO2lmKHIhPT12b2lkIDAmJnRoaXMuX2JwZW52JiZ0aGlzLmJwZW52IT09dm9pZCAwKXtjb25zdCBhPXRoaXMuX2JwZW52LnVwZGF0ZShzLHQsdGhpcy5icGF0dGFjayx0aGlzLmJwZGVjYXksdGhpcy5icHN1c3RhaW4sdGhpcy5icHJlbGVhc2UpO3I9MioqdGhpcy5icGVudiphKnIrcn1jb25zdCBwPXRoaXMuX2Fkc3IudXBkYXRlKHMsdCx0aGlzLmF0dGFjayx0aGlzLmRlY2F5LHRoaXMuc3VzdGFpbix0aGlzLnJlbGVhc2UpO2ZvcihsZXQgYT0wO2E8dGhpcy5fY2hhbm5lbHM7YSsrKXtpZih0aGlzLl9zb3VuZCYmdGhpcy5zPT09InB1bHNlIj90aGlzLm91dFthXT10aGlzLl9zb3VuZC51cGRhdGUoaSx0aGlzLnB3KTp0aGlzLl9zb3VuZD90aGlzLm91dFthXT10aGlzLl9zb3VuZC51cGRhdGUoaSk6dGhpcy5fYnVmZmVycyYmKHRoaXMub3V0W2FdPXRoaXMuX2J1ZmZlcnNbYV0udXBkYXRlKGkpKSx0aGlzLm91dFthXT10aGlzLm91dFthXSp0aGlzLmdhaW4qdGhpcy52ZWxvY2l0eSx0aGlzLl9jaG9ydXMpe2NvbnN0IGM9dGhpcy5fY2hvcnVzW2FdLnVwZGF0ZSh0aGlzLm91dFthXSx0aGlzLmNob3J1cywuMDMrLjA1KmEsMSwuMTEpO3RoaXMub3V0W2FdPWMrdGhpcy5vdXRbYV19dGhpcy5fbHBmJiYodGhpcy5fbHBmW2FdLnVwZGF0ZSh0aGlzLm91dFthXSxuLHRoaXMucmVzb25hbmNlKSx0aGlzLm91dFthXT10aGlzLl9scGZbYV0uczEpLHRoaXMuX2hwZiYmKHRoaXMuX2hwZlthXS51cGRhdGUodGhpcy5vdXRbYV0sbCx0aGlzLmhyZXNvbmFuY2UpLHRoaXMub3V0W2FdPXRoaXMub3V0W2FdLXRoaXMuX2hwZlthXS5zMSksdGhpcy5fYnBmJiYodGhpcy5fYnBmW2FdLnVwZGF0ZSh0aGlzLm91dFthXSxyLHRoaXMuYmFuZHEpLHRoaXMub3V0W2FdPXRoaXMuX2JwZlthXS5zMCksdGhpcy5fY29hcnNlJiYodGhpcy5vdXRbYV09dGhpcy5fY29hcnNlW2FdLnVwZGF0ZSh0aGlzLm91dFthXSx0aGlzLmNvYXJzZSkpLHRoaXMuX2NydXNoJiYodGhpcy5vdXRbYV09dGhpcy5fY3J1c2hbYV0udXBkYXRlKHRoaXMub3V0W2FdLHRoaXMuY3J1c2gpKSx0aGlzLl9kaXN0b3J0JiYodGhpcy5vdXRbYV09dGhpcy5fZGlzdG9ydFthXS51cGRhdGUodGhpcy5vdXRbYV0sdGhpcy5kaXN0b3J0LHRoaXMuZGlzdG9ydHZvbCkpLHRoaXMub3V0W2FdPXRoaXMub3V0W2FdKnAsdGhpcy5vdXRbYV09dGhpcy5vdXRbYV0qdGhpcy5wb3N0Z2Fpbix0aGlzLl9idWZmZXJzfHwodGhpcy5vdXRbYV09dGhpcy5vdXRbYV0qLjIpfWlmKHRoaXMuX2NoYW5uZWxzPT09MSYmKHRoaXMub3V0WzFdPXRoaXMub3V0WzBdKSx0aGlzLnBhbiE9PS41KXtjb25zdCBhPXRoaXMucGFuKk1hdGguUEkvMjt0aGlzLm91dFswXT10aGlzLm91dFswXSpNYXRoLmNvcyhhKSx0aGlzLm91dFsxXT10aGlzLm91dFsxXSpNYXRoLnNpbihhKX19fWNsYXNzIHN0e2NvbnN0cnVjdG9yKHM9NDhlMyx0PTApe2UodGhpcywidm9pY2VzIixbXSk7ZSh0aGlzLCJ2aWQiLDApO2UodGhpcywicSIsW10pO2UodGhpcywib3V0IixbMCwwXSk7ZSh0aGlzLCJkZWxheXNlbmQiLFswLDBdKTtlKHRoaXMsImRlbGF5dGltZSIsbygiZGVsYXl0aW1lIikpO2UodGhpcywiZGVsYXlmZWVkYmFjayIsbygiZGVsYXlmZWVkYmFjayIpKTtlKHRoaXMsImRlbGF5c3BlZWQiLG8oImRlbGF5c3BlZWQiKSk7ZSh0aGlzLCJ0IiwwKTt0aGlzLnNhbXBsZVJhdGU9cyx0aGlzLnQ9TWF0aC5mbG9vcih0KnMpLHRoaXMuX2RlbGF5TD1uZXcgeCx0aGlzLl9kZWxheVI9bmV3IHh9bG9hZFNhbXBsZShzLHQsaSl7dy5zYW1wbGVzLnNldChzLHtjaGFubmVsczp0LHNhbXBsZVJhdGU6aX0pfXNjaGVkdWxlU3Bhd24ocyl7aWYocy5fYmVnaW49PT12b2lkIDApdGhyb3cgbmV3IEVycm9yKCJbZG91Z2hdOiBzY2hlZHVsZVNwYXduIGV4cGVjdGVkIF9iZWdpbiB0byBiZSBzZXQiKTtpZihzLl9kdXJhdGlvbj09PXZvaWQgMCl0aHJvdyBuZXcgRXJyb3IoIltkb3VnaF06IHNjaGVkdWxlU3Bhd24gZXhwZWN0ZWQgX2R1cmF0aW9uIHRvIGJlIHNldCIpO3Muc2FtcGxlUmF0ZT10aGlzLnNhbXBsZVJhdGU7Y29uc3QgdD1NYXRoLmZsb29yKHMuX2JlZ2luKnRoaXMuc2FtcGxlUmF0ZSk7dGhpcy5zY2hlZHVsZSh7dGltZTp0LHR5cGU6InNwYXduIixhcmc6c30pfXNwYXduKHMpe3MuaWQ9dGhpcy52aWQrKztjb25zdCB0PW5ldyB0dChzKTt0aGlzLnZvaWNlcy5wdXNoKHQpO2NvbnN0IGk9TWF0aC5jZWlsKHQuX2VuZCp0aGlzLnNhbXBsZVJhdGUpO3RoaXMuc2NoZWR1bGUoe3RpbWU6aSx0eXBlOiJkZXNwYXduIixhcmc6dC5pZH0pfWRlc3Bhd24ocyl7dGhpcy52b2ljZXM9dGhpcy52b2ljZXMuZmlsdGVyKHQ9PnQuaWQhPT1zKX1zY2hlZHVsZShzKXtpZighdGhpcy5xLmxlbmd0aCl7dGhpcy5xLnB1c2gocyk7cmV0dXJufWxldCB0PTA7Zm9yKDt0PHRoaXMucS5sZW5ndGgmJnRoaXMucVt0XS50aW1lPHMudGltZTspdCsrO3RoaXMucS5zcGxpY2UodCwwLHMpfXVwZGF0ZSgpe2Zvcig7dGhpcy5xLmxlbmd0aD4wJiZ0aGlzLnFbMF0udGltZTw9dGhpcy50Oyl0aGlzW3RoaXMucVswXS50eXBlXSh0aGlzLnFbMF0uYXJnKSx0aGlzLnEuc2hpZnQoKTt0aGlzLm91dFswXT0wLHRoaXMub3V0WzFdPTA7Zm9yKGxldCBpPTA7aTx0aGlzLnZvaWNlcy5sZW5ndGg7aSsrKXRoaXMudm9pY2VzW2ldLnVwZGF0ZSh0aGlzLnQvdGhpcy5zYW1wbGVSYXRlKSx0aGlzLm91dFswXSs9dGhpcy52b2ljZXNbaV0ub3V0WzBdLHRoaXMub3V0WzFdKz10aGlzLnZvaWNlc1tpXS5vdXRbMV0sdGhpcy52b2ljZXNbaV0uZGVsYXkmJih0aGlzLmRlbGF5c2VuZFswXSs9dGhpcy52b2ljZXNbaV0ub3V0WzBdKnRoaXMudm9pY2VzW2ldLmRlbGF5LHRoaXMuZGVsYXlzZW5kWzFdKz10aGlzLnZvaWNlc1tpXS5vdXRbMV0qdGhpcy52b2ljZXNbaV0uZGVsYXksdGhpcy5kZWxheXRpbWU9dGhpcy52b2ljZXNbaV0uZGVsYXl0aW1lLHRoaXMuZGVsYXlzcGVlZD10aGlzLnZvaWNlc1tpXS5kZWxheXNwZWVkLHRoaXMuZGVsYXlmZWVkYmFjaz10aGlzLnZvaWNlc1tpXS5kZWxheWZlZWRiYWNrKTtjb25zdCBzPXRoaXMuX2RlbGF5TC51cGRhdGUodGhpcy5kZWxheXNlbmRbMF0sdGhpcy5kZWxheXRpbWUpLHQ9dGhpcy5fZGVsYXlSLnVwZGF0ZSh0aGlzLmRlbGF5c2VuZFsxXSx0aGlzLmRlbGF5dGltZSk7dGhpcy5kZWxheXNlbmRbMF09cyp0aGlzLmRlbGF5ZmVlZGJhY2ssdGhpcy5kZWxheXNlbmRbMV09dCp0aGlzLmRlbGF5ZmVlZGJhY2ssdGhpcy5vdXRbMF0rPXMsdGhpcy5vdXRbMV0rPXQsdGhpcy50Kyt9fWNvbnN0IGV0PShoLHMsdCk9Pk1hdGgubWluKE1hdGgubWF4KGgscyksdCk7Y2xhc3MgaXQgZXh0ZW5kcyBBdWRpb1dvcmtsZXRQcm9jZXNzb3J7Y29uc3RydWN0b3IoKXtzdXBlcigpLHRoaXMuZG91Z2g9bmV3IHN0KHNhbXBsZVJhdGUsY3VycmVudFRpbWUpLHRoaXMucG9ydC5vbm1lc3NhZ2U9cz0+e3MuZGF0YS5zcGF3bj90aGlzLmRvdWdoLnNjaGVkdWxlU3Bhd24ocy5kYXRhLnNwYXduKTpzLmRhdGEuc2FtcGxlP3RoaXMuZG91Z2gubG9hZFNhbXBsZShzLmRhdGEuc2FtcGxlLHMuZGF0YS5jaGFubmVscyxzLmRhdGEuc2FtcGxlUmF0ZSk6cy5kYXRhLnNhbXBsZXM/cy5kYXRhLnNhbXBsZXMuZm9yRWFjaCgoW3QsaSxuXSk9Pnt0aGlzLmRvdWdoLmxvYWRTYW1wbGUodCxpLG4pfSk6Y29uc29sZS5sb2coInVucmVjb2duaXplZCBldmVudCB0eXBlIixzLmRhdGEpfX1wcm9jZXNzKHMsdCxpKXtpZih0aGlzLmRpc2Nvbm5lY3RlZClyZXR1cm4hMTtjb25zdCBuPXRbMF07Zm9yKGxldCBsPTA7bDxuWzBdLmxlbmd0aDtsKyspe3RoaXMuZG91Z2gudXBkYXRlKCk7Zm9yKGxldCByPTA7cjxuLmxlbmd0aDtyKyspbltyXVtsXT1ldCh0aGlzLmRvdWdoLm91dFtyXSwtMSwxKX1yZXR1cm4hMH19cmVnaXN0ZXJQcm9jZXNzb3IoImRvdWdoLXByb2Nlc3NvciIsaXQpfSkoKTsK";
   var u2 = typeof sampleRate < "u" ? sampleRate : 48e3;
   var k2 = Math.PI / u2;
   var n = 1 / u2;
   var us2 = H2;
 
-  // node_modules/@strudel/draw/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@strudel/draw/dist/index.mjs
   var Z3 = (t = "test-canvas", e) => {
     let { contextType: n2 = "2d", pixelated: o = false, pixelRatio: a2 = window.devicePixelRatio } = e || {}, r = document.querySelector("#" + t);
     if (!r) {
@@ -16656,7 +16656,7 @@ registerProcessor('${n2}', MyProcessor);
     );
   };
 
-  // node_modules/@strudel/webaudio/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@strudel/webaudio/dist/index.mjs
   var C3;
   function ie4() {
     const e = z2();
@@ -17108,7 +17108,7 @@ registerProcessor('${n2}', MyProcessor);
     _3.set(r, a2.getImageData(0, 0, u3.width, u3.height));
   }
 
-  // node_modules/@strudel/mini/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@strudel/mini/dist/index.mjs
   var dist_exports3 = {};
   __export(dist_exports3, {
     StartRules: () => Gr2,
@@ -18565,7 +18565,7 @@ registerProcessor('${n2}', MyProcessor);
     mh(te3);
   }
 
-  // node_modules/@strudel/tonal/dist/index.mjs
+  // ../../../../Volumes/PRO-G40/Code/handstrudel/node_modules/@strudel/tonal/dist/index.mjs
   var dist_exports4 = {};
   __export(dist_exports4, {
     addVoicings: () => A1,
@@ -19444,7 +19444,7 @@ registerProcessor('${n2}', MyProcessor);
   }
   var _1 = "@strudel/tonal";
 
-  // ios/strudel-entry.mjs
+  // strudel-entry.mjs
   window.__hp = {};
   var _evaluate = null;
   var _stop = null;
@@ -19490,20 +19490,6 @@ registerProcessor('${n2}', MyProcessor);
         };
         checkBeat();
       }
-      if (typeof Hydra !== "undefined") {
-        try {
-          const canvas = document.getElementById("hydra-canvas");
-          canvas.width = window.innerWidth || 390;
-          canvas.height = window.innerHeight || 844;
-          new Hydra({ canvas, detectAudio: false, makeGlobal: true, autoLoop: true });
-          window.H = (pat) => () => d(pat).queryArc(Wy(), Wy())[0]?.value ?? 0;
-          log("hydra initialized");
-        } catch (e) {
-          log("hydra init failed: " + e);
-        }
-      } else {
-        log("hydra not available (script not loaded)");
-      }
       log("loading drum samples...");
       try {
         await _evaluate(`samples('github:tidalcycles/Dirt-Samples/master')`);
@@ -19534,13 +19520,6 @@ registerProcessor('${n2}', MyProcessor);
       } catch (e) {
         log("eval error: " + e);
       }
-    }
-  };
-  window.hydraEval = function(code) {
-    try {
-      new Function(code)();
-    } catch (e) {
-      log("hydra eval: " + e);
     }
   };
   window.strudelStop = function() {
@@ -19734,25 +19713,6 @@ registerProcessor('${n2}', MyProcessor);
     window.noteOn("oneshot", midi2, waveform, vel);
     setTimeout(() => window.noteOff("oneshot"), (duration || 0.3) * 1e3);
   };
-  window.showHydra = function() {
-    const c3 = document.getElementById("hydra-canvas");
-    if (c3) c3.style.display = "";
-  };
-  window.hideHydra = function() {
-    const c3 = document.getElementById("hydra-canvas");
-    if (c3) c3.style.display = "none";
-    try {
-      new Function("solid(0,0,0,0).out()")();
-    } catch {
-    }
-  };
-  window.addEventListener("resize", () => {
-    const c3 = document.getElementById("hydra-canvas");
-    if (c3) {
-      c3.width = window.innerWidth;
-      c3.height = window.innerHeight;
-    }
-  });
   window._moduleReady = true;
   log("module ready");
   window.webkit?.messageHandlers?.strudelBridge?.postMessage({ ready: true });

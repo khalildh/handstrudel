@@ -1,5 +1,5 @@
 // Entry point for bundling all Strudel packages into a single file
-import { repl, evalScope, reify, getTime } from '@strudel/core';
+import { repl, evalScope } from '@strudel/core';
 import { webaudioOutput, initAudio, getAudioContext, registerSynthSounds } from '@strudel/webaudio';
 import * as strudelCore from '@strudel/core';
 import * as strudelMini from '@strudel/mini';
@@ -60,22 +60,6 @@ window.initStrudel = async function() {
             checkBeat();
         }
 
-        // Initialize Hydra (loaded via classic script tag before this module)
-        if (typeof Hydra !== 'undefined') {
-            try {
-                const canvas = document.getElementById('hydra-canvas');
-                canvas.width = window.innerWidth || 390;
-                canvas.height = window.innerHeight || 844;
-                new Hydra({ canvas, detectAudio: false, makeGlobal: true, autoLoop: true });
-                window.H = (pat) => () => reify(pat).queryArc(getTime(), getTime())[0]?.value ?? 0;
-                log('hydra initialized');
-            } catch (e) {
-                log('hydra init failed: ' + e);
-            }
-        } else {
-            log('hydra not available (script not loaded)');
-        }
-
         // Load drum samples via Strudel's evaluate (runs in sandboxed scope where samples() lives)
         log('loading drum samples...');
         try {
@@ -108,11 +92,6 @@ window.strudelEval = async function(code) {
         try { await _evaluate(code); }
         catch (e) { log('eval error: ' + e); }
     }
-};
-
-window.hydraEval = function(code) {
-    try { new Function(code)(); }
-    catch (e) { log('hydra eval: ' + e); }
 };
 
 window.strudelStop = function() {
@@ -335,22 +314,6 @@ window.playNote = function(midi, waveform, vel, duration) {
     window.noteOn('oneshot', midi, waveform, vel);
     setTimeout(() => window.noteOff('oneshot'), (duration || 0.3) * 1000);
 };
-
-window.showHydra = function() {
-    const c = document.getElementById('hydra-canvas');
-    if (c) c.style.display = '';
-};
-
-window.hideHydra = function() {
-    const c = document.getElementById('hydra-canvas');
-    if (c) c.style.display = 'none';
-    try { new Function('solid(0,0,0,0).out()')(); } catch {}
-};
-
-window.addEventListener('resize', () => {
-    const c = document.getElementById('hydra-canvas');
-    if (c) { c.width = window.innerWidth; c.height = window.innerHeight; }
-});
 
 window._moduleReady = true;
 log('module ready');

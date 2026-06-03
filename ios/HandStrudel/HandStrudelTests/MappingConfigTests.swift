@@ -233,17 +233,6 @@ final class MappingConfigTests: XCTestCase {
         }
     }
 
-    // MARK: - DEFAULT_HYDRA_MAPPING
-
-    func testDefaultHydraMapping_allNone() {
-        for (_, paramId) in DEFAULT_HYDRA_MAPPING.left {
-            XCTAssertEqual(paramId, "none")
-        }
-        for (_, paramId) in DEFAULT_HYDRA_MAPPING.right {
-            XCTAssertEqual(paramId, "none")
-        }
-    }
-
     // MARK: - Preset mapping axis keys reference valid AXIS_DEFS
 
     func testPresets_mappingAxisKeysAreValidAxisDefs() {

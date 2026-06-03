@@ -43,7 +43,6 @@ final class EngineController: ObservableObject {
 
     // Configuration
     @Published var config = DEFAULT_MAPPING
-    @Published var hydraConfig = DEFAULT_HYDRA_MAPPING
     @Published var advanced = false
     @Published var isRunning = false
     @Published var isPaused = false  // true when control sheet is open
@@ -53,7 +52,6 @@ final class EngineController: ObservableObject {
     @Published var handsState = HandsState()
     @Published var smoothedParams = MusicParams()
     @Published var codeDisplay = ""
-    @Published var hydraCodeDisplay = ""
     @Published var noteDisplay = ""
     @Published var bpm: Double = 120
     @Published var currentBeat = 0
@@ -63,7 +61,6 @@ final class EngineController: ObservableObject {
     @Published var playingSet = Set<Int>()
     @Published var track = (slots: [Int](), speed: 1.0)
     @Published var trackPlaying = false
-    @Published var hydraEnabled = false
 
     // Drum mode
     @Published var drumModeEnabled = false
@@ -202,25 +199,21 @@ final class EngineController: ObservableObject {
     private var currentHands = HandsState()
     private var structIdx = 0
     private var lastStructKey = ""
-    private var lastHydraCode = ""
     private var displayLink: CADisplayLink?
     private var uiTimer: Timer?
     private var structTimer: Timer?
     private(set) var startTime: Date?
 
-    func start(config: MappingConfig, hydraConfig: MappingConfig, advanced: Bool) {
+    func start(config: MappingConfig, advanced: Bool) {
         debugLog("start() called")
         self.config = config
-        self.hydraConfig = hydraConfig
         self.advanced = advanced
 
         // Always start in melodic mode
         learnModeEnabled = false
 
         // Build default params
-        let musicDefs = buildDefaultParams(config)
-        let hydraDefs = buildDefaultParams(hydraConfig)
-        let defs = musicDefs.merging(hydraDefs) { _, new in new }
+        let defs = buildDefaultParams(config)
         rawParams = defs
         smoothed = defs
 
@@ -312,7 +305,6 @@ final class EngineController: ObservableObject {
             // Skip param mapping in grid/drum mode — hands control notes/hits, not synth params
             if !self.gridModeEnabled && !self.drumModeEnabled {
                 HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.config)
-                HandMapper.mapHandsToParams(hands, params: &self.rawParams, config: self.hydraConfig)
             }
         }
     }
@@ -574,13 +566,6 @@ final class EngineController: ObservableObject {
             strudelBridge.evaluate(code)
         }
 
-        if hydraEnabled {
-            let hydraCode = buildHydraCode(smoothed)
-            if hydraCode != lastHydraCode {
-                lastHydraCode = hydraCode
-                strudelBridge.evalHydra(hydraCode)
-            }
-        }
     }
 
     private static let maxSnippets = 50
@@ -784,9 +769,6 @@ final class EngineController: ObservableObject {
                 if !self.gridModeEnabled {
                     self.codeDisplay = self.buildDisplayCode(s)
                 }
-                if self.hydraEnabled {
-                    self.hydraCodeDisplay = self.buildHydraDisplayCode(s)
-                }
             }
         }
     }
@@ -824,32 +806,6 @@ final class EngineController: ObservableObject {
             lines.append("  .\(def.strudelKey)(\(def.toCode(p[id] ?? def.defaultValue)))")
         }
 
-        return lines.joined(separator: "\n")
-    }
-
-    private func buildHydraDisplayCode(_ p: MusicParams) -> String {
-        let freq = p["hFreq"] ?? 10
-        let sync = p["hSync"] ?? 0.1
-        let kaleid = Int((p["hKaleid"] ?? 3).rounded())
-        let rot = p["hRotate"] ?? 0
-        let colorama = p["hColorama"] ?? 0.05
-        let bright = p["hBright"] ?? 1
-        let pixel = Int((p["hPixel"] ?? 200).rounded())
-        let mod = p["hModulate"] ?? 0.02
-        let scale = p["hScale"] ?? 1
-        let sat = p["hSaturate"] ?? 1
-
-        var lines = ["osc(\(String(format: "%.1f", freq)),\(String(format: "%.2f", sync)),1.5)"]
-        if kaleid > 1 { lines.append("  .kaleid(\(kaleid))") }
-        if rot > 0.01 { lines.append("  .rotate(\(String(format: "%.3f", rot)))") }
-        if scale != 1 { lines.append("  .scale(\(String(format: "%.2f", scale)))") }
-        if pixel < 190 { lines.append("  .pixelate(\(pixel),\(pixel))") }
-        lines.append("  .color(1,1,1)")
-        if bright != 1 { lines.append("  .brightness(\(String(format: "%.2f", bright)))") }
-        if sat != 1 { lines.append("  .saturate(\(String(format: "%.2f", sat)))") }
-        if colorama > 0.01 { lines.append("  .colorama(\(String(format: "%.3f", colorama)))") }
-        if mod > 0.005 { lines.append("  .modulate(noise(3),\(String(format: "%.3f", mod)))") }
-        lines.append("  .out()")
         return lines.joined(separator: "\n")
     }
 
@@ -919,14 +875,6 @@ final class EngineController: ObservableObject {
             if let code = buildTrackCode(slots: track.slots, speed: track.speed, snippets: savedSnippets) {
                 strudelBridge.evaluate(code)
             }
-        }
-    }
-
-    func toggleHydra() {
-        hydraEnabled.toggle()
-        strudelBridge.setHydraEnabled(hydraEnabled)
-        if !hydraEnabled {
-            lastHydraCode = ""
         }
     }
 

@@ -40,8 +40,8 @@ struct ContentView: View {
                 StartOverlayView(
                     status: engine.status,
                     storeManager: storeManager,
-                    onStart: { cfg, hCfg, adv in
-                        engine.start(config: cfg, hydraConfig: hCfg, advanced: adv)
+                    onStart: { cfg, adv in
+                        engine.start(config: cfg, advanced: adv)
                     }
                 )
             }
@@ -61,14 +61,14 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
             guard !engine.isRunning, let presetId = notification.object as? String else { return }
             if let preset = PRESETS.first(where: { $0.id == presetId }) {
-                engine.start(config: preset.mapping, hydraConfig: preset.hydraMapping, advanced: false)
+                engine.start(config: preset.mapping, advanced: false)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .siriStartMode)) { notification in
             guard let mode = notification.object as? String else { return }
             if !engine.isRunning {
                 // Start with default preset first
-                engine.start(config: DEFAULT_MAPPING, hydraConfig: DEFAULT_HYDRA_MAPPING, advanced: false)
+                engine.start(config: DEFAULT_MAPPING, advanced: false)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 switch mode {
