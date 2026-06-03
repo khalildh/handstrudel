@@ -8,13 +8,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 await build({
     entryPoints: [join(__dirname, 'strudel-entry.mjs')],
     bundle: true,
-    format: 'esm',
+    // IIFE so top-level helper `var`s don't leak to window (Hydra defines
+    // some of the same names — colliding kept _moduleReady from firing).
+    format: 'iife',
     outfile: join(__dirname, 'HandStrudel/HandStrudel/Resources/strudel-bundle.js'),
     platform: 'browser',
     target: 'es2020',
     minify: false,
     sourcemap: false,
-    // Keep dynamic import for worker
     splitting: false,
 });
 
