@@ -538,9 +538,9 @@ struct ContentView: View {
 
                 // Position dot
                 Circle()
-                    .fill(Color.green)
+                    .fill(accentColor)
                     .frame(width: 20, height: 20)
-                    .shadow(color: .green.opacity(0.5), radius: 8)
+                    .shadow(color: accentColor.opacity(0.5), radius: 8)
                     .position(x: dotX, y: dotY)
             }
             .gesture(
@@ -566,7 +566,7 @@ struct ContentView: View {
                     // Show finger count visually
                     ForEach(1...5, id: \.self) { i in
                         Circle()
-                            .fill(i <= engine.currentFingerCount ? Color.green : Color.white.opacity(0.15))
+                            .fill(i <= engine.currentFingerCount ? accentColor : Color.white.opacity(0.15))
                             .frame(width: 8, height: 8)
                     }
                 }
@@ -575,7 +575,7 @@ struct ContentView: View {
             // Octave display
             Text("Oct \(engine.gridBaseOctave)")
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(.green)
+                .foregroundColor(accentColor)
 
             // Manual octave controls (when finger control is off)
             if !engine.fingerOctaveEnabled {
@@ -601,9 +601,9 @@ struct ContentView: View {
             Button(action: { engine.fingerOctaveEnabled.toggle() }) {
                 Image(systemName: engine.fingerOctaveEnabled ? "hand.raised.fingers.spread" : "hand.raised.slash")
                     .font(.system(size: 12))
-                    .foregroundColor(engine.fingerOctaveEnabled ? .green : .white.opacity(0.5))
+                    .foregroundColor(engine.fingerOctaveEnabled ? accentColor : .white.opacity(0.5))
                     .frame(width: 26, height: 26)
-                    .background(Circle().fill(engine.fingerOctaveEnabled ? Color.green.opacity(0.15) : Color.white.opacity(0.1)))
+                    .background(Circle().fill(engine.fingerOctaveEnabled ? accentColor.opacity(0.15) : Color.white.opacity(0.1)))
             }
 
             // Range pills
@@ -614,7 +614,7 @@ struct ContentView: View {
                         .foregroundColor(engine.gridOctaveRange == range ? .black : .white.opacity(0.6))
                         .frame(width: 26, height: 26)
                         .background(
-                            Circle().fill(engine.gridOctaveRange == range ? Color.green : Color.white.opacity(0.1))
+                            Circle().fill(engine.gridOctaveRange == range ? accentColor : Color.white.opacity(0.1))
                         )
                 }
             }
@@ -949,7 +949,7 @@ struct ContentView: View {
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                         .frame(width: 18, height: 18)
-                        .background(Circle().fill(Color.green))
+                        .background(Circle().fill(accentColor))
                         .offset(x: 16, y: -16)
                 }
             }
@@ -1402,9 +1402,9 @@ struct ControlSheet: View {
                             Button(action: { engine.gridOctaveRange = range }) {
                                 Text("\(range)")
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(engine.gridOctaveRange == range ? .green : .secondary)
+                                    .foregroundColor(engine.gridOctaveRange == range ? DS.signature : .secondary)
                                     .frame(width: 28, height: 28)
-                                    .background(Circle().fill(engine.gridOctaveRange == range ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
+                                    .background(Circle().fill(engine.gridOctaveRange == range ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04)))
                             }
                         }
                     }
@@ -1425,7 +1425,7 @@ struct ControlSheet: View {
                         }
                         Text("\(engine.gridBaseOctave)")
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green)
+                            .foregroundColor(DS.signature)
                             .frame(width: 20)
                         Button(action: { if engine.gridBaseOctave < 6 { engine.gridBaseOctave += 1 } }) {
                             Image(systemName: "plus")
@@ -1467,23 +1467,23 @@ struct ControlSheet: View {
                     .font(.system(size: 14))
                 Text(prog.name)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.75))
+                    .foregroundColor(isActive ? DS.signature : .primary.opacity(0.75))
                 Text("\(prog.degrees.count)")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(isActive ? 0.7 : 0.35))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
                     .background(
-                        Capsule().fill(isActive ? Color.green.opacity(0.2) : Color.white.opacity(0.06))
+                        Capsule().fill(isActive ? DS.signature.opacity(0.2) : Color.white.opacity(0.06))
                     )
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(
-                Capsule().fill(isActive ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                Capsule().fill(isActive ? DS.signature.opacity(0.12) : Color.primary.opacity(0.04))
             )
             .overlay(
-                Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
+                Capsule().stroke(isActive ? DS.signature.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
             )
         }
     }
@@ -1505,16 +1505,16 @@ struct ControlSheet: View {
                         }) {
                             Text(key.rawValue)
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundColor(engine.selectedKey == key ? .green : .primary.opacity(0.6))
+                                .foregroundColor(engine.selectedKey == key ? DS.signature : .primary.opacity(0.6))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 9)
                                 .background(
                                     Capsule()
-                                        .fill(engine.selectedKey == key ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                        .fill(engine.selectedKey == key ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04))
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(engine.selectedKey == key ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                        .stroke(engine.selectedKey == key ? DS.signature.opacity(0.4) : Color.clear, lineWidth: 1.5)
                                 )
                         }
                     }
@@ -1536,16 +1536,16 @@ struct ControlSheet: View {
                         }) {
                             Text(scale.rawValue)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundColor(engine.selectedScale == scale ? .green : .primary.opacity(0.6))
+                                .foregroundColor(engine.selectedScale == scale ? DS.signature : .primary.opacity(0.6))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .background(
                                     Capsule()
-                                        .fill(engine.selectedScale == scale ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                        .fill(engine.selectedScale == scale ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04))
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(engine.selectedScale == scale ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                        .stroke(engine.selectedScale == scale ? DS.signature.opacity(0.4) : Color.clear, lineWidth: 1.5)
                                 )
                                 .overlay(alignment: .topTrailing) {
                                     if locked {
@@ -1580,16 +1580,16 @@ struct ControlSheet: View {
                 Text(label)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
             }
-            .foregroundColor(isOn.wrappedValue ? .green : .primary.opacity(0.5))
+            .foregroundColor(isOn.wrappedValue ? DS.signature : .primary.opacity(0.5))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(isOn.wrappedValue ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                    .fill(isOn.wrappedValue ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04))
             )
             .overlay(
                 Capsule()
-                    .stroke(isOn.wrappedValue ? Color.green.opacity(0.4) : Color.white.opacity(0.06), lineWidth: isOn.wrappedValue ? 1.5 : 0.5)
+                    .stroke(isOn.wrappedValue ? DS.signature.opacity(0.4) : Color.white.opacity(0.06), lineWidth: isOn.wrappedValue ? 1.5 : 0.5)
             )
         }
     }
@@ -1628,7 +1628,7 @@ struct ControlSheet: View {
                     .font(.system(size: 20))
                 Text(wf.name)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                    .foregroundColor(isSelected ? DS.signature : .primary.opacity(0.6))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -1637,12 +1637,12 @@ struct ControlSheet: View {
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(isSelected
-                        ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                        ? LinearGradient(colors: [DS.signature.opacity(0.2), DS.signature.opacity(0.08)], startPoint: .top, endPoint: .bottom)
                         : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isSelected ? 1.5 : 0.5)
+                    .stroke(isSelected ? DS.signature.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isSelected ? 1.5 : 0.5)
             )
             .overlay(alignment: .topTrailing) {
                 if locked {
@@ -1684,19 +1684,19 @@ struct ControlSheet: View {
                                 .font(.system(size: 22))
                             Text(drumLoop.name)
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundColor(loop.wrappedValue.id == drumLoop.id ? .green : .primary.opacity(0.6))
+                                .foregroundColor(loop.wrappedValue.id == drumLoop.id ? DS.signature : .primary.opacity(0.6))
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(loop.wrappedValue.id == drumLoop.id
-                                    ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                                    ? LinearGradient(colors: [DS.signature.opacity(0.2), DS.signature.opacity(0.08)], startPoint: .top, endPoint: .bottom)
                                     : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(loop.wrappedValue.id == drumLoop.id ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: loop.wrappedValue.id == drumLoop.id ? 1.5 : 0.5)
+                                .stroke(loop.wrappedValue.id == drumLoop.id ? DS.signature.opacity(0.5) : Color.white.opacity(0.06), lineWidth: loop.wrappedValue.id == drumLoop.id ? 1.5 : 0.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
@@ -1754,7 +1754,7 @@ struct ControlSheet: View {
                 Spacer()
                 Text("\(Int(engine.manualBPM.rounded()))")
                     .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .foregroundColor(.green)
+                    .foregroundColor(DS.signature)
                 Spacer()
             }
 
@@ -1844,7 +1844,7 @@ struct ControlSheet: View {
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.primary.opacity(0.08))
                             Capsule()
-                                .fill(Color.green.opacity(0.5))
+                                .fill(DS.signature.opacity(0.5))
                                 .frame(width: geo.size.width * max(0, min(1, normalized)))
                         }
                     }
@@ -1889,18 +1889,18 @@ struct ControlSheet: View {
                                 .font(.system(size: 18))
                             Text(filter.name)
                                 .font(.system(size: 8, weight: .semibold, design: .rounded))
-                                .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                                .foregroundColor(isSelected ? DS.signature : .primary.opacity(0.6))
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(isSelected ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                                .fill(isSelected ? DS.signature.opacity(0.12) : Color.primary.opacity(0.04))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(isSelected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                .stroke(isSelected ? DS.signature.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
@@ -1947,18 +1947,18 @@ struct ControlSheet: View {
                                 .font(.system(size: 18))
                             Text(theme.name)
                                 .font(.system(size: 8, weight: .semibold, design: .rounded))
-                                .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                                .foregroundColor(isSelected ? DS.signature : .primary.opacity(0.6))
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(isSelected ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                                .fill(isSelected ? DS.signature.opacity(0.12) : Color.primary.opacity(0.04))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(isSelected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                .stroke(isSelected ? DS.signature.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
@@ -2007,11 +2007,11 @@ struct ControlSheet: View {
                     Button(action: { engine.loopRecorder.selectedBars = bars }) {
                         Text("\(bars) bars")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(engine.loopRecorder.selectedBars == bars ? .green : .secondary)
+                            .foregroundColor(engine.loopRecorder.selectedBars == bars ? DS.signature : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(
-                                Capsule().fill(engine.loopRecorder.selectedBars == bars ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                Capsule().fill(engine.loopRecorder.selectedBars == bars ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04))
                             )
                     }
                 }
@@ -2024,7 +2024,7 @@ struct ControlSheet: View {
                     Button(action: { engine.toggleLoopPlayback(loop.id) }) {
                         Image(systemName: engine.playingLoopIds.contains(loop.id) ? "stop.circle.fill" : "play.circle.fill")
                             .font(.system(size: 28))
-                            .foregroundColor(engine.playingLoopIds.contains(loop.id) ? .orange : .green)
+                            .foregroundColor(engine.playingLoopIds.contains(loop.id) ? .orange : DS.signature)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -2033,10 +2033,10 @@ struct ControlSheet: View {
                         HStack(spacing: 6) {
                             Text(loop.mode)
                                 .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(.green)
+                                .foregroundColor(DS.signature)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Capsule().fill(Color.green.opacity(0.15)))
+                                .background(Capsule().fill(DS.signature.opacity(0.15)))
                             Text("\(loop.events.count) events")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundColor(.secondary)
@@ -2061,7 +2061,7 @@ struct ControlSheet: View {
                     }) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 14))
-                            .foregroundColor(.green.opacity(0.6))
+                            .foregroundColor(DS.signature.opacity(0.6))
                     }
 
                     // Delete
@@ -2095,7 +2095,7 @@ struct ControlSheet: View {
                     Button(action: { engine.toggleSnippet(idx) }) {
                         Image(systemName: engine.playingSet.contains(idx) ? "pause.circle.fill" : "play.circle.fill")
                             .font(.system(size: 24))
-                            .foregroundColor(engine.playingSet.contains(idx) ? .orange : .green)
+                            .foregroundColor(engine.playingSet.contains(idx) ? .orange : DS.signature)
                     }
                     VStack(alignment: .leading) {
                         Text("Snippet #\(idx + 1)")
@@ -2126,7 +2126,7 @@ struct ControlSheet: View {
                 Button(action: engine.toggleTrackPlay) {
                     Image(systemName: engine.trackPlaying ? "stop.circle.fill" : "play.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundColor(engine.trackPlaying ? .orange : .green)
+                        .foregroundColor(engine.trackPlaying ? .orange : DS.signature)
                 }
             }
 
@@ -2135,10 +2135,10 @@ struct ControlSheet: View {
                     Button(action: { engine.setTrackSpeed(speed) }) {
                         Text("\(speed == Double(Int(speed)) ? "\(Int(speed))" : String(format: "%.1f", speed))x")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundColor(engine.track.speed == speed ? .green : .secondary)
+                            .foregroundColor(engine.track.speed == speed ? DS.signature : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(Capsule().fill(engine.track.speed == speed ? Color.green.opacity(0.15) : Color.clear))
+                            .background(Capsule().fill(engine.track.speed == speed ? DS.signature.opacity(0.15) : Color.clear))
                     }
                 }
             }
