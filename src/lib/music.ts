@@ -1,27 +1,17 @@
-export const NOTES = [
-  "c2", "d2", "e2", "g2", "a2",
-  "c3", "d3", "e3", "g3", "a3",
-  "c4", "d4", "e4", "g4", "a4",
-  "c5", "d5", "e5",
-];
+import {
+  NOTES,
+  MIDI_NOTES,
+  STRUCTS,
+  PARAM_SPECS,
+  type ParamSpec,
+} from "./music-data.generated";
 
-/** MIDI note numbers corresponding to each entry in NOTES (for signal-based playback). */
-export const MIDI_NOTES = [
-  36, 38, 40, 43, 45,
-  48, 50, 52, 55, 57,
-  60, 62, 64, 67, 69,
-  72, 74, 76,
-];
+// NOTES / MIDI_NOTES / STRUCTS are generated from shared/music-config.json (the
+// single source of truth shared with the iOS app). Re-export so the rest of the
+// app keeps importing them from "music".
+export { NOTES, MIDI_NOTES, STRUCTS };
 
 export const NOTE_DISPLAY = NOTES.map((n) => n[0].toUpperCase() + n.slice(1));
-
-export const STRUCTS = [
-  "x ~ x ~ x ~ x ~",
-  "x ~ ~ x ~ ~ x ~",
-  "x x ~ x ~ x x ~",
-  "[x x x] ~ ~ ~",
-  "x ~ x x ~ x ~ ~",
-];
 
 /* ── Parameter definitions ───────────────────────────── */
 
@@ -37,140 +27,35 @@ export interface ParamDef {
   hlClass: string;
 }
 
-export const PARAM_DEFS: ParamDef[] = [
-  {
-    id: "noteIdx",
-    label: "pitch",
-    strudelKey: "note",
-    min: 0,
-    max: NOTES.length - 1,
-    default: 10,
+type Formatter = { format: (v: number) => string; toCode: (v: number) => string };
+
+/** Formatter implementations keyed by the `format` kind in music-config.json. */
+const FORMATTERS: Record<string, Formatter> = {
+  note: {
     format: (v) => NOTE_DISPLAY[Math.max(0, Math.min(NOTES.length - 1, Math.round(v)))],
     toCode: (v) => `"${NOTES[Math.max(0, Math.min(NOTES.length - 1, Math.round(v)))]}"`,
-    hlClass: "c-str",
   },
-  {
-    id: "gain",
-    label: "volume",
-    strudelKey: "gain",
-    min: 0.03,
-    max: 0.9,
-    default: 0.55,
-    format: (v) => v.toFixed(2),
-    toCode: (v) => v.toFixed(2),
-    hlClass: "c-nr",
-  },
-  {
-    id: "lpf",
-    label: "filter",
-    strudelKey: "lpf",
-    min: 120,
-    max: 6120,
-    default: 3000,
-    format: (v) => Math.round(v) + "hz",
-    toCode: (v) => String(Math.round(v)),
-    hlClass: "c-nl",
-  },
-  {
-    id: "hpf",
-    label: "hi-pass",
-    strudelKey: "hpf",
-    min: 20,
-    max: 4000,
-    default: 2000,
-    format: (v) => Math.round(v) + "hz",
-    toCode: (v) => String(Math.round(v)),
-    hlClass: "c-nl",
-  },
-  {
-    id: "reverb",
-    label: "reverb",
-    strudelKey: "room",
-    min: 0,
-    max: 0.9,
-    default: 0.2,
-    format: (v) => v.toFixed(2),
-    toCode: (v) => v.toFixed(2),
-    hlClass: "c-nl",
-  },
-  {
-    id: "bpm",
-    label: "tempo",
-    strudelKey: "cpm",
-    min: 50,
-    max: 205,
-    default: 120,
-    format: (v) => Math.round(v) + " bpm",
-    toCode: (v) => (v / 4).toFixed(1),
-    hlClass: "c-nr",
-  },
-  {
-    id: "delay",
-    label: "delay",
-    strudelKey: "delay",
-    min: 0,
-    max: 0.55,
-    default: 0.12,
-    format: (v) => v.toFixed(2),
-    toCode: (v) => v.toFixed(2),
-    hlClass: "c-nr",
-  },
-  {
-    id: "pan",
-    label: "pan",
-    strudelKey: "pan",
-    min: 0,
-    max: 1,
-    default: 0.5,
-    format: (v) => v.toFixed(2),
-    toCode: (v) => v.toFixed(2),
-    hlClass: "c-nr",
-  },
-  {
-    id: "crush",
-    label: "crush",
-    strudelKey: "crush",
-    min: 1,
-    max: 16,
-    default: 8,
-    format: (v) => Math.round(v).toString(),
-    toCode: (v) => String(Math.round(v)),
-    hlClass: "c-nl",
-  },
-  {
-    id: "shape",
-    label: "shape",
-    strudelKey: "shape",
-    min: 0,
-    max: 0.9,
-    default: 0,
-    format: (v) => v.toFixed(2),
-    toCode: (v) => v.toFixed(2),
-    hlClass: "c-nr",
-  },
-  {
-    id: "attack",
-    label: "attack",
-    strudelKey: "attack",
-    min: 0.001,
-    max: 0.5,
-    default: 0.01,
-    format: (v) => v.toFixed(3),
-    toCode: (v) => v.toFixed(3),
-    hlClass: "c-nr",
-  },
-  {
-    id: "release",
-    label: "release",
-    strudelKey: "release",
-    min: 0.01,
-    max: 1.0,
-    default: 0.1,
-    format: (v) => v.toFixed(2),
-    toCode: (v) => v.toFixed(2),
-    hlClass: "c-nr",
-  },
-];
+  fixed2: { format: (v) => v.toFixed(2), toCode: (v) => v.toFixed(2) },
+  fixed3: { format: (v) => v.toFixed(3), toCode: (v) => v.toFixed(3) },
+  hz: { format: (v) => Math.round(v) + "hz", toCode: (v) => String(Math.round(v)) },
+  bpm: { format: (v) => Math.round(v) + " bpm", toCode: (v) => (v / 4).toFixed(1) },
+  int: { format: (v) => Math.round(v).toString(), toCode: (v) => String(Math.round(v)) },
+};
+
+export const PARAM_DEFS: ParamDef[] = PARAM_SPECS.map((spec: ParamSpec) => {
+  const fmt = FORMATTERS[spec.format] ?? FORMATTERS.fixed2;
+  return {
+    id: spec.id,
+    label: spec.label,
+    strudelKey: spec.strudelKey,
+    min: spec.min,
+    max: spec.max,
+    default: spec.default,
+    format: fmt.format,
+    toCode: fmt.toCode,
+    hlClass: spec.hlClass,
+  };
+});
 
 /* ── Hydra visual parameter definitions ─────────────── */
 

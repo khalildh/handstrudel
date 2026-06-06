@@ -33,9 +33,6 @@ final class ChordMelodyModeManager {
 
     var swapHands: Bool = false
 
-    private let pinchThreshold: Double = 0.8
-    private let releaseThreshold: Double = 0.5
-
     /// The scale degrees that each chord zone resolves to. With "Free" this
     /// is [0,1,2,3,4,5,6] (all 7 diatonic chords). With a progression like
     /// Pop it's [0,4,5,3] (I, V, vi, IV) — only 4 zones, easier to play.
@@ -46,8 +43,8 @@ final class ChordMelodyModeManager {
 
     // MARK: - State (mutated each tick)
 
-    private var chordHandPinching = false
-    private var melodyHandPinching = false
+    private var chordPinch = PinchDetector(on: 0.8, off: 0.5)
+    private var melodyPinch = PinchDetector(on: 0.8, off: 0.5)
     private var heldMelodyMidi: Int? = nil
 
     /// Whether the pad is currently sounding (chord hand visible in frame).
@@ -68,8 +65,8 @@ final class ChordMelodyModeManager {
 
     private(set) var currentChordDegree: Int? = nil
     private(set) var currentChordMidi: [Int] = []
-    var isChordHandPinching: Bool { chordHandPinching }
-    var isMelodyHandPinching: Bool { melodyHandPinching }
+    var isChordHandPinching: Bool { chordPinch.isPinching }
+    var isMelodyHandPinching: Bool { melodyPinch.isPinching }
 
     // MARK: - Hand routing
 
@@ -176,16 +173,12 @@ final class ChordMelodyModeManager {
             }
 
             // Pinch crossings trigger an additive accent on top of the pad.
-            let isPinching = h.pinch > pinchThreshold
-            if isPinching && !chordHandPinching {
-                chordHandPinching = true
+            if case .began = chordPinch.update(pinch: h.pinch) {
                 actions.append(.chordAccent(
                     midiNotes: currentChordMidi,
                     degree: degree,
                     velocity: min(1, h.pinch)
                 ))
-            } else if h.pinch < releaseThreshold && chordHandPinching {
-                chordHandPinching = false
             }
         } else {
             // Hand left the frame — fade the pad out and clear pinch latch.
@@ -194,7 +187,7 @@ final class ChordMelodyModeManager {
                 padDegree = nil
                 actions.append(.padOff)
             }
-            chordHandPinching = false
+            chordPinch.reset()
         }
 
         // -------------------- Melody hand --------------------
@@ -206,10 +199,9 @@ final class ChordMelodyModeManager {
         if let h = melodyHand(hands), !melodySnapTargets.isEmpty {
             let laneIdx = yToMelodyLane(h.pinchY, noteCount: melodySnapTargets.count)
             let midi = melodySnapTargets[laneIdx]
-            let isPinching = h.pinch > pinchThreshold
 
-            if isPinching && !melodyHandPinching {
-                melodyHandPinching = true
+            switch melodyPinch.update(pinch: h.pinch) {
+            case .began:
                 heldMelodyMidi = midi
                 actions.append(.melodyOn(
                     hand: melodyHandName,
@@ -217,7 +209,7 @@ final class ChordMelodyModeManager {
                     name: midiNoteName(midi),
                     velocity: min(1, h.pinch)
                 ))
-            } else if isPinching && melodyHandPinching {
+            case .held:
                 if midi != heldMelodyMidi {
                     heldMelodyMidi = midi
                     actions.append(.melodySlide(
@@ -226,13 +218,13 @@ final class ChordMelodyModeManager {
                         name: midiNoteName(midi)
                     ))
                 }
-            } else if h.pinch < releaseThreshold && melodyHandPinching {
-                melodyHandPinching = false
+            case .ended:
                 heldMelodyMidi = nil
                 actions.append(.melodyOff(hand: melodyHandName))
+            case .idle:
+                break
             }
-        } else if melodyHandPinching {
-            melodyHandPinching = false
+        } else if melodyPinch.release() == .ended {
             heldMelodyMidi = nil
             actions.append(.melodyOff(hand: melodyHandName))
         }

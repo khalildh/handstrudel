@@ -16,6 +16,13 @@
 		1EE6860496AAB0772E65E97D /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */; };
 		1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */; };
 		204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 938A00F6A5044E13D981C663 /* EngineController.swift */; };
+		A1B2C3D4E5F600000001A002 /* ModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A001 /* ModeController.swift */; };
+		A1B2C3D4E5F600000001A012 /* MelodicModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A011 /* MelodicModeController.swift */; };
+		A1B2C3D4E5F600000001A022 /* GridModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A021 /* GridModeController.swift */; };
+		A1B2C3D4E5F600000001A032 /* DrumModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A031 /* DrumModeController.swift */; };
+		A1B2C3D4E5F600000001A042 /* ChordMelodyModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A041 /* ChordMelodyModeController.swift */; };
+		A1B2C3D4E5F600000001A052 /* LearnModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A051 /* LearnModeController.swift */; };
+		A1B2C3D4E5F600000000FF02 /* PinchDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000FF01 /* PinchDetector.swift */; };
 		22BEC592D38D4260A28EA96C /* StoreManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */; };
 		25A87740F4DA10D91C739E18 /* JamSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2105F77EC139355C8EC8FB3D /* JamSession.swift */; };
 		2FC5D55810AF0B87923E355B /* ParamSmoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */; };
@@ -46,12 +53,15 @@
 		8590BD09D74A051C39590A4D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */; };
 		90224DD8E3719A286A3B008A /* strudel-engine.html in Resources */ = {isa = PBXBuildFile; fileRef = BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */; };
 		9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F66A4286F922F3805EADFE /* ParamDefs.swift */; };
+		A1B2C3D4E5F600000000FF11 /* MusicConfig.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000FF10 /* MusicConfig.generated.swift */; };
 		A380AD271A6485FF679B0DCD /* HandOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */; };
 		AD7403E055504FCFE716C5F9 /* AudioLooper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F81CA2974F2ED11BEA62AC3F /* AudioLooper.swift */; };
 		B033D247CE64C351B3262535 /* iMessageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6755AC0E55CFA644BF8217 /* iMessageManager.swift */; };
 		B59B82967BBF79A13E8EC3E6 /* DrumModeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */; };
 		B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9238181B674B4222B2F52C5A /* GridTouchView.swift */; };
 		B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D77EA18663B3717C68CAAB /* ContentView.swift */; };
+		A1B2C3D4E5F600000002B002 /* ControlSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000002B001 /* ControlSheetView.swift */; };
+		A1B2C3D4E5F600000002B012 /* UIKitBridges.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000002B011 /* UIKitBridges.swift */; };
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
 		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
 		BF459746DBE08887CD29CFF3 /* SaveGestureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C89256347633541234267B8 /* SaveGestureDetector.swift */; };
@@ -95,8 +105,11 @@
 		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
 		05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeManagerTests.swift; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000002B001 /* ControlSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlSheetView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000002B011 /* UIKitBridges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIKitBridges.swift; sourceTree = "<group>"; };
 		0CB456251F49E8C1FE668CC2 /* LearnSong.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSong.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000FF10 /* MusicConfig.generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicConfig.generated.swift; sourceTree = "<group>"; };
 		11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
 		15EE16108C9368E03A5293FC /* LoopRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopRecorder.swift; sourceTree = "<group>"; };
 		18B0EF83FDEC95F58B860F5A /* HandMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandMapper.swift; sourceTree = "<group>"; };
@@ -126,6 +139,13 @@
 		9238181B674B4222B2F52C5A /* GridTouchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridTouchView.swift; sourceTree = "<group>"; };
 		925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamSmoother.swift; sourceTree = "<group>"; };
 		938A00F6A5044E13D981C663 /* EngineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A001 /* ModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A011 /* MelodicModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelodicModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A021 /* GridModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A031 /* DrumModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A041 /* ChordMelodyModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordMelodyModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A051 /* LearnModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000FF01 /* PinchDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinchDetector.swift; sourceTree = "<group>"; };
 		93D6C035D4A9EE1A66C31839 /* Loop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loop.swift; sourceTree = "<group>"; };
 		9531420BA306B5BC2AB859A6 /* AudioExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioExporter.swift; sourceTree = "<group>"; };
 		953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -217,6 +237,13 @@
 				F81CA2974F2ED11BEA62AC3F /* AudioLooper.swift */,
 				AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */,
 				938A00F6A5044E13D981C663 /* EngineController.swift */,
+				A1B2C3D4E5F600000001A001 /* ModeController.swift */,
+				A1B2C3D4E5F600000001A011 /* MelodicModeController.swift */,
+				A1B2C3D4E5F600000001A021 /* GridModeController.swift */,
+				A1B2C3D4E5F600000001A031 /* DrumModeController.swift */,
+				A1B2C3D4E5F600000001A041 /* ChordMelodyModeController.swift */,
+				A1B2C3D4E5F600000001A051 /* LearnModeController.swift */,
+				A1B2C3D4E5F600000000FF01 /* PinchDetector.swift */,
 				F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */,
 				CM4D9E5A8B7C40119EE3A002 /* ChordMelodyModeManager.swift */,
 				18B0EF83FDEC95F58B860F5A /* HandMapper.swift */,
@@ -255,6 +282,8 @@
 			isa = PBXGroup;
 			children = (
 				09D77EA18663B3717C68CAAB /* ContentView.swift */,
+				A1B2C3D4E5F600000002B001 /* ControlSheetView.swift */,
+				A1B2C3D4E5F600000002B011 /* UIKitBridges.swift */,
 				7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */,
 			);
 			path = App;
@@ -278,6 +307,7 @@
 				5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */,
 				A9F505B00217A74555C8E226 /* MusicTheory.swift */,
 				10F66A4286F922F3805EADFE /* ParamDefs.swift */,
+				A1B2C3D4E5F600000000FF10 /* MusicConfig.generated.swift */,
 				F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */,
 				21E972CF1E53A24CA899C1A5 /* StoreManager.swift */,
 			);
@@ -454,8 +484,17 @@
 				6342A972BB06049F9B3999BC /* CameraFilter.swift in Sources */,
 				043BBAAF12C3D3188CF3823F /* CameraView.swift in Sources */,
 				B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */,
+				A1B2C3D4E5F600000002B002 /* ControlSheetView.swift in Sources */,
+				A1B2C3D4E5F600000002B012 /* UIKitBridges.swift in Sources */,
 				1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */,
 				204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */,
+				A1B2C3D4E5F600000001A002 /* ModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A012 /* MelodicModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A022 /* GridModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A032 /* DrumModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A042 /* ChordMelodyModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A052 /* LearnModeController.swift in Sources */,
+				A1B2C3D4E5F600000000FF02 /* PinchDetector.swift in Sources */,
 				E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */,
 				CM4D9E5A8B7C40119EE3A001 /* ChordMelodyModeManager.swift in Sources */,
 				B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */,
@@ -481,6 +520,7 @@
 				F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */,
 				375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */,
 				9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */,
+				A1B2C3D4E5F600000000FF11 /* MusicConfig.generated.swift in Sources */,
 				2FC5D55810AF0B87923E355B /* ParamSmoother.swift in Sources */,
 				701DC3F0F0B8477FAC156842 /* PaywallOverlay.swift in Sources */,
 				E1B4E6E7F7AA5E7E64ED69D0 /* PersistenceManager.swift in Sources */,
