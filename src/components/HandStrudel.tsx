@@ -15,6 +15,7 @@ import {
   NOTE_DISPLAY,
   STRUCTS,
   DEFAULT_INSTRUMENT,
+  nextInstrument,
 } from "../lib/music";
 import { buildDefaultParams, smoothParams } from "../lib/params";
 import {
@@ -24,6 +25,7 @@ import {
   DEFAULT_HYDRA_MAPPING,
   mapHandsToParams,
   getSaveAxes,
+  getInstrumentAxes,
 } from "../lib/hand-mapping";
 import { initializeStrudel } from "../lib/strudel";
 import { initializeMediaPipe } from "../lib/mediapipe";
@@ -63,6 +65,7 @@ export default function HandStrudel() {
   const [config, setConfig] = useState<MappingConfig>(DEFAULT_MAPPING);
   const [hydraConfig, setHydraConfig] = useState<MappingConfig>(DEFAULT_HYDRA_MAPPING);
   const [advanced, setAdvanced] = useState(false);
+  const [instrument, setInstrument] = useState<string>(DEFAULT_INSTRUMENT);
 
   const defaults = buildDefaultParams(DEFAULT_MAPPING);
   const defaultNI = Math.round(defaults.noteIdx ?? 10);
@@ -98,6 +101,10 @@ export default function HandStrudel() {
   const saveArmedRef = useRef<Map<string, boolean>>(new Map());
   const lastSaveTimeRef = useRef(0);
   const [savedSnippets, setSavedSnippets] = useState<SavedSnippet[]>([]);
+
+  // Instrument-gesture refs (cycle instruments via a mapped hand axis)
+  const instArmedRef = useRef<Map<string, boolean>>(new Map());
+  const lastInstTimeRef = useRef(0);
 
   // Snippet playback (multiple simultaneous via Set)
   const playingSetRef = useRef<Set<number>>(new Set());
@@ -236,6 +243,14 @@ export default function HandStrudel() {
     }
   }, []);
 
+  const handleInstrumentChange = useCallback((id: string) => {
+    instrumentRef.current = id;
+    setInstrument(id);
+    // Force the live signal-based code to re-evaluate with the new sound on the
+    // next frame (no-op while a snippet/track is playing — picked up on resume).
+    lastStructKeyRef.current = "";
+  }, []);
+
   const handleToggleRecording = useCallback(() => {
     if (recording) {
       // Stop recording
@@ -275,6 +290,7 @@ export default function HandStrudel() {
     hydraConfigRef.current = hCfg;
     advancedRef.current = adv;
     instrumentRef.current = instrument;
+    setInstrument(instrument);
 
     // Reset params for chosen config (merge music + hydra defaults)
     const musicDefs = buildDefaultParams(cfg);
@@ -410,6 +426,27 @@ export default function HandStrudel() {
           }
         }
 
+        // Instrument-gesture trigger (cycle to next sound). Same hysteresis +
+        // debounce as the save gesture to avoid rapid flicking through sounds.
+        for (const { side, axisKey } of getInstrumentAxes(configRef.current)) {
+          const hand = handsRef.current[side];
+          if (!hand) continue;
+          const raw = hand[axisKey];
+          if (typeof raw !== "number") continue;
+          const armKey = `${side}:${axisKey}`;
+          const armed = instArmedRef.current.get(armKey) ?? true;
+          if (raw > 0.8 && armed && now - lastInstTimeRef.current > 600) {
+            const next = nextInstrument(instrumentRef.current);
+            instrumentRef.current = next;
+            setInstrument(next);
+            lastStructKeyRef.current = ""; // force live re-eval with new sound
+            instArmedRef.current.set(armKey, false);
+            lastInstTimeRef.current = now;
+          } else if (raw < 0.3) {
+            instArmedRef.current.set(armKey, true);
+          }
+        }
+
         animFrameRef.current = requestAnimationFrame(loop);
       };
 
@@ -493,6 +530,8 @@ export default function HandStrudel() {
         hydraAvailable={hasHydraMapping(hydraConfig)}
         onHydraToggle={handleHydraToggle}
         onImportSnippets={handleImportSnippets}
+        instrument={instrument}
+        onInstrumentChange={handleInstrumentChange}
       />
     </div>
   );

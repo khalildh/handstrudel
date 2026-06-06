@@ -82,6 +82,12 @@ export function resolveInstrument(id: string | undefined): string {
   return id && INSTRUMENT_IDS.has(id) ? id : DEFAULT_INSTRUMENT;
 }
 
+/** Cycle to the next instrument id in the curated list (wraps around). */
+export function nextInstrument(id: string): string {
+  const idx = INSTRUMENTS.findIndex((i) => i.id === id);
+  return INSTRUMENTS[(idx + 1) % INSTRUMENTS.length].id;
+}
+
 /* ── Parameter definitions ───────────────────────────── */
 
 export interface ParamDef {

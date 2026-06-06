@@ -152,6 +152,7 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
                     </option>
                   ))}
                   <option value="save">💾 save</option>
+                  <option value="instrument">🎹 instrument</option>
                 </select>
                 <select
                   className={`config-select config-select-hydra`}

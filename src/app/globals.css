@@ -543,6 +543,46 @@ body {
 #hydra-code-wrap .c-comment { color: #6a3d9a; }
 #hydra-code-display { white-space: pre-wrap; line-height: 1.6; }
 
+/* ── Sidebar Sound Switcher ─────────────────────────── */
+.sound-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sound-switch-label {
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: var(--dim);
+}
+
+.sound-switch-select {
+  flex: 1;
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 1px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--left) 40%, var(--border));
+  border-radius: 3px;
+  padding: 3px 8px;
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.sound-switch-select:focus {
+  border-color: var(--left);
+}
+
+.sound-switch-select option {
+  background: var(--bg);
+  color: var(--text);
+}
+
 /* ── Hydra Toggle ───────────────────────────────────── */
 .hydra-toggle {
   display: flex;
