@@ -217,6 +217,7 @@ struct ControlSheet: View {
             }
 
             if currentMode == .chordMelody {
+                quantizeRow
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
                         .font(.system(size: 10, design: .rounded))
@@ -388,6 +389,7 @@ struct ControlSheet: View {
             }
 
             if currentMode == .grid {
+                quantizeRow
                 Text("Pinch to play notes. Move hand up/down to change pitch.")
                     .font(.system(size: 10, design: .rounded))
                     .foregroundColor(.secondary)
@@ -508,6 +510,41 @@ struct ControlSheet: View {
                 Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
             )
         }
+    }
+
+    /// "Sync to beat" toggle + divisor picker. Reused by Grid and
+    /// Chord+Melody / SoundFont modes since the quantize behaviour is
+    /// identical — both gate note onsets to the same beat clock.
+    @ViewBuilder
+    private var quantizeRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: $engine.quantizeEnabled) {
+                Text("Sync to beat (snap notes to the grid)")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundColor(.primary.opacity(0.8))
+            }
+            .tint(.green)
+
+            if engine.quantizeEnabled {
+                HStack(spacing: 8) {
+                    Text("Grid")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                    ForEach([(4.0, "1/4"), (8.0, "1/8"), (16.0, "1/16")], id: \.0) { div, label in
+                        Button(action: { engine.quantizeDiv = div }) {
+                            Text(label)
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundColor(engine.quantizeDiv == div ? .green : .secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(engine.quantizeDiv == div ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
+                        }
+                    }
+                    Spacer()
+                }
+            }
+        }
+        .padding(.top, 2)
     }
 
     private func progressionCategoryChip(_ cat: ProgressionCategory) -> some View {

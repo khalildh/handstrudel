@@ -41,7 +41,9 @@ final class ChordMelodyModeController: ModeController {
         let actions = chordMelodyModeManager.tick(
             hands: engine.currentHands,
             chordTones: chordTones,
-            melodyTones: melodyTones
+            melodyTones: melodyTones,
+            quantize: engine.quantizeEnabled,
+            gridBoundaryCrossed: engine.quantizeBoundaryCrossed()
         )
 
         for action in actions {

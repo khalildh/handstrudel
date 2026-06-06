@@ -616,6 +616,15 @@ struct ContentView: View {
 
             Spacer()
 
+            // Sync-to-beat (quantize) toggle
+            Button(action: { engine.quantizeEnabled.toggle() }) {
+                Image(systemName: engine.quantizeEnabled ? "metronome.fill" : "metronome")
+                    .font(.system(size: 12))
+                    .foregroundColor(engine.quantizeEnabled ? .green : .white.opacity(0.5))
+                    .frame(width: 26, height: 26)
+                    .background(Circle().fill(engine.quantizeEnabled ? Color.green.opacity(0.15) : Color.white.opacity(0.1)))
+            }
+
             // Finger octave toggle
             Button(action: { engine.fingerOctaveEnabled.toggle() }) {
                 Image(systemName: engine.fingerOctaveEnabled ? "hand.raised.fingers.spread" : "hand.raised.slash")

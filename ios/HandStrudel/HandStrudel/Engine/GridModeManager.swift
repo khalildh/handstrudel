@@ -5,12 +5,11 @@ final class GridModeManager {
     private var leftPinch = PinchDetector(on: 0.8, off: 0.5)
     private var rightPinch = PinchDetector(on: 0.8, off: 0.5)
 
-    // Track current held MIDI note per hand (for slide detection)
+    // The MIDI note each hand is currently *sounding* (nil = silent). Used both
+    // for slide detection and, in quantized mode, to hold the audible note
+    // steady between grid boundaries.
     private var leftHeldMidi: Int? = nil
     private var rightHeldMidi: Int? = nil
-
-    var quantizeEnabled = false
-    var quantizeDiv: Double = 8
 
     enum NoteAction {
         case noteOn(hand: String, midi: Int, noteName: String, velocity: Double)
@@ -18,64 +17,72 @@ final class GridModeManager {
         case slide(hand: String, midi: Int, noteName: String)
     }
 
-    func checkNotes(hands: HandsState, scaleNotes: [Int], currentBeat: Double) -> [NoteAction] {
+    /// Process one frame of hand state into note actions.
+    ///
+    /// When `quantize` is false (the default), note-ons and slides fire the
+    /// instant the hand pinches or crosses into a new lane — free, expressive
+    /// timing. When `quantize` is true, the audible note is only allowed to
+    /// change on a grid boundary (`gridBoundaryCrossed`), so onsets and slides
+    /// snap to the beat. Releases always fire immediately so letting go feels
+    /// responsive regardless of mode.
+    func checkNotes(hands: HandsState, scaleNotes: [Int],
+                    quantize: Bool = false,
+                    gridBoundaryCrossed: Bool = false) -> [NoteAction] {
         guard !scaleNotes.isEmpty else { return [] }
         var actions: [NoteAction] = []
-
-        // Left hand
-        if let left = hands.left {
-            let noteIdx = yToNoteIndex(y: left.pinchY, noteCount: scaleNotes.count)
-            let midi = scaleNotes[noteIdx]
-
-            switch leftPinch.update(pinch: left.pinch) {
-            case .began:
-                // New pinch — note on
-                leftHeldMidi = midi
-                actions.append(.noteOn(hand: "left", midi: midi, noteName: midiNoteName(midi), velocity: min(1, left.pinch)))
-            case .held:
-                // Still pinching — check if lane changed (slide)
-                if midi != leftHeldMidi {
-                    leftHeldMidi = midi
-                    actions.append(.slide(hand: "left", midi: midi, noteName: midiNoteName(midi)))
-                }
-            case .ended:
-                // Released — note off
-                leftHeldMidi = nil
-                actions.append(.noteOff(hand: "left"))
-            case .idle:
-                break
-            }
-        } else if leftPinch.release() == .ended {
-            leftHeldMidi = nil
-            actions.append(.noteOff(hand: "left"))
-        }
-
-        // Right hand
-        if let right = hands.right {
-            let noteIdx = yToNoteIndex(y: right.pinchY, noteCount: scaleNotes.count)
-            let midi = scaleNotes[noteIdx]
-
-            switch rightPinch.update(pinch: right.pinch) {
-            case .began:
-                rightHeldMidi = midi
-                actions.append(.noteOn(hand: "right", midi: midi, noteName: midiNoteName(midi), velocity: min(1, right.pinch)))
-            case .held:
-                if midi != rightHeldMidi {
-                    rightHeldMidi = midi
-                    actions.append(.slide(hand: "right", midi: midi, noteName: midiNoteName(midi)))
-                }
-            case .ended:
-                rightHeldMidi = nil
-                actions.append(.noteOff(hand: "right"))
-            case .idle:
-                break
-            }
-        } else if rightPinch.release() == .ended {
-            rightHeldMidi = nil
-            actions.append(.noteOff(hand: "right"))
-        }
-
+        processHand(hands.left, handName: "left", scaleNotes: scaleNotes,
+                    quantize: quantize, boundary: gridBoundaryCrossed,
+                    pinch: &leftPinch, audibleMidi: &leftHeldMidi, actions: &actions)
+        processHand(hands.right, handName: "right", scaleNotes: scaleNotes,
+                    quantize: quantize, boundary: gridBoundaryCrossed,
+                    pinch: &rightPinch, audibleMidi: &rightHeldMidi, actions: &actions)
         return actions
+    }
+
+    private func processHand(_ hand: HandData?, handName: String, scaleNotes: [Int],
+                             quantize: Bool, boundary: Bool,
+                             pinch: inout PinchDetector, audibleMidi: inout Int?,
+                             actions: inout [NoteAction]) {
+        guard let h = hand else {
+            // Hand left the frame — stop any sounding note immediately. Releases
+            // always fire live so letting go feels responsive even in quantize.
+            if pinch.release() == .ended, audibleMidi != nil {
+                actions.append(.noteOff(hand: handName))
+                audibleMidi = nil
+            }
+            return
+        }
+
+        let phase = pinch.update(pinch: h.pinch)
+        let noteIdx = yToNoteIndex(y: h.pinchY, noteCount: scaleNotes.count)
+        let midi = scaleNotes[noteIdx]
+        let allowChange = !quantize || boundary
+
+        switch phase {
+        case .began:
+            // Defer the onset to the next grid boundary when quantized.
+            if allowChange {
+                audibleMidi = midi
+                actions.append(.noteOn(hand: handName, midi: midi, noteName: midiNoteName(midi), velocity: min(1, h.pinch)))
+            }
+        case .held:
+            if !allowChange { return }
+            if audibleMidi == nil {
+                audibleMidi = midi
+                actions.append(.noteOn(hand: handName, midi: midi, noteName: midiNoteName(midi), velocity: min(1, h.pinch)))
+            } else if midi != audibleMidi {
+                audibleMidi = midi
+                actions.append(.slide(hand: handName, midi: midi, noteName: midiNoteName(midi)))
+            }
+        case .ended:
+            // Release immediately, regardless of quantize.
+            if audibleMidi != nil {
+                audibleMidi = nil
+                actions.append(.noteOff(hand: handName))
+            }
+        case .idle:
+            break
+        }
     }
 
     /// Video aspect ratio for correcting Y position (set from HandTrackingManager)

@@ -143,6 +143,24 @@ final class EngineController: ObservableObject {
     @Published var gridLeftLane: Int? = nil
     @Published var gridRightLane: Int? = nil
 
+    // Grid quantize ("sync to beat"): snap note timing to a rhythmic grid that
+    // is phase-locked to the audible/haptic beat. See the quantize clock below.
+    @Published var quantizeEnabled = false {
+        didSet { quantizeLastGridStep = -1 }   // re-sync the clock on toggle
+    }
+    @Published var quantizeDiv: Double = 8 {  // subdivisions per cycle: 4=¼, 8=⅛, 16=1/16
+        didSet { quantizeLastGridStep = -1 }   // re-sync when the grid resolution changes
+    }
+
+    // Quantize clock — learned empirically from the onBeat callbacks so the
+    // grid tracks the beat the player actually hears/feels without us having to
+    // know the tempo. `quantizeBeatIndex` counts quarter notes; the wall-clock
+    // gap between beats gives the quarter period, which we subdivide.
+    private var quantizeBeatIndex = 0
+    private var quantizeBeatWallTime: CFTimeInterval = 0
+    private var quantizeQuarterPeriod: Double = 0.5
+    private var quantizeLastGridStep = -1
+
     // Chord+Melody mode (two-hand harmony)
     @Published var chordMelodyModeEnabled = false
     @Published var chordMelodySwapHands = false  // left=chords by default; toggle for lefties
@@ -238,6 +256,8 @@ final class EngineController: ObservableObject {
         manualBPM = pm.lastBPM
         gridBaseOctave = pm.lastGridBaseOctave
         gridOctaveRange = pm.lastGridOctaveRange
+        quantizeEnabled = pm.lastQuantizeEnabled
+        quantizeDiv = pm.lastQuantizeDiv
 
         // Restore mode
         switch pm.lastMode {
@@ -376,6 +396,15 @@ final class EngineController: ObservableObject {
                         self.currentBeat = beat
                         if beat != oldBeat {
                             self.haptics.beatPulse(isDownbeat: beat == 0)
+                            // Advance the quantize clock by one quarter note and
+                            // learn the tempo from the gap between beats.
+                            let now = CACurrentMediaTime()
+                            if self.quantizeBeatWallTime > 0 {
+                                let delta = now - self.quantizeBeatWallTime
+                                if delta > 0.05 && delta < 2.0 { self.quantizeQuarterPeriod = delta }
+                            }
+                            self.quantizeBeatWallTime = now
+                            self.quantizeBeatIndex += 1
                         }
                     }
                 }
@@ -506,7 +535,9 @@ final class EngineController: ObservableObject {
         let actions = chordMelodyModeManager.tick(
             hands: currentHands,
             chordTones: chordTones,
-            melodyTones: melodyTones
+            melodyTones: melodyTones,
+            quantize: quantizeEnabled,
+            gridBoundaryCrossed: quantizeBoundaryCrossed()
         )
 
         for action in actions {
@@ -567,6 +598,29 @@ final class EngineController: ObservableObject {
         }
 
         evaluateDrumLoopsIfChanged(modePrefix: "soundfont")
+    }
+
+    /// Has the quantize grid advanced to a new subdivision since the last tick?
+    /// Returns true at most once per grid step. The grid is anchored to the
+    /// onBeat clock so steps land on (and evenly between) the felt beats.
+    /// `quantizeDiv` is the number of subdivisions per cycle (4 quarters), so
+    /// e.g. 8 → two steps per quarter (eighth notes).
+    func quantizeBoundaryCrossed() -> Bool {
+        guard quantizeEnabled, quantizeBeatWallTime > 0, quantizeQuarterPeriod > 0 else { return false }
+        let subsPerQuarter = max(1.0, quantizeDiv / 4.0)
+        let now = CACurrentMediaTime()
+        let frac = min(2.0, max(0, (now - quantizeBeatWallTime) / quantizeQuarterPeriod))
+        let subPos = (Double(quantizeBeatIndex) + frac) * subsPerQuarter
+        let step = Int(floor(subPos))
+        if quantizeLastGridStep == -1 {
+            quantizeLastGridStep = step   // first observation: sync, don't fire
+            return false
+        }
+        if step != quantizeLastGridStep {
+            quantizeLastGridStep = step
+            return true
+        }
+        return false
     }
 
     // Drum hand lane tracking for UI
@@ -967,7 +1021,9 @@ final class EngineController: ObservableObject {
             bpm: manualBPM,
             filterId: selectedFilter.id,
             gridBaseOctave: gridBaseOctave,
-            gridOctaveRange: gridOctaveRange
+            gridOctaveRange: gridOctaveRange,
+            quantizeEnabled: quantizeEnabled,
+            quantizeDiv: quantizeDiv
         )
         PersistenceManager.shared.saveLoops(savedLoops)
         PersistenceManager.shared.saveSnippets(savedSnippets)

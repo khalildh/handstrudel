@@ -47,7 +47,9 @@ final class GridModeController: ModeController {
         }
 
         let gridNotes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale, baseOctave: engine.gridBaseOctave, octaveRange: engine.gridOctaveRange)
-        let actions = gridModeManager.checkNotes(hands: engine.currentHands, scaleNotes: gridNotes, currentBeat: 0)
+        let actions = gridModeManager.checkNotes(hands: engine.currentHands, scaleNotes: gridNotes,
+                                                 quantize: engine.quantizeEnabled,
+                                                 gridBoundaryCrossed: engine.quantizeBoundaryCrossed())
         let elapsed = engine.startTime.map { Date().timeIntervalSince($0) } ?? 0
         for action in actions {
             switch action {

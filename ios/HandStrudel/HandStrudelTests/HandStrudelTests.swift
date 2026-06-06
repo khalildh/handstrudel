@@ -363,3 +363,95 @@ final class SaveGestureDetectorTests: XCTestCase {
         XCTAssertFalse(result)
     }
 }
+
+// MARK: - ChordMelodyModeManager quantize ("sync to beat")
+
+final class ChordMelodyModeManagerQuantizeTests: XCTestCase {
+
+    private let chordTones: (Int) -> [Int] = { _ in [60, 64, 67] }
+    private let melodyTones: (Int) -> [Int] = { _ in [60, 64, 67, 72, 76, 79] }
+
+    private func makeManager() -> ChordMelodyModeManager {
+        let m = ChordMelodyModeManager()
+        // Neutralize aspect-fill cropping so X maps straight through.
+        m.videoAspect = 1
+        m.screenAspect = 1
+        return m
+    }
+
+    private func hasMelodyOn(_ actions: [ChordMelodyModeManager.Action]) -> Bool {
+        actions.contains { if case .melodyOn = $0 { return true }; return false }
+    }
+    private func hasChordAccent(_ actions: [ChordMelodyModeManager.Action]) -> Bool {
+        actions.contains { if case .chordAccent = $0 { return true }; return false }
+    }
+    private func hasPadSlide(_ actions: [ChordMelodyModeManager.Action]) -> Bool {
+        actions.contains { if case .padSlide = $0 { return true }; return false }
+    }
+
+    func testQuantize_melodyWaitsForBoundary() {
+        let m = makeManager()
+        let chordHand = makeHandData(pinch: 0.0, pinchX: 0.1, pinchY: 0.5)   // left = chords, present
+        let melodyHand = makeHandData(pinch: 0.9, pinchY: 0.1)               // right = melody, pinching
+        let hands = HandsState(left: chordHand, right: melodyHand)
+
+        let before = m.tick(hands: hands, chordTones: chordTones, melodyTones: melodyTones,
+                            quantize: true, gridBoundaryCrossed: false)
+        XCTAssertFalse(hasMelodyOn(before), "Melody should not fire before a grid boundary")
+
+        let onBoundary = m.tick(hands: hands, chordTones: chordTones, melodyTones: melodyTones,
+                                quantize: true, gridBoundaryCrossed: true)
+        XCTAssertTrue(hasMelodyOn(onBoundary), "Melody fires on the grid boundary")
+    }
+
+    func testQuantize_melodyReleaseIsImmediate() {
+        let m = makeManager()
+        let chordHand = makeHandData(pinch: 0.0, pinchX: 0.1, pinchY: 0.5)
+        let melodyHand = makeHandData(pinch: 0.9, pinchY: 0.1)
+        _ = m.tick(hands: HandsState(left: chordHand, right: melodyHand),
+                   chordTones: chordTones, melodyTones: melodyTones,
+                   quantize: true, gridBoundaryCrossed: true)
+
+        let released = makeHandData(pinch: 0.1, pinchY: 0.1)
+        let actions = m.tick(hands: HandsState(left: chordHand, right: released),
+                             chordTones: chordTones, melodyTones: melodyTones,
+                             quantize: true, gridBoundaryCrossed: false)
+        XCTAssertTrue(actions.contains { if case .melodyOff = $0 { return true }; return false },
+                      "Melody note-off should be immediate even when quantized")
+    }
+
+    func testQuantize_chordAccentLatchesToBoundary() {
+        let m = makeManager()
+        let chordPinch = makeHandData(pinch: 0.9, pinchX: 0.1, pinchY: 0.5)  // chord hand pinching
+        let hands = HandsState(left: chordPinch, right: nil)
+
+        let before = m.tick(hands: hands, chordTones: chordTones, melodyTones: melodyTones,
+                            quantize: true, gridBoundaryCrossed: false)
+        XCTAssertFalse(hasChordAccent(before), "Strum accent should wait for a grid boundary")
+
+        let onBoundary = m.tick(hands: hands, chordTones: chordTones, melodyTones: melodyTones,
+                                quantize: true, gridBoundaryCrossed: true)
+        XCTAssertTrue(hasChordAccent(onBoundary), "Strum accent strikes on the grid boundary")
+    }
+
+    func testQuantize_chordChangeWaitsForBoundary() {
+        let m = makeManager()
+        // Establish the pad at the far-left zone.
+        let zoneA = makeHandData(pinch: 0.0, pinchX: 0.05, pinchY: 0.5)
+        _ = m.tick(hands: HandsState(left: zoneA, right: nil),
+                   chordTones: chordTones, melodyTones: melodyTones,
+                   quantize: true, gridBoundaryCrossed: true)
+
+        // Move to the far-right zone (different chord degree).
+        let zoneB = makeHandData(pinch: 0.0, pinchX: 0.95, pinchY: 0.5)
+        let before = m.tick(hands: HandsState(left: zoneB, right: nil),
+                            chordTones: chordTones, melodyTones: melodyTones,
+                            quantize: true, gridBoundaryCrossed: false)
+        XCTAssertFalse(hasPadSlide(before), "Chord change should hold until the next boundary")
+
+        let onBoundary = m.tick(hands: HandsState(left: zoneB, right: nil),
+                                chordTones: chordTones, melodyTones: melodyTones,
+                                quantize: true, gridBoundaryCrossed: true)
+        XCTAssertTrue(hasPadSlide(onBoundary), "Chord change glides on the boundary")
+    }
+}
