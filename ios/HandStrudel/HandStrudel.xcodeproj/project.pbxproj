@@ -16,6 +16,12 @@
 		1EE6860496AAB0772E65E97D /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */; };
 		1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */; };
 		204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 938A00F6A5044E13D981C663 /* EngineController.swift */; };
+		A1B2C3D4E5F600000001A002 /* ModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A001 /* ModeController.swift */; };
+		A1B2C3D4E5F600000001A012 /* MelodicModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A011 /* MelodicModeController.swift */; };
+		A1B2C3D4E5F600000001A022 /* GridModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A021 /* GridModeController.swift */; };
+		A1B2C3D4E5F600000001A032 /* DrumModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A031 /* DrumModeController.swift */; };
+		A1B2C3D4E5F600000001A042 /* ChordMelodyModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A041 /* ChordMelodyModeController.swift */; };
+		A1B2C3D4E5F600000001A052 /* LearnModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000001A051 /* LearnModeController.swift */; };
 		A1B2C3D4E5F600000000FF02 /* PinchDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000FF01 /* PinchDetector.swift */; };
 		22BEC592D38D4260A28EA96C /* StoreManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */; };
 		25A87740F4DA10D91C739E18 /* JamSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2105F77EC139355C8EC8FB3D /* JamSession.swift */; };
@@ -129,6 +135,12 @@
 		9238181B674B4222B2F52C5A /* GridTouchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridTouchView.swift; sourceTree = "<group>"; };
 		925F5A6BB1349D3D8600B323 /* ParamSmoother.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamSmoother.swift; sourceTree = "<group>"; };
 		938A00F6A5044E13D981C663 /* EngineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A001 /* ModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A011 /* MelodicModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelodicModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A021 /* GridModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A031 /* DrumModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A041 /* ChordMelodyModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordMelodyModeController.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000001A051 /* LearnModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnModeController.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000FF01 /* PinchDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinchDetector.swift; sourceTree = "<group>"; };
 		93D6C035D4A9EE1A66C31839 /* Loop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loop.swift; sourceTree = "<group>"; };
 		9531420BA306B5BC2AB859A6 /* AudioExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioExporter.swift; sourceTree = "<group>"; };
@@ -221,6 +233,12 @@
 				F81CA2974F2ED11BEA62AC3F /* AudioLooper.swift */,
 				AF0224AFA4065E8E733BD21E /* DrumModeManager.swift */,
 				938A00F6A5044E13D981C663 /* EngineController.swift */,
+				A1B2C3D4E5F600000001A001 /* ModeController.swift */,
+				A1B2C3D4E5F600000001A011 /* MelodicModeController.swift */,
+				A1B2C3D4E5F600000001A021 /* GridModeController.swift */,
+				A1B2C3D4E5F600000001A031 /* DrumModeController.swift */,
+				A1B2C3D4E5F600000001A041 /* ChordMelodyModeController.swift */,
+				A1B2C3D4E5F600000001A051 /* LearnModeController.swift */,
 				A1B2C3D4E5F600000000FF01 /* PinchDetector.swift */,
 				F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */,
 				CM4D9E5A8B7C40119EE3A002 /* ChordMelodyModeManager.swift */,
@@ -462,6 +480,12 @@
 				B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */,
 				1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */,
 				204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */,
+				A1B2C3D4E5F600000001A002 /* ModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A012 /* MelodicModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A022 /* GridModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A032 /* DrumModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A042 /* ChordMelodyModeController.swift in Sources */,
+				A1B2C3D4E5F600000001A052 /* LearnModeController.swift in Sources */,
 				A1B2C3D4E5F600000000FF02 /* PinchDetector.swift in Sources */,
 				E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */,
 				CM4D9E5A8B7C40119EE3A001 /* ChordMelodyModeManager.swift in Sources */,
