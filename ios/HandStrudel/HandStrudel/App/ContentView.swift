@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var showLearnPicker = false
     @State private var watermarkView: UIView?
     @State private var showRandomizedToast = false
+    @State private var chromeVisible = true
     // Song mode removed
 
     var body: some View {
@@ -214,6 +215,19 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
 
+            // Tap an empty area (melodic mode) to hide/show the HUD for a clean
+            // view of the camera + weave. Sits behind the controls so buttons
+            // still work; when the HUD is hidden it stops capturing taps so the
+            // next tap brings it back.
+            if melodicActive {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.25)) { chromeVisible.toggle() }
+                    }
+            }
+
             // Floating UI overlays
             VStack {
                 // Top bar: close button + beat dots
@@ -303,6 +317,8 @@ struct ContentView: View {
                         .transition(.opacity)
                 }
             }
+            .opacity(melodicActive && !chromeVisible ? 0 : 1)
+            .allowsHitTesting(chromeVisible || !melodicActive)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 50)
                     .onEnded { value in
