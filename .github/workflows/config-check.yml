@@ -1,0 +1,31 @@
+name: Config Sync Check
+
+# shared/music-config.json is the single source of truth for the music params
+# used by BOTH the web app and the iOS app. This job regenerates the per-platform
+# data files and fails if they drift from the JSON, so a change to the config
+# can't land on one platform but not the other.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "shared/**"
+      - "scripts/gen-music-config.mjs"
+      - "src/lib/music-data.generated.ts"
+      - "ios/HandStrudel/HandStrudel/Models/MusicConfig.generated.swift"
+  pull_request:
+    paths:
+      - "shared/**"
+      - "scripts/gen-music-config.mjs"
+      - "src/lib/music-data.generated.ts"
+      - "ios/HandStrudel/HandStrudel/Models/MusicConfig.generated.swift"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify generated config is in sync with shared/music-config.json
+        run: npm run verify:config

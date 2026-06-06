@@ -1,0 +1,36 @@
+{
+  "_comment": "CANONICAL source of truth for music parameters shared by the web app (src/lib/music.ts) and the iOS app (ios/.../Models/ParamDefs.swift). Edit this file, then run `npm run gen:config` to regenerate the per-platform data files. The `format` field names a formatter kind whose format()/toCode() implementations live in each platform's code (keyed by the same name).",
+  "notes": [
+    "c2", "d2", "e2", "g2", "a2",
+    "c3", "d3", "e3", "g3", "a3",
+    "c4", "d4", "e4", "g4", "a4",
+    "c5", "d5", "e5"
+  ],
+  "midiNotes": [
+    36, 38, 40, 43, 45,
+    48, 50, 52, 55, 57,
+    60, 62, 64, 67, 69,
+    72, 74, 76
+  ],
+  "structs": [
+    "x ~ x ~ x ~ x ~",
+    "x ~ ~ x ~ ~ x ~",
+    "x x ~ x ~ x x ~",
+    "[x x x] ~ ~ ~",
+    "x ~ x x ~ x ~ ~"
+  ],
+  "params": [
+    { "id": "noteIdx", "label": "pitch",   "strudelKey": "note",    "min": 0,     "max": 17,   "default": 10,   "format": "note",   "hlClass": "c-str" },
+    { "id": "gain",    "label": "volume",  "strudelKey": "gain",    "min": 0.03,  "max": 0.9,  "default": 0.55, "format": "fixed2", "hlClass": "c-nr" },
+    { "id": "lpf",     "label": "filter",  "strudelKey": "lpf",     "min": 120,   "max": 6120, "default": 3000, "format": "hz",     "hlClass": "c-nl" },
+    { "id": "hpf",     "label": "hi-pass", "strudelKey": "hpf",     "min": 20,    "max": 4000, "default": 2000, "format": "hz",     "hlClass": "c-nl" },
+    { "id": "reverb",  "label": "reverb",  "strudelKey": "room",    "min": 0,     "max": 0.9,  "default": 0.2,  "format": "fixed2", "hlClass": "c-nl" },
+    { "id": "bpm",     "label": "tempo",   "strudelKey": "cpm",     "min": 50,    "max": 205,  "default": 120,  "format": "bpm",    "hlClass": "c-nr" },
+    { "id": "delay",   "label": "delay",   "strudelKey": "delay",   "min": 0,     "max": 0.55, "default": 0.12, "format": "fixed2", "hlClass": "c-nr" },
+    { "id": "pan",     "label": "pan",     "strudelKey": "pan",     "min": 0,     "max": 1,    "default": 0.5,  "format": "fixed2", "hlClass": "c-nr" },
+    { "id": "crush",   "label": "crush",   "strudelKey": "crush",   "min": 1,     "max": 16,   "default": 8,    "format": "int",    "hlClass": "c-nl" },
+    { "id": "shape",   "label": "shape",   "strudelKey": "shape",   "min": 0,     "max": 0.9,  "default": 0,    "format": "fixed2", "hlClass": "c-nr" },
+    { "id": "attack",  "label": "attack",  "strudelKey": "attack",  "min": 0.001, "max": 0.5,  "default": 0.01, "format": "fixed3", "hlClass": "c-nr" },
+    { "id": "release", "label": "release", "strudelKey": "release", "min": 0.01,  "max": 1.0,  "default": 0.1,  "format": "fixed2", "hlClass": "c-nr" }
+  ]
+}

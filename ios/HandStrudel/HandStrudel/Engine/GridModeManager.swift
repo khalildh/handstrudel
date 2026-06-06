@@ -1,10 +1,9 @@
 import Foundation
 
 final class GridModeManager {
-    private var leftPinching = false
-    private var rightPinching = false
-    private let pinchThreshold: Double = 0.8   // fingers must be nearly touching
-    private let releaseThreshold: Double = 0.5  // open a bit to release
+    // Fingers must be nearly touching (0.8) to fire; open a bit (0.5) to release.
+    private var leftPinch = PinchDetector(on: 0.8, off: 0.5)
+    private var rightPinch = PinchDetector(on: 0.8, off: 0.5)
 
     // Track current held MIDI note per hand (for slide detection)
     private var leftHeldMidi: Int? = nil
@@ -27,27 +26,26 @@ final class GridModeManager {
         if let left = hands.left {
             let noteIdx = yToNoteIndex(y: left.pinchY, noteCount: scaleNotes.count)
             let midi = scaleNotes[noteIdx]
-            let isPinching = left.pinch > pinchThreshold
 
-            if isPinching && !leftPinching {
+            switch leftPinch.update(pinch: left.pinch) {
+            case .began:
                 // New pinch — note on
-                leftPinching = true
                 leftHeldMidi = midi
                 actions.append(.noteOn(hand: "left", midi: midi, noteName: midiNoteName(midi), velocity: min(1, left.pinch)))
-            } else if isPinching && leftPinching {
+            case .held:
                 // Still pinching — check if lane changed (slide)
                 if midi != leftHeldMidi {
                     leftHeldMidi = midi
                     actions.append(.slide(hand: "left", midi: midi, noteName: midiNoteName(midi)))
                 }
-            } else if left.pinch < releaseThreshold && leftPinching {
+            case .ended:
                 // Released — note off
-                leftPinching = false
                 leftHeldMidi = nil
                 actions.append(.noteOff(hand: "left"))
+            case .idle:
+                break
             }
-        } else if leftPinching {
-            leftPinching = false
+        } else if leftPinch.release() == .ended {
             leftHeldMidi = nil
             actions.append(.noteOff(hand: "left"))
         }
@@ -56,24 +54,23 @@ final class GridModeManager {
         if let right = hands.right {
             let noteIdx = yToNoteIndex(y: right.pinchY, noteCount: scaleNotes.count)
             let midi = scaleNotes[noteIdx]
-            let isPinching = right.pinch > pinchThreshold
 
-            if isPinching && !rightPinching {
-                rightPinching = true
+            switch rightPinch.update(pinch: right.pinch) {
+            case .began:
                 rightHeldMidi = midi
                 actions.append(.noteOn(hand: "right", midi: midi, noteName: midiNoteName(midi), velocity: min(1, right.pinch)))
-            } else if isPinching && rightPinching {
+            case .held:
                 if midi != rightHeldMidi {
                     rightHeldMidi = midi
                     actions.append(.slide(hand: "right", midi: midi, noteName: midiNoteName(midi)))
                 }
-            } else if right.pinch < releaseThreshold && rightPinching {
-                rightPinching = false
+            case .ended:
                 rightHeldMidi = nil
                 actions.append(.noteOff(hand: "right"))
+            case .idle:
+                break
             }
-        } else if rightPinching {
-            rightPinching = false
+        } else if rightPinch.release() == .ended {
             rightHeldMidi = nil
             actions.append(.noteOff(hand: "right"))
         }
@@ -102,6 +99,6 @@ final class GridModeManager {
         return (leftIdx, rightIdx)
     }
 
-    var isLeftPinching: Bool { leftPinching }
-    var isRightPinching: Bool { rightPinching }
+    var isLeftPinching: Bool { leftPinch.isPinching }
+    var isRightPinching: Bool { rightPinch.isPinching }
 }
