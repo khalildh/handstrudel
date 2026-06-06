@@ -34,6 +34,11 @@ final class PersistenceManager {
         set { defaults.set(newValue, forKey: "lastWaveform") }
     }
 
+    var lastSoundFont: String {
+        get { defaults.string(forKey: "lastSoundFont") ?? DEFAULT_SOUNDFONT_INSTRUMENT.id }
+        set { defaults.set(newValue, forKey: "lastSoundFont") }
+    }
+
     var lastBPM: Double {
         get { defaults.double(forKey: "lastBPM").nonZero ?? 120 }
         set { defaults.set(newValue, forKey: "lastBPM") }

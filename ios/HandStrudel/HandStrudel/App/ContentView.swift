@@ -152,8 +152,10 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
 
-            // Chord+Melody mode overlay (7 chord zones + melody lanes)
-            if engine.chordMelodyModeEnabled {
+            // Chord+Melody / SoundFont mode overlay (chord zones + melody lanes).
+            // Both modes share the same two-hand interaction and chordMelody*
+            // UI state, so they render the same overlay.
+            if engine.chordMelodyModeEnabled || engine.soundFontModeEnabled {
                 ChordMelodyOverlayView(
                     zoneDegrees: engine.chordMelodyModeManager.zoneDegrees,
                     currentChordZone: engine.chordMelodyChordHandLane,
@@ -223,8 +225,8 @@ struct ContentView: View {
                     }
                 }
 
-                // Floating code pill — hide in grid/drum/learn mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
+                // Floating code pill — hide in grid/drum/learn/chord/soundfont mode
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     codePill
                         .padding(.horizontal, 20)
                         .padding(.top, 2)
@@ -232,8 +234,8 @@ struct ContentView: View {
 
                 Spacer()
 
-                // Note badge — hide in grid/drum/learn mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
+                // Note badge — hide in grid/drum/learn/chord/soundfont mode
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     noteBadge
 
                     beatRing
@@ -1308,9 +1310,10 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, grid, drums, learn, chordMelody }
+    private enum AppMode: String { case melodic, grid, drums, learn, chordMelody, soundFont }
     private var currentMode: AppMode {
         if engine.learnModeEnabled { return .learn }
+        if engine.soundFontModeEnabled { return .soundFont }
         if engine.chordMelodyModeEnabled { return .chordMelody }
         if engine.gridModeEnabled { return .grid }
         if engine.drumModeEnabled { return .drums }
@@ -1322,7 +1325,8 @@ struct ControlSheet: View {
             grid: mode == .grid,
             drums: mode == .drums,
             learn: mode == .learn,
-            chordMelody: mode == .chordMelody
+            chordMelody: mode == .chordMelody,
+            soundFont: mode == .soundFont
         )
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
@@ -1333,7 +1337,7 @@ struct ControlSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("MODE", icon: "gamecontroller")
 
-            // 5 modes — wrap to 2 rows so each button still has a usable target size.
+            // 6 modes — wrap to 2 rows so each button still has a usable target size.
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     modeButton("Melodic", icon: "pianokeys", mode: .melodic)
@@ -1342,6 +1346,7 @@ struct ControlSheet: View {
                 }
                 HStack(spacing: 8) {
                     modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
+                    modeButton("SoundFont", icon: "pianokeys.inverse", mode: .soundFont)
                     modeButton("Learn", icon: "music.note.list", mode: .learn)
                 }
             }
@@ -1352,6 +1357,70 @@ struct ControlSheet: View {
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Progression")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundColor(.primary.opacity(0.7))
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(CHORD_PROGRESSIONS) { prog in
+                                    progressionChip(prog)
+                                }
+                            }
+                        }
+                    }
+
+                    Toggle(isOn: $engine.chordMelodySwapHands) {
+                        Text("Swap hands (right = chords)")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(.primary.opacity(0.8))
+                    }
+                    .tint(.green)
+
+                    Toggle(isOn: $engine.chordMelodyAutoStrum) {
+                        Text("Auto-strum (re-articulate on each beat)")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(.primary.opacity(0.8))
+                    }
+                    .tint(.green)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Pad volume")
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundColor(.primary.opacity(0.8))
+                            Spacer()
+                            Text(String(format: "%.0f%%", engine.chordMelodyPadVolume / 0.6 * 100))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $engine.chordMelodyPadVolume, in: 0...0.6)
+                            .tint(.green)
+                    }
+                }
+                .padding(.top, 2)
+            }
+
+            if currentMode == .soundFont {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Chord+melody played through a real SoundFont instrument. Chord hand holds the harmony; melody hand plays notes snapped to the current chord. Requires a General MIDI .sf2 in the app bundle (see Resources/soundfonts).")
+                        .font(.system(size: 10, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Instrument")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundColor(.primary.opacity(0.7))
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(SOUNDFONT_INSTRUMENTS) { inst in
+                                    soundFontChip(inst)
+                                }
+                            }
+                        }
+                    }
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Progression")
@@ -1497,6 +1566,27 @@ struct ControlSheet: View {
                     .background(
                         Capsule().fill(isActive ? Color.green.opacity(0.2) : Color.white.opacity(0.06))
                     )
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                Capsule().fill(isActive ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+            )
+            .overlay(
+                Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
+            )
+        }
+    }
+
+    private func soundFontChip(_ inst: SoundFontInstrument) -> some View {
+        let isActive = engine.selectedSoundFontInstrument.id == inst.id
+        return Button(action: { engine.selectedSoundFontInstrument = inst }) {
+            HStack(spacing: 6) {
+                Text(inst.emoji)
+                    .font(.system(size: 14))
+                Text(inst.name)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(isActive ? .green : .primary.opacity(0.75))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
