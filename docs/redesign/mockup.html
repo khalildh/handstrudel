@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HandStrudel — redesign mockup</title>
+<style>
+  :root{
+    --bg:#08090b; --panel:#0f1114; --line:rgba(255,255,255,.10);
+    --t1:#fff; --t2:rgba(255,255,255,.62); --t3:rgba(255,255,255,.36);
+    --accent:#37e0b0; --accent2:#36b8e0;
+    --mat:rgba(255,255,255,.06);
+    --r:22px;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#000;color:var(--t1);padding:40px 28px 80px}
+  h1{font-size:22px;font-weight:700;margin:0 0 4px}
+  .sub{color:var(--t2);font-size:14px;margin:0 0 28px;max-width:760px;line-height:1.5}
+  .row{display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start}
+  .col{width:300px}
+  .cap{color:var(--t2);font-size:13px;margin-top:14px;line-height:1.45}
+  .cap b{color:var(--t1);font-weight:600}
+
+  /* phone */
+  .phone{width:300px;height:620px;border-radius:46px;background:var(--bg);
+    border:1px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.6);
+    position:relative;overflow:hidden}
+  .notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+    width:110px;height:26px;background:#000;border-radius:16px;z-index:30}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column}
+
+  /* generic bits */
+  .pill{background:var(--mat);border:1px solid var(--line);border-radius:999px;
+    padding:7px 12px;font-size:12px;color:var(--t2);display:inline-flex;gap:6px;align-items:center}
+  .pill.solid{background:var(--accent);color:#04130d;border:none;font-weight:700}
+  .dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.18)}
+  .dot.on{background:var(--accent);transform:scale(1.4)}
+  .icon{width:40px;height:40px;border-radius:50%;background:var(--mat);
+    border:1px solid var(--line);display:grid;place-items:center;font-size:16px;color:var(--t2)}
+  .tile{background:var(--mat);border:1px solid var(--line);border-radius:14px;padding:10px;
+    display:flex;flex-direction:column;gap:6px}
+  .label{font-size:10px;letter-spacing:.6px;color:var(--t3);text-transform:uppercase;font-weight:600}
+  .seg{display:flex;background:var(--mat);border:1px solid var(--line);border-radius:14px;padding:4px;gap:2px}
+  .seg div{flex:1;text-align:center;font-size:11px;color:var(--t2);padding:9px 0;border-radius:10px}
+  .seg div.on{background:var(--accent);color:#04130d;font-weight:700}
+  .bar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;
+    justify-content:space-between;padding:46px 16px 12px}
+  .deck{position:absolute;left:12px;right:12px;bottom:18px;background:rgba(16,18,21,.72);
+    backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:24px;padding:12px;
+    display:flex;flex-direction:column;gap:10px}
+  .camera{position:absolute;inset:0;background:
+    radial-gradient(120% 80% at 50% 18%, rgba(54,184,224,.10), transparent 60%),
+    radial-gradient(90% 60% at 50% 80%, rgba(55,224,176,.08), transparent 60%),
+    linear-gradient(180deg,#0b0e12,#070809)}
+  .hand{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);
+    font-size:84px;filter:drop-shadow(0 0 24px rgba(55,224,176,.5));opacity:.5}
+  .note{position:absolute;left:0;right:0;top:42%;text-align:center;font-size:64px;font-weight:200;
+    text-shadow:0 0 28px rgba(55,224,176,.5)}
+  .transport{display:flex;justify-content:space-around;align-items:center;padding-top:2px}
+  .rec{width:46px;height:46px;border-radius:50%;border:2px solid rgba(255,255,255,.3);
+    display:grid;place-items:center}
+  .rec span{width:18px;height:18px;border-radius:50%;background:#ff4d4d}
+  .tabbar{display:flex;justify-content:space-around;padding:10px 8px 22px;border-top:1px solid var(--line);background:#0a0c0e}
+  .tab{font-size:10px;color:var(--t3);display:flex;flex-direction:column;align-items:center;gap:4px}
+  .tab.on{color:var(--accent)}
+  .tab .g{font-size:18px}
+  .scroll{flex:1;overflow:hidden;padding:54px 14px 14px}
+  .h2{font-size:18px;font-weight:700;margin:0 0 12px}
+  .listrow{display:flex;align-items:center;gap:12px;background:var(--mat);border:1px solid var(--line);
+    border-radius:14px;padding:12px;margin-bottom:10px}
+  .play{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#04130d;display:grid;place-items:center;font-size:14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .hero{height:240px;border-radius:18px;margin:0 0 14px;position:relative;overflow:hidden;
+    background:radial-gradient(80% 80% at 50% 40%, rgba(55,224,176,.22), transparent 70%),#0c0f12;
+    display:flex;align-items:flex-end;justify-content:center}
+  .hero .nm{padding:0 0 22px;text-align:center}
+  .hero .nm b{font-size:24px;font-weight:700}
+  .hero .nm div{color:var(--t2);font-size:13px}
+  .muted{color:var(--t3)}
+  .legend{margin-top:8px;color:var(--t3);font-size:12px;max-width:760px;line-height:1.5}
+  .swatch{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--accent);margin-right:4px;vertical-align:middle}
+</style>
+</head>
+<body>
+
+<h1>HandStrudel — proposed structure</h1>
+<p class="sub">The change isn't the paint, it's the bones. Four real destinations via a tab bar instead of one linear flow + a junk-drawer sheet. <b>Play</b> gets a persistent control deck. <b>Loops</b> becomes a first-class place for the capture→layer→arrange flow. <b>Sounds</b> holds presets + store. <b>Tune</b> is the small set you change mid-session; everything power-user folds under Advanced.</p>
+
+<div class="row">
+
+  <!-- PLAY -->
+  <div class="col">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="camera"></div>
+        <div class="hand">🖐️</div>
+        <div class="note">D4</div>
+
+        <div class="bar">
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="dot on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="muted" style="font-size:11px;margin-left:6px">120 BPM</span>
+          </div>
+          <div class="icon" style="width:34px;height:34px;font-size:14px">✕</div>
+        </div>
+
+        <div class="deck">
+          <div class="seg">
+            <div class="on">Play</div><div>Grid</div><div>Drums</div><div>Chord</div><div>Learn</div>
+          </div>
+          <div class="transport">
+            <div style="text-align:center"><div class="icon">🔁</div><div class="label" style="margin-top:5px">Loop</div></div>
+            <div style="text-align:center"><div class="rec"><span></span></div><div class="label" style="margin-top:5px">Record</div></div>
+            <div style="text-align:center"><div class="icon">🎚️</div><div class="label" style="margin-top:5px">Tune</div></div>
+            <div style="text-align:center"><div class="icon">🎛️</div><div class="label" style="margin-top:5px">Sounds</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>Play.</b> Camera + hands stay the instrument. A persistent <b>control deck</b> replaces the scattered floating buttons: mode tabs on top, transport below. Loop / Record / Tune / Sounds are one tap, not buried in a sheet. Tap the camera to hide the deck.</div>
+  </div>
+
+  <!-- LOOPS -->
+  <div class="col">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="scroll">
+          <div class="h2">Loops</div>
+          <div class="listrow"><div class="play">▮▮</div><div style="flex:1"><b style="font-size:14px">Layer 1 · melodic</b><div class="muted" style="font-size:11px">4 bars · playing</div></div><div class="muted">⇡</div></div>
+          <div class="listrow"><div class="play">▶</div><div style="flex:1"><b style="font-size:14px">Layer 2 · drums</b><div class="muted" style="font-size:11px">4 bars</div></div><div class="muted">⇡</div></div>
+          <div class="listrow"><div class="play">▶</div><div style="flex:1"><b style="font-size:14px">Layer 3 · chords</b><div class="muted" style="font-size:11px">8 bars</div></div><div class="muted">⇡</div></div>
+          <div class="label" style="margin:18px 0 8px">Arrange</div>
+          <div class="grid2">
+            <div class="tile" style="height:54px;justify-content:center;align-items:center">1</div>
+            <div class="tile" style="height:54px;justify-content:center;align-items:center">2</div>
+            <div class="tile" style="height:54px;justify-content:center;align-items:center;border-style:dashed;color:var(--t3)">+</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><div class="g">🌀</div>Play</div>
+          <div class="tab on"><div class="g">🔁</div>Loops</div>
+          <div class="tab"><div class="g">🎛️</div>Sounds</div>
+          <div class="tab"><div class="g">🎚️</div>Tune</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>Loops.</b> The capture→layer→arrange flow gets a real home. Recorded loops stack and play together; drag them into the arranger. This is the thing that turns playing around into a track — today it's a red button and a hidden list.</div>
+  </div>
+
+  <!-- SOUNDS -->
+  <div class="col">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="scroll">
+          <div class="h2">Sounds</div>
+          <div class="hero"><div class="nm"><b>Dreamy</b><div>Floaty reverb &amp; delay</div></div></div>
+          <div class="grid2">
+            <div class="tile" style="align-items:center"><div style="font-size:22px">🌙</div><div style="font-size:11px">Dreamy</div></div>
+            <div class="tile" style="align-items:center"><div style="font-size:22px">🔥</div><div style="font-size:11px">Gritty</div></div>
+            <div class="tile" style="align-items:center"><div style="font-size:22px">🎾</div><div style="font-size:11px">Bouncy</div></div>
+            <div class="tile" style="align-items:center"><div style="font-size:22px">🧊</div><div style="font-size:11px">Chill</div></div>
+            <div class="tile" style="align-items:center;opacity:.6"><div style="font-size:22px">⚡</div><div style="font-size:11px">EDM 🔒</div></div>
+            <div class="tile" style="align-items:center;opacity:.6"><div style="font-size:22px">🌊</div><div style="font-size:11px">Ambient 🔒</div></div>
+          </div>
+          <div style="margin-top:14px"><span class="pill" style="width:100%;justify-content:center">Browse packs &amp; store →</span></div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><div class="g">🌀</div>Play</div>
+          <div class="tab"><div class="g">🔁</div>Loops</div>
+          <div class="tab on"><div class="g">🎛️</div>Sounds</div>
+          <div class="tab"><div class="g">🎚️</div>Tune</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>Sounds.</b> Presets + the store live together as one place to pick/own gear. Picking previews the vibe. No separate "start screen" that you only ever see once — sound selection is always one tab away while you play.</div>
+  </div>
+
+  <!-- TUNE -->
+  <div class="col">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="scroll">
+          <div class="h2">Tune</div>
+          <div class="label">Key</div>
+          <div class="seg" style="margin:8px 0 16px"><div class="on">C</div><div>D</div><div>E</div><div>G</div><div>A</div></div>
+          <div class="label">Scale</div>
+          <div class="seg" style="margin:8px 0 16px"><div class="on">Penta</div><div>Major</div><div>Minor</div><div>Dorian</div></div>
+          <div class="label">Effects</div>
+          <div class="tile" style="margin:8px 0 16px;gap:12px">
+            <div><div class="muted" style="font-size:11px;margin-bottom:5px">Reverb</div><div style="height:6px;background:var(--mat);border-radius:3px"><div style="width:45%;height:6px;background:var(--accent);border-radius:3px"></div></div></div>
+            <div><div class="muted" style="font-size:11px;margin-bottom:5px">Filter</div><div style="height:6px;background:var(--mat);border-radius:3px"><div style="width:70%;height:6px;background:var(--accent);border-radius:3px"></div></div></div>
+          </div>
+          <div class="listrow" style="justify-content:space-between"><span>Advanced</span><span class="muted">⌄</span></div>
+          <div class="muted" style="font-size:11px;padding:2px 4px">Hand→param mapping · 2nd drum track · sequencer · live code</div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><div class="g">🌀</div>Play</div>
+          <div class="tab"><div class="g">🔁</div>Loops</div>
+          <div class="tab"><div class="g">🎛️</div>Sounds</div>
+          <div class="tab on"><div class="g">🎚️</div>Tune</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>Tune.</b> Only the few things you change mid-session: key, scale, effects. The entire old mega-sheet (mapping, dual drums, sequencer, code) collapses under one <b>Advanced</b> row. Players never see the cockpit unless they want it.</div>
+  </div>
+
+</div>
+
+<p class="legend"><span class="swatch"></span>This is a static mockup of <b>structure</b>, not final visuals — colors/spacing follow the design tokens already in the branch. The point is the architecture: 4 destinations, a persistent play deck, a real Loops flow, and a tiny Tune surface. Tell me where this is wrong and I'll change the map before touching more code.</p>
+
+</body>
+</html>
