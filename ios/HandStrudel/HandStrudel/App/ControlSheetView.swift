@@ -10,6 +10,8 @@ struct ControlSheet: View {
     @State private var showAudioExport = false
     @State private var exportedAudioURL: URL?
     @State private var soundFontCategory: GMCategory = DEFAULT_SOUNDFONT_INSTRUMENT.category
+    @State private var customProgressionText = ""
+    @State private var progressionCategory: ProgressionCategory = .essentials
 
     var body: some View {
         ScrollView {
@@ -227,10 +229,55 @@ struct ControlSheet: View {
                             .foregroundColor(.primary.opacity(0.7))
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
-                                ForEach(CHORD_PROGRESSIONS) { prog in
+                                ForEach(ProgressionCategory.allCases) { cat in
+                                    progressionCategoryChip(cat)
+                                }
+                            }
+                        }
+                        .onAppear { syncProgressionCategoryToSelection() }
+                        .onChange(of: engine.chordMelodyProgression) { _ in
+                            syncProgressionCategoryToSelection()
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                if engine.chordMelodyProgression.isCustom {
+                                    progressionChip(engine.chordMelodyProgression)
+                                }
+                                ForEach(CHORD_PROGRESSIONS.filter { $0.category == progressionCategory }) { prog in
                                     progressionChip(prog)
                                 }
                             }
+                        }
+
+                        // Manual entry: type any progression in Roman numerals
+                        // ("I V vi IV") or scale-degree numbers ("1 5 6 4").
+                        HStack(spacing: 6) {
+                            TextField("Type a progression…", text: $customProgressionText)
+                                .font(.system(size: 12, design: .rounded))
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
+                                .submitLabel(.go)
+                                .onSubmit { applyCustomProgression() }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Capsule().fill(Color.primary.opacity(0.05)))
+                                .overlay(Capsule().stroke(Color.white.opacity(0.07), lineWidth: 0.5))
+                                .accessibilityIdentifier("progression-input")
+
+                            Button(action: applyCustomProgression) {
+                                Text("Set")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundColor(customProgressionPreview == nil ? .secondary : .green)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        Capsule().fill(customProgressionPreview == nil
+                                            ? Color.primary.opacity(0.04)
+                                            : Color.green.opacity(0.12))
+                                    )
+                            }
+                            .disabled(customProgressionPreview == nil)
+                            .accessibilityIdentifier("progression-set")
                         }
                     }
 
@@ -461,6 +508,52 @@ struct ControlSheet: View {
                 Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
             )
         }
+    }
+
+    private func progressionCategoryChip(_ cat: ProgressionCategory) -> some View {
+        let isActive = progressionCategory == cat
+        return Button(action: { progressionCategory = cat }) {
+            HStack(spacing: 5) {
+                Text(cat.emoji).font(.system(size: 12))
+                Text(cat.displayName)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(isActive ? .blue : .primary.opacity(0.6))
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(isActive ? Color.blue.opacity(0.12) : Color.primary.opacity(0.03))
+            )
+            .overlay(
+                Capsule().stroke(isActive ? Color.blue.opacity(0.5) : Color.white.opacity(0.05), lineWidth: isActive ? 1 : 0.5)
+            )
+        }
+    }
+
+    // Snap the category filter to whichever bucket the active progression
+    // belongs to. Custom progressions stick to the user's current filter so
+    // they can keep browsing while their typed-in one rides at the front.
+    private func syncProgressionCategoryToSelection() {
+        let cat = engine.chordMelodyProgression.category
+        if cat != .custom { progressionCategory = cat }
+    }
+
+    private var customProgressionPreview: ChordProgression? {
+        guard let prog = ChordProgression.parse(customProgressionText) else { return nil }
+        return prog.degrees.isEmpty ? nil : prog
+    }
+
+    private func applyCustomProgression() {
+        guard let parsed = ChordProgression.parse(customProgressionText) else { return }
+        let label = parsed.degrees.map(romanNumeral).joined(separator: " ")
+        engine.chordMelodyProgression = ChordProgression(
+            id: "custom", name: label, emoji: "✍️", degrees: parsed.degrees, category: .custom)
+    }
+
+    /// Diatonic Roman numeral for a 0-based scale degree (0 = I … 6 = vii°).
+    private func romanNumeral(_ degree: Int) -> String {
+        let numerals = ["I", "ii", "iii", "IV", "V", "vi", "vii°"]
+        return numerals.indices.contains(degree) ? numerals[degree] : "\(degree + 1)"
     }
 
     private func progressionChip(_ prog: ChordProgression) -> some View {
