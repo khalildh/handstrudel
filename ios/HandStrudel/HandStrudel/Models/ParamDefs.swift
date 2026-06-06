@@ -46,6 +46,12 @@ private func paramFormatter(
     }
 }
 
+/// Dense, rest-free 16th-note pulse used by Flow mode. Strudel only samples
+/// the pitch signal at a note onset, so packing more onsets into each cycle
+/// tightens pitch feedback (~125 ms vs. up to ~750 ms with the sparse STRUCTS)
+/// while staying 100% Strudel — code snapshots, effects and stack() all intact.
+let FLOW_STRUCT = "x x x x x x x x x x x x x x x x"
+
 let PARAM_DEFS: [ParamDef] = PARAM_SPECS.map { spec in
     let f = paramFormatter(spec.format)
     return ParamDef(
@@ -99,8 +105,8 @@ func buildCode(_ p: MusicParams, structIdx: Int, config: MappingConfig, waveform
     return code
 }
 
-func buildSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth") -> String {
-    let st = STRUCTS[max(0, min(STRUCTS.count - 1, structIdx))]
+func buildSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth", structOverride: String? = nil) -> String {
+    let st = structOverride ?? STRUCTS[max(0, min(STRUCTS.count - 1, structIdx))]
 
     var code = "note(signal(() => __hp._midi)).s(\"\(waveform)\").struct(\"\(st)\").cpm(signal(() => __hp._cpm))"
 
@@ -112,8 +118,8 @@ func buildSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "
     return code
 }
 
-func buildChordSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth") -> String {
-    let st = STRUCTS[max(0, min(STRUCTS.count - 1, structIdx))]
+func buildChordSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth", structOverride: String? = nil) -> String {
+    let st = structOverride ?? STRUCTS[max(0, min(STRUCTS.count - 1, structIdx))]
 
     // Build extra params chain (shared across all chord voices)
     var extras = ""

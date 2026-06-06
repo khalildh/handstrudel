@@ -161,12 +161,15 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, grid, drums, learn, chordMelody }
+    private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody }
     private var currentMode: AppMode {
         if engine.learnModeEnabled { return .learn }
         if engine.chordMelodyModeEnabled { return .chordMelody }
         if engine.gridModeEnabled { return .grid }
         if engine.drumModeEnabled { return .drums }
+        if engine.leadModeEnabled { return .lead }
+        if engine.hybridModeEnabled { return .hybrid }
+        if engine.flowModeEnabled { return .flow }
         return .melodic
     }
 
@@ -175,7 +178,10 @@ struct ControlSheet: View {
             grid: mode == .grid,
             drums: mode == .drums,
             learn: mode == .learn,
-            chordMelody: mode == .chordMelody
+            chordMelody: mode == .chordMelody,
+            lead: mode == .lead,
+            hybrid: mode == .hybrid,
+            flow: mode == .flow
         )
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
@@ -186,10 +192,15 @@ struct ControlSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("MODE", icon: "gamecontroller")
 
-            // 5 modes — wrap to 2 rows so each button still has a usable target size.
+            // 8 modes — wrap so each button still has a usable target size.
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     modeButton("Melodic", icon: "pianokeys", mode: .melodic)
+                    modeButton("Flow", icon: "waveform", mode: .flow)
+                    modeButton("Hybrid", icon: "waveform.path", mode: .hybrid)
+                }
+                HStack(spacing: 8) {
+                    modeButton("Lead", icon: "guitars", mode: .lead)
                     modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
                     modeButton("Drums", icon: "beats.headphones", mode: .drums)
                 }
