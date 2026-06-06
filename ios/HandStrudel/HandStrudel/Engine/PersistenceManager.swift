@@ -54,14 +54,14 @@ final class PersistenceManager {
         set { defaults.set(newValue, forKey: "lastGridOctaveRange") }
     }
 
-    var lastGridQuantizeEnabled: Bool {
-        get { defaults.bool(forKey: "lastGridQuantizeEnabled") }
-        set { defaults.set(newValue, forKey: "lastGridQuantizeEnabled") }
+    var lastQuantizeEnabled: Bool {
+        get { defaults.bool(forKey: "lastQuantizeEnabled") }
+        set { defaults.set(newValue, forKey: "lastQuantizeEnabled") }
     }
 
-    var lastGridQuantizeDiv: Double {
-        get { let v = defaults.double(forKey: "lastGridQuantizeDiv"); return v == 0 ? 8 : v }
-        set { defaults.set(newValue, forKey: "lastGridQuantizeDiv") }
+    var lastQuantizeDiv: Double {
+        get { let v = defaults.double(forKey: "lastQuantizeDiv"); return v == 0 ? 8 : v }
+        set { defaults.set(newValue, forKey: "lastQuantizeDiv") }
     }
 
     // MARK: - Loops
@@ -101,7 +101,7 @@ final class PersistenceManager {
     func saveEngineState(presetId: String?, mode: String, key: String, scale: String,
                          waveform: String, bpm: Double, filterId: String,
                          gridBaseOctave: Int, gridOctaveRange: Int,
-                         gridQuantizeEnabled: Bool, gridQuantizeDiv: Double) {
+                         quantizeEnabled: Bool, quantizeDiv: Double) {
         lastPresetId = presetId
         lastMode = mode
         lastKey = key
@@ -111,8 +111,8 @@ final class PersistenceManager {
         lastFilterId = filterId
         lastGridBaseOctave = gridBaseOctave
         lastGridOctaveRange = gridOctaveRange
-        lastGridQuantizeEnabled = gridQuantizeEnabled
-        lastGridQuantizeDiv = gridQuantizeDiv
+        lastQuantizeEnabled = quantizeEnabled
+        lastQuantizeDiv = quantizeDiv
     }
 }
 

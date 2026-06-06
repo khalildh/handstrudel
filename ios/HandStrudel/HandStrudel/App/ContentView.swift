@@ -615,12 +615,12 @@ struct ContentView: View {
             Spacer()
 
             // Sync-to-beat (quantize) toggle
-            Button(action: { engine.gridQuantizeEnabled.toggle() }) {
-                Image(systemName: engine.gridQuantizeEnabled ? "metronome.fill" : "metronome")
+            Button(action: { engine.quantizeEnabled.toggle() }) {
+                Image(systemName: engine.quantizeEnabled ? "metronome.fill" : "metronome")
                     .font(.system(size: 12))
-                    .foregroundColor(engine.gridQuantizeEnabled ? .green : .white.opacity(0.5))
+                    .foregroundColor(engine.quantizeEnabled ? .green : .white.opacity(0.5))
                     .frame(width: 26, height: 26)
-                    .background(Circle().fill(engine.gridQuantizeEnabled ? Color.green.opacity(0.15) : Color.white.opacity(0.1)))
+                    .background(Circle().fill(engine.quantizeEnabled ? Color.green.opacity(0.15) : Color.white.opacity(0.1)))
             }
 
             // Finger octave toggle
@@ -1389,6 +1389,32 @@ struct ControlSheet: View {
                     }
                     .tint(.green)
 
+                    Toggle(isOn: $engine.quantizeEnabled) {
+                        Text("Sync to beat (snap notes & chord changes to the grid)")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(.primary.opacity(0.8))
+                    }
+                    .tint(.green)
+
+                    if engine.quantizeEnabled {
+                        HStack(spacing: 8) {
+                            Text("Grid")
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundColor(.secondary)
+                            ForEach([(4.0, "1/4"), (8.0, "1/8"), (16.0, "1/16")], id: \.0) { div, label in
+                                Button(action: { engine.quantizeDiv = div }) {
+                                    Text(label)
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .foregroundColor(engine.quantizeDiv == div ? .green : .secondary)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 6)
+                                        .background(Capsule().fill(engine.quantizeDiv == div ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
+                                }
+                            }
+                            Spacer()
+                        }
+                    }
+
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Pad volume")
@@ -1461,30 +1487,30 @@ struct ControlSheet: View {
 
                 // Sync to beat (quantize): snap note timing to a rhythmic grid
                 HStack(spacing: 12) {
-                    Button(action: { engine.gridQuantizeEnabled.toggle() }) {
+                    Button(action: { engine.quantizeEnabled.toggle() }) {
                         HStack(spacing: 6) {
-                            Image(systemName: engine.gridQuantizeEnabled ? "metronome.fill" : "metronome")
+                            Image(systemName: engine.quantizeEnabled ? "metronome.fill" : "metronome")
                                 .font(.system(size: 12))
                             Text("Sync to beat")
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
                         }
-                        .foregroundColor(engine.gridQuantizeEnabled ? .green : .secondary)
+                        .foregroundColor(engine.quantizeEnabled ? .green : .secondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Capsule().fill(engine.gridQuantizeEnabled ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
+                        .background(Capsule().fill(engine.quantizeEnabled ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
                     }
 
                     Spacer()
 
-                    if engine.gridQuantizeEnabled {
+                    if engine.quantizeEnabled {
                         ForEach([(4.0, "1/4"), (8.0, "1/8"), (16.0, "1/16")], id: \.0) { div, label in
-                            Button(action: { engine.gridQuantizeDiv = div }) {
+                            Button(action: { engine.quantizeDiv = div }) {
                                 Text(label)
                                     .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                    .foregroundColor(engine.gridQuantizeDiv == div ? .green : .secondary)
+                                    .foregroundColor(engine.quantizeDiv == div ? .green : .secondary)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 6)
-                                    .background(Capsule().fill(engine.gridQuantizeDiv == div ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
+                                    .background(Capsule().fill(engine.quantizeDiv == div ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
                             }
                         }
                     }

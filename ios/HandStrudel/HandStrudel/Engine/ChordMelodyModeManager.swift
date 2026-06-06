@@ -50,6 +50,11 @@ final class ChordMelodyModeManager {
     private var melodyHandPinching = false
     private var heldMelodyMidi: Int? = nil
 
+    /// When quantized, a chord-hand pinch is latched here and the strum accent
+    /// is struck on the next grid boundary instead of immediately.
+    private var pendingChordAccent = false
+    private var pendingChordAccentVel: Double = 0
+
     /// Whether the pad is currently sounding (chord hand visible in frame).
     private var padOn = false
     /// The chord degree the pad is currently voicing.
@@ -146,10 +151,17 @@ final class ChordMelodyModeManager {
     /// Process one frame of hand state and emit chord/melody actions.
     /// `chordTones(forDegree:)` returns the MIDI notes of the chord at that
     /// degree (root/third/fifth, three octaves' worth for the melody hand).
+    ///
+    /// When `quantize` is true, the audible changes — chord changes, the strum
+    /// accent, and melody onsets/slides — only happen on a grid boundary
+    /// (`gridBoundaryCrossed`) so everything locks to the beat. The pad coming
+    /// up when the hand appears, and all note-offs, stay immediate.
     func tick(
         hands: HandsState,
         chordTones: (Int) -> [Int],
-        melodyTones: (Int) -> [Int]
+        melodyTones: (Int) -> [Int],
+        quantize: Bool = false,
+        gridBoundaryCrossed: Bool = false
     ) -> [Action] {
         var actions: [Action] = []
 
@@ -163,75 +175,109 @@ final class ChordMelodyModeManager {
             currentChordMidi = baseTones.map { $0 + octave * 12 }
 
             if !padOn {
-                // First frame of presence — bring the pad up.
+                // First frame of presence — bring the pad up immediately.
                 padOn = true
                 padDegree = degree
                 padOctaveShift = octave
                 actions.append(.padOn(midiNotes: currentChordMidi, degree: degree))
-            } else if degree != padDegree || octave != padOctaveShift {
-                // Hand moved to a new zone or octave — glide the pad.
+            } else if (degree != padDegree || octave != padOctaveShift) && (!quantize || gridBoundaryCrossed) {
+                // Hand moved to a new zone or octave — glide the pad. Quantized:
+                // hold the change until the next grid boundary.
                 padDegree = degree
                 padOctaveShift = octave
                 actions.append(.padSlide(midiNotes: currentChordMidi, degree: degree))
             }
 
             // Pinch crossings trigger an additive accent on top of the pad.
+            // Free: strike immediately. Quantized: latch and strike the
+            // sounding chord on the next grid boundary.
             let isPinching = h.pinch > pinchThreshold
             if isPinching && !chordHandPinching {
                 chordHandPinching = true
-                actions.append(.chordAccent(
-                    midiNotes: currentChordMidi,
-                    degree: degree,
-                    velocity: min(1, h.pinch)
-                ))
+                if quantize {
+                    pendingChordAccent = true
+                    pendingChordAccentVel = min(1, h.pinch)
+                } else {
+                    actions.append(.chordAccent(
+                        midiNotes: currentChordMidi,
+                        degree: degree,
+                        velocity: min(1, h.pinch)
+                    ))
+                }
             } else if h.pinch < releaseThreshold && chordHandPinching {
                 chordHandPinching = false
             }
+
+            if quantize && pendingChordAccent && gridBoundaryCrossed {
+                pendingChordAccent = false
+                // Strike the chord that is actually sounding (the pad), so the
+                // accent matches the harmony even if the hand has already moved.
+                let strikeDegree = padDegree ?? degree
+                let strikeMidi = chordTones(strikeDegree).map { $0 + padOctaveShift * 12 }
+                actions.append(.chordAccent(
+                    midiNotes: strikeMidi,
+                    degree: strikeDegree,
+                    velocity: pendingChordAccentVel
+                ))
+            }
         } else {
-            // Hand left the frame — fade the pad out and clear pinch latch.
+            // Hand left the frame — fade the pad out and clear pinch latches.
             if padOn {
                 padOn = false
                 padDegree = nil
                 actions.append(.padOff)
             }
             chordHandPinching = false
+            pendingChordAccent = false
         }
 
         // -------------------- Melody hand --------------------
-        // Melody snaps to the *current chord's* tones. If no chord is held
-        // yet, fall back to degree 0 so the right hand still makes sound.
-        let snapDegree = currentChordDegree ?? 0
+        // Melody snaps to the *sounding* chord's tones (the pad degree), so when
+        // quantized it stays consonant with the chord you actually hear rather
+        // than the one the hand is mid-move toward. Falls back to the last known
+        // chord, then degree 0, so the melody hand always makes sound.
+        let snapDegree = padDegree ?? currentChordDegree ?? 0
         let melodySnapTargets = melodyTones(snapDegree)
 
         if let h = melodyHand(hands), !melodySnapTargets.isEmpty {
-            let laneIdx = yToMelodyLane(h.pinchY, noteCount: melodySnapTargets.count)
-            let midi = melodySnapTargets[laneIdx]
-            let isPinching = h.pinch > pinchThreshold
-
-            if isPinching && !melodyHandPinching {
+            // Hysteresis latch: engage above pinchThreshold, release below
+            // releaseThreshold — matches the grid hand's feel.
+            if h.pinch > pinchThreshold {
                 melodyHandPinching = true
-                heldMelodyMidi = midi
-                actions.append(.melodyOn(
-                    hand: melodyHandName,
-                    midi: midi,
-                    name: midiNoteName(midi),
-                    velocity: min(1, h.pinch)
-                ))
-            } else if isPinching && melodyHandPinching {
-                if midi != heldMelodyMidi {
-                    heldMelodyMidi = midi
-                    actions.append(.melodySlide(
-                        hand: melodyHandName,
-                        midi: midi,
-                        name: midiNoteName(midi)
-                    ))
-                }
-            } else if h.pinch < releaseThreshold && melodyHandPinching {
+            } else if h.pinch < releaseThreshold {
                 melodyHandPinching = false
-                heldMelodyMidi = nil
-                actions.append(.melodyOff(hand: melodyHandName))
             }
-        } else if melodyHandPinching {
+
+            if !melodyHandPinching {
+                // Released — note off is always immediate.
+                if heldMelodyMidi != nil {
+                    heldMelodyMidi = nil
+                    actions.append(.melodyOff(hand: melodyHandName))
+                }
+            } else {
+                let laneIdx = yToMelodyLane(h.pinchY, noteCount: melodySnapTargets.count)
+                let midi = melodySnapTargets[laneIdx]
+                // Quantized: only let the audible note change on a boundary.
+                if !quantize || gridBoundaryCrossed {
+                    if heldMelodyMidi == nil {
+                        heldMelodyMidi = midi
+                        actions.append(.melodyOn(
+                            hand: melodyHandName,
+                            midi: midi,
+                            name: midiNoteName(midi),
+                            velocity: min(1, h.pinch)
+                        ))
+                    } else if midi != heldMelodyMidi {
+                        heldMelodyMidi = midi
+                        actions.append(.melodySlide(
+                            hand: melodyHandName,
+                            midi: midi,
+                            name: midiNoteName(midi)
+                        ))
+                    }
+                }
+            }
+        } else if heldMelodyMidi != nil {
             melodyHandPinching = false
             heldMelodyMidi = nil
             actions.append(.melodyOff(hand: melodyHandName))

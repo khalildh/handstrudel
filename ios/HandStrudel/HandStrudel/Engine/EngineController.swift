@@ -144,10 +144,10 @@ final class EngineController: ObservableObject {
 
     // Grid quantize ("sync to beat"): snap note timing to a rhythmic grid that
     // is phase-locked to the audible/haptic beat. See the quantize clock below.
-    @Published var gridQuantizeEnabled = false {
+    @Published var quantizeEnabled = false {
         didSet { quantizeLastGridStep = -1 }   // re-sync the clock on toggle
     }
-    @Published var gridQuantizeDiv: Double = 8 {  // subdivisions per cycle: 4=¼, 8=⅛, 16=1/16
+    @Published var quantizeDiv: Double = 8 {  // subdivisions per cycle: 4=¼, 8=⅛, 16=1/16
         didSet { quantizeLastGridStep = -1 }   // re-sync when the grid resolution changes
     }
 
@@ -226,8 +226,8 @@ final class EngineController: ObservableObject {
         manualBPM = pm.lastBPM
         gridBaseOctave = pm.lastGridBaseOctave
         gridOctaveRange = pm.lastGridOctaveRange
-        gridQuantizeEnabled = pm.lastGridQuantizeEnabled
-        gridQuantizeDiv = pm.lastGridQuantizeDiv
+        quantizeEnabled = pm.lastQuantizeEnabled
+        quantizeDiv = pm.lastQuantizeDiv
 
         // Restore mode
         switch pm.lastMode {
@@ -491,9 +491,9 @@ final class EngineController: ObservableObject {
         }
 
         let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale, baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
-        let boundary = gridBoundaryCrossed()
+        let boundary = quantizeBoundaryCrossed()
         let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: gridNotes,
-                                                 quantize: gridQuantizeEnabled,
+                                                 quantize: quantizeEnabled,
                                                  gridBoundaryCrossed: boundary)
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         for action in actions {
@@ -527,9 +527,9 @@ final class EngineController: ObservableObject {
     /// onBeat clock so steps land on (and evenly between) the felt beats.
     /// `quantizeDiv` is the number of subdivisions per cycle (4 quarters), so
     /// e.g. 8 → two steps per quarter (eighth notes).
-    private func gridBoundaryCrossed() -> Bool {
-        guard gridQuantizeEnabled, quantizeBeatWallTime > 0, quantizeQuarterPeriod > 0 else { return false }
-        let subsPerQuarter = max(1.0, gridQuantizeDiv / 4.0)
+    private func quantizeBoundaryCrossed() -> Bool {
+        guard quantizeEnabled, quantizeBeatWallTime > 0, quantizeQuarterPeriod > 0 else { return false }
+        let subsPerQuarter = max(1.0, quantizeDiv / 4.0)
         let now = CACurrentMediaTime()
         let frac = min(2.0, max(0, (now - quantizeBeatWallTime) / quantizeQuarterPeriod))
         let subPos = (Double(quantizeBeatIndex) + frac) * subsPerQuarter
@@ -583,7 +583,9 @@ final class EngineController: ObservableObject {
         let actions = chordMelodyModeManager.tick(
             hands: currentHands,
             chordTones: chordTones,
-            melodyTones: melodyTones
+            melodyTones: melodyTones,
+            quantize: quantizeEnabled,
+            gridBoundaryCrossed: quantizeBoundaryCrossed()
         )
 
         for action in actions {
@@ -1165,8 +1167,8 @@ final class EngineController: ObservableObject {
             filterId: selectedFilter.id,
             gridBaseOctave: gridBaseOctave,
             gridOctaveRange: gridOctaveRange,
-            gridQuantizeEnabled: gridQuantizeEnabled,
-            gridQuantizeDiv: gridQuantizeDiv
+            quantizeEnabled: quantizeEnabled,
+            quantizeDiv: quantizeDiv
         )
         PersistenceManager.shared.saveLoops(savedLoops)
         PersistenceManager.shared.saveSnippets(savedSnippets)
