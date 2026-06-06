@@ -193,6 +193,42 @@ func buildChordSignalCode(structIdx: Int, config: MappingConfig, waveform: Strin
     return "stack(\(voice(0)), \(voice(1)), \(voice(2)))"
 }
 
+// MARK: - EDM Mode
+
+/// Drum bed for EDM mode. Groove = four-on-the-floor (kick on every beat,
+/// backbeat clap, offbeat open hats, 8th closed hats). Build = the kick drops
+/// out and a snare roll accelerates into the drop for the classic riser.
+func buildEDMDrumCode(building: Bool) -> String {
+    // Gains are baked into the sound constants (_houseKick etc.), so the
+    // patterns just supply rhythm — same approach as DRUM_LOOPS.
+    if building {
+        return "stack("
+            + "\(_snare).struct(\"[x x] [x x] [x x x] [x x x x]\"), "
+            + "\(_closedHat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\")"
+            + ")"
+    }
+    return "stack("
+        + "\(_houseKick).struct(\"x x x x\"), "
+        + "\(_clap).struct(\"~ ~ x ~\"), "
+        + "\(_openHat).struct(\"~ x ~ x ~ x ~ x\"), "
+        + "\(_closedHat).struct(\"[x x] [x x] [x x] [x x]\")"
+        + ")"
+}
+
+/// Full EDM-mode Strudel body: a sustained pad/bass driven by the live note
+/// signal and sidechain-pumped to a 4-on-the-floor gain LFO, stacked with the
+/// drum bed, all under a hand-controlled master low-pass (`__hp._edmLpf`).
+/// The instant lead voice is layered separately (imperative synth), so this
+/// covers everything except the topline.
+func buildEDMCode(structIdx: Int, config: MappingConfig, waveform: String, building: Bool) -> String {
+    // One held note per cycle = a sustained pad/bass; the saw gain LFO at
+    // fast(4) ducks it on every kick for the sidechain "pump".
+    let pad = buildSignalCode(structIdx: structIdx, config: config, waveform: waveform, structOverride: "x")
+    let pumpedPad = "(\(pad)).gain(saw.range(0.4, 1).fast(4))"
+    let drums = "(\(buildEDMDrumCode(building: building))).cpm(signal(() => __hp._cpm))"
+    return "stack(\(pumpedPad), \(drums)).lpf(signal(() => __hp._edmLpf))"
+}
+
 func buildTrackCode(slots: [Int], speed: Double, snippets: [SavedSnippet]) -> String? {
     let codes = slots.compactMap { snippets[safe: $0]?.code }
     guard !codes.isEmpty else { return nil }

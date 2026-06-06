@@ -1308,12 +1308,13 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, grid, drums, learn, chordMelody, lead, hybrid, flow }
+    private enum AppMode: String { case melodic, grid, drums, learn, chordMelody, lead, hybrid, flow, edm }
     private var currentMode: AppMode {
         if engine.learnModeEnabled { return .learn }
         if engine.chordMelodyModeEnabled { return .chordMelody }
         if engine.gridModeEnabled { return .grid }
         if engine.drumModeEnabled { return .drums }
+        if engine.edmModeEnabled { return .edm }
         if engine.leadModeEnabled { return .lead }
         if engine.hybridModeEnabled { return .hybrid }
         if engine.flowModeEnabled { return .flow }
@@ -1328,7 +1329,8 @@ struct ControlSheet: View {
             chordMelody: mode == .chordMelody,
             lead: mode == .lead,
             hybrid: mode == .hybrid,
-            flow: mode == .flow
+            flow: mode == .flow,
+            edm: mode == .edm
         )
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
@@ -1371,6 +1373,8 @@ struct ControlSheet: View {
                     modeButton("Hybrid", icon: "square.stack.3d.up.fill", mode: .hybrid)
                     modeButton("Lead", icon: "bolt.fill", mode: .lead)
                 }
+                // EDM performance mode (built on Hybrid).
+                modeButton("EDM Set", icon: "flame.fill", mode: .edm)
             }
 
             if let blurb = melodicVariantBlurb {
@@ -1379,6 +1383,10 @@ struct ControlSheet: View {
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
+            }
+
+            if currentMode == .edm {
+                edmControls
             }
 
             if currentMode == .chordMelody {
@@ -1486,6 +1494,56 @@ struct ControlSheet: View {
                 .padding(.top, 4)
             }
         }
+    }
+
+    @ViewBuilder
+    private var edmControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Four-on-floor groove runs continuously. Raise your hands to open the filter (energy); lead plays instantly on top. Hit Build-Up — or make two fists — for a riser, then it drops.")
+                .font(.system(size: 10, design: .rounded))
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // Build-up length
+            HStack(spacing: 8) {
+                Text("Build")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+                ForEach([1, 2, 4], id: \.self) { bars in
+                    Button(action: { engine.edmBuildBars = bars }) {
+                        Text("\(bars) bar\(bars > 1 ? "s" : "")")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(engine.edmBuildBars == bars ? .orange : .secondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 30)
+                            .background(RoundedRectangle(cornerRadius: 8)
+                                .fill(engine.edmBuildBars == bars ? Color.orange.opacity(0.15) : Color.primary.opacity(0.04)))
+                    }
+                }
+            }
+
+            // Build-up / drop trigger
+            Button(action: { engine.triggerEDMBuild() }) {
+                HStack(spacing: 8) {
+                    Image(systemName: engine.edmBuilding ? "arrow.down.to.line" : "flame.fill")
+                        .font(.system(size: 16, weight: .bold))
+                    Text(engine.edmBuilding ? "DROP NOW" : "BUILD-UP")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(LinearGradient(
+                            colors: engine.edmBuilding
+                                ? [Color.red, Color.orange]
+                                : [Color.orange, Color.orange.opacity(0.7)],
+                            startPoint: .top, endPoint: .bottom))
+                )
+            }
+        }
+        .padding(.top, 2)
     }
 
     private func modeButton(_ label: String, icon: String, mode: AppMode) -> some View {
