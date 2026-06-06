@@ -1157,6 +1157,7 @@ struct ControlSheet: View {
     @State private var showAudioExport = false
     @State private var exportedAudioURL: URL?
     @State private var customProgressionText = ""
+    @State private var progressionCategory: ProgressionCategory = .essentials
 
     var body: some View {
         ScrollView {
@@ -1358,6 +1359,20 @@ struct ControlSheet: View {
                         Text("Progression")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .foregroundColor(.primary.opacity(0.7))
+                        // Category row: filter the chip row by genre/feel.
+                        // Defaults to the current progression's category and
+                        // tracks gesture/restore-driven changes.
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(ProgressionCategory.allCases) { cat in
+                                    progressionCategoryChip(cat)
+                                }
+                            }
+                        }
+                        .onAppear { syncProgressionCategoryToSelection() }
+                        .onChange(of: engine.chordMelodyProgression) { _ in
+                            syncProgressionCategoryToSelection()
+                        }
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
                                 // A typed-in progression rides at the front of
@@ -1365,7 +1380,7 @@ struct ControlSheet: View {
                                 if engine.chordMelodyProgression.isCustom {
                                     progressionChip(engine.chordMelodyProgression)
                                 }
-                                ForEach(CHORD_PROGRESSIONS) { prog in
+                                ForEach(CHORD_PROGRESSIONS.filter { $0.category == progressionCategory }) { prog in
                                     progressionChip(prog)
                                 }
                             }
@@ -1524,6 +1539,34 @@ struct ControlSheet: View {
         .accessibilityIdentifier("mode-\(mode.rawValue)")
     }
 
+    private func progressionCategoryChip(_ cat: ProgressionCategory) -> some View {
+        let isActive = progressionCategory == cat
+        return Button(action: { progressionCategory = cat }) {
+            HStack(spacing: 5) {
+                Text(cat.emoji).font(.system(size: 12))
+                Text(cat.displayName)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(isActive ? .blue : .primary.opacity(0.6))
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(isActive ? Color.blue.opacity(0.12) : Color.primary.opacity(0.03))
+            )
+            .overlay(
+                Capsule().stroke(isActive ? Color.blue.opacity(0.5) : Color.white.opacity(0.05), lineWidth: isActive ? 1 : 0.5)
+            )
+        }
+    }
+
+    // Snap the category filter to whichever bucket the active progression
+    // belongs to. Custom progressions stick to the user's current filter so
+    // they can keep browsing while their typed-in one rides at the front.
+    private func syncProgressionCategoryToSelection() {
+        let cat = engine.chordMelodyProgression.category
+        if cat != .custom { progressionCategory = cat }
+    }
+
     private func progressionChip(_ prog: ChordProgression) -> some View {
         let isActive = engine.chordMelodyProgression.id == prog.id
         return Button(action: { engine.chordMelodyProgression = prog }) {
@@ -1568,7 +1611,7 @@ struct ControlSheet: View {
         guard let parsed = ChordProgression.parse(customProgressionText) else { return }
         let label = parsed.degrees.map(romanNumeral).joined(separator: " ")
         engine.chordMelodyProgression = ChordProgression(
-            id: "custom", name: label, emoji: "✍️", degrees: parsed.degrees)
+            id: "custom", name: label, emoji: "✍️", degrees: parsed.degrees, category: .custom)
     }
 
     /// Diatonic Roman numeral for a 0-based scale degree (0 = I … 6 = vii°).
