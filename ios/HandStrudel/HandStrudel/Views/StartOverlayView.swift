@@ -11,32 +11,28 @@ struct StartOverlayView: View {
 
     private let columns = [
         GridItem(.flexible(), spacing: DS.Space.sm),
+        GridItem(.flexible(), spacing: DS.Space.sm),
         GridItem(.flexible(), spacing: DS.Space.sm)
     ]
 
+    private var selectedHue: Double {
+        guard let p = selectedPreset else { return DS.signatureHue }
+        return Self.hue(of: p.color)
+    }
+
     var body: some View {
-        ZStack {
-            DS.background.ignoresSafeArea()
+        GeometryReader { geo in
+            ZStack {
+                DS.background.ignoresSafeArea()
 
-            // A single, restrained accent glow at the top — the one expressive
-            // element, drifting slowly through the spectrum.
-            AmbientAccent(period: 30, sat: 0.7) { color, _ in
-                RadialGradient(
-                    colors: [color.opacity(0.16), .clear],
-                    center: .top, startRadius: 0, endRadius: 360
-                )
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-            }
+                VStack(spacing: 0) {
+                    hero
+                        .frame(height: geo.size.height * 0.46)
 
-            VStack(spacing: 0) {
-                header
-                    .padding(.top, DS.Space.xl)
-                    .padding(.bottom, DS.Space.lg)
+                    picker
 
-                presetGrid
-
-                footer
+                    footer
+                }
             }
         }
         .sheet(item: $paywallPackId) { packId in
@@ -51,59 +47,76 @@ struct StartOverlayView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Hero preview (live weave, retints to the selected sound)
 
-    private var header: some View {
-        VStack(spacing: DS.Space.sm) {
-            AmbientAccent(period: 30) { color, _ in
+    private var hero: some View {
+        ZStack {
+            WeaveView(hue: selectedHue, energy: 0.5, space: 0.6, brightness: 0.55, speed: 0.3, complexity: 0.5)
+                .opacity(0.9)
+                .mask(
+                    LinearGradient(colors: [.black, .black, .clear],
+                                   startPoint: .top, endPoint: .bottom)
+                )
+
+            VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     Text("hand")
-                        .font(.system(size: 40, weight: .ultraLight, design: .monospaced))
+                        .font(.system(size: 26, weight: .ultraLight, design: .monospaced))
                         .foregroundColor(DS.textPrimary)
                     Text("strudel")
-                        .font(.system(size: 40, weight: .semibold, design: .monospaced))
-                        .foregroundColor(color)
+                        .font(.system(size: 26, weight: .semibold, design: .monospaced))
+                        .foregroundColor(DS.accent(selectedHue))
+                }
+                .padding(.top, DS.Space.md)
+
+                Spacer()
+
+                if let p = selectedPreset {
+                    VStack(spacing: DS.Space.xxs) {
+                        Text(p.name)
+                            .font(.dsTitle)
+                            .foregroundColor(DS.textPrimary)
+                        Text(p.description)
+                            .font(.dsCallout)
+                            .foregroundColor(DS.textSecondary)
+                    }
+                    .transition(.opacity)
+                } else {
+                    Text("Pick a sound")
+                        .font(.dsTitle3)
+                        .foregroundColor(DS.textTertiary)
                 }
             }
-            .frame(height: 48)
-
-            Text("Your hands are the instrument")
-                .font(.dsCallout)
-                .foregroundColor(DS.textSecondary)
+            .padding(.bottom, DS.Space.lg)
         }
     }
 
-    // MARK: - Preset grid
+    // MARK: - Picker
 
-    private var presetGrid: some View {
+    private var picker: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: DS.Space.sm) {
-                DSSectionHeader("Pick a sound")
-                    .padding(.horizontal, DS.Space.xxs)
-
-                LazyVGrid(columns: columns, spacing: DS.Space.sm) {
-                    ForEach(PRESETS) { preset in
-                        let locked = preset.isPremium && !storeManager.isUnlocked(preset.packId ?? "")
-                        PresetCard(
-                            preset: preset,
-                            isSelected: selectedPreset?.id == preset.id,
-                            isLocked: locked
-                        )
-                        .onTapGesture {
-                            if locked, let packId = preset.packId {
-                                paywallPackId = packId
-                            } else {
-                                withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
-                                    selectedPreset = preset
-                                }
+            LazyVGrid(columns: columns, spacing: DS.Space.sm) {
+                ForEach(PRESETS) { preset in
+                    let locked = preset.isPremium && !storeManager.isUnlocked(preset.packId ?? "")
+                    PresetTile(
+                        preset: preset,
+                        isSelected: selectedPreset?.id == preset.id,
+                        isLocked: locked
+                    )
+                    .onTapGesture {
+                        if locked, let packId = preset.packId {
+                            paywallPackId = packId
+                        } else {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                selectedPreset = preset
                             }
                         }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier("preset-\(preset.name)")
                     }
+                    .accessibilityIdentifier("preset-\(preset.name)")
                 }
             }
             .padding(.horizontal, DS.Space.lg)
+            .padding(.top, DS.Space.xs)
             .padding(.bottom, DS.Space.md)
         }
     }
@@ -111,29 +124,26 @@ struct StartOverlayView: View {
     // MARK: - Footer (CTA)
 
     private var footer: some View {
-        VStack(spacing: DS.Space.sm) {
+        VStack(spacing: 0) {
             if starting {
                 HStack(spacing: DS.Space.xs) {
-                    ProgressView().tint(DS.signature)
+                    ProgressView().tint(DS.accent(selectedHue))
                     Text(status)
                         .font(.dsMono(12))
                         .foregroundColor(DS.textSecondary)
                 }
                 .frame(height: 54)
             } else {
-                AmbientAccent(period: 30) { color, _ in
-                    Button(action: startTapped) {
-                        Text(selectedPreset == nil ? "Pick a sound to begin" : "Start playing")
-                    }
-                    .buttonStyle(DSPrimaryButtonStyle(accent: color, enabled: selectedPreset != nil))
-                    .disabled(selectedPreset == nil)
-                    .accessibilityIdentifier("lets-go-button")
+                Button(action: startTapped) {
+                    Text(selectedPreset == nil ? "Pick a sound to begin" : "Start playing")
                 }
-                .frame(height: 54)
+                .buttonStyle(DSPrimaryButtonStyle(accent: DS.accent(selectedHue), enabled: selectedPreset != nil))
+                .disabled(selectedPreset == nil)
+                .accessibilityIdentifier("lets-go-button")
             }
         }
         .padding(.horizontal, DS.Space.lg)
-        .padding(.top, DS.Space.sm)
+        .padding(.top, DS.Space.xs)
         .padding(.bottom, DS.Space.md)
     }
 
@@ -143,6 +153,22 @@ struct StartOverlayView: View {
         guard let preset = selectedPreset else { return }
         starting = true
         onStart(preset.mapping, false)
+    }
+
+    // MARK: - Color helper
+
+    /// RGB (0…1) → hue (0…1), so a preset's color drives the live weave.
+    static func hue(of c: (Double, Double, Double)) -> Double {
+        let r = c.0, g = c.1, b = c.2
+        let maxv = max(r, g, b), minv = min(r, g, b)
+        let d = maxv - minv
+        if d < 0.0001 { return DS.signatureHue }
+        var h: Double
+        if maxv == r { h = (g - b) / d; h = h.truncatingRemainder(dividingBy: 6) }
+        else if maxv == g { h = (b - r) / d + 2 }
+        else { h = (r - g) / d + 4 }
+        h /= 6
+        return h < 0 ? h + 1 : h
     }
 
     // MARK: - Paywall plumbing
@@ -172,15 +198,14 @@ struct StartOverlayView: View {
     }
 }
 
-// MARK: - Preset card
+// MARK: - Preset tile (compact picker cell)
 
-struct PresetCard: View {
+struct PresetTile: View {
     let preset: Preset
     let isSelected: Bool
     var isLocked: Bool = false
 
-    private var presetColor: Color {
-        // Lift dark preset colors so they stay legible as an accent on black.
+    private var tint: Color {
         let (r, g, b) = preset.color
         let maxC = max(r, max(g, b))
         let boost = maxC < 0.55 ? 0.55 / max(maxC, 0.01) : 1.0
@@ -188,29 +213,21 @@ struct PresetCard: View {
     }
 
     var body: some View {
-        HStack(spacing: DS.Space.sm) {
-            IconTile(emoji: preset.emoji, tint: presetColor, size: 46)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(preset.name)
-                    .font(.dsHeadline)
-                    .foregroundColor(DS.textPrimary)
-                Text(preset.description)
-                    .font(.dsCaption)
-                    .foregroundColor(DS.textTertiary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 0)
+        VStack(spacing: DS.Space.xxs) {
+            Text(preset.emoji)
+                .font(.system(size: 24))
+            Text(preset.name)
+                .font(.dsCaption)
+                .foregroundColor(isSelected ? DS.textPrimary : DS.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-        .padding(DS.Space.sm)
-        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-        .dsCard(selected: isSelected, accent: presetColor)
+        .frame(maxWidth: .infinity)
+        .frame(height: 68)
+        .dsCard(radius: DS.Radius.chip, selected: isSelected, accent: tint)
         .overlay(alignment: .topTrailing) {
-            if isLocked { ProBadge().padding(DS.Space.xs) }
+            if isLocked { ProBadge(compact: true).padding(DS.Space.xs) }
         }
         .opacity(isLocked ? 0.6 : 1.0)
-        .scaleEffect(isSelected ? 1.02 : 1.0)
     }
 }
