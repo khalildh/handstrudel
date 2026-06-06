@@ -72,8 +72,8 @@ struct ContentView: View {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 switch mode {
-                case "grid": engine.gridModeEnabled = true; engine.drumModeEnabled = false
-                case "drums": engine.drumModeEnabled = true; engine.gridModeEnabled = false
+                case "grid": engine.switchMode(grid: true, drums: false, learn: false)
+                case "drums": engine.switchMode(grid: false, drums: true, learn: false)
                 default: break
                 }
             }
@@ -1308,12 +1308,15 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, grid, drums, learn, chordMelody }
+    private enum AppMode: String { case melodic, grid, drums, learn, chordMelody, lead, hybrid, flow }
     private var currentMode: AppMode {
         if engine.learnModeEnabled { return .learn }
         if engine.chordMelodyModeEnabled { return .chordMelody }
         if engine.gridModeEnabled { return .grid }
         if engine.drumModeEnabled { return .drums }
+        if engine.leadModeEnabled { return .lead }
+        if engine.hybridModeEnabled { return .hybrid }
+        if engine.flowModeEnabled { return .flow }
         return .melodic
     }
 
@@ -1322,10 +1325,28 @@ struct ControlSheet: View {
             grid: mode == .grid,
             drums: mode == .drums,
             learn: mode == .learn,
-            chordMelody: mode == .chordMelody
+            chordMelody: mode == .chordMelody,
+            lead: mode == .lead,
+            hybrid: mode == .hybrid,
+            flow: mode == .flow
         )
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
+        }
+    }
+
+    /// One-line explainer shown under the mode picker for the melodic-family
+    /// alternatives, so players understand the latency/feel trade-offs.
+    private var melodicVariantBlurb: String? {
+        switch currentMode {
+        case .flow:
+            return "100% Strudel, but a dense 16th-note pulse so pitch tracks your hand much more tightly. Snippets, effects and saving all still work."
+        case .hybrid:
+            return "Strudel melodic body (rhythm + effects + saveable code) with an instant lead voice layered on top for snappy pitch feedback."
+        case .lead:
+            return "Single hand-tracked lead routed straight through the synth — instant, theremin-like pitch. Not Strudel, so no code snapshots or pattern effects on the lead."
+        default:
+            return nil
         }
     }
 
@@ -1333,7 +1354,7 @@ struct ControlSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("MODE", icon: "gamecontroller")
 
-            // 5 modes — wrap to 2 rows so each button still has a usable target size.
+            // 8 modes — wrap to rows so each button still has a usable target size.
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     modeButton("Melodic", icon: "pianokeys", mode: .melodic)
@@ -1344,6 +1365,20 @@ struct ControlSheet: View {
                     modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
                     modeButton("Learn", icon: "music.note.list", mode: .learn)
                 }
+                // Melodic-family alternatives with different latency/feel trade-offs.
+                HStack(spacing: 8) {
+                    modeButton("Flow", icon: "waveform", mode: .flow)
+                    modeButton("Hybrid", icon: "square.stack.3d.up.fill", mode: .hybrid)
+                    modeButton("Lead", icon: "bolt.fill", mode: .lead)
+                }
+            }
+
+            if let blurb = melodicVariantBlurb {
+                Text(blurb)
+                    .font(.system(size: 10, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
             }
 
             if currentMode == .chordMelody {

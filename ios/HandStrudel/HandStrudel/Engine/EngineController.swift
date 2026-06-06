@@ -161,6 +161,21 @@ final class EngineController: ObservableObject {
         didSet { chordMelodyModeManager.zoneDegrees = chordMelodyProgression.degrees }
     }
 
+    // Melodic-family alternative voices (all keep the other modes intact):
+    //  - lead:   single hand-tracked voice routed through the imperative
+    //            noteOn/noteSlide synth (no Strudel) — instant, theremin-like.
+    //  - hybrid: full Strudel melodic body (effects + rhythm + code snapshots)
+    //            with an imperative lead layered on top for instant pitch feel.
+    //  - flow:   100% Strudel melodic, but a dense 16th-note struct so the
+    //            pitch signal is sampled far more often (much tighter feedback).
+    @Published var leadModeEnabled = false
+    @Published var hybridModeEnabled = false
+    @Published var flowModeEnabled = false
+
+    /// MIDI note currently held by the imperative lead voice (lead + hybrid
+    /// modes), or nil when the voice is off. Drives noteOn vs. noteSlide.
+    private var leadVoiceMidi: Int? = nil
+
     // Manual controls
     @Published var manualBPM: Double = 120
     @Published var currentStructIdx = 0
@@ -213,6 +228,9 @@ final class EngineController: ObservableObject {
         switch pm.lastMode {
         case "grid": gridModeEnabled = true
         case "drum": drumModeEnabled = true
+        case "lead": leadModeEnabled = true
+        case "hybrid": hybridModeEnabled = true
+        case "flow": flowModeEnabled = true
         default: break // melodic is the default
         }
 
@@ -395,6 +413,12 @@ final class EngineController: ObservableObject {
             tickGridMode()
         } else if drumModeEnabled {
             tickDrumMode()
+        } else if leadModeEnabled {
+            tickLeadMode()
+        } else if hybridModeEnabled {
+            tickHybridMode()
+        } else if flowModeEnabled {
+            tickFlowMode()
         } else {
             tickMelodicMode()
         }
@@ -701,6 +725,49 @@ final class EngineController: ObservableObject {
     private var lastMelodicSnapshotTime: Double = 0
 
     private func tickMelodicMode() {
+        tickMelodicCore(keyPrefix: "melodic", structOverride: nil)
+    }
+
+    /// Flow mode: identical Strudel pipeline to melodic, but a dense rest-free
+    /// 16th-note struct so the pitch signal is sampled far more often. Stays
+    /// 100% Strudel — code snapshots, effects and stack() all still work.
+    private func tickFlowMode() {
+        tickMelodicCore(keyPrefix: "flow", structOverride: FLOW_STRUCT)
+    }
+
+    /// Hybrid mode: the full Strudel melodic body (effects + rhythm + code
+    /// snapshots) plus an imperative lead voice layered on top so pitch changes
+    /// are heard instantly instead of waiting for the next struct onset.
+    private func tickHybridMode() {
+        tickMelodicCore(keyPrefix: "hybrid", structOverride: nil)
+        driveLeadVoice(velocity: 0.45)
+    }
+
+    /// Lead mode: the melodic voice routed entirely through the imperative
+    /// noteOn/noteSlide synth (no Strudel pattern). Pitch snaps to scale notes
+    /// but retunes instantly, so feedback is as snappy as chord-melody mode.
+    /// Drum loops still play underneath via Strudel.
+    private func tickLeadMode() {
+        driveLeadVoice(velocity: 0.6)
+
+        // Keep Strudel drum loops playing underneath the imperative lead.
+        let structKey = "lead|\(drumStateKey)"
+        if structKey != lastStructKey {
+            lastStructKey = structKey
+            let parts = buildDrumCodeParts()
+            if parts.isEmpty {
+                strudelBridge.evaluate("silence")
+            } else {
+                let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
+                strudelBridge.evaluate(code)
+            }
+        }
+    }
+
+    /// Shared Strudel melodic pipeline for melodic / flow / hybrid modes.
+    /// `keyPrefix` keeps each variant's re-eval cache distinct; `structOverride`
+    /// lets flow swap in a denser rhythm without touching the others.
+    private func tickMelodicCore(keyPrefix: String, structOverride: String?) {
         // Mute when no hands detected
         let hasHands = currentHands.left != nil || currentHands.right != nil
         if !hasHands {
@@ -714,9 +781,6 @@ final class EngineController: ObservableObject {
             let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
             if elapsed - lastMelodicSnapshotTime > 0.1 {
                 lastMelodicSnapshotTime = elapsed
-                let code = chordMode
-                    ? buildChordSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                    : buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
                 // Build a static code string with current param values baked in
                 let staticCode = buildCode(smoothed, structIdx: structIdx, config: config, waveform: selectedWaveform)
                 loopRecorder.recordEvent(.codeSnapshot(code: staticCode), currentTime: elapsed)
@@ -741,20 +805,51 @@ final class EngineController: ObservableObject {
 
         // Re-evaluate when config changes
         let harmonyKey = "\(selectedKey.rawValue)|\(selectedScale.rawValue)|\(chordMode)"
-        let structKey = "melodic|\(structIdx)|\(drumStateKey)|\(selectedWaveform)|\(harmonyKey)"
+        let structKey = "\(keyPrefix)|\(structIdx)|\(drumStateKey)|\(selectedWaveform)|\(harmonyKey)"
         if structKey != lastStructKey {
             lastStructKey = structKey
             recomputeScaleNotes()
             let synthCode = chordMode
-                ? buildChordSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                : buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
+                ? buildChordSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform, structOverride: structOverride)
+                : buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform, structOverride: structOverride)
 
             var parts = [synthCode]
             parts.append(contentsOf: buildDrumCodeParts())
             let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
             strudelBridge.evaluate(code)
         }
+    }
 
+    /// Current monophonic melodic note (scale-snapped) from the noteIdx param,
+    /// or nil if no scale notes are available. Shared by lead + hybrid voices.
+    private func melodicMidi() -> Int? {
+        let notes = cachedScaleNotes
+        guard !notes.isEmpty else { return nil }
+        let rawIdx = smoothed["noteIdx"] ?? 10
+        let normalized = rawIdx / Double(max(1, NOTES.count - 1))
+        let idx = max(0, min(notes.count - 1, Int(normalized * Double(notes.count - 1) + 0.5)))
+        return notes[idx]
+    }
+
+    /// Drive the imperative lead voice from the current melodic note: noteOn on
+    /// first contact, noteSlide while a hand is present, noteOff when hands
+    /// leave. Retunes instantly — no struct quantization.
+    private func driveLeadVoice(velocity: Double) {
+        let hasHands = currentHands.left != nil || currentHands.right != nil
+        guard hasHands, let midi = melodicMidi() else {
+            if leadVoiceMidi != nil {
+                strudelBridge.noteOff(hand: "lead")
+                leadVoiceMidi = nil
+            }
+            return
+        }
+        if leadVoiceMidi == nil {
+            strudelBridge.noteOn(hand: "lead", midi: midi, waveform: selectedWaveform, velocity: velocity)
+            leadVoiceMidi = midi
+        } else if leadVoiceMidi != midi {
+            strudelBridge.noteSlide(hand: "lead", midi: midi)
+            leadVoiceMidi = midi
+        }
     }
 
     private static let maxSnippets = 50
@@ -813,7 +908,7 @@ final class EngineController: ObservableObject {
     func startLoopRecording() {
         guard savedLoops.count < Self.maxLoops else { return }
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
-        let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
+        let mode = currentModeString
         loopRecorder.startRecording(currentTime: elapsed, mode: mode)
         isLoopRecording = true
     }
@@ -1073,6 +1168,8 @@ final class EngineController: ObservableObject {
         strudelBridge.noteOff(hand: "right")
         strudelBridge.noteOff(hand: "touch1")
         strudelBridge.noteOff(hand: "touch2")
+        strudelBridge.noteOff(hand: "lead")
+        leadVoiceMidi = nil
         strudelBridge.stop()
         lastStructKey = "" // force re-eval when resuming
     }
@@ -1089,17 +1186,31 @@ final class EngineController: ObservableObject {
     }
 
     /// Call when switching modes to stop lingering sounds
-    func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false) {
+    func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
+                    lead: Bool = false, hybrid: Bool = false, flow: Bool = false) {
         silenceAll()
         gridModeEnabled = grid
         drumModeEnabled = drums
         learnModeEnabled = learn
         chordMelodyModeEnabled = chordMelody
+        leadModeEnabled = lead
+        hybridModeEnabled = hybrid
+        flowModeEnabled = flow
+    }
+
+    /// Persisted/loop-record label for the current mode.
+    var currentModeString: String {
+        if gridModeEnabled { return "grid" }
+        if drumModeEnabled { return "drum" }
+        if leadModeEnabled { return "lead" }
+        if hybridModeEnabled { return "hybrid" }
+        if flowModeEnabled { return "flow" }
+        return "melodic"
     }
 
     func stop() {
         // Persist state before teardown
-        let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
+        let mode = currentModeString
         PersistenceManager.shared.saveEngineState(
             presetId: nil,
             mode: mode,
@@ -1136,6 +1247,10 @@ final class EngineController: ObservableObject {
         jamSession.leaveSession()
         gridModeEnabled = false
         drumModeEnabled = false
+        leadModeEnabled = false
+        hybridModeEnabled = false
+        flowModeEnabled = false
+        leadVoiceMidi = nil
         gridLeftLane = nil
         gridRightLane = nil
         lastGridNote = ""
