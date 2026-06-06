@@ -11,106 +11,49 @@ struct ParamDef: Identifiable {
     let toCode: (Double) -> String
 }
 
-let NOTES = [
-    "c2", "d2", "e2", "g2", "a2",
-    "c3", "d3", "e3", "g3", "a3",
-    "c4", "d4", "e4", "g4", "a4",
-    "c5", "d5", "e5",
-]
-
-let MIDI_NOTES = [
-    36, 38, 40, 43, 45,
-    48, 50, 52, 55, 57,
-    60, 62, 64, 67, 69,
-    72, 74, 76,
-]
+// NOTES, MIDI_NOTES, STRUCTS and PARAM_SPECS are generated from
+// shared/music-config.json (the single source of truth shared with the web app)
+// into MusicConfig.generated.swift. Run `npm run gen:config` after editing it.
 
 let NOTE_DISPLAY = NOTES.map { n in
     n.prefix(1).uppercased() + n.dropFirst()
 }
 
-let STRUCTS = [
-    "x ~ x ~ x ~ x ~",
-    "x ~ ~ x ~ ~ x ~",
-    "x x ~ x ~ x x ~",
-    "[x x x] ~ ~ ~",
-    "x ~ x x ~ x ~ ~",
-]
+/// Formatter closures keyed by the `format` kind in music-config.json. Kept in
+/// hand-written code (not the generated data) because they're behaviour, not
+/// data — the web app has the matching set in music.ts.
+private func paramFormatter(
+    _ kind: String
+) -> (format: (Double) -> String, toCode: (Double) -> String) {
+    switch kind {
+    case "note":
+        return (
+            { v in NOTE_DISPLAY[max(0, min(NOTES.count - 1, Int(v.rounded())))] },
+            { v in "\"\(NOTES[max(0, min(NOTES.count - 1, Int(v.rounded())))])\"" }
+        )
+    case "fixed3":
+        return ({ String(format: "%.3f", $0) }, { String(format: "%.3f", $0) })
+    case "hz":
+        return ({ "\(Int($0.rounded()))hz" }, { "\(Int($0.rounded()))" })
+    case "bpm":
+        return ({ "\(Int($0.rounded())) bpm" }, { String(format: "%.1f", $0 / 4) })
+    case "int":
+        return ({ "\(Int($0.rounded()))" }, { "\(Int($0.rounded()))" })
+    case "fixed2":
+        fallthrough
+    default:
+        return ({ String(format: "%.2f", $0) }, { String(format: "%.2f", $0) })
+    }
+}
 
-let PARAM_DEFS: [ParamDef] = [
-    ParamDef(
-        id: "noteIdx", label: "pitch", strudelKey: "note",
-        min: 0, max: Double(NOTES.count - 1), defaultValue: 10,
-        format: { v in NOTE_DISPLAY[max(0, min(NOTES.count - 1, Int(v.rounded())))] },
-        toCode: { v in "\"\(NOTES[max(0, min(NOTES.count - 1, Int(v.rounded())))])\"" }
-    ),
-    ParamDef(
-        id: "gain", label: "volume", strudelKey: "gain",
-        min: 0.03, max: 0.9, defaultValue: 0.55,
-        format: { String(format: "%.2f", $0) },
-        toCode: { String(format: "%.2f", $0) }
-    ),
-    ParamDef(
-        id: "lpf", label: "filter", strudelKey: "lpf",
-        min: 120, max: 6120, defaultValue: 3000,
-        format: { "\(Int($0.rounded()))hz" },
-        toCode: { "\(Int($0.rounded()))" }
-    ),
-    ParamDef(
-        id: "hpf", label: "hi-pass", strudelKey: "hpf",
-        min: 20, max: 4000, defaultValue: 2000,
-        format: { "\(Int($0.rounded()))hz" },
-        toCode: { "\(Int($0.rounded()))" }
-    ),
-    ParamDef(
-        id: "reverb", label: "reverb", strudelKey: "room",
-        min: 0, max: 0.9, defaultValue: 0.2,
-        format: { String(format: "%.2f", $0) },
-        toCode: { String(format: "%.2f", $0) }
-    ),
-    ParamDef(
-        id: "bpm", label: "tempo", strudelKey: "cpm",
-        min: 50, max: 205, defaultValue: 120,
-        format: { "\(Int($0.rounded())) bpm" },
-        toCode: { String(format: "%.1f", $0 / 4) }
-    ),
-    ParamDef(
-        id: "delay", label: "delay", strudelKey: "delay",
-        min: 0, max: 0.55, defaultValue: 0.12,
-        format: { String(format: "%.2f", $0) },
-        toCode: { String(format: "%.2f", $0) }
-    ),
-    ParamDef(
-        id: "pan", label: "pan", strudelKey: "pan",
-        min: 0, max: 1, defaultValue: 0.5,
-        format: { String(format: "%.2f", $0) },
-        toCode: { String(format: "%.2f", $0) }
-    ),
-    ParamDef(
-        id: "crush", label: "crush", strudelKey: "crush",
-        min: 1, max: 16, defaultValue: 8,
-        format: { "\(Int($0.rounded()))" },
-        toCode: { "\(Int($0.rounded()))" }
-    ),
-    ParamDef(
-        id: "shape", label: "shape", strudelKey: "shape",
-        min: 0, max: 0.9, defaultValue: 0,
-        format: { String(format: "%.2f", $0) },
-        toCode: { String(format: "%.2f", $0) }
-    ),
-    ParamDef(
-        id: "attack", label: "attack", strudelKey: "attack",
-        min: 0.001, max: 0.5, defaultValue: 0.01,
-        format: { String(format: "%.3f", $0) },
-        toCode: { String(format: "%.3f", $0) }
-    ),
-    ParamDef(
-        id: "release", label: "release", strudelKey: "release",
-        min: 0.01, max: 1.0, defaultValue: 0.1,
-        format: { String(format: "%.2f", $0) },
-        toCode: { String(format: "%.2f", $0) }
-    ),
-]
+let PARAM_DEFS: [ParamDef] = PARAM_SPECS.map { spec in
+    let f = paramFormatter(spec.format)
+    return ParamDef(
+        id: spec.id, label: spec.label, strudelKey: spec.strudelKey,
+        min: spec.min, max: spec.max, defaultValue: spec.defaultValue,
+        format: f.format, toCode: f.toCode
+    )
+}
 
 let PARAM_MAP: [String: ParamDef] = Dictionary(uniqueKeysWithValues: PARAM_DEFS.map { ($0.id, $0) })
 
