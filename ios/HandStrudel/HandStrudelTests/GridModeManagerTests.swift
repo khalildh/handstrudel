@@ -90,7 +90,7 @@ final class GridModeManagerTests: XCTestCase {
         let notes = scaleNotes(key: .C, scale: .major, baseOctave: 3, octaveRange: 2)
         let hand = makeHandData(pinch: 0.9, pinchY: 0.5)
         let hands = HandsState(left: hand, right: nil)
-        let actions = manager.checkNotes(hands: hands, scaleNotes: notes, currentBeat: 0)
+        let actions = manager.checkNotes(hands: hands, scaleNotes: notes)
 
         XCTAssertEqual(actions.count, 1)
         if case .noteOn(let hand, let midi, _, _) = actions.first {
@@ -106,7 +106,7 @@ final class GridModeManagerTests: XCTestCase {
         let notes = scaleNotes(key: .C, scale: .major, baseOctave: 3, octaveRange: 2)
         let hand = makeHandData(pinch: 0.3, pinchY: 0.5)
         let hands = HandsState(left: hand, right: nil)
-        let actions = manager.checkNotes(hands: hands, scaleNotes: notes, currentBeat: 0)
+        let actions = manager.checkNotes(hands: hands, scaleNotes: notes)
         XCTAssertTrue(actions.isEmpty)
     }
 
@@ -114,7 +114,7 @@ final class GridModeManagerTests: XCTestCase {
         let manager = GridModeManager()
         let hand = makeHandData(pinch: 0.9, pinchY: 0.5)
         let hands = HandsState(left: hand, right: nil)
-        let actions = manager.checkNotes(hands: hands, scaleNotes: [], currentBeat: 0)
+        let actions = manager.checkNotes(hands: hands, scaleNotes: [])
         XCTAssertTrue(actions.isEmpty)
     }
 
@@ -127,12 +127,12 @@ final class GridModeManagerTests: XCTestCase {
         // First: pinch to trigger note on
         let hand1 = makeHandData(pinch: 0.9, pinchY: 0.5)
         let hands1 = HandsState(left: hand1, right: nil)
-        _ = manager.checkNotes(hands: hands1, scaleNotes: notes, currentBeat: 0)
+        _ = manager.checkNotes(hands: hands1, scaleNotes: notes)
 
         // Release below threshold
         let hand2 = makeHandData(pinch: 0.3, pinchY: 0.5)
         let hands2 = HandsState(left: hand2, right: nil)
-        let actions = manager.checkNotes(hands: hands2, scaleNotes: notes, currentBeat: 1)
+        let actions = manager.checkNotes(hands: hands2, scaleNotes: notes)
 
         XCTAssertEqual(actions.count, 1)
         if case .noteOff(let hand) = actions.first {
@@ -149,11 +149,11 @@ final class GridModeManagerTests: XCTestCase {
         // Pinch to start note
         let hand = makeHandData(pinch: 0.9, pinchY: 0.5)
         let hands1 = HandsState(left: hand, right: nil)
-        _ = manager.checkNotes(hands: hands1, scaleNotes: notes, currentBeat: 0)
+        _ = manager.checkNotes(hands: hands1, scaleNotes: notes)
 
         // Remove hand
         let hands2 = HandsState(left: nil, right: nil)
-        let actions = manager.checkNotes(hands: hands2, scaleNotes: notes, currentBeat: 1)
+        let actions = manager.checkNotes(hands: hands2, scaleNotes: notes)
 
         XCTAssertEqual(actions.count, 1)
         if case .noteOff(let hand) = actions.first {
@@ -172,13 +172,13 @@ final class GridModeManagerTests: XCTestCase {
         // Start pinching at top
         let hand1 = makeHandData(pinch: 0.9, pinchY: 0.0)
         let hands1 = HandsState(left: hand1, right: nil)
-        let actions1 = manager.checkNotes(hands: hands1, scaleNotes: notes, currentBeat: 0)
+        let actions1 = manager.checkNotes(hands: hands1, scaleNotes: notes)
         XCTAssertEqual(actions1.count, 1)
 
         // Move to bottom while still pinching
         let hand2 = makeHandData(pinch: 0.9, pinchY: 1.0)
         let hands2 = HandsState(left: hand2, right: nil)
-        let actions2 = manager.checkNotes(hands: hands2, scaleNotes: notes, currentBeat: 1)
+        let actions2 = manager.checkNotes(hands: hands2, scaleNotes: notes)
 
         XCTAssertEqual(actions2.count, 1)
         if case .slide(let hand, _, _) = actions2.first {
@@ -195,12 +195,12 @@ final class GridModeManagerTests: XCTestCase {
         // Pinch
         let hand1 = makeHandData(pinch: 0.9, pinchY: 0.5)
         let hands1 = HandsState(left: hand1, right: nil)
-        _ = manager.checkNotes(hands: hands1, scaleNotes: notes, currentBeat: 0)
+        _ = manager.checkNotes(hands: hands1, scaleNotes: notes)
 
         // Same position, still pinching
         let hand2 = makeHandData(pinch: 0.85, pinchY: 0.5)
         let hands2 = HandsState(left: hand2, right: nil)
-        let actions2 = manager.checkNotes(hands: hands2, scaleNotes: notes, currentBeat: 1)
+        let actions2 = manager.checkNotes(hands: hands2, scaleNotes: notes)
         XCTAssertTrue(actions2.isEmpty, "No action when staying on same note")
     }
 
@@ -214,7 +214,7 @@ final class GridModeManagerTests: XCTestCase {
         let leftHand = makeHandData(pinch: 0.9, pinchY: 0.0)
         let rightHand = makeHandData(pinch: 0.9, pinchY: 1.0)
         let hands = HandsState(left: leftHand, right: rightHand)
-        let actions = manager.checkNotes(hands: hands, scaleNotes: notes, currentBeat: 0)
+        let actions = manager.checkNotes(hands: hands, scaleNotes: notes)
 
         XCTAssertEqual(actions.count, 2)
         let handLabels = actions.compactMap { action -> String? in
@@ -235,12 +235,12 @@ final class GridModeManagerTests: XCTestCase {
         let leftHand = makeHandData(pinch: 0.9, pinchY: 0.3)
         let rightHand = makeHandData(pinch: 0.9, pinchY: 0.7)
         let hands1 = HandsState(left: leftHand, right: rightHand)
-        _ = manager.checkNotes(hands: hands1, scaleNotes: notes, currentBeat: 0)
+        _ = manager.checkNotes(hands: hands1, scaleNotes: notes)
 
         // Release left, keep right
         let leftReleased = makeHandData(pinch: 0.2, pinchY: 0.3)
         let hands2 = HandsState(left: leftReleased, right: rightHand)
-        let actions = manager.checkNotes(hands: hands2, scaleNotes: notes, currentBeat: 1)
+        let actions = manager.checkNotes(hands: hands2, scaleNotes: notes)
 
         // Should get noteOff for left only, no action for right (still holding same note)
         XCTAssertEqual(actions.count, 1)
@@ -257,7 +257,7 @@ final class GridModeManagerTests: XCTestCase {
         let manager = GridModeManager()
         let notes = scaleNotes(key: .C, scale: .major, baseOctave: 3, octaveRange: 2)
         let hands = HandsState(left: nil, right: nil)
-        let actions = manager.checkNotes(hands: hands, scaleNotes: notes, currentBeat: 0)
+        let actions = manager.checkNotes(hands: hands, scaleNotes: notes)
         XCTAssertTrue(actions.isEmpty)
     }
 
@@ -269,11 +269,11 @@ final class GridModeManagerTests: XCTestCase {
         let leftHand = makeHandData(pinch: 0.9, pinchY: 0.3)
         let rightHand = makeHandData(pinch: 0.9, pinchY: 0.7)
         let hands1 = HandsState(left: leftHand, right: rightHand)
-        _ = manager.checkNotes(hands: hands1, scaleNotes: notes, currentBeat: 0)
+        _ = manager.checkNotes(hands: hands1, scaleNotes: notes)
 
         // Both hands disappear
         let hands2 = HandsState(left: nil, right: nil)
-        let actions = manager.checkNotes(hands: hands2, scaleNotes: notes, currentBeat: 1)
+        let actions = manager.checkNotes(hands: hands2, scaleNotes: notes)
 
         XCTAssertEqual(actions.count, 2)
         let offHands = actions.compactMap { action -> String? in
@@ -293,7 +293,7 @@ final class GridModeManagerTests: XCTestCase {
         // Pinch > 1.0 (hypothetical)
         let hand = makeHandData(pinch: 1.5, pinchY: 0.5)
         let hands = HandsState(left: hand, right: nil)
-        let actions = manager.checkNotes(hands: hands, scaleNotes: notes, currentBeat: 0)
+        let actions = manager.checkNotes(hands: hands, scaleNotes: notes)
 
         if case .noteOn(_, _, _, let velocity) = actions.first {
             XCTAssertLessThanOrEqual(velocity, 1.0)
@@ -352,7 +352,7 @@ final class GridModeManagerTests: XCTestCase {
         let notes = scaleNotes(key: .C, scale: .major, baseOctave: 3, octaveRange: 2)
         let hand = makeHandData(pinch: 0.9, pinchY: 0.5)
         let hands = HandsState(left: hand, right: nil)
-        _ = manager.checkNotes(hands: hands, scaleNotes: notes, currentBeat: 0)
+        _ = manager.checkNotes(hands: hands, scaleNotes: notes)
         XCTAssertTrue(manager.isLeftPinching)
     }
 
@@ -362,11 +362,82 @@ final class GridModeManagerTests: XCTestCase {
 
         // Pinch
         let hand1 = makeHandData(pinch: 0.9, pinchY: 0.5)
-        _ = manager.checkNotes(hands: HandsState(left: hand1, right: nil), scaleNotes: notes, currentBeat: 0)
+        _ = manager.checkNotes(hands: HandsState(left: hand1, right: nil), scaleNotes: notes)
 
         // Release
         let hand2 = makeHandData(pinch: 0.3, pinchY: 0.5)
-        _ = manager.checkNotes(hands: HandsState(left: hand2, right: nil), scaleNotes: notes, currentBeat: 1)
+        _ = manager.checkNotes(hands: HandsState(left: hand2, right: nil), scaleNotes: notes)
         XCTAssertFalse(manager.isLeftPinching)
+    }
+
+    // MARK: - checkNotes: quantize (sync to beat)
+
+    func testCheckNotes_quantize_pinchWithoutBoundary_holdsUntilBoundary() {
+        let manager = GridModeManager()
+        let notes = scaleNotes(key: .C, scale: .major, baseOctave: 3, octaveRange: 2)
+        let hand = makeHandData(pinch: 0.9, pinchY: 0.5)
+        let hands = HandsState(left: hand, right: nil)
+
+        // Pinch is engaged but no grid boundary yet — note must wait.
+        let before = manager.checkNotes(hands: hands, scaleNotes: notes,
+                                        quantize: true, gridBoundaryCrossed: false)
+        XCTAssertTrue(before.isEmpty, "Quantized note should not fire before a grid boundary")
+
+        // Boundary arrives — note fires now.
+        let onBoundary = manager.checkNotes(hands: hands, scaleNotes: notes,
+                                            quantize: true, gridBoundaryCrossed: true)
+        XCTAssertEqual(onBoundary.count, 1)
+        if case .noteOn(let h, _, _, _) = onBoundary.first {
+            XCTAssertEqual(h, "left")
+        } else {
+            XCTFail("Expected noteOn on the grid boundary")
+        }
+    }
+
+    func testCheckNotes_quantize_releaseFiresImmediatelyWithoutBoundary() {
+        let manager = GridModeManager()
+        let notes = scaleNotes(key: .C, scale: .major, baseOctave: 3, octaveRange: 2)
+
+        // Start a quantized note on a boundary.
+        let hand1 = makeHandData(pinch: 0.9, pinchY: 0.5)
+        _ = manager.checkNotes(hands: HandsState(left: hand1, right: nil), scaleNotes: notes,
+                               quantize: true, gridBoundaryCrossed: true)
+
+        // Release with no boundary — note off should still be immediate.
+        let hand2 = makeHandData(pinch: 0.2, pinchY: 0.5)
+        let actions = manager.checkNotes(hands: HandsState(left: hand2, right: nil), scaleNotes: notes,
+                                         quantize: true, gridBoundaryCrossed: false)
+        XCTAssertEqual(actions.count, 1)
+        if case .noteOff(let h) = actions.first {
+            XCTAssertEqual(h, "left")
+        } else {
+            XCTFail("Expected immediate noteOff on release even when quantized")
+        }
+    }
+
+    func testCheckNotes_quantize_slideSnapsToBoundary() {
+        let manager = GridModeManager()
+        let notes = scaleNotes(key: .C, scale: .major, baseOctave: 3, octaveRange: 2)
+
+        // Note on at top, on a boundary.
+        let hand1 = makeHandData(pinch: 0.9, pinchY: 0.0)
+        _ = manager.checkNotes(hands: HandsState(left: hand1, right: nil), scaleNotes: notes,
+                               quantize: true, gridBoundaryCrossed: true)
+
+        // Move to a new lane while held, but no boundary yet — no slide.
+        let hand2 = makeHandData(pinch: 0.9, pinchY: 1.0)
+        let noBoundary = manager.checkNotes(hands: HandsState(left: hand2, right: nil), scaleNotes: notes,
+                                            quantize: true, gridBoundaryCrossed: false)
+        XCTAssertTrue(noBoundary.isEmpty, "Slide should wait for the next grid boundary")
+
+        // Next boundary — slide fires.
+        let onBoundary = manager.checkNotes(hands: HandsState(left: hand2, right: nil), scaleNotes: notes,
+                                            quantize: true, gridBoundaryCrossed: true)
+        XCTAssertEqual(onBoundary.count, 1)
+        if case .slide(let h, _, _) = onBoundary.first {
+            XCTAssertEqual(h, "left")
+        } else {
+            XCTFail("Expected slide on the grid boundary")
+        }
     }
 }
