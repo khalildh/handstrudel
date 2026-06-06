@@ -358,9 +358,7 @@ struct ContentView: View {
             HStack(spacing: 5) {
                 ForEach(0..<4, id: \.self) { i in
                     Circle()
-                        .fill(i == engine.currentBeat
-                              ? (i % 2 == 0 ? Color.green : Color.pink)
-                              : Color.white.opacity(0.15))
+                        .fill(i == engine.currentBeat ? accentColor : Color.white.opacity(0.18))
                         .frame(width: 7, height: 7)
                         .scaleEffect(i == engine.currentBeat ? 1.5 : 1.0)
                         .animation(.easeOut(duration: 0.1), value: engine.currentBeat)
@@ -380,29 +378,27 @@ struct ContentView: View {
             }) {
                 HStack(spacing: 4) {
                     Image(systemName: engine.jamSession.isActive ? "person.2.fill" : "person.2")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 13, weight: .semibold))
                     if engine.jamSession.isActive {
                         Text("\(engine.jamSession.participants.count)")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(.system(size: 11, weight: .bold))
                     }
                 }
-                .foregroundColor(engine.jamSession.isActive ? .green : .white.opacity(0.6))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(engine.jamSession.isActive ? Color.green.opacity(0.2) : Color.black.opacity(0.3))
-                )
+                .foregroundColor(engine.jamSession.isActive ? accentColor : DS.textSecondary)
+                .padding(.horizontal, DS.Space.sm)
+                .frame(height: 36)
+                .background(Capsule().fill(.ultraThinMaterial))
+                .overlay(Capsule().strokeBorder(engine.jamSession.isActive ? accentColor.opacity(0.5) : Color.white.opacity(0.08), lineWidth: 0.5))
             }
 
             // Close button
             Button(action: { engine.stop() }) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white.opacity(0.85))
-                    .frame(width: 44, height: 44)
-                    .background(Color.black.opacity(0.4))
-                    .clipShape(Circle())
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(DS.textPrimary)
+                    .frame(width: 40, height: 40)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
             }
             .accessibilityIdentifier("close-button")
         }
@@ -418,25 +414,23 @@ struct ContentView: View {
         return (base + beatShift).truncatingRemainder(dividingBy: 1.0)
     }
 
+    /// Single source of truth for the live, music-reactive accent.
+    private var accentColor: Color { DS.accent(strudelHue) }
+
     private var logoMark: some View {
         HStack(spacing: 0) {
             Text("hand")
-                .font(.system(size: 18, weight: .light, design: .monospaced))
-                .foregroundColor(.white.opacity(0.9))
+                .font(.system(size: 17, weight: .ultraLight, design: .monospaced))
+                .foregroundColor(DS.textPrimary)
             Text("strudel")
-                .font(.system(size: 18, weight: .black, design: .monospaced))
-                .foregroundColor(Color(hue: strudelHue, saturation: 0.8, brightness: 1.0))
+                .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                .foregroundColor(accentColor)
                 .animation(.easeInOut(duration: 0.3), value: strudelHue)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(
-            Capsule()
-                .fill(Color.black.opacity(0.3))
-                .background(Capsule().fill(.ultraThinMaterial).opacity(0.3))
-        )
-        .clipShape(Capsule())
-        .shadow(color: Color(hue: strudelHue, saturation: 0.6, brightness: 0.8).opacity(0.5), radius: 10, x: 0, y: 2)
+        .padding(.horizontal, DS.Space.sm)
+        .padding(.vertical, DS.Space.xxs)
+        .background(Capsule().fill(.ultraThinMaterial))
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
     }
 
     // MARK: - Code Pill
@@ -445,20 +439,19 @@ struct ContentView: View {
         Group {
             if !engine.codeDisplay.isEmpty {
                 Text(engine.codeDisplay.components(separatedBy: "\n").prefix(3).joined(separator: "\n"))
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundColor(.green.opacity(0.8))
+                    .font(.dsMono(9))
+                    .foregroundColor(DS.textSecondary)
                     .lineLimit(3)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, DS.Space.sm)
+                    .padding(.vertical, DS.Space.xs)
                     .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.black.opacity(0.5))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Color.green.opacity(0.12), lineWidth: 0.5)
-                            )
+                        RoundedRectangle(cornerRadius: DS.Radius.chip, style: .continuous)
+                            .fill(.ultraThinMaterial)
                     )
-                    .shadow(color: Color.green.opacity(0.25), radius: 8, x: 0, y: 0)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DS.Radius.chip, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                    )
             }
         }
     }
@@ -467,20 +460,13 @@ struct ContentView: View {
 
     private var noteBadge: some View {
         Text(engine.noteDisplay)
-            .font(.system(size: 28, weight: .black, design: .rounded))
-            .foregroundColor(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(
-                Capsule()
-                    .fill(Color(hue: strudelHue, saturation: 0.6, brightness: 0.3).opacity(0.5))
-                    .overlay(
-                        Capsule()
-                            .stroke(Color(hue: strudelHue, saturation: 0.8, brightness: 1.0).opacity(0.6), lineWidth: 2)
-                    )
-            )
-            .shadow(color: Color(hue: strudelHue, saturation: 0.8, brightness: 1.0).opacity(0.5), radius: 12, x: 0, y: 0)
-            .scaleEffect(engine.currentBeat == 0 ? 1.1 : 1.0)
+            .font(.system(size: 30, weight: .bold))
+            .foregroundColor(DS.textPrimary)
+            .padding(.horizontal, DS.Space.lg)
+            .padding(.vertical, DS.Space.sm)
+            .background(Capsule().fill(.ultraThinMaterial))
+            .overlay(Capsule().strokeBorder(accentColor.opacity(0.7), lineWidth: 1.5))
+            .scaleEffect(engine.currentBeat == 0 ? 1.08 : 1.0)
             .animation(.spring(response: 0.15, dampingFraction: 0.5), value: engine.currentBeat)
     }
 
@@ -489,22 +475,19 @@ struct ContentView: View {
     private var beatRing: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.04), lineWidth: 1.5)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1.5)
                 .frame(width: 50, height: 50)
 
             Circle()
-                .stroke(
-                    engine.currentBeat % 2 == 0 ? Color.green.opacity(0.6) : Color.pink.opacity(0.6),
-                    lineWidth: 1.5
-                )
+                .stroke(accentColor.opacity(0.7), lineWidth: 1.5)
                 .frame(width: 50, height: 50)
                 .scaleEffect(engine.currentBeat == 0 ? 1.15 : 1.0)
-                .opacity(engine.currentBeat == 0 ? 0.4 : 0.8)
+                .opacity(engine.currentBeat == 0 ? 0.4 : 0.85)
                 .animation(.easeOut(duration: 0.3), value: engine.currentBeat)
 
             Text("\(Int(engine.bpm.rounded()))")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundColor(.white.opacity(0.5))
+                .font(.dsMono(13, .semibold))
+                .foregroundColor(DS.textSecondary)
         }
     }
 
@@ -903,11 +886,12 @@ struct ContentView: View {
 
             // Settings button
             Button(action: { showSheet = true }) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.4))
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.black.opacity(0.3)))
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(DS.textSecondary)
+                    .frame(width: 40, height: 40)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
             }
             .accessibilityIdentifier("settings-button")
         }
@@ -1160,21 +1144,24 @@ struct ControlSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                // Header with store button
+                // Header with title + store button
                 HStack {
+                    Text("Settings")
+                        .font(.dsTitle2)
+                        .foregroundColor(DS.textPrimary)
                     Spacer()
                     Button(action: { showStore = true }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: "bag.fill")
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.system(size: 12, weight: .semibold))
                             Text("Store")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .font(.dsSubheadline)
                         }
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(Color.white.opacity(0.08)))
-                        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+                        .foregroundColor(DS.textPrimary)
+                        .padding(.horizontal, DS.Space.md)
+                        .frame(height: 34)
+                        .background(Capsule().fill(.ultraThinMaterial))
+                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
                     }
                 }
 
@@ -1271,12 +1258,13 @@ struct ControlSheet: View {
     private func sectionHeader(_ title: String, icon: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.green.opacity(0.6))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(DS.signature)
             Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundColor(.secondary)
-                .tracking(1.5)
+                .font(.dsFootnote)
+                .tracking(0.6)
+                .foregroundColor(DS.textTertiary)
+                .textCase(.uppercase)
         }
     }
 
@@ -1371,14 +1359,14 @@ struct ControlSheet: View {
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundColor(.primary.opacity(0.8))
                     }
-                    .tint(.green)
+                    .tint(DS.signature)
 
                     Toggle(isOn: $engine.chordMelodyAutoStrum) {
                         Text("Auto-strum (re-articulate on each beat)")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundColor(.primary.opacity(0.8))
                     }
-                    .tint(.green)
+                    .tint(DS.signature)
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -1391,7 +1379,7 @@ struct ControlSheet: View {
                                 .foregroundColor(.secondary)
                         }
                         Slider(value: $engine.chordMelodyPadVolume, in: 0...0.6)
-                            .tint(.green)
+                            .tint(DS.signature)
                     }
                 }
                 .padding(.top, 2)
@@ -1459,23 +1447,14 @@ struct ControlSheet: View {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.5))
+                    .foregroundColor(isActive ? DS.signature : DS.textSecondary)
                 Text(label)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.6))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(isActive ? DS.signature : DS.textSecondary)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isActive
-                        ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
-                        : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1.5 : 0.5)
-            )
+            .frame(height: 52)
+            .dsCard(radius: DS.Radius.chip, selected: isActive)
         }
         .accessibilityIdentifier("mode-\(mode.rawValue)")
     }
@@ -1742,7 +1721,7 @@ struct ControlSheet: View {
                         .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 28)
                     Slider(value: volume, in: 0.2...2.0)
-                        .tint(.green)
+                        .tint(DS.signature)
                     Text(String(format: "%.0f%%", volume.wrappedValue * 100))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
@@ -1755,7 +1734,7 @@ struct ControlSheet: View {
                         .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 28)
                     Slider(value: bpm, in: 40...240, step: 1)
-                        .tint(.green)
+                        .tint(DS.signature)
                     Text("\(Int(bpm.wrappedValue.rounded()))")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
@@ -1797,7 +1776,7 @@ struct ControlSheet: View {
                         get: { engine.manualBPM },
                         set: { engine.manualBPM = $0 }
                     ), in: 50...205, step: 1)
-                    .tint(.green)
+                    .tint(DS.signature)
 
                     Button(action: { engine.manualBPM = min(205, engine.manualBPM + 1) }) {
                         Image(systemName: "plus")

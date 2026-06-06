@@ -52,6 +52,7 @@
 		B59B82967BBF79A13E8EC3E6 /* DrumModeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */; };
 		B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9238181B674B4222B2F52C5A /* GridTouchView.swift */; };
 		B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D77EA18663B3717C68CAAB /* ContentView.swift */; };
+		DE519A7E0000000000000001 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE519A7E0000000000000002 /* DesignSystem.swift */; };
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
 		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
 		BF459746DBE08887CD29CFF3 /* SaveGestureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C89256347633541234267B8 /* SaveGestureDetector.swift */; };
@@ -95,6 +96,7 @@
 		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
 		05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeManagerTests.swift; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		DE519A7E0000000000000002 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		0CB456251F49E8C1FE668CC2 /* LearnSong.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSong.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
 		11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
@@ -179,6 +181,7 @@
 			isa = PBXGroup;
 			children = (
 				CFD5BAADCF3D53AE6287AB67 /* Assets.xcassets */,
+				DE519A7E0000000000000002 /* DesignSystem.swift */,
 				852A794A228073601B3D9322 /* HandStrudel.entitlements */,
 				2E3A4C0D73CA4CA64494F9A1 /* HandStrudel.storekit */,
 				8B7A548807FF6856B92FC423 /* Info.plist */,
@@ -454,6 +457,7 @@
 				6342A972BB06049F9B3999BC /* CameraFilter.swift in Sources */,
 				043BBAAF12C3D3188CF3823F /* CameraView.swift in Sources */,
 				B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */,
+				DE519A7E0000000000000001 /* DesignSystem.swift in Sources */,
 				1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */,
 				204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */,
 				E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */,
