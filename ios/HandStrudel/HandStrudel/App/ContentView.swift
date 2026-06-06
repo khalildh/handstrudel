@@ -148,6 +148,18 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
 
+            // Current note at the heart of the weave (content, not chrome — stays
+            // visible when the HUD is hidden).
+            if melodicActive {
+                Text(engine.noteDisplay)
+                    .font(.system(size: 72, weight: .ultraLight))
+                    .foregroundColor(.white.opacity(0.92))
+                    .shadow(color: accentColor.opacity(0.6), radius: 24)
+                    .scaleEffect(engine.currentBeat == 0 ? 1.06 : 1.0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.6), value: engine.currentBeat)
+                    .allowsHitTesting(false)
+            }
+
             // Hand skeleton overlay with glow (aspect-corrected)
             HandOverlayView(
                 handsState: engine.handsState,
@@ -268,13 +280,6 @@ struct ContentView: View {
 
                 Spacer()
 
-                // Note badge — hide in grid/drum/learn mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
-                    noteBadge
-
-                    beatRing
-                        .padding(.bottom, 8)
-                }
 
                 // Grid quick controls (range + octave)
                 if engine.gridModeEnabled {
@@ -402,6 +407,11 @@ struct ContentView: View {
                         .animation(.easeOut(duration: 0.1), value: engine.currentBeat)
                 }
             }
+
+            Text("\(Int(engine.bpm.rounded())) BPM")
+                .font(.dsMono(11, .semibold))
+                .foregroundColor(DS.textTertiary)
+                .padding(.leading, 6)
 
             Spacer()
 
