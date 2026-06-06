@@ -1156,6 +1156,7 @@ struct ControlSheet: View {
     @State private var paywallPackId: String?
     @State private var showAudioExport = false
     @State private var exportedAudioURL: URL?
+    @State private var customProgressionText = ""
 
     var body: some View {
         ScrollView {
@@ -1359,11 +1360,54 @@ struct ControlSheet: View {
                             .foregroundColor(.primary.opacity(0.7))
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
+                                // A typed-in progression rides at the front of
+                                // the list so it stays visible and selected.
+                                if engine.chordMelodyProgression.isCustom {
+                                    progressionChip(engine.chordMelodyProgression)
+                                }
                                 ForEach(CHORD_PROGRESSIONS) { prog in
                                     progressionChip(prog)
                                 }
                             }
                         }
+
+                        // Manual entry: type any progression in Roman numerals
+                        // ("I V vi IV") or scale-degree numbers ("1 5 6 4").
+                        HStack(spacing: 6) {
+                            TextField("Type a progression…", text: $customProgressionText)
+                                .font(.system(size: 12, design: .rounded))
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
+                                .submitLabel(.go)
+                                .onSubmit { applyCustomProgression() }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Capsule().fill(Color.primary.opacity(0.05)))
+                                .overlay(Capsule().stroke(Color.white.opacity(0.07), lineWidth: 0.5))
+                                .accessibilityIdentifier("progression-input")
+
+                            Button(action: applyCustomProgression) {
+                                Text("Set")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundColor(customProgressionPreview == nil ? .secondary : .green)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        Capsule().fill(customProgressionPreview == nil
+                                            ? Color.primary.opacity(0.04)
+                                            : Color.green.opacity(0.12))
+                                    )
+                            }
+                            .disabled(customProgressionPreview == nil)
+                            .accessibilityIdentifier("progression-set")
+                        }
+
+                        // Live feedback: show what the typed text parses to, or
+                        // a hint on the accepted notation.
+                        Text(customProgressionPreview ?? "Use Roman numerals (I, ii, V) or numbers 1–7.")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundColor(customProgressionPreview == nil ? .secondary : .green.opacity(0.8))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Toggle(isOn: $engine.chordMelodySwapHands) {
@@ -1507,6 +1551,30 @@ struct ControlSheet: View {
                 Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
             )
         }
+    }
+
+    /// A normalized Roman-numeral preview of whatever is currently typed in the
+    /// manual entry field, or `nil` when nothing parseable has been entered.
+    /// Drives both the hint text and the disabled state of the "Set" button.
+    private var customProgressionPreview: String? {
+        guard let prog = ChordProgression.parse(customProgressionText) else { return nil }
+        return prog.degrees.map(romanNumeral).joined(separator: " ")
+    }
+
+    /// Parse the manual entry field and make it the active progression. The
+    /// progression's name is set to its normalized Roman numerals so the chip
+    /// reads back what the player actually played (e.g. "I V vi IV").
+    private func applyCustomProgression() {
+        guard let parsed = ChordProgression.parse(customProgressionText) else { return }
+        let label = parsed.degrees.map(romanNumeral).joined(separator: " ")
+        engine.chordMelodyProgression = ChordProgression(
+            id: "custom", name: label, emoji: "✍️", degrees: parsed.degrees)
+    }
+
+    /// Diatonic Roman numeral for a 0-based scale degree (0 = I … 6 = vii°).
+    private func romanNumeral(_ degree: Int) -> String {
+        let numerals = ["I", "ii", "iii", "IV", "V", "vi", "vii°"]
+        return numerals.indices.contains(degree) ? numerals[degree] : "\(degree + 1)"
     }
 
 

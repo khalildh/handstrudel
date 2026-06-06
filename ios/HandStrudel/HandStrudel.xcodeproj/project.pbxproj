@@ -69,6 +69,7 @@
 		CM4D9E5A8B7C40119EE3A005 /* ChordProgression.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */; };
 		EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D6C035D4A9EE1A66C31839 /* Loop.swift */; };
 		F1E2FAD696F5D1BAD3542162 /* MusicTheoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */; };
+		AC0DDE0000000000CF09FEF2 /* ChordProgressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0DDE0000000000CF09FEF1 /* ChordProgressionTests.swift */; };
 		F29562634D40D21DF434DF6C /* LearnOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB44B1EB04F4196CFA4C8AD6 /* LearnOverlayView.swift */; };
 		F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F505B00217A74555C8E226 /* MusicTheory.swift */; };
 		F7E93C2DB10D88C64280E374 /* WatermarkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8857B4C9E8825F7E480DAED0 /* WatermarkManager.swift */; };
@@ -132,6 +133,7 @@
 		ISMP1A2B3C4D5E6F7A8B9C01 /* instrument-samples */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Resources/instrument-samples"; sourceTree = "<group>"; };
 		962D341307D9F8B90BCD5454 /* HandTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTheme.swift; sourceTree = "<group>"; };
 		9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheoryTests.swift; sourceTree = "<group>"; };
+		AC0DDE0000000000CF09FEF1 /* ChordProgressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordProgressionTests.swift; sourceTree = "<group>"; };
 		A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallOverlay.swift; sourceTree = "<group>"; };
 		A4D6E49EC2BD40C4448C835E /* SpatialAudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAudioManager.swift; sourceTree = "<group>"; };
 		A9F505B00217A74555C8E226 /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
@@ -318,6 +320,7 @@
 				859E2C859C653F058FAEBDD3 /* CameraFilterTests.swift */,
 				E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */,
 				05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */,
+				AC0DDE0000000000CF09FEF1 /* ChordProgressionTests.swift */,
 				3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */,
 				55E91BE8AD32AC69E4F4A3BA /* LearnModeManagerTests.swift */,
 				2777760AE87651C57AD36E38 /* LearnSongTests.swift */,
@@ -510,6 +513,7 @@
 				D07E059A67BBBA11346FB42B /* LearnSongTests.swift in Sources */,
 				DB9DE9A3806A7D566AAF5B0F /* MappingConfigTests.swift in Sources */,
 				F1E2FAD696F5D1BAD3542162 /* MusicTheoryTests.swift in Sources */,
+				AC0DDE0000000000CF09FEF2 /* ChordProgressionTests.swift in Sources */,
 				5953AA2B7EEB3B9102EEBCD1 /* ParamDefsTests.swift in Sources */,
 				22BEC592D38D4260A28EA96C /* StoreManagerTests.swift in Sources */,
 			);
