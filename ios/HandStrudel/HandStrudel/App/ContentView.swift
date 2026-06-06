@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var showSharePicker = false
     @State private var recordedVideoURL: URL?
     @AppStorage("hideSkeletonWhenRecording") private var hideSkeletonWhenRecording = true
+    @AppStorage("showLiveCode") private var showLiveCode = false
     @State private var filterName: String = ""
     @State private var showFilterName = false
     @State private var showJamAlert = false
@@ -130,6 +131,22 @@ struct ContentView: View {
             .hueRotation(.degrees(engine.selectedFilter.hueRotation))
             .ignoresSafeArea()
 
+            // The Weave — the music made visible. Lives under the hand skeleton
+            // so your hands stay the clear instrument. Melodic mode only; the
+            // other modes have their own spatial UI (lanes, pads, notes).
+            if !engine.gridModeEnabled && !engine.drumModeEnabled
+                && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
+                WeaveView(
+                    hue: strudelHue,
+                    energy: norm("gain"),
+                    space: norm("reverb"),
+                    brightness: norm("lpf"),
+                    speed: max(0, min(1, (engine.bpm - 50) / 155)),
+                    complexity: max(norm("crush"), norm("shape"))
+                )
+                .ignoresSafeArea()
+            }
+
             // Hand skeleton overlay with glow (aspect-corrected)
             HandOverlayView(
                 handsState: engine.handsState,
@@ -208,6 +225,10 @@ struct ContentView: View {
                 logoMark
                     .padding(.top, 2)
 
+                // Mode switcher — always on the surface, never buried in settings
+                modeStrip
+                    .padding(.top, 10)
+
                 // Jam session indicator
                 if engine.jamSession.isActive {
                     let text = engine.jamSession.lastReceivedEvent.isEmpty
@@ -223,8 +244,9 @@ struct ContentView: View {
                     }
                 }
 
-                // Floating code pill — hide in grid/drum/learn mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
+                // Live code — a developer view, off by default. The Weave is the
+                // hero now; opt back into code under Settings → Advanced.
+                if showLiveCode && !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
                     codePill
                         .padding(.horizontal, 20)
                         .padding(.top, 2)
@@ -416,6 +438,69 @@ struct ContentView: View {
 
     /// Single source of truth for the live, music-reactive accent.
     private var accentColor: Color { DS.accent(strudelHue) }
+
+    /// Normalize a live musical parameter to 0...1 using its defined range,
+    /// for feeding the Weave visualization.
+    private func norm(_ id: String) -> Double {
+        guard let def = PARAM_DEFS.first(where: { $0.id == id }) else { return 0.5 }
+        let v = engine.smoothedParams[id] ?? def.defaultValue
+        let range = def.max - def.min
+        guard range > 0 else { return 0.5 }
+        return max(0, min(1, (v - def.min) / range))
+    }
+
+    // MARK: - Mode switcher (modes are how your hands play — kept on the surface)
+
+    private var melodicActive: Bool {
+        !engine.gridModeEnabled && !engine.drumModeEnabled
+            && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled
+    }
+
+    private var modeStrip: some View {
+        HStack(spacing: 6) {
+            modeChip("Play", "waveform", active: melodicActive) {
+                engine.switchMode(grid: false, drums: false, learn: false, chordMelody: false)
+            }
+            modeChip("Grid", "square.grid.3x3", active: engine.gridModeEnabled) {
+                engine.switchMode(grid: true, drums: false, learn: false, chordMelody: false)
+            }
+            modeChip("Drums", "beats.headphones", active: engine.drumModeEnabled) {
+                engine.switchMode(grid: false, drums: true, learn: false, chordMelody: false)
+            }
+            modeChip("Chord", "hand.raised.fingers.spread", active: engine.chordMelodyModeEnabled) {
+                engine.switchMode(grid: false, drums: false, learn: false, chordMelody: true)
+            }
+            modeChip("Learn", "music.note.list", active: engine.learnModeEnabled) {
+                engine.switchMode(grid: false, drums: false, learn: true, chordMelody: false)
+                if engine.currentLearnSong == nil { showLearnPicker = true }
+            }
+        }
+    }
+
+    private func modeChip(_ label: String, _ icon: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 15, weight: .semibold))
+                Text(label).font(.system(size: 9, weight: .semibold))
+            }
+            .foregroundColor(active ? .black : DS.textSecondary)
+            .frame(width: 54, height: 42)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(active ? accentColor : Color.clear)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.white.opacity(active ? 0 : 0.08), lineWidth: 0.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .accessibilityIdentifier("mode-strip-\(label)")
+    }
 
     private var logoMark: some View {
         HStack(spacing: 0) {
@@ -1135,6 +1220,7 @@ struct ControlSheet: View {
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
     @Binding var hideSkeletonWhenRecording: Bool
+    @AppStorage("showLiveCode") private var showLiveCode = false
     @State private var showStore = false
     @State private var showLearnPicker = false
     @State private var paywallPackId: String?
@@ -1207,6 +1293,9 @@ struct ControlSheet: View {
 
                 sectionDivider
                 recordingSection
+
+                sectionDivider
+                advancedSection
 
                 if !engine.savedSnippets.isEmpty {
                     sectionDivider
@@ -2081,6 +2170,14 @@ struct ControlSheet: View {
             sectionHeader("RECORDING", icon: "video")
 
             pillToggle("Hide hand tracking in recordings", icon: "hand.raised.slash", isOn: $hideSkeletonWhenRecording)
+        }
+    }
+
+    private var advancedSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("ADVANCED", icon: "chevron.left.forwardslash.chevron.right")
+
+            pillToggle("Show live Strudel code", icon: "curlybraces", isOn: $showLiveCode)
         }
     }
 
