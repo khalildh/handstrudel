@@ -60,6 +60,8 @@
 		B59B82967BBF79A13E8EC3E6 /* DrumModeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */; };
 		B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9238181B674B4222B2F52C5A /* GridTouchView.swift */; };
 		B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D77EA18663B3717C68CAAB /* ContentView.swift */; };
+		A1B2C3D4E5F600000002B002 /* ControlSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000002B001 /* ControlSheetView.swift */; };
+		A1B2C3D4E5F600000002B012 /* UIKitBridges.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000002B011 /* UIKitBridges.swift */; };
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
 		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
 		BF459746DBE08887CD29CFF3 /* SaveGestureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C89256347633541234267B8 /* SaveGestureDetector.swift */; };
@@ -103,6 +105,8 @@
 		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
 		05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeManagerTests.swift; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000002B001 /* ControlSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlSheetView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000002B011 /* UIKitBridges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIKitBridges.swift; sourceTree = "<group>"; };
 		0CB456251F49E8C1FE668CC2 /* LearnSong.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSong.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000FF10 /* MusicConfig.generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicConfig.generated.swift; sourceTree = "<group>"; };
@@ -278,6 +282,8 @@
 			isa = PBXGroup;
 			children = (
 				09D77EA18663B3717C68CAAB /* ContentView.swift */,
+				A1B2C3D4E5F600000002B001 /* ControlSheetView.swift */,
+				A1B2C3D4E5F600000002B011 /* UIKitBridges.swift */,
 				7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */,
 			);
 			path = App;
@@ -478,6 +484,8 @@
 				6342A972BB06049F9B3999BC /* CameraFilter.swift in Sources */,
 				043BBAAF12C3D3188CF3823F /* CameraView.swift in Sources */,
 				B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */,
+				A1B2C3D4E5F600000002B002 /* ControlSheetView.swift in Sources */,
+				A1B2C3D4E5F600000002B012 /* UIKitBridges.swift in Sources */,
 				1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */,
 				204B7A838B214A6B19A7C549 /* EngineController.swift in Sources */,
 				A1B2C3D4E5F600000001A002 /* ModeController.swift in Sources */,
