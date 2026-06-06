@@ -1237,6 +1237,7 @@ struct ControlSheet: View {
     @ObservedObject var storeManager: StoreManager
     @Binding var hideSkeletonWhenRecording: Bool
     @AppStorage("showLiveCode") private var showLiveCode = false
+    @State private var showAdvanced = false
     @State private var showStore = false
     @State private var showLearnPicker = false
     @State private var paywallPackId: String?
@@ -1278,22 +1279,11 @@ struct ControlSheet: View {
                 bpmSection
 
                 sectionDivider
-                paramsSection
-
-                sectionDivider
                 drumTrackSection(
-                    label: "DRUMS 1",
+                    label: "DRUMS",
                     loop: $engine.selectedDrumLoop,
                     volume: $engine.drumVolume,
                     bpm: $engine.drumBPM
-                )
-
-                sectionDivider
-                drumTrackSection(
-                    label: "DRUMS 2",
-                    loop: $engine.selectedDrumLoop2,
-                    volume: $engine.drumVolume2,
-                    bpm: $engine.drumBPM2
                 )
 
                 sectionDivider
@@ -1307,21 +1297,16 @@ struct ControlSheet: View {
                     loopsSection
                 }
 
-                sectionDivider
-                recordingSection
-
-                sectionDivider
-                advancedSection
-
                 if !engine.savedSnippets.isEmpty {
                     sectionDivider
                     snippetsSection
                 }
 
-                if !engine.track.slots.isEmpty {
-                    sectionDivider
-                    trackSection
-                }
+                sectionDivider
+                recordingSection
+
+                sectionDivider
+                advancedDisclosure
 
             }
             .padding(20)
@@ -2189,11 +2174,37 @@ struct ControlSheet: View {
         }
     }
 
-    private var advancedSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("ADVANCED", icon: "chevron.left.forwardslash.chevron.right")
+    private var advancedDisclosure: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showAdvanced.toggle() } }) {
+                HStack {
+                    sectionHeader("ADVANCED", icon: "chevron.left.forwardslash.chevron.right")
+                    Spacer()
+                    Image(systemName: showAdvanced ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(DS.textTertiary)
+                }
+            }
 
-            pillToggle("Show live Strudel code", icon: "curlybraces", isOn: $showLiveCode)
+            if showAdvanced {
+                pillToggle("Show live Strudel code", icon: "curlybraces", isOn: $showLiveCode)
+
+                sectionDivider
+                paramsSection
+
+                sectionDivider
+                drumTrackSection(
+                    label: "DRUMS 2",
+                    loop: $engine.selectedDrumLoop2,
+                    volume: $engine.drumVolume2,
+                    bpm: $engine.drumBPM2
+                )
+
+                if !engine.track.slots.isEmpty {
+                    sectionDivider
+                    trackSection
+                }
+            }
         }
     }
 
