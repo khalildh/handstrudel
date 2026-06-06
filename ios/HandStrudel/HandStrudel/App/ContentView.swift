@@ -72,8 +72,8 @@ struct ContentView: View {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 switch mode {
-                case "grid": engine.gridModeEnabled = true; engine.drumModeEnabled = false
-                case "drums": engine.drumModeEnabled = true; engine.gridModeEnabled = false
+                case "grid": engine.switchMode(grid: true, drums: false, learn: false)
+                case "drums": engine.switchMode(grid: false, drums: true, learn: false)
                 default: break
                 }
             }

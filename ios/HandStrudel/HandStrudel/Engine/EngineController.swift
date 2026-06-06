@@ -160,6 +160,24 @@ final class EngineController: ObservableObject {
         didSet { chordMelodyModeManager.zoneDegrees = chordMelodyProgression.degrees }
     }
 
+    // Melodic-family alternative voices (all keep the other modes intact):
+    //  - lead:   single hand-tracked voice routed through the imperative
+    //            noteOn/noteSlide synth (no Strudel) — instant, theremin-like.
+    //  - hybrid: full Strudel melodic body (effects + rhythm + code snapshots)
+    //            with an imperative lead layered on top for instant pitch feel.
+    //  - flow:   100% Strudel melodic, but a dense 16th-note struct so the
+    //            pitch signal is sampled far more often (much tighter feedback).
+    @Published var leadModeEnabled = false
+    @Published var hybridModeEnabled = false
+    @Published var flowModeEnabled = false
+
+    /// MIDI note currently held by the imperative lead voice (lead + hybrid
+    /// modes), or nil when the voice is off. Drives noteOn vs. noteSlide.
+    /// Hand-tracked imperative lead voice MIDI (used by Hybrid + Lead modes).
+    /// Internal — `MelodicModeController` reads/writes; engine clears on
+    /// stop/pause so dangling notes don't hang.
+    var leadVoiceMidi: Int? = nil
+
     // Manual controls
     @Published var manualBPM: Double = 120
     @Published var currentStructIdx = 0
@@ -213,6 +231,9 @@ final class EngineController: ObservableObject {
         switch pm.lastMode {
         case "grid": gridModeEnabled = true
         case "drum": drumModeEnabled = true
+        case "lead": leadModeEnabled = true
+        case "hybrid": hybridModeEnabled = true
+        case "flow": flowModeEnabled = true
         default: break // melodic is the default
         }
 
@@ -508,7 +529,7 @@ final class EngineController: ObservableObject {
     func startLoopRecording() {
         guard savedLoops.count < Self.maxLoops else { return }
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
-        let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
+        let mode = currentModeString
         loopRecorder.startRecording(currentTime: elapsed, mode: mode)
         isLoopRecording = true
     }
@@ -769,6 +790,8 @@ final class EngineController: ObservableObject {
         strudelBridge.noteOff(hand: "right")
         strudelBridge.noteOff(hand: "touch1")
         strudelBridge.noteOff(hand: "touch2")
+        strudelBridge.noteOff(hand: "lead")
+        leadVoiceMidi = nil
         strudelBridge.stop()
         lastStructKey = "" // force re-eval when resuming
     }
@@ -785,17 +808,31 @@ final class EngineController: ObservableObject {
     }
 
     /// Call when switching modes to stop lingering sounds
-    func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false) {
+    func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
+                    lead: Bool = false, hybrid: Bool = false, flow: Bool = false) {
         silenceAll()
         gridModeEnabled = grid
         drumModeEnabled = drums
         learnModeEnabled = learn
         chordMelodyModeEnabled = chordMelody
+        leadModeEnabled = lead
+        hybridModeEnabled = hybrid
+        flowModeEnabled = flow
+    }
+
+    /// Persisted/loop-record label for the current mode.
+    var currentModeString: String {
+        if gridModeEnabled { return "grid" }
+        if drumModeEnabled { return "drum" }
+        if leadModeEnabled { return "lead" }
+        if hybridModeEnabled { return "hybrid" }
+        if flowModeEnabled { return "flow" }
+        return "melodic"
     }
 
     func stop() {
         // Persist state before teardown
-        let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
+        let mode = currentModeString
         PersistenceManager.shared.saveEngineState(
             presetId: nil,
             mode: mode,
@@ -832,6 +869,10 @@ final class EngineController: ObservableObject {
         jamSession.leaveSession()
         gridModeEnabled = false
         drumModeEnabled = false
+        leadModeEnabled = false
+        hybridModeEnabled = false
+        flowModeEnabled = false
+        leadVoiceMidi = nil
         gridLeftLane = nil
         gridRightLane = nil
         lastGridNote = ""
