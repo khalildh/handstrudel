@@ -193,6 +193,57 @@ func buildChordSignalCode(structIdx: Int, config: MappingConfig, waveform: Strin
     return "stack(\(voice(0)), \(voice(1)), \(voice(2)))"
 }
 
+// MARK: - EDM Mode
+
+/// Drum bed for EDM mode. Groove = four-on-the-floor (kick on every beat,
+/// backbeat clap, offbeat open hats, 8th closed hats). Build = the kick drops
+/// out and a snare roll accelerates into the drop for the classic riser.
+func buildEDMDrumCode(building: Bool) -> String {
+    // Gains are baked into the sound constants (_houseKick etc.), so the
+    // patterns just supply rhythm — same approach as DRUM_LOOPS.
+    if building {
+        return "stack("
+            + "\(_snare).struct(\"[x x] [x x] [x x x] [x x x x]\"), "
+            + "\(_closedHat).struct(\"[x x x x] [x x x x] [x x x x] [x x x x]\")"
+            + ")"
+    }
+    return "stack("
+        + "\(_houseKick).struct(\"x x x x\"), "
+        + "\(_clap).struct(\"~ x ~ x\"), "          // backbeat clap on 2 & 4
+        + "\(_openHat).struct(\"~ x ~ x ~ x ~ x\"), " // offbeat open hats
+        + "\(_closedHat).struct(\"[x x] [x x] [x x] [x x]\")"
+        + ")"
+}
+
+/// Full EDM-mode Strudel body: a big detuned **supersaw chord** (root + fifth +
+/// octave) held and hard-sidechained to the kick, plus a low **sub-bass**
+/// rolling on the offbeats — the classic festival/progressive-house drop sound.
+/// Everything sits under a hand-controlled master low-pass (`__hp._edmLpf`);
+/// the instant lead voice is layered separately on top.
+func buildEDMCode(building: Bool) -> String {
+    let root = "signal(() => __hp._midi)"
+
+    // Detuned supersaw chord stab, held a cycle and pumped hard on every kick.
+    let chord = "note(\(root)).struct(\"x\").add(\"0,7,12\")"
+        + ".s(\"supersaw\").unison(7).detune(0.4).spread(0.7)"
+        + ".attack(0.01).decay(0.2).sustain(0.75).release(0.2)"
+        + ".gain(saw.range(0.12, 1).fast(4))"   // hard sidechain pump
+        + ".room(0.3)"
+
+    // Sub-bass two octaves down, plucky, rolling on the offbeats under the kick.
+    let bass = "note(\(root)).sub(24).struct(\"~ x ~ x ~ x ~ x\")"
+        + ".s(\"sawtooth\")"
+        + ".attack(0.005).decay(0.16).sustain(0).release(0.05)"
+        + ".gain(0.9).lpf(600)"
+
+    // During a build-up the bass drops out so the chord + filter riser carry it.
+    let body = building
+        ? "(\(chord)).cpm(signal(() => __hp._cpm))"
+        : "stack(\(chord), \(bass)).cpm(signal(() => __hp._cpm))"
+    let drums = "(\(buildEDMDrumCode(building: building))).cpm(signal(() => __hp._cpm))"
+    return "stack(\(body), \(drums)).lpf(signal(() => __hp._edmLpf))"
+}
+
 func buildTrackCode(slots: [Int], speed: Double, snippets: [SavedSnippet]) -> String? {
     let codes = slots.compactMap { snippets[safe: $0]?.code }
     guard !codes.isEmpty else { return nil }

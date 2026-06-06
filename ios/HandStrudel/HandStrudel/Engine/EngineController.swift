@@ -176,6 +176,18 @@ final class EngineController: ObservableObject {
     /// modes), or nil when the voice is off. Drives noteOn vs. noteSlide.
     private var leadVoiceMidi: Int? = nil
 
+    // EDM mode — a live, gesture-driven performance mode built on the hybrid
+    // approach (Strudel four-on-floor + pumped pad/bass + master filter, with
+    // the instant imperative lead on top). See tickEDMMode.
+    @Published var edmModeEnabled = false
+    /// True while a build-up/riser is running (kick drops out, filter sweeps up).
+    @Published var edmBuilding = false
+    /// Length of the build-up in bars (4 beats each) before it drops.
+    @Published var edmBuildBars = 2
+    private var edmBuildStart: Date?
+    /// Edge-trigger guard for the two-fist build gesture (re-arms on release).
+    private var edmGestureArmed = true
+
     // Manual controls
     @Published var manualBPM: Double = 120
     @Published var currentStructIdx = 0
@@ -231,6 +243,7 @@ final class EngineController: ObservableObject {
         case "lead": leadModeEnabled = true
         case "hybrid": hybridModeEnabled = true
         case "flow": flowModeEnabled = true
+        case "edm": edmModeEnabled = true
         default: break // melodic is the default
         }
 
@@ -413,6 +426,8 @@ final class EngineController: ObservableObject {
             tickGridMode()
         } else if drumModeEnabled {
             tickDrumMode()
+        } else if edmModeEnabled {
+            tickEDMMode()
         } else if leadModeEnabled {
             tickLeadMode()
         } else if hybridModeEnabled {
@@ -852,6 +867,87 @@ final class EngineController: ObservableObject {
         }
     }
 
+    // MARK: - EDM Mode
+
+    /// Duration in seconds of the current build-up setting (bars × 4 beats).
+    private var edmBuildDuration: Double {
+        let beatDur = 60.0 / max(40, manualBPM)
+        return beatDur * Double(max(1, edmBuildBars)) * 4.0
+    }
+
+    /// Start a build-up, or — if one is already running — drop immediately.
+    /// Wired to the on-screen BUILD-UP / DROP button and the two-fist gesture.
+    func triggerEDMBuild() {
+        if edmBuilding {
+            dropEDM()
+        } else {
+            edmBuilding = true
+            edmBuildStart = Date()
+        }
+    }
+
+    private func dropEDM() {
+        edmBuilding = false
+        edmBuildStart = nil
+        strudelBridge.playHit("crash") // impact on the drop
+    }
+
+    /// EDM mode: a self-running four-on-floor groove + sidechained pad/bass
+    /// (Strudel) with the instant imperative lead on top (the hybrid idea).
+    /// Hands open the master filter (energy); the BUILD-UP button or a two-fist
+    /// gesture fires a riser that drops back into the groove. The beat keeps
+    /// playing even with no hands so you can actually run a set.
+    private func tickEDMMode() {
+        // Instant topline lead (hybrid voice).
+        driveLeadVoice(velocity: 0.5)
+
+        let now = Date()
+
+        // Auto-drop when the build-up timer elapses.
+        if edmBuilding, let start = edmBuildStart, now.timeIntervalSince(start) >= edmBuildDuration {
+            dropEDM()
+        }
+
+        // Two-fist gesture → build-up (edge-triggered, re-arms when released).
+        let bothFists = (currentHands.left?.fist ?? 0) > 0.7 && (currentHands.right?.fist ?? 0) > 0.7
+        if bothFists {
+            if edmGestureArmed && !edmBuilding {
+                triggerEDMBuild()
+            }
+            edmGestureArmed = false
+        } else {
+            edmGestureArmed = true
+        }
+
+        // Master low-pass cutoff: a riser sweep while building, otherwise driven
+        // by hand height (raise hands = brighter = more energy).
+        let cutoff: Double
+        if edmBuilding, let start = edmBuildStart {
+            let p = min(1, now.timeIntervalSince(start) / edmBuildDuration)
+            cutoff = 600 * pow(16000.0 / 600.0, p) // exponential 600 → 16 kHz
+        } else {
+            let hasHands = currentHands.left != nil || currentHands.right != nil
+            let energy = max(currentHands.left?.y ?? 0, currentHands.right?.y ?? 0)
+            cutoff = hasHands ? 300 * pow(2.0, energy * 6.0) : 2200 // ~300 .. ~19 kHz
+        }
+        strudelBridge.setSynthParam("_edmLpf", value: cutoff)
+
+        // Keep the pad/bass tracking the current scale note (slow, sustained).
+        if let midi = melodicMidi() {
+            strudelBridge.updateScaleParams(smoothed, config: config, midi: midi)
+        }
+
+        // Re-evaluate the Strudel body only when the phase or sound changes —
+        // the filter sweep rides the live signal, no re-eval needed.
+        let harmonyKey = "\(selectedKey.rawValue)|\(selectedScale.rawValue)"
+        let structKey = "edm|\(edmBuilding)|\(harmonyKey)"
+        if structKey != lastStructKey {
+            lastStructKey = structKey
+            recomputeScaleNotes()
+            strudelBridge.evaluate(buildEDMCode(building: edmBuilding))
+        }
+    }
+
     private static let maxSnippets = 50
     private static let maxLoops = 20
 
@@ -1170,6 +1266,9 @@ final class EngineController: ObservableObject {
         strudelBridge.noteOff(hand: "touch2")
         strudelBridge.noteOff(hand: "lead")
         leadVoiceMidi = nil
+        edmBuilding = false
+        edmBuildStart = nil
+        edmGestureArmed = true
         strudelBridge.stop()
         lastStructKey = "" // force re-eval when resuming
     }
@@ -1187,7 +1286,7 @@ final class EngineController: ObservableObject {
 
     /// Call when switching modes to stop lingering sounds
     func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
-                    lead: Bool = false, hybrid: Bool = false, flow: Bool = false) {
+                    lead: Bool = false, hybrid: Bool = false, flow: Bool = false, edm: Bool = false) {
         silenceAll()
         gridModeEnabled = grid
         drumModeEnabled = drums
@@ -1196,6 +1295,7 @@ final class EngineController: ObservableObject {
         leadModeEnabled = lead
         hybridModeEnabled = hybrid
         flowModeEnabled = flow
+        edmModeEnabled = edm
     }
 
     /// Persisted/loop-record label for the current mode.
@@ -1205,6 +1305,7 @@ final class EngineController: ObservableObject {
         if leadModeEnabled { return "lead" }
         if hybridModeEnabled { return "hybrid" }
         if flowModeEnabled { return "flow" }
+        if edmModeEnabled { return "edm" }
         return "melodic"
     }
 
@@ -1250,6 +1351,9 @@ final class EngineController: ObservableObject {
         leadModeEnabled = false
         hybridModeEnabled = false
         flowModeEnabled = false
+        edmModeEnabled = false
+        edmBuilding = false
+        edmBuildStart = nil
         leadVoiceMidi = nil
         gridLeftLane = nil
         gridRightLane = nil
