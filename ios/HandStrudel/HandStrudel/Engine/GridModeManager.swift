@@ -1,10 +1,9 @@
 import Foundation
 
 final class GridModeManager {
-    private var leftPinching = false
-    private var rightPinching = false
-    private let pinchThreshold: Double = 0.8   // fingers must be nearly touching
-    private let releaseThreshold: Double = 0.5  // open a bit to release
+    // Fingers must be nearly touching (0.8) to fire; open a bit (0.5) to release.
+    private var leftPinch = PinchDetector(on: 0.8, off: 0.5)
+    private var rightPinch = PinchDetector(on: 0.8, off: 0.5)
 
     // The MIDI note each hand is currently *sounding* (nil = silent). Used both
     // for slide detection and, in quantized mode, to hold the audible note
@@ -33,57 +32,56 @@ final class GridModeManager {
         var actions: [NoteAction] = []
         processHand(hands.left, handName: "left", scaleNotes: scaleNotes,
                     quantize: quantize, boundary: gridBoundaryCrossed,
-                    pinching: &leftPinching, audibleMidi: &leftHeldMidi, actions: &actions)
+                    pinch: &leftPinch, audibleMidi: &leftHeldMidi, actions: &actions)
         processHand(hands.right, handName: "right", scaleNotes: scaleNotes,
                     quantize: quantize, boundary: gridBoundaryCrossed,
-                    pinching: &rightPinching, audibleMidi: &rightHeldMidi, actions: &actions)
+                    pinch: &rightPinch, audibleMidi: &rightHeldMidi, actions: &actions)
         return actions
     }
 
     private func processHand(_ hand: HandData?, handName: String, scaleNotes: [Int],
                              quantize: Bool, boundary: Bool,
-                             pinching: inout Bool, audibleMidi: inout Int?,
+                             pinch: inout PinchDetector, audibleMidi: inout Int?,
                              actions: inout [NoteAction]) {
         guard let h = hand else {
-            // Hand left the frame — stop any sounding note immediately.
-            pinching = false
-            if audibleMidi != nil {
+            // Hand left the frame — stop any sounding note immediately. Releases
+            // always fire live so letting go feels responsive even in quantize.
+            if pinch.release() == .ended, audibleMidi != nil {
                 actions.append(.noteOff(hand: handName))
                 audibleMidi = nil
             }
             return
         }
 
-        // Hysteresis latch: pinch must reach pinchThreshold to engage and fall
-        // below releaseThreshold to disengage — prevents flicker in the middle.
-        if h.pinch > pinchThreshold {
-            pinching = true
-        } else if h.pinch < releaseThreshold {
-            pinching = false
-        }
-
-        // Not pinching → release any held note right away. Releases stay live
-        // even when quantized so let-go is always immediate.
-        guard pinching else {
-            if audibleMidi != nil {
-                actions.append(.noteOff(hand: handName))
-                audibleMidi = nil
-            }
-            return
-        }
-
+        let phase = pinch.update(pinch: h.pinch)
         let noteIdx = yToNoteIndex(y: h.pinchY, noteCount: scaleNotes.count)
         let midi = scaleNotes[noteIdx]
+        let allowChange = !quantize || boundary
 
-        // Quantized: only let the audible note change on a grid boundary.
-        guard !quantize || boundary else { return }
-
-        if audibleMidi == nil {
-            actions.append(.noteOn(hand: handName, midi: midi, noteName: midiNoteName(midi), velocity: min(1, h.pinch)))
-            audibleMidi = midi
-        } else if midi != audibleMidi {
-            actions.append(.slide(hand: handName, midi: midi, noteName: midiNoteName(midi)))
-            audibleMidi = midi
+        switch phase {
+        case .began:
+            // Defer the onset to the next grid boundary when quantized.
+            if allowChange {
+                audibleMidi = midi
+                actions.append(.noteOn(hand: handName, midi: midi, noteName: midiNoteName(midi), velocity: min(1, h.pinch)))
+            }
+        case .held:
+            if !allowChange { return }
+            if audibleMidi == nil {
+                audibleMidi = midi
+                actions.append(.noteOn(hand: handName, midi: midi, noteName: midiNoteName(midi), velocity: min(1, h.pinch)))
+            } else if midi != audibleMidi {
+                audibleMidi = midi
+                actions.append(.slide(hand: handName, midi: midi, noteName: midiNoteName(midi)))
+            }
+        case .ended:
+            // Release immediately, regardless of quantize.
+            if audibleMidi != nil {
+                audibleMidi = nil
+                actions.append(.noteOff(hand: handName))
+            }
+        case .idle:
+            break
         }
     }
 
@@ -108,6 +106,6 @@ final class GridModeManager {
         return (leftIdx, rightIdx)
     }
 
-    var isLeftPinching: Bool { leftPinching }
-    var isRightPinching: Bool { rightPinching }
+    var isLeftPinching: Bool { leftPinch.isPinching }
+    var isRightPinching: Bool { rightPinch.isPinching }
 }

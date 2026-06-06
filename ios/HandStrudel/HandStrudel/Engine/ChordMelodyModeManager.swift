@@ -33,9 +33,6 @@ final class ChordMelodyModeManager {
 
     var swapHands: Bool = false
 
-    private let pinchThreshold: Double = 0.8
-    private let releaseThreshold: Double = 0.5
-
     /// The scale degrees that each chord zone resolves to. With "Free" this
     /// is [0,1,2,3,4,5,6] (all 7 diatonic chords). With a progression like
     /// Pop it's [0,4,5,3] (I, V, vi, IV) — only 4 zones, easier to play.
@@ -46,8 +43,8 @@ final class ChordMelodyModeManager {
 
     // MARK: - State (mutated each tick)
 
-    private var chordHandPinching = false
-    private var melodyHandPinching = false
+    private var chordPinch = PinchDetector(on: 0.8, off: 0.5)
+    private var melodyPinch = PinchDetector(on: 0.8, off: 0.5)
     private var heldMelodyMidi: Int? = nil
 
     /// When quantized, a chord-hand pinch is latched here and the strum accent
@@ -73,8 +70,8 @@ final class ChordMelodyModeManager {
 
     private(set) var currentChordDegree: Int? = nil
     private(set) var currentChordMidi: [Int] = []
-    var isChordHandPinching: Bool { chordHandPinching }
-    var isMelodyHandPinching: Bool { melodyHandPinching }
+    var isChordHandPinching: Bool { chordPinch.isPinching }
+    var isMelodyHandPinching: Bool { melodyPinch.isPinching }
 
     // MARK: - Hand routing
 
@@ -191,9 +188,7 @@ final class ChordMelodyModeManager {
             // Pinch crossings trigger an additive accent on top of the pad.
             // Free: strike immediately. Quantized: latch and strike the
             // sounding chord on the next grid boundary.
-            let isPinching = h.pinch > pinchThreshold
-            if isPinching && !chordHandPinching {
-                chordHandPinching = true
+            if case .began = chordPinch.update(pinch: h.pinch) {
                 if quantize {
                     pendingChordAccent = true
                     pendingChordAccentVel = min(1, h.pinch)
@@ -204,8 +199,6 @@ final class ChordMelodyModeManager {
                         velocity: min(1, h.pinch)
                     ))
                 }
-            } else if h.pinch < releaseThreshold && chordHandPinching {
-                chordHandPinching = false
             }
 
             if quantize && pendingChordAccent && gridBoundaryCrossed {
@@ -227,7 +220,7 @@ final class ChordMelodyModeManager {
                 padDegree = nil
                 actions.append(.padOff)
             }
-            chordHandPinching = false
+            chordPinch.reset()
             pendingChordAccent = false
         }
 
@@ -240,45 +233,47 @@ final class ChordMelodyModeManager {
         let melodySnapTargets = melodyTones(snapDegree)
 
         if let h = melodyHand(hands), !melodySnapTargets.isEmpty {
-            // Hysteresis latch: engage above pinchThreshold, release below
-            // releaseThreshold — matches the grid hand's feel.
-            if h.pinch > pinchThreshold {
-                melodyHandPinching = true
-            } else if h.pinch < releaseThreshold {
-                melodyHandPinching = false
-            }
+            let laneIdx = yToMelodyLane(h.pinchY, noteCount: melodySnapTargets.count)
+            let midi = melodySnapTargets[laneIdx]
+            let allowChange = !quantize || gridBoundaryCrossed
 
-            if !melodyHandPinching {
-                // Released — note off is always immediate.
-                if heldMelodyMidi != nil {
-                    heldMelodyMidi = nil
-                    actions.append(.melodyOff(hand: melodyHandName))
+            switch melodyPinch.update(pinch: h.pinch) {
+            case .began:
+                if allowChange {
+                    heldMelodyMidi = midi
+                    actions.append(.melodyOn(
+                        hand: melodyHandName,
+                        midi: midi,
+                        name: midiNoteName(midi),
+                        velocity: min(1, h.pinch)
+                    ))
                 }
-            } else {
-                let laneIdx = yToMelodyLane(h.pinchY, noteCount: melodySnapTargets.count)
-                let midi = melodySnapTargets[laneIdx]
-                // Quantized: only let the audible note change on a boundary.
-                if !quantize || gridBoundaryCrossed {
-                    if heldMelodyMidi == nil {
-                        heldMelodyMidi = midi
-                        actions.append(.melodyOn(
-                            hand: melodyHandName,
-                            midi: midi,
-                            name: midiNoteName(midi),
-                            velocity: min(1, h.pinch)
-                        ))
-                    } else if midi != heldMelodyMidi {
-                        heldMelodyMidi = midi
-                        actions.append(.melodySlide(
-                            hand: melodyHandName,
-                            midi: midi,
-                            name: midiNoteName(midi)
-                        ))
-                    }
+            case .held:
+                if !allowChange { break }
+                if heldMelodyMidi == nil {
+                    heldMelodyMidi = midi
+                    actions.append(.melodyOn(
+                        hand: melodyHandName,
+                        midi: midi,
+                        name: midiNoteName(midi),
+                        velocity: min(1, h.pinch)
+                    ))
+                } else if midi != heldMelodyMidi {
+                    heldMelodyMidi = midi
+                    actions.append(.melodySlide(
+                        hand: melodyHandName,
+                        midi: midi,
+                        name: midiNoteName(midi)
+                    ))
                 }
+            case .ended:
+                // Release always fires immediately, even in quantize.
+                heldMelodyMidi = nil
+                actions.append(.melodyOff(hand: melodyHandName))
+            case .idle:
+                break
             }
-        } else if heldMelodyMidi != nil {
-            melodyHandPinching = false
+        } else if melodyPinch.release() == .ended {
             heldMelodyMidi = nil
             actions.append(.melodyOff(hand: melodyHandName))
         }

@@ -21,11 +21,10 @@ final class DrumModeManager {
     static let leftZones = allDrums
     static let rightZones = allDrums
 
-    // Pinch detection (same as GridModeManager)
-    private var leftPinching = false
-    private var rightPinching = false
-    private let pinchThreshold: Double = 0.7
-    private let releaseThreshold: Double = 0.4
+    // Pinch detection — drums use a lighter touch (0.7/0.4) than melodic modes
+    // so percussive hits feel responsive.
+    private var leftPinch = PinchDetector(on: 0.7, off: 0.4)
+    private var rightPinch = PinchDetector(on: 0.7, off: 0.4)
 
     // Track which drum each hand last triggered (prevent re-trigger)
     private var leftLastDrum: String? = nil
@@ -34,8 +33,8 @@ final class DrumModeManager {
     // Published lane indices for UI highlighting
     var leftLane: Int? = nil
     var rightLane: Int? = nil
-    var isLeftPinching: Bool { leftPinching }
-    var isRightPinching: Bool { rightPinching }
+    var isLeftPinching: Bool { leftPinch.isPinching }
+    var isRightPinching: Bool { rightPinch.isPinching }
 
     struct DrumHit {
         let hand: String
@@ -60,24 +59,24 @@ final class DrumModeManager {
             let drumIdx = yToDrumIndex(y: left.pinchY)
             leftLane = drumIdx
             let drum = Self.allDrums[drumIdx]
-            let isPinching = left.pinch > pinchThreshold
 
-            if isPinching && !leftPinching {
-                leftPinching = true
+            switch leftPinch.update(pinch: left.pinch) {
+            case .began:
                 leftLastDrum = drum.hitType
                 hits.append(DrumHit(hand: "left", hitType: drum.hitType))
-            } else if isPinching && leftPinching {
+            case .held:
                 // Still pinching — retrigger if moved to new drum
                 if drum.hitType != leftLastDrum {
                     leftLastDrum = drum.hitType
                     hits.append(DrumHit(hand: "left", hitType: drum.hitType))
                 }
-            } else if left.pinch < releaseThreshold {
-                leftPinching = false
+            case .ended:
                 leftLastDrum = nil
+            case .idle:
+                break
             }
         } else {
-            leftPinching = false
+            leftPinch.release()
             leftLastDrum = nil
             leftLane = nil
         }
@@ -87,23 +86,23 @@ final class DrumModeManager {
             let drumIdx = yToDrumIndex(y: right.pinchY)
             rightLane = drumIdx
             let drum = Self.allDrums[drumIdx]
-            let isPinching = right.pinch > pinchThreshold
 
-            if isPinching && !rightPinching {
-                rightPinching = true
+            switch rightPinch.update(pinch: right.pinch) {
+            case .began:
                 rightLastDrum = drum.hitType
                 hits.append(DrumHit(hand: "right", hitType: drum.hitType))
-            } else if isPinching && rightPinching {
+            case .held:
                 if drum.hitType != rightLastDrum {
                     rightLastDrum = drum.hitType
                     hits.append(DrumHit(hand: "right", hitType: drum.hitType))
                 }
-            } else if right.pinch < releaseThreshold {
-                rightPinching = false
+            case .ended:
                 rightLastDrum = nil
+            case .idle:
+                break
             }
         } else {
-            rightPinching = false
+            rightPinch.release()
             rightLastDrum = nil
             rightLane = nil
         }

@@ -35,12 +35,16 @@ Users map hand axes to music params via `MappingConfig`:
 ```
 
 - Axes: `y`, `x`, `spread` (basic) + `pinch`, `fist`, `rotation`, `thumbCurl`, `indexCurl`, `middleCurl`, `ringCurl`, `pinkyCurl` (advanced)
-- Special values: `"none"` (unmapped), `"save"` (gesture trigger, not a param)
+- Special values: `"none"` (unmapped), `"save"` (gesture trigger, not a param), `"instrument"` (gesture trigger that cycles the sound)
 - `PARAM_DEFS` in `music.ts` defines all musical parameters with ranges, defaults, formatters, and Strudel code generators
 
 ### Save Gesture
 
 Axes can be mapped to `"save"` instead of a param. When the axis value crosses > 0.8, it snapshots the current Strudel code. Hysteresis (must drop below 0.3 to re-arm) and debounce (1s minimum) prevent spam.
+
+### Instruments / SoundFonts
+
+The melody's sound source is selectable from `INSTRUMENTS` in `music.ts` — built-in oscillator synths plus General MIDI soundfonts registered by `@strudel/soundfonts` (ids like `gm_acoustic_piano`). Soundfonts share the `s()` namespace and run through the existing effects chain; their sample data lazy-loads from a CDN on first use. The chosen instrument id is threaded through `buildCode`/`buildSignalCode`/`buildCodeHL` and held in `instrumentRef` (mirrored to `instrument` state). It can be picked up front in `StartOverlay`, changed live via the Sidebar dropdown, or cycled by an `"instrument"` gesture axis (same hysteresis/debounce as save). Changing it sets `lastStructKeyRef = ""` to force a live re-eval.
 
 ### Snippet Playback
 

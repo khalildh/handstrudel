@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { MusicParams, PARAM_MAP, NOTES, NOTE_DISPLAY } from "../lib/music";
+import { MusicParams, PARAM_MAP, NOTES, NOTE_DISPLAY, INSTRUMENTS } from "../lib/music";
 import { HandsState, MappingConfig } from "../lib/hand-mapping";
 import HandPanel from "./HandPanel";
 import type { SavedSnippet } from "./HandStrudel";
@@ -28,6 +28,8 @@ interface SidebarProps {
   hydraAvailable: boolean;
   onHydraToggle: () => void;
   onImportSnippets: (snippets: SavedSnippet[]) => void;
+  instrument: string;
+  onInstrumentChange: (id: string) => void;
 }
 
 function paramRow(id: string, value: number) {
@@ -39,7 +41,7 @@ function paramRow(id: string, value: number) {
 
 function buildParamRows(sideConfig: Record<string, string>, smoothed: MusicParams) {
   return Object.entries(sideConfig)
-    .filter(([, paramId]) => paramId !== "none" && paramId !== "save")
+    .filter(([, paramId]) => paramId !== "none" && paramId !== "save" && paramId !== "instrument")
     .map(([, paramId]) => paramRow(paramId, smoothed[paramId] ?? 0));
 }
 
@@ -65,6 +67,8 @@ export default function Sidebar({
   hydraAvailable,
   onHydraToggle,
   onImportSnippets,
+  instrument,
+  onInstrumentChange,
 }: SidebarProps) {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -112,6 +116,21 @@ export default function Sidebar({
           id="code-display"
           dangerouslySetInnerHTML={{ __html: codeHL }}
         />
+      </div>
+
+      <div className="sound-switch">
+        <span className="sound-switch-label">🎹 SOUND</span>
+        <select
+          className="sound-switch-select"
+          value={instrument}
+          onChange={(e) => onInstrumentChange(e.target.value)}
+        >
+          {INSTRUMENTS.map((inst) => (
+            <option key={inst.id} value={inst.id}>
+              {inst.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {hydraCodeHL && (
