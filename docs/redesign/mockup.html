@@ -166,6 +166,10 @@
             <div class="tile" style="align-items:center;opacity:.6"><div style="font-size:22px">⚡</div><div style="font-size:11px">EDM 🔒</div></div>
             <div class="tile" style="align-items:center;opacity:.6"><div style="font-size:22px">🌊</div><div style="font-size:11px">Ambient 🔒</div></div>
           </div>
+          <div class="label" style="margin:16px 0 8px">Voice</div>
+          <div class="seg"><div class="on">Saw</div><div>Square</div><div>Sine</div><div>Tri</div></div>
+          <div class="label" style="margin:16px 0 8px">Backing beat</div>
+          <div class="listrow" style="margin:0"><div style="font-size:18px">🥁</div><div style="flex:1"><b style="font-size:13px">Boom Bap</b><div class="muted" style="font-size:11px">vol ▓▓▓▓░</div></div><div class="muted">›</div></div>
           <div style="margin-top:14px"><span class="pill" style="width:100%;justify-content:center">Browse packs &amp; store →</span></div>
         </div>
         <div class="tabbar">
@@ -176,7 +180,7 @@
         </div>
       </div>
     </div>
-    <div class="cap"><b>Sounds.</b> Presets + the store live together as one place to pick/own gear. Picking previews the vibe. No separate "start screen" that you only ever see once — sound selection is always one tab away while you play.</div>
+    <div class="cap"><b>Sounds.</b> Everything you play <i>with</i>: preset vibe, synth <b>Voice</b> (the old waveform picker), and the <b>Backing beat</b> (Drums 1). Presets + store in one place. Always one tab away — no throwaway start screen.</div>
   </div>
 
   <!-- TUNE -->
@@ -186,17 +190,33 @@
       <div class="screen">
         <div class="scroll">
           <div class="h2">Tune</div>
-          <div class="label">Key</div>
-          <div class="seg" style="margin:8px 0 16px"><div class="on">C</div><div>D</div><div>E</div><div>G</div><div>A</div></div>
-          <div class="label">Scale</div>
-          <div class="seg" style="margin:8px 0 16px"><div class="on">Penta</div><div>Major</div><div>Minor</div><div>Dorian</div></div>
-          <div class="label">Effects</div>
-          <div class="tile" style="margin:8px 0 16px;gap:12px">
-            <div><div class="muted" style="font-size:11px;margin-bottom:5px">Reverb</div><div style="height:6px;background:var(--mat);border-radius:3px"><div style="width:45%;height:6px;background:var(--accent);border-radius:3px"></div></div></div>
-            <div><div class="muted" style="font-size:11px;margin-bottom:5px">Filter</div><div style="height:6px;background:var(--mat);border-radius:3px"><div style="width:70%;height:6px;background:var(--accent);border-radius:3px"></div></div></div>
+
+          <div class="label">Harmony</div>
+          <div class="seg" style="margin:8px 0 6px"><div class="on">C</div><div>D</div><div>E</div><div>G</div><div>A</div></div>
+          <div class="seg" style="margin:0 0 8px"><div class="on">Penta</div><div>Major</div><div>Minor</div><div>Dorian</div></div>
+          <div style="display:flex;gap:8px;margin:0 0 14px">
+            <span class="pill" style="flex:1;justify-content:center">Chords</span>
+            <span class="pill" style="flex:1;justify-content:center">Circle of 5ths</span>
           </div>
-          <div class="listrow" style="justify-content:space-between"><span>Advanced</span><span class="muted">⌄</span></div>
-          <div class="muted" style="font-size:11px;padding:2px 4px">Hand→param mapping · 2nd drum track · sequencer · live code</div>
+
+          <div class="label">Feel</div>
+          <div class="tile" style="margin:8px 0 14px;gap:11px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t2)"><span>Tempo</span><span>120 BPM</span></div>
+            <div><div class="muted" style="font-size:11px;margin-bottom:5px">Reverb</div><div style="height:6px;background:var(--mat);border-radius:3px"><div style="width:45%;height:6px;background:var(--accent);border-radius:3px"></div></div></div>
+            <div><div class="muted" style="font-size:11px;margin-bottom:5px">Delay · Filter</div><div style="height:6px;background:var(--mat);border-radius:3px"><div style="width:62%;height:6px;background:var(--accent);border-radius:3px"></div></div></div>
+          </div>
+
+          <div class="label">Mode options</div>
+          <div class="muted" style="font-size:11px;margin:6px 0 14px">The active mode's controls only — octave &amp; range in Grid, progression &amp; swap hands in Chord, song in Learn.</div>
+
+          <div class="label">Look</div>
+          <div style="display:flex;gap:8px;margin:8px 0 14px">
+            <span class="pill" style="flex:1;justify-content:center">Camera filter</span>
+            <span class="pill" style="flex:1;justify-content:center">Hand theme</span>
+          </div>
+
+          <div class="listrow" style="justify-content:space-between;margin-bottom:6px"><span>Advanced</span><span class="muted">⌄</span></div>
+          <div class="muted" style="font-size:11px;padding:0 4px">Hand→param mapping · 2nd drum track · sequencer · live code · recording</div>
         </div>
         <div class="tabbar">
           <div class="tab"><div class="g">🌀</div>Play</div>
@@ -206,12 +226,29 @@
         </div>
       </div>
     </div>
-    <div class="cap"><b>Tune.</b> Only the few things you change mid-session: key, scale, effects. The entire old mega-sheet (mapping, dual drums, sequencer, code) collapses under one <b>Advanced</b> row. Players never see the cockpit unless they want it.</div>
+    <div class="cap"><b>Tune (the dismantled settings sheet).</b> Grouped, not dumped: <b>Harmony</b> (key/scale/chords), <b>Feel</b> (tempo + effects), <b>Mode options</b> (only the active mode's controls), <b>Look</b> (filter + hand theme). The cockpit — mapping, 2nd drums, sequencer, code, recording — sits under <b>Advanced</b>.</div>
   </div>
 
 </div>
 
-<p class="legend"><span class="swatch"></span>This is a static mockup of <b>structure</b>, not final visuals — colors/spacing follow the design tokens already in the branch. The point is the architecture: 4 destinations, a persistent play deck, a real Loops flow, and a tiny Tune surface. Tell me where this is wrong and I'll change the map before touching more code.</p>
+<h1 style="margin-top:48px;font-size:18px">The settings sheet, dismantled</h1>
+<p class="sub">The single endless scroll is the core structural flaw. It's broken into grouped surfaces with real homes — nothing is lost, but players see only what they need.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:8px;max-width:1100px">
+  <div class="listrow" style="margin:0"><span style="flex:1">Mode + per-mode options</span><span class="pill solid">Play deck · Tune › Mode options</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Key / Scale / Chords / Circle of 5ths</span><span class="pill solid">Tune › Harmony</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">BPM</span><span class="pill solid">Play tempo · Tune › Feel</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Effects (reverb/delay/filter…)</span><span class="pill solid">Tune › Feel</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Waveform</span><span class="pill solid">Sounds › Voice</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Drums 1 (backing)</span><span class="pill solid">Sounds › Backing beat</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Camera filters</span><span class="pill solid">Tune › Look · Play swipe</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Hand themes</span><span class="pill solid">Tune › Look</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Loops / Snippets</span><span class="pill solid">Loops tab</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Track sequencer</span><span class="pill solid">Loops › Arrange</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Hand→param mapping</span><span class="pill solid">Tune › Advanced</span></div>
+  <div class="listrow" style="margin:0"><span style="flex:1">Drums 2 · Live code · Recording</span><span class="pill solid">Tune › Advanced</span></div>
+</div>
+
+<p class="legend"><span class="swatch"></span>Static mockup of <b>structure</b>, not final visuals. The architecture: 4 destinations, a persistent Play deck, a real Loops flow, and the old mega-sheet broken into grouped surfaces. Tell me where this is wrong and I'll change the map before touching code.</p>
 
 </body>
 </html>
