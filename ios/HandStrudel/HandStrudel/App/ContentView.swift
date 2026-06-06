@@ -1158,6 +1158,7 @@ struct ControlSheet: View {
     @State private var paywallPackId: String?
     @State private var showAudioExport = false
     @State private var exportedAudioURL: URL?
+    @State private var soundFontCategory: GMCategory = DEFAULT_SOUNDFONT_INSTRUMENT.category
 
     var body: some View {
         ScrollView {
@@ -1405,6 +1406,10 @@ struct ControlSheet: View {
             if currentMode == .soundFont {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Chord+melody played through a real SoundFont instrument. Chord hand holds the harmony; melody hand plays notes snapped to the current chord. Requires a General MIDI .sf2 in the app bundle (see Resources/soundfonts).")
+                        .onAppear { soundFontCategory = engine.selectedSoundFontInstrument.category }
+                        .onChange(of: engine.selectedSoundFontInstrument) { new in
+                            soundFontCategory = new.category
+                        }
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1413,9 +1418,20 @@ struct ControlSheet: View {
                         Text("Instrument")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .foregroundColor(.primary.opacity(0.7))
+                        // Category row — picks which GM family the chip row
+                        // shows. Defaults to whatever category the currently
+                        // selected instrument belongs to, then sticks to the
+                        // user's last tap.
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
-                                ForEach(SOUNDFONT_INSTRUMENTS) { inst in
+                                ForEach(GMCategory.allCases) { cat in
+                                    soundFontCategoryChip(cat)
+                                }
+                            }
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(SOUNDFONT_INSTRUMENTS.filter { $0.category == soundFontCategory }) { inst in
                                     soundFontChip(inst)
                                 }
                             }
@@ -1574,6 +1590,26 @@ struct ControlSheet: View {
             )
             .overlay(
                 Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
+            )
+        }
+    }
+
+    private func soundFontCategoryChip(_ cat: GMCategory) -> some View {
+        let isActive = soundFontCategory == cat
+        return Button(action: { soundFontCategory = cat }) {
+            HStack(spacing: 5) {
+                Text(cat.emoji).font(.system(size: 12))
+                Text(cat.displayName)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(isActive ? .blue : .primary.opacity(0.6))
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(isActive ? Color.blue.opacity(0.12) : Color.primary.opacity(0.03))
+            )
+            .overlay(
+                Capsule().stroke(isActive ? Color.blue.opacity(0.5) : Color.white.opacity(0.05), lineWidth: isActive ? 1 : 0.5)
             )
         }
     }
