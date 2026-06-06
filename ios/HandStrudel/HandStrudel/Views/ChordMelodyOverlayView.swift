@@ -72,7 +72,7 @@ struct ChordMelodyOverlayView: View {
                 // ---- chord name display ----
                 if !currentChordName.isEmpty {
                     Text(currentChordName)
-                        .font(.system(size: 56, weight: .black, design: .rounded))
+                        .font(.system(size: 56, weight: .black))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: chordHandPinching ? [.green, .cyan] : [.white.opacity(0.5), .white.opacity(0.3)],
@@ -131,16 +131,16 @@ struct ChordMelodyOverlayView: View {
             if octave == 0 {
                 VStack(spacing: 4) {
                     Text(romanNumeral(degree: degree))
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(.system(size: 18, weight: .black))
                         .foregroundColor(isCurrentZone ? .white : .white.opacity(0.55))
                     Text(degreeLabel(degree: degree))
-                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .font(.system(size: 9, weight: .semibold))
                         .foregroundColor(.white.opacity(isCurrentZone ? 0.7 : 0.4))
                 }
             } else {
                 // Tiny octave indicator (+ for high, − for low) on outer rows.
                 Text(octave > 0 ? "+8va" : "−8va")
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .font(.system(size: 9, weight: .semibold))
                     .foregroundColor(.white.opacity(isActiveCell ? 0.85 : 0.3))
             }
         }

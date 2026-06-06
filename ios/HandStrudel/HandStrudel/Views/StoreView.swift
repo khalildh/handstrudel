@@ -5,273 +5,190 @@ import RevenueCatUI
 struct StoreView: View {
     @ObservedObject var storeManager: StoreManager
 
+    @State private var showPaywall = false
+    @State private var showCustomerCenter = false
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                // Title
-                Text("STORE")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.top, 16)
+            VStack(alignment: .leading, spacing: DS.Space.xl) {
+                Text("Store")
+                    .font(.dsLargeTitle)
+                    .foregroundColor(DS.textPrimary)
+                    .padding(.top, DS.Space.md)
 
                 // Preset Packs
-                sectionHeader("PRESET PACKS")
-                packRow(
-                    id: StoreManager.studioPack,
-                    name: "Studio Pack",
-                    emoji: "🎛️",
-                    contents: ["Tape", "Glass", "Deep", "Foggy", "Pulse", "Cosmic", "Glitch"],
-                    description: "7 professional studio presets"
-                )
-                packRow(
-                    id: StoreManager.partyPack,
-                    name: "Party Pack",
-                    emoji: "🎉",
-                    contents: ["EDM", "DnB", "Dubstep", "Rave", "Reggaeton", "Future Bass", "Techno", "Garage", "Phonk"],
-                    description: "9 high-energy party presets"
-                )
+                section("Preset Packs") {
+                    packRow(
+                        id: StoreManager.studioPack,
+                        name: "Studio Pack", emoji: "🎛️",
+                        contents: ["Tape", "Glass", "Deep", "Foggy", "Pulse", "Cosmic", "Glitch"]
+                    )
+                    packRow(
+                        id: StoreManager.partyPack,
+                        name: "Party Pack", emoji: "🎉",
+                        contents: ["EDM", "DnB", "Dubstep", "Rave", "Reggaeton", "Future Bass", "Techno", "Garage", "Phonk"]
+                    )
+                }
 
                 // Drum Kits
-                sectionHeader("DRUM KITS")
-                packRow(
-                    id: StoreManager.kit808,
-                    name: "808 Kit",
-                    emoji: "🥁",
-                    contents: ["Boom Bap", "Drill", "Lo-Fi Hip Hop", "R&B", "Afrobeat", "Bounce", "Jersey Club", "Memphis", "Bossa Nova", "Reggae"],
-                    description: "10 hip-hop, urban & world drum patterns"
-                )
-                packRow(
-                    id: StoreManager.kitElectronic,
-                    name: "Electronic Kit",
-                    emoji: "⚡",
-                    contents: ["Techno", "Breakbeat", "IDM", "Jungle", "Ambient", "Industrial", "2-Step", "Synthwave"],
-                    description: "8 electronic drum patterns"
-                )
+                section("Drum Kits") {
+                    packRow(
+                        id: StoreManager.kit808,
+                        name: "808 Kit", emoji: "🥁",
+                        contents: ["Boom Bap", "Drill", "Lo-Fi Hip Hop", "R&B", "Afrobeat", "Bounce", "Jersey Club", "Memphis", "Bossa Nova", "Reggae"]
+                    )
+                    packRow(
+                        id: StoreManager.kitElectronic,
+                        name: "Electronic Kit", emoji: "⚡",
+                        contents: ["Techno", "Breakbeat", "IDM", "Jungle", "Ambient", "Industrial", "2-Step", "Synthwave"]
+                    )
+                }
 
                 // Pro
-                sectionHeader("PRO")
-                proRow
+                section("Pro") { proCard }
 
-                // HandStrudel+
-                sectionHeader("HANDSTRUDEL+")
-                subscriptionRow
+                // Subscription
+                section("HandStrudel+") { subscriptionCard }
 
-                // Required policy links — also surfaced inside the RevenueCat
-                // paywall, but kept here so they're always reachable from the
-                // Store screen regardless of paywall state.
-                HStack(spacing: 20) {
+                // Policy links
+                HStack(spacing: DS.Space.lg) {
                     Link("Privacy Policy", destination: URL(string: "https://handstrudel.com/privacy")!)
                     Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                 }
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.5))
+                .font(.dsFootnote)
+                .foregroundColor(DS.textTertiary)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 8)
+                .padding(.top, DS.Space.xs)
 
-                Spacer().frame(height: 20)
+                Spacer().frame(height: DS.Space.md)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DS.Space.lg)
         }
-        .background(Color.black.ignoresSafeArea())
-        .task {
-            // Always reload — if a previous load failed, products would be
-            // missing and pack buttons would show "---" with no action.
-            await storeManager.loadProducts()
+        .background(DS.background.ignoresSafeArea())
+        .task { await storeManager.loadProducts() }
+    }
+
+    // MARK: - Layout helpers
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: DS.Space.sm) {
+            DSSectionHeader(title)
+            content()
         }
     }
 
-    // MARK: - Components
+    // MARK: - Pack row
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundColor(.secondary)
-            .tracking(1.5)
-    }
-
-    private func packRow(id: String, name: String, emoji: String, contents: [String], description: String) -> some View {
+    private func packRow(id: String, name: String, emoji: String, contents: [String]) -> some View {
         let unlocked = storeManager.isUnlocked(id)
         let product = storeManager.products.first(where: { $0.productIdentifier == id })
 
-        return HStack(spacing: 14) {
-            Text(emoji)
-                .font(.system(size: 28))
-                .frame(width: 44)
+        return HStack(spacing: DS.Space.sm) {
+            IconTile(emoji: emoji, tint: DS.signature, size: 46)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(name)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .font(.dsHeadline)
+                    .foregroundColor(DS.textPrimary)
                 Text(contents.joined(separator: " · "))
-                    .font(.system(size: 11, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
+                    .font(.dsCaption)
+                    .foregroundColor(DS.textTertiary)
                     .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: DS.Space.xs)
 
             if unlocked {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(.green)
+                    .foregroundColor(DS.signature)
             } else {
-                Button(action: {
-                    Task { try? await storeManager.purchase(productId: id) }
-                }) {
-                    HStack(spacing: 6) {
-                        Text("Buy")
-                            .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        if let price = product?.localizedPriceString {
-                            Text(price)
-                                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        }
-                    }
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.green)
-                    .cornerRadius(10)
+                Button(action: { Task { try? await storeManager.purchase(productId: id) } }) {
+                    Text(product?.localizedPriceString ?? "Buy")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, DS.Space.md)
+                        .padding(.vertical, 9)
+                        .background(Capsule().fill(DS.signature))
                 }
+                .fixedSize()
             }
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(unlocked ? Color.green.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
-        )
+        .padding(DS.Space.sm)
+        .dsCard(selected: unlocked)
     }
 
-    private var proRow: some View {
+    // MARK: - Pro
+
+    private var proCard: some View {
         let unlocked = storeManager.hasProAccess
         let product = storeManager.products.first(where: { $0.productIdentifier == StoreManager.pro })
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("⭐")
-                    .font(.system(size: 28))
-                Text("HandStrudel Pro")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
+        return VStack(alignment: .leading, spacing: DS.Space.md) {
+            HStack(spacing: DS.Space.sm) {
+                IconTile(symbol: "star.fill", tint: DS.signature, size: 46)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("HandStrudel Pro")
+                        .font(.dsTitle3)
+                        .foregroundColor(DS.textPrimary)
+                    Text("One-time purchase")
+                        .font(.dsCaption)
+                        .foregroundColor(DS.textTertiary)
+                }
                 Spacer()
                 if unlocked {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundColor(.green)
+                        .foregroundColor(DS.signature)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DS.Space.xs) {
                 featureItem("All preset packs")
                 featureItem("All sound packs")
                 featureItem("All drum kits")
-                featureItem("One-time purchase")
             }
 
             if !unlocked {
-                Button(action: {
-                    Task { try? await storeManager.purchase(productId: StoreManager.pro) }
-                }) {
-                    HStack(spacing: 8) {
-                        Text("BUY PRO")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                Button(action: { Task { try? await storeManager.purchase(productId: StoreManager.pro) } }) {
+                    HStack(spacing: DS.Space.xs) {
+                        Text("Get Pro")
                         if let price = product?.localizedPriceString {
-                            Text("• \(price)")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                .opacity(0.7)
+                            Text("·").opacity(0.5)
+                            Text(price).font(.dsMono(15, .semibold))
                         }
                     }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Color.green)
-                    .cornerRadius(12)
                 }
+                .buttonStyle(DSPrimaryButtonStyle())
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(unlocked ? Color.green.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
-        )
+        .padding(DS.Space.md)
+        .dsCard(selected: unlocked)
     }
 
-    @State private var showPaywall = false
-    @State private var showCustomerCenter = false
+    // MARK: - Subscription
 
-    private var subscriptionRow: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
+    private var subscriptionCard: some View {
+        VStack(alignment: .leading, spacing: DS.Space.md) {
+            VStack(alignment: .leading, spacing: DS.Space.xs) {
                 featureItem("Everything in Pro")
                 featureItem("Early access to new content")
                 featureItem("Exclusive presets & sounds")
             }
 
             if storeManager.hasSubscription {
-                VStack(spacing: 10) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Subscribed")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    Button(action: { showCustomerCenter = true }) {
-                        Text("MANAGE SUBSCRIPTION")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 40)
-                            .background(Color.white.opacity(0.08))
-                            .cornerRadius(10)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                            )
-                    }
-                }
-                .padding(.vertical, 4)
+                statusPill("Subscribed")
+                Button("Manage Subscription") { showCustomerCenter = true }
+                    .buttonStyle(DSSecondaryButtonStyle())
             } else if storeManager.hasProAccess {
-                // One-time Pro purchase — no subscription to manage
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("Pro — Lifetime Access")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                statusPill("Pro — Lifetime Access")
             } else {
-                Button(action: { showPaywall = true }) {
-                    Text("SUBSCRIBE")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Color.green)
-                        .cornerRadius(12)
-                }
+                Button("Subscribe") { showPaywall = true }
+                    .buttonStyle(DSPrimaryButtonStyle())
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(storeManager.hasProAccess ? Color.green.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
-        )
+        .padding(DS.Space.md)
+        .dsCard(selected: storeManager.hasProAccess)
         .sheet(isPresented: $showPaywall) {
             PaywallView(displayCloseButton: true)
         }
@@ -280,14 +197,26 @@ struct StoreView: View {
         }
     }
 
-    private func featureItem(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.green)
+    private func statusPill(_ text: String) -> some View {
+        HStack(spacing: DS.Space.xs) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(DS.signature)
             Text(text)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.7))
+                .font(.dsCallout)
+                .foregroundColor(DS.textPrimary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, DS.Space.xs)
+    }
+
+    private func featureItem(_ text: String) -> some View {
+        HStack(spacing: DS.Space.xs) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(DS.signature)
+            Text(text)
+                .font(.dsCallout)
+                .foregroundColor(DS.textSecondary)
         }
     }
 }

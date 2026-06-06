@@ -14,98 +14,97 @@ struct PaywallOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            DS.background.ignoresSafeArea()
 
-            // Scrollable content lets the header + items breathe on any height;
-            // the action button is pinned below the scroll so it stays visible
-            // even on short sheet detents (e.g. iPad in iPhone-compat mode).
+            AmbientAccent(period: 28) { color, _ in
+                RadialGradient(colors: [color.opacity(0.14), .clear],
+                               center: .top, startRadius: 0, endRadius: 300)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+
             VStack(spacing: 0) {
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
+                    VStack(spacing: DS.Space.lg) {
                         // Header
-                        VStack(spacing: 8) {
+                        VStack(spacing: DS.Space.sm) {
+                            IconTile(symbol: "sparkles", tint: DS.signature, size: 64)
+                                .padding(.bottom, DS.Space.xxs)
+
                             Text(packName)
-                                .font(.system(size: 28, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
+                                .font(.dsTitle)
+                                .foregroundColor(DS.textPrimary)
                                 .multilineTextAlignment(.center)
 
                             Text(packDescription)
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundColor(.white.opacity(0.5))
+                                .font(.dsCallout)
+                                .foregroundColor(DS.textSecondary)
                                 .multilineTextAlignment(.center)
                         }
-                        .padding(.top, 24)
-                        .padding(.horizontal, 24)
+                        .padding(.top, DS.Space.xl)
+                        .padding(.horizontal, DS.Space.lg)
 
-                        // Items list
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("INCLUDES")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundColor(.secondary)
-                                .tracking(1.5)
-
-                            ForEach(items, id: \.self) { item in
-                                HStack(spacing: 10) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.green)
-                                    Text(item)
-                                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.9))
+                        // Includes
+                        VStack(alignment: .leading, spacing: DS.Space.sm) {
+                            DSSectionHeader("Includes")
+                            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                                ForEach(items, id: \.self) { item in
+                                    HStack(spacing: DS.Space.sm) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(DS.signature)
+                                        Text(item)
+                                            .font(.dsBody)
+                                            .foregroundColor(DS.textPrimary)
+                                        Spacer(minLength: 0)
+                                    }
                                 }
                             }
+                            .padding(DS.Space.md)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .dsCard()
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 24)
-
-                        // Price
-                        Text(price)
-                            .font(.system(size: 22, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green)
-                            .padding(.top, 8)
+                        .padding(.horizontal, DS.Space.lg)
                     }
-                    .padding(.bottom, 16)
+                    .padding(.bottom, DS.Space.md)
                 }
 
-                // Pinned action area — always visible regardless of sheet height
-                VStack(spacing: 10) {
+                // Pinned action area — visible at any sheet height.
+                VStack(spacing: DS.Space.sm) {
                     Button(action: purchaseTapped) {
                         Group {
                             if purchasing {
-                                ProgressView()
-                                    .tint(.black)
+                                ProgressView().tint(.black)
                             } else {
-                                Text("UNLOCK")
-                                    .font(.system(size: 18, weight: .black, design: .rounded))
+                                HStack(spacing: DS.Space.xs) {
+                                    Text("Unlock")
+                                    Text("·").opacity(0.5)
+                                    Text(price).font(.dsMono(15, .semibold))
+                                }
                             }
                         }
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(Color.green)
-                        .cornerRadius(16)
                     }
+                    .buttonStyle(DSPrimaryButtonStyle())
                     .disabled(purchasing)
                     .accessibilityIdentifier("paywall-unlock")
 
                     Button(action: restoreTapped) {
                         Text("Restore Purchases")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundColor(.white.opacity(0.4))
+                            .font(.dsFootnote)
+                            .foregroundColor(DS.textTertiary)
                     }
                     .disabled(purchasing)
 
                     if let errorMessage {
                         Text(errorMessage)
-                            .font(.system(size: 12, design: .rounded))
-                            .foregroundColor(.red.opacity(0.8))
+                            .font(.dsCaption)
+                            .foregroundColor(.red.opacity(0.85))
                             .multilineTextAlignment(.center)
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-                .padding(.bottom, 16)
-                .background(Color.black)
+                .padding(.horizontal, DS.Space.lg)
+                .padding(.top, DS.Space.sm)
+                .padding(.bottom, DS.Space.md)
             }
         }
     }
@@ -117,9 +116,7 @@ struct PaywallOverlay: View {
         Task {
             do {
                 try await storeManager.purchase(productId: resolvedId)
-                if storeManager.isUnlocked(packId) {
-                    dismiss()
-                }
+                if storeManager.isUnlocked(packId) { dismiss() }
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -132,9 +129,7 @@ struct PaywallOverlay: View {
         errorMessage = nil
         Task {
             await storeManager.restorePurchases()
-            if storeManager.isUnlocked(packId) {
-                dismiss()
-            }
+            if storeManager.isUnlocked(packId) { dismiss() }
             purchasing = false
         }
     }

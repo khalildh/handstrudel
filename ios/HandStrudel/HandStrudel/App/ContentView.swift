@@ -215,7 +215,7 @@ struct ContentView: View {
                         : engine.jamSession.lastReceivedEvent
                     if !text.isEmpty {
                         Text(text)
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.cyan.opacity(0.8))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
@@ -262,7 +262,7 @@ struct ContentView: View {
                 // Filter name toast
                 if showFilterName {
                     Text(engine.selectedFilter.emoji + " " + engine.selectedFilter.name)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
@@ -273,7 +273,7 @@ struct ContentView: View {
                 // Shake-to-randomize toast
                 if showRandomizedToast {
                     Text("\u{1F3B2} Randomized!")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
@@ -358,9 +358,7 @@ struct ContentView: View {
             HStack(spacing: 5) {
                 ForEach(0..<4, id: \.self) { i in
                     Circle()
-                        .fill(i == engine.currentBeat
-                              ? (i % 2 == 0 ? Color.green : Color.pink)
-                              : Color.white.opacity(0.15))
+                        .fill(i == engine.currentBeat ? accentColor : Color.white.opacity(0.18))
                         .frame(width: 7, height: 7)
                         .scaleEffect(i == engine.currentBeat ? 1.5 : 1.0)
                         .animation(.easeOut(duration: 0.1), value: engine.currentBeat)
@@ -380,29 +378,27 @@ struct ContentView: View {
             }) {
                 HStack(spacing: 4) {
                     Image(systemName: engine.jamSession.isActive ? "person.2.fill" : "person.2")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 13, weight: .semibold))
                     if engine.jamSession.isActive {
                         Text("\(engine.jamSession.participants.count)")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(.system(size: 11, weight: .bold))
                     }
                 }
-                .foregroundColor(engine.jamSession.isActive ? .green : .white.opacity(0.6))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(engine.jamSession.isActive ? Color.green.opacity(0.2) : Color.black.opacity(0.3))
-                )
+                .foregroundColor(engine.jamSession.isActive ? accentColor : DS.textSecondary)
+                .padding(.horizontal, DS.Space.sm)
+                .frame(height: 36)
+                .background(Capsule().fill(.ultraThinMaterial))
+                .overlay(Capsule().strokeBorder(engine.jamSession.isActive ? accentColor.opacity(0.5) : Color.white.opacity(0.08), lineWidth: 0.5))
             }
 
             // Close button
             Button(action: { engine.stop() }) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white.opacity(0.85))
-                    .frame(width: 44, height: 44)
-                    .background(Color.black.opacity(0.4))
-                    .clipShape(Circle())
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(DS.textPrimary)
+                    .frame(width: 40, height: 40)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
             }
             .accessibilityIdentifier("close-button")
         }
@@ -418,25 +414,23 @@ struct ContentView: View {
         return (base + beatShift).truncatingRemainder(dividingBy: 1.0)
     }
 
+    /// Single source of truth for the live, music-reactive accent.
+    private var accentColor: Color { DS.accent(strudelHue) }
+
     private var logoMark: some View {
         HStack(spacing: 0) {
             Text("hand")
-                .font(.system(size: 18, weight: .light, design: .monospaced))
-                .foregroundColor(.white.opacity(0.9))
+                .font(.system(size: 17, weight: .ultraLight, design: .monospaced))
+                .foregroundColor(DS.textPrimary)
             Text("strudel")
-                .font(.system(size: 18, weight: .black, design: .monospaced))
-                .foregroundColor(Color(hue: strudelHue, saturation: 0.8, brightness: 1.0))
+                .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                .foregroundColor(accentColor)
                 .animation(.easeInOut(duration: 0.3), value: strudelHue)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(
-            Capsule()
-                .fill(Color.black.opacity(0.3))
-                .background(Capsule().fill(.ultraThinMaterial).opacity(0.3))
-        )
-        .clipShape(Capsule())
-        .shadow(color: Color(hue: strudelHue, saturation: 0.6, brightness: 0.8).opacity(0.5), radius: 10, x: 0, y: 2)
+        .padding(.horizontal, DS.Space.sm)
+        .padding(.vertical, DS.Space.xxs)
+        .background(Capsule().fill(.ultraThinMaterial))
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
     }
 
     // MARK: - Code Pill
@@ -445,20 +439,19 @@ struct ContentView: View {
         Group {
             if !engine.codeDisplay.isEmpty {
                 Text(engine.codeDisplay.components(separatedBy: "\n").prefix(3).joined(separator: "\n"))
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundColor(.green.opacity(0.8))
+                    .font(.dsMono(9))
+                    .foregroundColor(DS.textSecondary)
                     .lineLimit(3)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, DS.Space.sm)
+                    .padding(.vertical, DS.Space.xs)
                     .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.black.opacity(0.5))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Color.green.opacity(0.12), lineWidth: 0.5)
-                            )
+                        RoundedRectangle(cornerRadius: DS.Radius.chip, style: .continuous)
+                            .fill(.ultraThinMaterial)
                     )
-                    .shadow(color: Color.green.opacity(0.25), radius: 8, x: 0, y: 0)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DS.Radius.chip, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                    )
             }
         }
     }
@@ -467,20 +460,13 @@ struct ContentView: View {
 
     private var noteBadge: some View {
         Text(engine.noteDisplay)
-            .font(.system(size: 28, weight: .black, design: .rounded))
-            .foregroundColor(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(
-                Capsule()
-                    .fill(Color(hue: strudelHue, saturation: 0.6, brightness: 0.3).opacity(0.5))
-                    .overlay(
-                        Capsule()
-                            .stroke(Color(hue: strudelHue, saturation: 0.8, brightness: 1.0).opacity(0.6), lineWidth: 2)
-                    )
-            )
-            .shadow(color: Color(hue: strudelHue, saturation: 0.8, brightness: 1.0).opacity(0.5), radius: 12, x: 0, y: 0)
-            .scaleEffect(engine.currentBeat == 0 ? 1.1 : 1.0)
+            .font(.system(size: 30, weight: .bold))
+            .foregroundColor(DS.textPrimary)
+            .padding(.horizontal, DS.Space.lg)
+            .padding(.vertical, DS.Space.sm)
+            .background(Capsule().fill(.ultraThinMaterial))
+            .overlay(Capsule().strokeBorder(accentColor.opacity(0.7), lineWidth: 1.5))
+            .scaleEffect(engine.currentBeat == 0 ? 1.08 : 1.0)
             .animation(.spring(response: 0.15, dampingFraction: 0.5), value: engine.currentBeat)
     }
 
@@ -489,22 +475,19 @@ struct ContentView: View {
     private var beatRing: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.04), lineWidth: 1.5)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1.5)
                 .frame(width: 50, height: 50)
 
             Circle()
-                .stroke(
-                    engine.currentBeat % 2 == 0 ? Color.green.opacity(0.6) : Color.pink.opacity(0.6),
-                    lineWidth: 1.5
-                )
+                .stroke(accentColor.opacity(0.7), lineWidth: 1.5)
                 .frame(width: 50, height: 50)
                 .scaleEffect(engine.currentBeat == 0 ? 1.15 : 1.0)
-                .opacity(engine.currentBeat == 0 ? 0.4 : 0.8)
+                .opacity(engine.currentBeat == 0 ? 0.4 : 0.85)
                 .animation(.easeOut(duration: 0.3), value: engine.currentBeat)
 
             Text("\(Int(engine.bpm.rounded()))")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundColor(.white.opacity(0.5))
+                .font(.dsMono(13, .semibold))
+                .foregroundColor(DS.textSecondary)
         }
     }
 
@@ -542,7 +525,7 @@ struct ContentView: View {
                             .foregroundColor(.white.opacity(0.15))
                     }
                 }
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(.system(size: 9, weight: .bold))
                 .padding(8)
 
                 // Crosshair lines
@@ -555,9 +538,9 @@ struct ContentView: View {
 
                 // Position dot
                 Circle()
-                    .fill(Color.green)
+                    .fill(accentColor)
                     .frame(width: 20, height: 20)
-                    .shadow(color: .green.opacity(0.5), radius: 8)
+                    .shadow(color: accentColor.opacity(0.5), radius: 8)
                     .position(x: dotX, y: dotY)
             }
             .gesture(
@@ -583,7 +566,7 @@ struct ContentView: View {
                     // Show finger count visually
                     ForEach(1...5, id: \.self) { i in
                         Circle()
-                            .fill(i <= engine.currentFingerCount ? Color.green : Color.white.opacity(0.15))
+                            .fill(i <= engine.currentFingerCount ? accentColor : Color.white.opacity(0.15))
                             .frame(width: 8, height: 8)
                     }
                 }
@@ -592,7 +575,7 @@ struct ContentView: View {
             // Octave display
             Text("Oct \(engine.gridBaseOctave)")
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(.green)
+                .foregroundColor(accentColor)
 
             // Manual octave controls (when finger control is off)
             if !engine.fingerOctaveEnabled {
@@ -618,20 +601,20 @@ struct ContentView: View {
             Button(action: { engine.fingerOctaveEnabled.toggle() }) {
                 Image(systemName: engine.fingerOctaveEnabled ? "hand.raised.fingers.spread" : "hand.raised.slash")
                     .font(.system(size: 12))
-                    .foregroundColor(engine.fingerOctaveEnabled ? .green : .white.opacity(0.5))
+                    .foregroundColor(engine.fingerOctaveEnabled ? accentColor : .white.opacity(0.5))
                     .frame(width: 26, height: 26)
-                    .background(Circle().fill(engine.fingerOctaveEnabled ? Color.green.opacity(0.15) : Color.white.opacity(0.1)))
+                    .background(Circle().fill(engine.fingerOctaveEnabled ? accentColor.opacity(0.15) : Color.white.opacity(0.1)))
             }
 
             // Range pills
             ForEach([1, 2, 3], id: \.self) { range in
                 Button(action: { engine.gridOctaveRange = range }) {
                     Text("\(range)")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundColor(engine.gridOctaveRange == range ? .black : .white.opacity(0.6))
                         .frame(width: 26, height: 26)
                         .background(
-                            Circle().fill(engine.gridOctaveRange == range ? Color.green : Color.white.opacity(0.1))
+                            Circle().fill(engine.gridOctaveRange == range ? accentColor : Color.white.opacity(0.1))
                         )
                 }
             }
@@ -816,7 +799,7 @@ struct ContentView: View {
                             Text(lane.emoji)
                                 .font(.system(size: 20))
                             Text(lane.name)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(.system(size: 12, weight: .black))
                                 .foregroundColor(leftActive ? lane.color : .white.opacity(0.4))
                         }
                     }
@@ -850,7 +833,7 @@ struct ContentView: View {
 
                         HStack(spacing: 6) {
                             Text(lane.name)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(.system(size: 12, weight: .black))
                                 .foregroundColor(rightActive ? lane.color : .white.opacity(0.4))
                             Text(lane.emoji)
                                 .font(.system(size: 20))
@@ -903,11 +886,12 @@ struct ContentView: View {
 
             // Settings button
             Button(action: { showSheet = true }) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.4))
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.black.opacity(0.3)))
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(DS.textSecondary)
+                    .frame(width: 40, height: 40)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
             }
             .accessibilityIdentifier("settings-button")
         }
@@ -962,10 +946,10 @@ struct ContentView: View {
                 // Loop count badge
                 if !engine.savedLoops.isEmpty && !engine.isLoopRecording {
                     Text("\(engine.savedLoops.count)")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.white)
                         .frame(width: 18, height: 18)
-                        .background(Circle().fill(Color.green))
+                        .background(Circle().fill(accentColor))
                         .offset(x: 16, y: -16)
                 }
             }
@@ -976,7 +960,7 @@ struct ContentView: View {
                     Image(systemName: loopMessage.contains("saved") ? "checkmark.circle.fill" : loopMessage.contains("Recording") ? "record.circle" : "info.circle.fill")
                         .font(.system(size: 12))
                     Text(loopMessage)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11, weight: .semibold))
                 }
                 .foregroundColor(loopMessage.contains("saved") ? .green : loopMessage.contains("Recording") ? .red : .orange)
                 .padding(.horizontal, 12)
@@ -1014,7 +998,7 @@ struct ContentView: View {
                                 .rotationEffect(.degrees(-90))
                                 .animation(.linear(duration: 1), value: recordCountdown)
                             Text("\(recordCountdown)")
-                                .font(.system(size: 18, weight: .black, design: .rounded))
+                                .font(.system(size: 18, weight: .black))
                                 .foregroundColor(.white)
                         }
                     } else {
@@ -1037,7 +1021,7 @@ struct ContentView: View {
                                     .foregroundColor(.white)
                             }
                             Text("7s")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(.white.opacity(0.5))
                         }
                     }
@@ -1160,21 +1144,24 @@ struct ControlSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                // Header with store button
+                // Header with title + store button
                 HStack {
+                    Text("Settings")
+                        .font(.dsTitle2)
+                        .foregroundColor(DS.textPrimary)
                     Spacer()
                     Button(action: { showStore = true }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: "bag.fill")
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.system(size: 12, weight: .semibold))
                             Text("Store")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .font(.dsSubheadline)
                         }
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(Color.white.opacity(0.08)))
-                        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+                        .foregroundColor(DS.textPrimary)
+                        .padding(.horizontal, DS.Space.md)
+                        .frame(height: 34)
+                        .background(Capsule().fill(.ultraThinMaterial))
+                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
                     }
                 }
 
@@ -1271,12 +1258,13 @@ struct ControlSheet: View {
     private func sectionHeader(_ title: String, icon: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.green.opacity(0.6))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(DS.signature)
             Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundColor(.secondary)
-                .tracking(1.5)
+                .font(.dsFootnote)
+                .tracking(0.6)
+                .foregroundColor(DS.textTertiary)
+                .textCase(.uppercase)
         }
     }
 
@@ -1349,13 +1337,13 @@ struct ControlSheet: View {
             if currentMode == .chordMelody {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Progression")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.primary.opacity(0.7))
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
@@ -1368,22 +1356,22 @@ struct ControlSheet: View {
 
                     Toggle(isOn: $engine.chordMelodySwapHands) {
                         Text("Swap hands (right = chords)")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.primary.opacity(0.8))
                     }
-                    .tint(.green)
+                    .tint(DS.signature)
 
                     Toggle(isOn: $engine.chordMelodyAutoStrum) {
                         Text("Auto-strum (re-articulate on each beat)")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.primary.opacity(0.8))
                     }
-                    .tint(.green)
+                    .tint(DS.signature)
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Pad volume")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.primary.opacity(0.8))
                             Spacer()
                             Text(String(format: "%.0f%%", engine.chordMelodyPadVolume / 0.6 * 100))
@@ -1391,7 +1379,7 @@ struct ControlSheet: View {
                                 .foregroundColor(.secondary)
                         }
                         Slider(value: $engine.chordMelodyPadVolume, in: 0...0.6)
-                            .tint(.green)
+                            .tint(DS.signature)
                     }
                 }
                 .padding(.top, 2)
@@ -1399,7 +1387,7 @@ struct ControlSheet: View {
 
             if currentMode == .grid {
                 Text("Pinch to play notes. Move hand up/down to change pitch.")
-                    .font(.system(size: 10, design: .rounded))
+                    .font(.system(size: 10))
                     .foregroundColor(.secondary)
                     .padding(.top, 2)
 
@@ -1408,15 +1396,15 @@ struct ControlSheet: View {
                     // Octave range
                     HStack(spacing: 6) {
                         Text("Range")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.secondary)
                         ForEach([1, 2, 3], id: \.self) { range in
                             Button(action: { engine.gridOctaveRange = range }) {
                                 Text("\(range)")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(engine.gridOctaveRange == range ? .green : .secondary)
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(engine.gridOctaveRange == range ? DS.signature : .secondary)
                                     .frame(width: 28, height: 28)
-                                    .background(Circle().fill(engine.gridOctaveRange == range ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
+                                    .background(Circle().fill(engine.gridOctaveRange == range ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04)))
                             }
                         }
                     }
@@ -1426,7 +1414,7 @@ struct ControlSheet: View {
                     // Base octave
                     HStack(spacing: 4) {
                         Text("Oct")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.secondary)
                         Button(action: { if engine.gridBaseOctave > 1 { engine.gridBaseOctave -= 1 } }) {
                             Image(systemName: "minus")
@@ -1437,7 +1425,7 @@ struct ControlSheet: View {
                         }
                         Text("\(engine.gridBaseOctave)")
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green)
+                            .foregroundColor(DS.signature)
                             .frame(width: 20)
                         Button(action: { if engine.gridBaseOctave < 6 { engine.gridBaseOctave += 1 } }) {
                             Image(systemName: "plus")
@@ -1459,23 +1447,14 @@ struct ControlSheet: View {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.5))
+                    .foregroundColor(isActive ? DS.signature : DS.textSecondary)
                 Text(label)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.6))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(isActive ? DS.signature : DS.textSecondary)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isActive
-                        ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
-                        : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1.5 : 0.5)
-            )
+            .frame(height: 52)
+            .dsCard(radius: DS.Radius.chip, selected: isActive)
         }
         .accessibilityIdentifier("mode-\(mode.rawValue)")
     }
@@ -1487,24 +1466,24 @@ struct ControlSheet: View {
                 Text(prog.emoji)
                     .font(.system(size: 14))
                 Text(prog.name)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.75))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(isActive ? DS.signature : .primary.opacity(0.75))
                 Text("\(prog.degrees.count)")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(isActive ? 0.7 : 0.35))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
                     .background(
-                        Capsule().fill(isActive ? Color.green.opacity(0.2) : Color.white.opacity(0.06))
+                        Capsule().fill(isActive ? DS.signature.opacity(0.2) : Color.white.opacity(0.06))
                     )
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(
-                Capsule().fill(isActive ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                Capsule().fill(isActive ? DS.signature.opacity(0.12) : Color.primary.opacity(0.04))
             )
             .overlay(
-                Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
+                Capsule().stroke(isActive ? DS.signature.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
             )
         }
     }
@@ -1525,17 +1504,17 @@ struct ControlSheet: View {
                             engine.recomputeScaleNotes()
                         }) {
                             Text(key.rawValue)
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundColor(engine.selectedKey == key ? .green : .primary.opacity(0.6))
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(engine.selectedKey == key ? DS.signature : .primary.opacity(0.6))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 9)
                                 .background(
                                     Capsule()
-                                        .fill(engine.selectedKey == key ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                        .fill(engine.selectedKey == key ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04))
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(engine.selectedKey == key ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                        .stroke(engine.selectedKey == key ? DS.signature.opacity(0.4) : Color.clear, lineWidth: 1.5)
                                 )
                         }
                     }
@@ -1556,22 +1535,22 @@ struct ControlSheet: View {
                             }
                         }) {
                             Text(scale.rawValue)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundColor(engine.selectedScale == scale ? .green : .primary.opacity(0.6))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(engine.selectedScale == scale ? DS.signature : .primary.opacity(0.6))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .background(
                                     Capsule()
-                                        .fill(engine.selectedScale == scale ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                        .fill(engine.selectedScale == scale ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04))
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(engine.selectedScale == scale ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                        .stroke(engine.selectedScale == scale ? DS.signature.opacity(0.4) : Color.clear, lineWidth: 1.5)
                                 )
                                 .overlay(alignment: .topTrailing) {
                                     if locked {
                                         Text("PRO")
-                                            .font(.system(size: 6, weight: .bold, design: .rounded))
+                                            .font(.system(size: 6, weight: .bold))
                                             .foregroundColor(.white.opacity(0.8))
                                             .padding(.horizontal, 3)
                                             .padding(.vertical, 1)
@@ -1599,18 +1578,18 @@ struct ControlSheet: View {
                 Image(systemName: icon)
                     .font(.system(size: 11))
                 Text(label)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.system(size: 12, weight: .medium))
             }
-            .foregroundColor(isOn.wrappedValue ? .green : .primary.opacity(0.5))
+            .foregroundColor(isOn.wrappedValue ? DS.signature : .primary.opacity(0.5))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(isOn.wrappedValue ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                    .fill(isOn.wrappedValue ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04))
             )
             .overlay(
                 Capsule()
-                    .stroke(isOn.wrappedValue ? Color.green.opacity(0.4) : Color.white.opacity(0.06), lineWidth: isOn.wrappedValue ? 1.5 : 0.5)
+                    .stroke(isOn.wrappedValue ? DS.signature.opacity(0.4) : Color.white.opacity(0.06), lineWidth: isOn.wrappedValue ? 1.5 : 0.5)
             )
         }
     }
@@ -1648,8 +1627,8 @@ struct ControlSheet: View {
                 Text(wf.emoji)
                     .font(.system(size: 20))
                 Text(wf.name)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(isSelected ? DS.signature : .primary.opacity(0.6))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -1658,17 +1637,17 @@ struct ControlSheet: View {
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(isSelected
-                        ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                        ? LinearGradient(colors: [DS.signature.opacity(0.2), DS.signature.opacity(0.08)], startPoint: .top, endPoint: .bottom)
                         : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isSelected ? 1.5 : 0.5)
+                    .stroke(isSelected ? DS.signature.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isSelected ? 1.5 : 0.5)
             )
             .overlay(alignment: .topTrailing) {
                 if locked {
                     Text("PRO")
-                        .font(.system(size: 8, weight: .heavy, design: .rounded))
+                        .font(.system(size: 8, weight: .heavy))
                         .foregroundColor(.white.opacity(0.8))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
@@ -1704,25 +1683,25 @@ struct ControlSheet: View {
                             Text(drumLoop.emoji)
                                 .font(.system(size: 22))
                             Text(drumLoop.name)
-                                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundColor(loop.wrappedValue.id == drumLoop.id ? .green : .primary.opacity(0.6))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(loop.wrappedValue.id == drumLoop.id ? DS.signature : .primary.opacity(0.6))
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(loop.wrappedValue.id == drumLoop.id
-                                    ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                                    ? LinearGradient(colors: [DS.signature.opacity(0.2), DS.signature.opacity(0.08)], startPoint: .top, endPoint: .bottom)
                                     : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(loop.wrappedValue.id == drumLoop.id ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: loop.wrappedValue.id == drumLoop.id ? 1.5 : 0.5)
+                                .stroke(loop.wrappedValue.id == drumLoop.id ? DS.signature.opacity(0.5) : Color.white.opacity(0.06), lineWidth: loop.wrappedValue.id == drumLoop.id ? 1.5 : 0.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
                                 Text("PRO")
-                                    .font(.system(size: 8, weight: .heavy, design: .rounded))
+                                    .font(.system(size: 8, weight: .heavy))
                                     .foregroundColor(.white.opacity(0.8))
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 2)
@@ -1738,11 +1717,11 @@ struct ControlSheet: View {
             if loop.wrappedValue.id != "none" {
                 HStack(spacing: 8) {
                     Text("VOL")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 28)
                     Slider(value: volume, in: 0.2...2.0)
-                        .tint(.green)
+                        .tint(DS.signature)
                     Text(String(format: "%.0f%%", volume.wrappedValue * 100))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
@@ -1751,11 +1730,11 @@ struct ControlSheet: View {
 
                 HStack(spacing: 8) {
                     Text("BPM")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 28)
                     Slider(value: bpm, in: 40...240, step: 1)
-                        .tint(.green)
+                        .tint(DS.signature)
                     Text("\(Int(bpm.wrappedValue.rounded()))")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
@@ -1775,13 +1754,13 @@ struct ControlSheet: View {
                 Spacer()
                 Text("\(Int(engine.manualBPM.rounded()))")
                     .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .foregroundColor(.green)
+                    .foregroundColor(DS.signature)
                 Spacer()
             }
 
             if engine.bpmIsMapped {
                 Text("Controlled by hand")
-                    .font(.system(size: 11, design: .rounded))
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
             } else {
                 HStack(spacing: 10) {
@@ -1797,7 +1776,7 @@ struct ControlSheet: View {
                         get: { engine.manualBPM },
                         set: { engine.manualBPM = $0 }
                     ), in: 50...205, step: 1)
-                    .tint(.green)
+                    .tint(DS.signature)
 
                     Button(action: { engine.manualBPM = min(205, engine.manualBPM + 1) }) {
                         Image(systemName: "plus")
@@ -1849,7 +1828,7 @@ struct ControlSheet: View {
                 .frame(width: 24)
 
                 Text(def.label)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(isLocked ? .orange : .primary)
                     .frame(width: 55, alignment: .leading)
 
@@ -1865,7 +1844,7 @@ struct ControlSheet: View {
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.primary.opacity(0.08))
                             Capsule()
-                                .fill(Color.green.opacity(0.5))
+                                .fill(DS.signature.opacity(0.5))
                                 .frame(width: geo.size.width * max(0, min(1, normalized)))
                         }
                     }
@@ -1909,24 +1888,24 @@ struct ControlSheet: View {
                             Text(filter.emoji)
                                 .font(.system(size: 18))
                             Text(filter.name)
-                                .font(.system(size: 8, weight: .semibold, design: .rounded))
-                                .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                                .font(.system(size: 8, weight: .semibold))
+                                .foregroundColor(isSelected ? DS.signature : .primary.opacity(0.6))
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(isSelected ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                                .fill(isSelected ? DS.signature.opacity(0.12) : Color.primary.opacity(0.04))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(isSelected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                .stroke(isSelected ? DS.signature.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
                                 Text("PRO")
-                                    .font(.system(size: 7, weight: .bold, design: .rounded))
+                                    .font(.system(size: 7, weight: .bold))
                                     .foregroundColor(.white.opacity(0.8))
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 2)
@@ -1967,24 +1946,24 @@ struct ControlSheet: View {
                             Text(theme.emoji)
                                 .font(.system(size: 18))
                             Text(theme.name)
-                                .font(.system(size: 8, weight: .semibold, design: .rounded))
-                                .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                                .font(.system(size: 8, weight: .semibold))
+                                .foregroundColor(isSelected ? DS.signature : .primary.opacity(0.6))
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(isSelected ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                                .fill(isSelected ? DS.signature.opacity(0.12) : Color.primary.opacity(0.04))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(isSelected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                .stroke(isSelected ? DS.signature.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
                                 Text("PRO")
-                                    .font(.system(size: 7, weight: .bold, design: .rounded))
+                                    .font(.system(size: 7, weight: .bold))
                                     .foregroundColor(.white.opacity(0.8))
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 2)
@@ -2009,30 +1988,30 @@ struct ControlSheet: View {
                 if !engine.playingLoopIds.isEmpty {
                     Button(action: engine.stopAllLoops) {
                         Text("Stop All")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.red.opacity(0.8))
                     }
                 }
             }
 
             Text("Tap the red circle button to record a loop. Loops auto-play and layer on top of each other.")
-                .font(.system(size: 10, design: .rounded))
+                .font(.system(size: 10))
                 .foregroundColor(.secondary)
 
             // Bar length picker
             HStack(spacing: 6) {
                 Text("Length")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.secondary)
                 ForEach(LoopRecorder.barOptions, id: \.self) { bars in
                     Button(action: { engine.loopRecorder.selectedBars = bars }) {
                         Text("\(bars) bars")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(engine.loopRecorder.selectedBars == bars ? .green : .secondary)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(engine.loopRecorder.selectedBars == bars ? DS.signature : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(
-                                Capsule().fill(engine.loopRecorder.selectedBars == bars ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                Capsule().fill(engine.loopRecorder.selectedBars == bars ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04))
                             )
                     }
                 }
@@ -2045,19 +2024,19 @@ struct ControlSheet: View {
                     Button(action: { engine.toggleLoopPlayback(loop.id) }) {
                         Image(systemName: engine.playingLoopIds.contains(loop.id) ? "stop.circle.fill" : "play.circle.fill")
                             .font(.system(size: 28))
-                            .foregroundColor(engine.playingLoopIds.contains(loop.id) ? .orange : .green)
+                            .foregroundColor(engine.playingLoopIds.contains(loop.id) ? .orange : DS.signature)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(loop.name)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(.system(size: 13, weight: .semibold))
                         HStack(spacing: 6) {
                             Text(loop.mode)
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(.green)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(DS.signature)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Capsule().fill(Color.green.opacity(0.15)))
+                                .background(Capsule().fill(DS.signature.opacity(0.15)))
                             Text("\(loop.events.count) events")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundColor(.secondary)
@@ -2082,7 +2061,7 @@ struct ControlSheet: View {
                     }) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 14))
-                            .foregroundColor(.green.opacity(0.6))
+                            .foregroundColor(DS.signature.opacity(0.6))
                     }
 
                     // Delete
@@ -2116,11 +2095,11 @@ struct ControlSheet: View {
                     Button(action: { engine.toggleSnippet(idx) }) {
                         Image(systemName: engine.playingSet.contains(idx) ? "pause.circle.fill" : "play.circle.fill")
                             .font(.system(size: 24))
-                            .foregroundColor(engine.playingSet.contains(idx) ? .orange : .green)
+                            .foregroundColor(engine.playingSet.contains(idx) ? .orange : DS.signature)
                     }
                     VStack(alignment: .leading) {
                         Text("Snippet #\(idx + 1)")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .font(.system(size: 14, weight: .semibold))
                         Text("\(snippet.bpm) bpm")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(.secondary)
@@ -2147,7 +2126,7 @@ struct ControlSheet: View {
                 Button(action: engine.toggleTrackPlay) {
                     Image(systemName: engine.trackPlaying ? "stop.circle.fill" : "play.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundColor(engine.trackPlaying ? .orange : .green)
+                        .foregroundColor(engine.trackPlaying ? .orange : DS.signature)
                 }
             }
 
@@ -2155,11 +2134,11 @@ struct ControlSheet: View {
                 ForEach([0.5, 1.0, 2.0, 4.0], id: \.self) { speed in
                     Button(action: { engine.setTrackSpeed(speed) }) {
                         Text("\(speed == Double(Int(speed)) ? "\(Int(speed))" : String(format: "%.1f", speed))x")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundColor(engine.track.speed == speed ? .green : .secondary)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(engine.track.speed == speed ? DS.signature : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(Capsule().fill(engine.track.speed == speed ? Color.green.opacity(0.15) : Color.clear))
+                            .background(Capsule().fill(engine.track.speed == speed ? DS.signature.opacity(0.15) : Color.clear))
                     }
                 }
             }
@@ -2170,7 +2149,7 @@ struct ControlSheet: View {
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(.secondary)
                     Text("Snippet #\(snippetIdx + 1)")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(.system(size: 13, weight: .medium))
                     Spacer()
                     Button(action: { engine.removeFromTrack(slotIdx) }) {
                         Image(systemName: "xmark.circle")

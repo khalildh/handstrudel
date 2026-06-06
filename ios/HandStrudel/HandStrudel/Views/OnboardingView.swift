@@ -5,92 +5,82 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.75)
+            // Frosted scrim over the live camera — premium, keeps context.
+            Rectangle()
+                .fill(.regularMaterial)
+                .environment(\.colorScheme, .dark)
                 .ignoresSafeArea()
+            Color.black.opacity(0.35).ignoresSafeArea()
 
-            VStack(spacing: 32) {
+            VStack(spacing: DS.Space.xl) {
                 Spacer()
 
-                // Title
-                VStack(spacing: 6) {
-                    Text("welcome to")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.4))
+                VStack(spacing: DS.Space.xs) {
+                    Text("WELCOME TO")
+                        .font(.dsCaption)
+                        .tracking(1.5)
+                        .foregroundColor(DS.textTertiary)
 
-                    HStack(spacing: 0) {
-                        Text("hand")
-                            .font(.system(size: 28, weight: .thin, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.8))
-                        Text("strudel")
-                            .font(.system(size: 28, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green)
+                    AmbientAccent(period: 26) { color, _ in
+                        HStack(spacing: 0) {
+                            Text("hand")
+                                .font(.system(size: 28, weight: .ultraLight, design: .monospaced))
+                                .foregroundColor(DS.textPrimary)
+                            Text("strudel")
+                                .font(.system(size: 28, weight: .semibold, design: .monospaced))
+                                .foregroundColor(color)
+                        }
                     }
+                    .frame(height: 34)
                 }
 
-                // Tips
-                VStack(spacing: 20) {
-                    tipRow(
-                        icon: "arrow.up.arrow.down",
-                        title: "Move your hands up & down",
-                        subtitle: "Controls pitch & volume"
-                    )
-                    tipRow(
-                        icon: "hand.raised.fingers.spread",
-                        title: "Spread your fingers",
-                        subtitle: "Adds reverb, filter & effects"
-                    )
-                    tipRow(
-                        icon: "video.circle",
-                        title: "Tap the record button",
-                        subtitle: "Share to Instagram"
-                    )
+                VStack(spacing: DS.Space.md) {
+                    tipRow(icon: "arrow.up.arrow.down",
+                           title: "Move your hands up & down",
+                           subtitle: "Controls pitch & volume")
+                    tipRow(icon: "hand.raised.fingers.spread",
+                           title: "Spread your fingers",
+                           subtitle: "Adds reverb, filter & effects")
+                    tipRow(icon: "video.fill",
+                           title: "Tap record to capture a clip",
+                           subtitle: "Share straight to Instagram")
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, DS.Space.lg)
 
                 Spacer()
 
-                // Dismiss button
-                Button(action: {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        hasSeenOnboarding = true
+                AmbientAccent(period: 26) { color, _ in
+                    Button(action: {
+                        withAnimation(.easeOut(duration: 0.3)) { hasSeenOnboarding = true }
+                    }) {
+                        Text("Got it")
                     }
-                }) {
-                    Text("GOT IT!")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(Color.green)
-                        .cornerRadius(16)
+                    .buttonStyle(DSPrimaryButtonStyle(accent: color))
+                    .accessibilityIdentifier("onboarding-got-it")
                 }
-                .accessibilityIdentifier("onboarding-got-it")
-                .padding(.horizontal, 24)
-                .padding(.bottom, 50)
+                .frame(height: 54)
+                .padding(.horizontal, DS.Space.lg)
+                .padding(.bottom, DS.Space.xxl)
             }
         }
     }
 
     private func tipRow(icon: String, title: String, subtitle: String) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 24))
-                .foregroundColor(.green)
-                .frame(width: 44, height: 44)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.green.opacity(0.12))
-                )
+        HStack(spacing: DS.Space.md) {
+            IconTile(symbol: icon, tint: DS.signature, size: 46)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
+                    .font(.dsHeadline)
+                    .foregroundColor(DS.textPrimary)
                 Text(subtitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
+                    .font(.dsFootnote)
+                    .foregroundColor(DS.textTertiary)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
         }
+        .padding(DS.Space.sm)
+        .dsCard()
     }
 }

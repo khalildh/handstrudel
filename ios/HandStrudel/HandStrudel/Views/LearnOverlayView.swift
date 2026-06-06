@@ -214,7 +214,7 @@ struct LearnOverlayView: View {
                 // MARK: - Countdown
                 if isCountingDown && countdownValue > 0 {
                     Text("\(countdownValue)")
-                        .font(.system(size: 120, weight: .black, design: .rounded))
+                        .font(.system(size: 120, weight: .black))
                         .foregroundColor(.white)
                         .shadow(color: .cyan, radius: 20)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -309,12 +309,12 @@ private struct SongCompleteCard: View {
         VStack(spacing: 20) {
             // Song name
             Text(songName)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .font(.system(size: 22, weight: .bold))
                 .foregroundColor(.white)
 
             // Accuracy (large)
             Text("\(Int(score.accuracy * 100))%")
-                .font(.system(size: 56, weight: .black, design: .rounded))
+                .font(.system(size: 56, weight: .black))
                 .foregroundStyle(
                     LinearGradient(
                         colors: accuracyGradient,
@@ -324,7 +324,7 @@ private struct SongCompleteCard: View {
                 )
 
             Text("ACCURACY")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.white.opacity(0.4))
                 .tracking(2)
 
@@ -342,7 +342,7 @@ private struct SongCompleteCard: View {
                     .font(.system(size: 14))
                     .foregroundColor(.orange)
                 Text("Best Streak: \(score.bestStreak)")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white.opacity(0.7))
             }
 
@@ -350,7 +350,7 @@ private struct SongCompleteCard: View {
             VStack(spacing: 10) {
                 Button(action: onPlayAgain) {
                     Text("PLAY AGAIN")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .font(.system(size: 16, weight: .black))
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
@@ -366,7 +366,7 @@ private struct SongCompleteCard: View {
 
                 Button(action: onPickSong) {
                     Text("PICK SONG")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white.opacity(0.8))
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
@@ -401,10 +401,10 @@ private struct SongCompleteCard: View {
     private func scoreColumn(value: Int, label: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Text("\(value)")
-                .font(.system(size: 24, weight: .black, design: .rounded))
+                .font(.system(size: 24, weight: .black))
                 .foregroundColor(color)
             Text(label)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(.system(size: 9, weight: .bold))
                 .foregroundColor(.white.opacity(0.4))
                 .tracking(1)
         }

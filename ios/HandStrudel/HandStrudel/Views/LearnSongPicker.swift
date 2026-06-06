@@ -9,7 +9,7 @@ struct LearnSongPicker: View {
             VStack(alignment: .leading, spacing: 24) {
                 // Title
                 Text("LEARN")
-                    .font(.system(size: 32, weight: .black, design: .rounded))
+                    .font(.system(size: 32, weight: .black))
                     .foregroundColor(.white)
                     .padding(.top, 20)
 
@@ -69,7 +69,7 @@ struct LearnSongPicker: View {
                         Image(systemName: "doc.badge.plus")
                             .font(.system(size: 16))
                         Text("Import MIDI")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .font(.system(size: 14, weight: .semibold))
                     }
                     .foregroundColor(.white.opacity(0.5))
                     .frame(maxWidth: .infinity)
@@ -99,7 +99,7 @@ struct LearnSongPicker: View {
                 .fill(Color.white.opacity(0.15))
                 .frame(width: 24, height: 1)
             Text(title)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.white.opacity(0.35))
                 .tracking(2)
             Rectangle()
@@ -119,7 +119,7 @@ struct LearnSongPicker: View {
                     .font(.system(size: 20))
                     .foregroundColor(.green)
                 Text(label)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.8))
             }
             .frame(width: 90, height: 72)
@@ -153,7 +153,7 @@ private struct SongCard: View {
                 .font(.system(size: 30))
 
             Text(song.name)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
 
