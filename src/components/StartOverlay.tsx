@@ -1,6 +1,6 @@
 "use client";
 
-import { PARAM_DEFS, HYDRA_PARAM_DEFS } from "../lib/music";
+import { PARAM_DEFS, HYDRA_PARAM_DEFS, INSTRUMENTS, DEFAULT_INSTRUMENT } from "../lib/music";
 import {
   MappingConfig,
   DEFAULT_MAPPING,
@@ -15,10 +15,11 @@ interface MappingPreset {
   config: MappingConfig;
   hydraConfig: MappingConfig;
   advanced: boolean;
+  instrument?: string;
 }
 
 interface StartOverlayProps {
-  onStart: (config: MappingConfig, hydraConfig: MappingConfig, advanced: boolean) => void;
+  onStart: (config: MappingConfig, hydraConfig: MappingConfig, advanced: boolean, instrument: string) => void;
   fading?: boolean;
 }
 
@@ -32,6 +33,7 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
     left:  { ...DEFAULT_HYDRA_MAPPING.left },
     right: { ...DEFAULT_HYDRA_MAPPING.right },
   });
+  const [instrument, setInstrument] = useState<string>(DEFAULT_INSTRUMENT);
 
   const toggleAdvanced = () => {
     setAdvanced((prev) => {
@@ -76,7 +78,7 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
-    const preset: MappingPreset = { config, hydraConfig, advanced };
+    const preset: MappingPreset = { config, hydraConfig, advanced, instrument };
     const blob = new Blob([JSON.stringify(preset, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -101,6 +103,9 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
         }
         if (typeof preset.advanced === "boolean") {
           setAdvanced(preset.advanced);
+        }
+        if (typeof preset.instrument === "string") {
+          setInstrument(preset.instrument);
         }
       } catch {
         console.warn("Invalid preset file");
@@ -166,6 +171,21 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
         ))}
       </div>
 
+      <div className="instrument-row">
+        <span className="instrument-label">🎹 sound</span>
+        <select
+          className="config-select instrument-select"
+          value={instrument}
+          onChange={(e) => setInstrument(e.target.value)}
+        >
+          {INSTRUMENTS.map((inst) => (
+            <option key={inst.id} value={inst.id}>
+              {inst.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="preset-actions">
         <button className="preset-btn" onClick={handleExport}>export</button>
         <button className="preset-btn" onClick={() => fileInputRef.current?.click()}>import</button>
@@ -178,7 +198,7 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
         />
       </div>
 
-      <button id="start-btn" onClick={() => onStart(config, hydraConfig, advanced)}>
+      <button id="start-btn" onClick={() => onStart(config, hydraConfig, advanced, instrument)}>
         ▶ START
       </button>
       <div className="hint">

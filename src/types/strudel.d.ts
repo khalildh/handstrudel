@@ -25,5 +25,9 @@ declare module "@strudel/webaudio" {
   export function registerSynthSounds(): void;
 }
 
+declare module "@strudel/soundfonts" {
+  export function registerSoundfonts(): void;
+}
+
 declare module "@strudel/mini" {}
 declare module "@strudel/tonal" {}

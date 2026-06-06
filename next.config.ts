@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     "@strudel/webaudio",
     "@strudel/mini",
     "@strudel/tonal",
+    "@strudel/soundfonts",
   ],
 };
 

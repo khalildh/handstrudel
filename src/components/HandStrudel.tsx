@@ -14,6 +14,7 @@ import {
   NOTES,
   NOTE_DISPLAY,
   STRUCTS,
+  DEFAULT_INSTRUMENT,
 } from "../lib/music";
 import { buildDefaultParams, smoothParams } from "../lib/params";
 import {
@@ -82,6 +83,7 @@ export default function HandStrudel() {
   const hydraConfigRef = useRef<MappingConfig>(DEFAULT_HYDRA_MAPPING);
   const advancedRef = useRef(false);
   const structIdxRef = useRef(0);
+  const instrumentRef = useRef<string>(DEFAULT_INSTRUMENT);
   const lastCodeRef = useRef("");
   const lastStructKeyRef = useRef("");
   const evaluateRef = useRef<
@@ -265,13 +267,14 @@ export default function HandStrudel() {
     }
   }, [recording, recordingAspect]);
 
-  const handleStart = useCallback(async (cfg: MappingConfig, hCfg: MappingConfig, adv: boolean) => {
+  const handleStart = useCallback(async (cfg: MappingConfig, hCfg: MappingConfig, adv: boolean, instrument: string) => {
     setConfig(cfg);
     setHydraConfig(hCfg);
     setAdvanced(adv);
     configRef.current = cfg;
     hydraConfigRef.current = hCfg;
     advancedRef.current = adv;
+    instrumentRef.current = instrument;
 
     // Reset params for chosen config (merge music + hydra defaults)
     const musicDefs = buildDefaultParams(cfg);
@@ -295,7 +298,7 @@ export default function HandStrudel() {
 
       // Initialize signal params and evaluate signal-based code once
       updateSignalParams(paramsRef.current, cfg);
-      const initCode = buildSignalCode(structIdxRef.current, cfg);
+      const initCode = buildSignalCode(structIdxRef.current, cfg, instrumentRef.current);
       console.log("Initial code (signal-based):", initCode);
       await evaluate(initCode);
       lastCodeRef.current = initCode;
@@ -364,6 +367,7 @@ export default function HandStrudel() {
             const code = buildSignalCode(
               structIdxRef.current,
               configRef.current,
+              instrumentRef.current,
             );
             lastCodeRef.current = code;
             evaluateRef
@@ -394,7 +398,7 @@ export default function HandStrudel() {
           if (raw > 0.8 && armed && now - lastSaveTimeRef.current > 1000) {
             // Capture literal code (not signal refs) for self-contained playback
             const snippet: SavedSnippet = {
-              code: buildCode(smoothedRef.current, structIdxRef.current, configRef.current),
+              code: buildCode(smoothedRef.current, structIdxRef.current, configRef.current, instrumentRef.current),
               timestamp: Date.now(),
               bpm: Math.round(smoothedRef.current.bpm ?? 120),
             };
@@ -419,7 +423,7 @@ export default function HandStrudel() {
           Math.min(NOTES.length - 1, Math.round(s.noteIdx ?? 10)),
         );
         setUiState({
-          codeHL: buildCodeHL(s, structIdxRef.current, configRef.current),
+          codeHL: buildCodeHL(s, structIdxRef.current, configRef.current, instrumentRef.current),
           hydraCodeHL: hydraEnabledRef.current ? buildHydraCodeHL(s) : "",
           smoothed: s,
           hands: { ...handsRef.current },

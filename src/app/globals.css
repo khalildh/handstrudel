@@ -264,6 +264,31 @@ body {
   box-shadow: 0 0 20px rgba(0, 255, 157, 0.2);
 }
 
+/* ── Instrument Picker ────────────────────────────────── */
+.instrument-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.instrument-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.instrument-select {
+  width: 160px;
+  border-color: color-mix(in srgb, var(--left) 40%, var(--border));
+}
+
+.instrument-select:focus {
+  border-color: var(--left);
+}
+
 /* ── Preset Export/Import ─────────────────────────────── */
 .preset-actions {
   display: flex;
