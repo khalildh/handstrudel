@@ -79,6 +79,7 @@ private func debugLog(_ msg: String) {
 final class EngineController: ObservableObject {
     let handTracker = HandTrackingManager()
     let strudelBridge = StrudelBridge()
+    let soundFontEngine = SoundFontEngine()
     let haptics = HapticManager()
     private let saveDetector = SaveGestureDetector()
 
@@ -160,6 +161,15 @@ final class EngineController: ObservableObject {
         didSet { chordMelodyModeManager.zoneDegrees = chordMelodyProgression.degrees }
     }
 
+    // SoundFont mode (chord+melody interaction played through a native .sf2
+    // sampler instead of the WebView synth). Reuses chordMelodyModeManager and
+    // the chordMelody* published UI state since the two modes are mutually
+    // exclusive and share the same two-hand interaction.
+    @Published var soundFontModeEnabled = false
+    @Published var selectedSoundFontInstrument: SoundFontInstrument = DEFAULT_SOUNDFONT_INSTRUMENT {
+        didSet { soundFontEngine.setInstrument(program: selectedSoundFontInstrument.program) }
+    }
+
     // Melodic-family alternative voices (all keep the other modes intact):
     //  - lead:   single hand-tracked voice routed through the imperative
     //            noteOn/noteSlide synth (no Strudel) — instant, theremin-like.
@@ -171,12 +181,14 @@ final class EngineController: ObservableObject {
     @Published var hybridModeEnabled = false
     @Published var flowModeEnabled = false
 
-    /// MIDI note currently held by the imperative lead voice (lead + hybrid
-    /// modes), or nil when the voice is off. Drives noteOn vs. noteSlide.
     /// Hand-tracked imperative lead voice MIDI (used by Hybrid + Lead modes).
     /// Internal — `MelodicModeController` reads/writes; engine clears on
     /// stop/pause so dangling notes don't hang.
     var leadVoiceMidi: Int? = nil
+
+    /// Last `currentBeat` value the chord-melody / SoundFont auto-strum fired
+    /// on, so we only re-articulate once per beat instead of every tick.
+    private var lastChordMelodyBeat: Int = -1
 
     // Manual controls
     @Published var manualBPM: Double = 120
@@ -231,11 +243,14 @@ final class EngineController: ObservableObject {
         switch pm.lastMode {
         case "grid": gridModeEnabled = true
         case "drum": drumModeEnabled = true
+        case "chordmelody": chordMelodyModeEnabled = true
+        case "soundfont": soundFontModeEnabled = true
         case "lead": leadModeEnabled = true
         case "hybrid": hybridModeEnabled = true
         case "flow": flowModeEnabled = true
         default: break // melodic is the default
         }
+        selectedSoundFontInstrument = soundFontInstrument(id: pm.lastSoundFont)
 
         // Restore camera filter
         if let filter = CAMERA_FILTERS.first(where: { $0.id == pm.lastFilterId }) {
@@ -411,9 +426,11 @@ final class EngineController: ObservableObject {
     private let drumMode = DrumModeController()
     private let chordMelodyMode = ChordMelodyModeController()
     private let learnMode = LearnModeController()
+    private let soundFontMode = SoundFontModeController()
 
     private var activeMode: ModeController {
         if learnModeEnabled { return learnMode }
+        if soundFontModeEnabled { return soundFontMode }
         if chordMelodyModeEnabled { return chordMelodyMode }
         if gridModeEnabled { return gridMode }
         if drumModeEnabled { return drumMode }
@@ -452,6 +469,105 @@ final class EngineController: ObservableObject {
 
     @Published var fingerOctaveEnabled = false
     @Published var currentFingerCount: Int = 0
+
+
+    // MARK: - SoundFont mode
+
+    /// Same two-hand chord+melody interaction as `tickChordMelodyMode`, but the
+    /// notes are voiced by the native `AVAudioUnitSampler` (`soundFontEngine`)
+    /// using a real General MIDI SoundFont instead of the WebView synth. Reuses
+    /// `chordMelodyModeManager` and the `chordMelody*` published UI state.
+    func tickSoundFontMode() {
+        // Lazily bring up the native audio graph the first time the mode runs —
+        // idempotent, so this covers both the mode-switch and restore paths.
+        soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
+
+        chordMelodyModeManager.swapHands = chordMelodySwapHands
+        chordMelodyModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
+        let bounds = UIScreen.main.bounds
+        chordMelodyModeManager.screenAspect = bounds.width / bounds.height
+
+        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+
+        let chordTones: (Int) -> [Int] = { [weak self] degree in
+            guard let self else { return [] }
+            return chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
+        }
+        let melodyTones: (Int) -> [Int] = { [weak self] degree in
+            guard let self else { return [] }
+            let triad = chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
+            var lanes: [Int] = []
+            for octave in 0..<3 {
+                for note in triad { lanes.append(note + octave * 12) }
+            }
+            return lanes.sorted()
+        }
+
+        let actions = chordMelodyModeManager.tick(
+            hands: currentHands,
+            chordTones: chordTones,
+            melodyTones: melodyTones
+        )
+
+        for action in actions {
+            switch action {
+            case .padOn(let notes, let degree):
+                chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree)
+                chordMelodyCurrentDegree = degree
+                chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
+                for (i, midi) in notes.enumerated() {
+                    soundFontEngine.noteOn(voice: "pad\(i)", midi: midi, velocity: chordMelodyPadVolume)
+                }
+            case .padSlide(let notes, let degree):
+                chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree)
+                chordMelodyCurrentDegree = degree
+                chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
+                for (i, midi) in notes.enumerated() {
+                    soundFontEngine.slide(voice: "pad\(i)", midi: midi)
+                }
+            case .padOff:
+                for i in 0..<3 { soundFontEngine.noteOff(voice: "pad\(i)") }
+            case .chordAccent(let notes, _, let vel):
+                for midi in notes {
+                    soundFontEngine.oneShot(midi: midi, velocity: vel * 0.6, duration: 0.5)
+                    loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel * 0.5), currentTime: elapsed)
+                }
+                haptics.noteTrigger()
+            case .melodyOn(let hand, let midi, let name, let vel):
+                soundFontEngine.noteOn(voice: hand, midi: midi, velocity: vel)
+                haptics.noteTrigger()
+                lastGridNote = name
+                loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel), currentTime: elapsed)
+            case .melodyOff(let hand):
+                soundFontEngine.noteOff(voice: hand)
+                loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
+            case .melodySlide(let hand, let midi, let name):
+                soundFontEngine.slide(voice: hand, midi: midi)
+                lastGridNote = name
+            }
+        }
+
+        // Publish UI state (shared with the chord+melody overlay).
+        let zones = chordMelodyModeManager.currentZones(hands: currentHands)
+        chordMelodyChordHandLane = zones.chordDegree
+        chordMelodyMelodyLane = zones.melodyLane
+        chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
+        if let deg = zones.chordDegree, chordMelodyCurrentDegree == nil {
+            chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: deg)
+        }
+
+        // Auto-strum: re-articulate the held chord on each beat.
+        if chordMelodyAutoStrum,
+           chordMelodyModeManager.currentChordMidi.isEmpty == false,
+           currentBeat != lastChordMelodyBeat {
+            lastChordMelodyBeat = currentBeat
+            for midi in chordMelodyModeManager.currentChordMidi {
+                soundFontEngine.oneShot(midi: midi, velocity: 0.3, duration: 0.4)
+            }
+        }
+
+        evaluateDrumLoopsIfChanged(modePrefix: "soundfont")
+    }
 
     // Drum hand lane tracking for UI
     @Published var drumLeftLane: Int? = nil
@@ -793,6 +909,7 @@ final class EngineController: ObservableObject {
         strudelBridge.noteOff(hand: "lead")
         leadVoiceMidi = nil
         strudelBridge.stop()
+        soundFontEngine.allNotesOff()
         lastStructKey = "" // force re-eval when resuming
     }
 
@@ -809,7 +926,8 @@ final class EngineController: ObservableObject {
 
     /// Call when switching modes to stop lingering sounds
     func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
-                    lead: Bool = false, hybrid: Bool = false, flow: Bool = false) {
+                    lead: Bool = false, hybrid: Bool = false, flow: Bool = false,
+                    soundFont: Bool = false) {
         silenceAll()
         gridModeEnabled = grid
         drumModeEnabled = drums
@@ -818,12 +936,18 @@ final class EngineController: ObservableObject {
         leadModeEnabled = lead
         hybridModeEnabled = hybrid
         flowModeEnabled = flow
+        soundFontModeEnabled = soundFont
+        if soundFont {
+            soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
+        }
     }
 
     /// Persisted/loop-record label for the current mode.
     var currentModeString: String {
         if gridModeEnabled { return "grid" }
         if drumModeEnabled { return "drum" }
+        if soundFontModeEnabled { return "soundfont" }
+        if chordMelodyModeEnabled { return "chordmelody" }
         if leadModeEnabled { return "lead" }
         if hybridModeEnabled { return "hybrid" }
         if flowModeEnabled { return "flow" }
@@ -833,6 +957,7 @@ final class EngineController: ObservableObject {
     func stop() {
         // Persist state before teardown
         let mode = currentModeString
+        PersistenceManager.shared.lastSoundFont = selectedSoundFontInstrument.id
         PersistenceManager.shared.saveEngineState(
             presetId: nil,
             mode: mode,
@@ -869,6 +994,7 @@ final class EngineController: ObservableObject {
         jamSession.leaveSession()
         gridModeEnabled = false
         drumModeEnabled = false
+        soundFontModeEnabled = false
         leadModeEnabled = false
         hybridModeEnabled = false
         flowModeEnabled = false

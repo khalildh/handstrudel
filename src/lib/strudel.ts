@@ -11,6 +11,7 @@ import {
   getAudioContext,
   registerSynthSounds,
 } from "@strudel/webaudio";
+import { registerSoundfonts } from "@strudel/soundfonts";
 
 declare const Hydra: new (opts: Record<string, unknown>) => { synth: unknown; hush: () => void };
 
@@ -27,12 +28,17 @@ function loadScript(src: string): Promise<void> {
 
 export async function initializeStrudel() {
   registerSynthSounds();
+  // Registers thousands of General MIDI instruments into the `s()` namespace
+  // (e.g. s("gm_acoustic_piano")). Sample data is lazy-loaded from a CDN the
+  // first time each instrument plays, and runs through the same effects chain.
+  registerSoundfonts();
 
   await evalScope(
     import("@strudel/core"),
     import("@strudel/mini"),
     import("@strudel/tonal"),
     import("@strudel/webaudio"),
+    import("@strudel/soundfonts"),
   );
 
   // initAudio directly initializes audio (not initAudioOnFirstClick which

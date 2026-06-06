@@ -152,8 +152,10 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
 
-            // Chord+Melody mode overlay (7 chord zones + melody lanes)
-            if engine.chordMelodyModeEnabled {
+            // Chord+Melody / SoundFont mode overlay (chord zones + melody lanes).
+            // Both modes share the same two-hand interaction and chordMelody*
+            // UI state, so they render the same overlay.
+            if engine.chordMelodyModeEnabled || engine.soundFontModeEnabled {
                 ChordMelodyOverlayView(
                     zoneDegrees: engine.chordMelodyModeManager.zoneDegrees,
                     currentChordZone: engine.chordMelodyChordHandLane,
@@ -223,8 +225,8 @@ struct ContentView: View {
                     }
                 }
 
-                // Floating code pill — hide in grid/drum/learn mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
+                // Floating code pill — hide in grid/drum/learn/chord/soundfont mode
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     codePill
                         .padding(.horizontal, 20)
                         .padding(.top, 2)
@@ -232,8 +234,8 @@ struct ContentView: View {
 
                 Spacer()
 
-                // Note badge — hide in grid/drum/learn mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled {
+                // Note badge — hide in grid/drum/learn/chord/soundfont mode
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     noteBadge
 
                     beatRing
