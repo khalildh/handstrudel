@@ -940,12 +940,11 @@ final class EngineController: ObservableObject {
         // Re-evaluate the Strudel body only when the phase or sound changes —
         // the filter sweep rides the live signal, no re-eval needed.
         let harmonyKey = "\(selectedKey.rawValue)|\(selectedScale.rawValue)"
-        let structKey = "edm|\(edmBuilding)|\(structIdx)|\(selectedWaveform)|\(harmonyKey)"
+        let structKey = "edm|\(edmBuilding)|\(harmonyKey)"
         if structKey != lastStructKey {
             lastStructKey = structKey
             recomputeScaleNotes()
-            let code = buildEDMCode(structIdx: structIdx, config: config, waveform: selectedWaveform, building: edmBuilding)
-            strudelBridge.evaluate(code)
+            strudelBridge.evaluate(buildEDMCode(building: edmBuilding))
         }
     }
 
