@@ -107,16 +107,26 @@ function scaleAxis(raw: number, paramId: string, invert: boolean): number {
   return def.min + t * (def.max - def.min);
 }
 
-export function getSaveAxes(
+/** Axes whose value triggers a gesture instead of mapping to a param. */
+function getGestureAxes(
   config: MappingConfig,
+  trigger: string,
 ): { side: "left" | "right"; axisKey: string }[] {
   const result: { side: "left" | "right"; axisKey: string }[] = [];
   for (const side of ["left", "right"] as const) {
     for (const [axisKey, paramId] of Object.entries(config[side])) {
-      if (paramId === "save") result.push({ side, axisKey });
+      if (paramId === trigger) result.push({ side, axisKey });
     }
   }
   return result;
+}
+
+export function getSaveAxes(config: MappingConfig) {
+  return getGestureAxes(config, "save");
+}
+
+export function getInstrumentAxes(config: MappingConfig) {
+  return getGestureAxes(config, "instrument");
 }
 
 export function mapHandsToParams(
@@ -128,7 +138,7 @@ export function mapHandsToParams(
     const hand = hands[side];
     if (!hand) continue;
     for (const [axisKey, paramId] of Object.entries(config[side])) {
-      if (paramId === "none" || paramId === "save") continue;
+      if (paramId === "none" || paramId === "save" || paramId === "instrument") continue;
       const axisDef = AXIS_MAP[axisKey];
       if (!axisDef) continue;
       const raw = hand[axisKey];

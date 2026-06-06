@@ -79,6 +79,7 @@ private func debugLog(_ msg: String) {
 final class EngineController: ObservableObject {
     let handTracker = HandTrackingManager()
     let strudelBridge = StrudelBridge()
+    let soundFontEngine = SoundFontEngine()
     let haptics = HapticManager()
     private let saveDetector = SaveGestureDetector()
 
@@ -153,13 +154,41 @@ final class EngineController: ObservableObject {
     @Published var chordMelodyMelodyLane: Int? = nil
     @Published var chordMelodyOctaveShift: Int = 0        // -1, 0, +1 from chord hand Y
     @Published var chordMelodyAutoStrum: Bool = false     // re-articulate chord on each beat
-    private var lastChordMelodyBeat: Int = -1             // edge detection for auto-strum
 
     /// Currently selected chord progression (subset of diatonic degrees the
     /// chord hand cycles through). Defaults to "Free" — all 7 diatonic chords.
     @Published var chordMelodyProgression: ChordProgression = CHORD_PROGRESSIONS.first(where: { $0.isFree }) ?? CHORD_PROGRESSIONS[0] {
         didSet { chordMelodyModeManager.zoneDegrees = chordMelodyProgression.degrees }
     }
+
+    // SoundFont mode (chord+melody interaction played through a native .sf2
+    // sampler instead of the WebView synth). Reuses chordMelodyModeManager and
+    // the chordMelody* published UI state since the two modes are mutually
+    // exclusive and share the same two-hand interaction.
+    @Published var soundFontModeEnabled = false
+    @Published var selectedSoundFontInstrument: SoundFontInstrument = DEFAULT_SOUNDFONT_INSTRUMENT {
+        didSet { soundFontEngine.setInstrument(program: selectedSoundFontInstrument.program) }
+    }
+
+    // Melodic-family alternative voices (all keep the other modes intact):
+    //  - lead:   single hand-tracked voice routed through the imperative
+    //            noteOn/noteSlide synth (no Strudel) — instant, theremin-like.
+    //  - hybrid: full Strudel melodic body (effects + rhythm + code snapshots)
+    //            with an imperative lead layered on top for instant pitch feel.
+    //  - flow:   100% Strudel melodic, but a dense 16th-note struct so the
+    //            pitch signal is sampled far more often (much tighter feedback).
+    @Published var leadModeEnabled = false
+    @Published var hybridModeEnabled = false
+    @Published var flowModeEnabled = false
+
+    /// Hand-tracked imperative lead voice MIDI (used by Hybrid + Lead modes).
+    /// Internal — `MelodicModeController` reads/writes; engine clears on
+    /// stop/pause so dangling notes don't hang.
+    var leadVoiceMidi: Int? = nil
+
+    /// Last `currentBeat` value the chord-melody / SoundFont auto-strum fired
+    /// on, so we only re-articulate once per beat instead of every tick.
+    private var lastChordMelodyBeat: Int = -1
 
     // Manual controls
     @Published var manualBPM: Double = 120
@@ -184,8 +213,9 @@ final class EngineController: ObservableObject {
     @Published var circleOfFifthsEnabled: Bool = false
     @Published var chordDisplay: String = ""
 
-    // Cached scale notes (recomputed when key/scale changes)
-    private var cachedScaleNotes: [Int] = scaleNotes(key: .C, scale: .pentatonic)
+    // Cached scale notes (recomputed when key/scale changes).
+    // `internal` so the mode controllers can read it each tick.
+    var cachedScaleNotes: [Int] = scaleNotes(key: .C, scale: .pentatonic)
     private var lastHarmonyKey = ""
 
     // MARK: - Persistence
@@ -213,8 +243,14 @@ final class EngineController: ObservableObject {
         switch pm.lastMode {
         case "grid": gridModeEnabled = true
         case "drum": drumModeEnabled = true
+        case "chordmelody": chordMelodyModeEnabled = true
+        case "soundfont": soundFontModeEnabled = true
+        case "lead": leadModeEnabled = true
+        case "hybrid": hybridModeEnabled = true
+        case "flow": flowModeEnabled = true
         default: break // melodic is the default
         }
+        selectedSoundFontInstrument = soundFontInstrument(id: pm.lastSoundFont)
 
         // Restore camera filter
         if let filter = CAMERA_FILTERS.first(where: { $0.id == pm.lastFilterId }) {
@@ -253,12 +289,14 @@ final class EngineController: ObservableObject {
         }
     }
 
-    // Hot-path state (not Published — updated at 60fps)
+    // Hot-path state (not Published — updated at 60fps). The mode controllers
+    // read/write `smoothed`, `currentHands`, `structIdx` and `lastStructKey`
+    // each tick, so those are `internal` rather than `private`.
     private var rawParams = MusicParams()
-    private var smoothed = MusicParams()
-    private var currentHands = HandsState()
-    private var structIdx = 0
-    private var lastStructKey = ""
+    var smoothed = MusicParams()
+    var currentHands = HandsState()
+    var structIdx = 0
+    var lastStructKey = ""
     private var displayLink: CADisplayLink?
     private var uiTimer: Timer?
     private var structTimer: Timer?
@@ -380,6 +418,25 @@ final class EngineController: ObservableObject {
 
     // MARK: - Tick (60fps main loop)
 
+    // One controller per playable mode; `activeMode` selects which runs each
+    // frame. The per-mode logic lives in these types (see *ModeController.swift)
+    // rather than in this class.
+    private let melodicMode = MelodicModeController()
+    private let gridMode = GridModeController()
+    private let drumMode = DrumModeController()
+    private let chordMelodyMode = ChordMelodyModeController()
+    private let learnMode = LearnModeController()
+    private let soundFontMode = SoundFontModeController()
+
+    private var activeMode: ModeController {
+        if learnModeEnabled { return learnMode }
+        if soundFontModeEnabled { return soundFontMode }
+        if chordMelodyModeEnabled { return chordMelodyMode }
+        if gridModeEnabled { return gridMode }
+        if drumModeEnabled { return drumMode }
+        return melodicMode
+    }
+
     private func tick() {
         updateManualOverrides()
         ParamSmoother.smooth(target: rawParams, smoothed: &smoothed)
@@ -387,18 +444,7 @@ final class EngineController: ObservableObject {
         let isLive = playingSet.isEmpty && !trackPlaying
         guard isLive, !isPaused else { return }
 
-        if learnModeEnabled {
-            tickLearnMode()
-        } else if chordMelodyModeEnabled {
-            tickChordMelodyMode()
-        } else if gridModeEnabled {
-            tickGridMode()
-        } else if drumModeEnabled {
-            tickDrumMode()
-        } else {
-            tickMelodicMode()
-        }
-
+        activeMode.tick(self)
 
         tickLoopPlayback()
         tickLoopRecordingProgress()
@@ -424,75 +470,18 @@ final class EngineController: ObservableObject {
     @Published var fingerOctaveEnabled = false
     @Published var currentFingerCount: Int = 0
 
-    private func tickGridMode() {
-        gridModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
-        let screenBounds = UIScreen.main.bounds
-        gridModeManager.screenAspect = screenBounds.width / screenBounds.height
 
-        // Finger count octave: non-pinching hand's fingers set the octave
-        if fingerOctaveEnabled {
-            // Check which hand is NOT pinching and use its finger count
-            let leftPinching = gridModeManager.isLeftPinching
-            let rightPinching = gridModeManager.isRightPinching
+    // MARK: - SoundFont mode
 
-            let fingerHand: HandData?
-            if leftPinching && !rightPinching {
-                fingerHand = currentHands.right // right hand controls octave
-            } else if rightPinching && !leftPinching {
-                fingerHand = currentHands.left  // left hand controls octave
-            } else if !leftPinching && !rightPinching {
-                // Neither pinching — use whichever hand has more fingers up
-                let leftFingers = currentHands.left?.fingersUp ?? 0
-                let rightFingers = currentHands.right?.fingersUp ?? 0
-                fingerHand = leftFingers >= rightFingers ? currentHands.left : currentHands.right
-            } else {
-                fingerHand = nil // both pinching, don't change
-            }
+    /// Same two-hand chord+melody interaction as `tickChordMelodyMode`, but the
+    /// notes are voiced by the native `AVAudioUnitSampler` (`soundFontEngine`)
+    /// using a real General MIDI SoundFont instead of the WebView synth. Reuses
+    /// `chordMelodyModeManager` and the `chordMelody*` published UI state.
+    func tickSoundFontMode() {
+        // Lazily bring up the native audio graph the first time the mode runs —
+        // idempotent, so this covers both the mode-switch and restore paths.
+        soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
 
-            if let hand = fingerHand {
-                let fingers = hand.fingersUp
-                currentFingerCount = fingers
-                if fingers >= 1 && fingers <= 5 {
-                    let newOctave = fingers + 1 // 1 finger = octave 2, 5 fingers = octave 6
-                    if newOctave != gridBaseOctave {
-                        gridBaseOctave = newOctave
-                    }
-                }
-            }
-        }
-
-        let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale, baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
-        let actions = gridModeManager.checkNotes(hands: currentHands, scaleNotes: gridNotes, currentBeat: 0)
-        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
-        for action in actions {
-            switch action {
-            case .noteOn(let hand, let midi, let name, let vel):
-                strudelBridge.noteOn(hand: hand, midi: midi, waveform: selectedWaveform, velocity: vel)
-                haptics.noteTrigger()
-                lastGridNote = name
-                loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel), currentTime: elapsed)
-                jamSession.sendEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel))
-            case .noteOff(let hand):
-                strudelBridge.noteOff(hand: hand)
-                loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
-                jamSession.sendEvent(.noteOff(hand: hand))
-            case .slide(let hand, let midi, let name):
-                strudelBridge.noteSlide(hand: hand, midi: midi)
-                lastGridNote = name
-            }
-        }
-
-        let lanes = gridModeManager.currentLanes(hands: currentHands, scaleNotes: gridNotes)
-        gridLeftLane = lanes.left
-        gridRightLane = lanes.right
-
-        // Only drum loops (no continuous synth)
-        evaluateDrumLoopsIfChanged(modePrefix: "grid")
-    }
-
-    // MARK: - Chord+Melody mode
-
-    private func tickChordMelodyMode() {
         chordMelodyModeManager.swapHands = chordMelodySwapHands
         chordMelodyModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
         let bounds = UIScreen.main.bounds
@@ -500,27 +489,16 @@ final class EngineController: ObservableObject {
 
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
 
-        // Closure that returns the triad MIDI notes for a given scale degree —
-        // used to play the chord on the chord hand.
         let chordTones: (Int) -> [Int] = { [weak self] degree in
             guard let self else { return [] }
             return chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
         }
-
-        // Closure that returns the melody hand's snap targets: the chord tones
-        // expanded across ~2 octaves so the melody hand has 6-9 lanes to choose
-        // from. This is the "cheap version" of chord-aware snap from the
-        // implementation notes: melody can only pick chord tones, period.
         let melodyTones: (Int) -> [Int] = { [weak self] degree in
             guard let self else { return [] }
             let triad = chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
-            // Expand triad up across octaves so the melody hand has multiple lanes.
-            // Each octave above the base contributes another root/third/fifth.
             var lanes: [Int] = []
             for octave in 0..<3 {
-                for note in triad {
-                    lanes.append(note + octave * 12)
-                }
+                for note in triad { lanes.append(note + octave * 12) }
             }
             return lanes.sorted()
         }
@@ -534,153 +512,68 @@ final class EngineController: ObservableObject {
         for action in actions {
             switch action {
             case .padOn(let notes, let degree):
-                let name = chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree)
-                chordMelodyCurrentChordName = name
+                chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree)
                 chordMelodyCurrentDegree = degree
                 chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
-                // Bring up 3 sustained pad voices at low volume — the chord
-                // sits quietly under the melody so the player always hears the
-                // harmony without the right hand having to play.
                 for (i, midi) in notes.enumerated() {
-                    strudelBridge.noteOn(hand: "pad\(i)", midi: midi, waveform: "triangle", velocity: chordMelodyPadVolume)
+                    soundFontEngine.noteOn(voice: "pad\(i)", midi: midi, velocity: chordMelodyPadVolume)
                 }
             case .padSlide(let notes, let degree):
-                let name = chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree)
-                chordMelodyCurrentChordName = name
+                chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree)
                 chordMelodyCurrentDegree = degree
                 chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
-                // Glide each pad voice to the new chord tone — Strudel's
-                // noteSlide ramps pitch without re-attacking the envelope, so
-                // chord changes blend instead of clicking.
                 for (i, midi) in notes.enumerated() {
-                    strudelBridge.noteSlide(hand: "pad\(i)", midi: midi)
+                    soundFontEngine.slide(voice: "pad\(i)", midi: midi)
                 }
             case .padOff:
-                for i in 0..<3 {
-                    strudelBridge.noteOff(hand: "pad\(i)")
-                }
+                for i in 0..<3 { soundFontEngine.noteOff(voice: "pad\(i)") }
             case .chordAccent(let notes, _, let vel):
-                // Pinch on the chord hand is an additive accent — a brief
-                // chord stab on top of the existing pad. Quiet enough that
-                // it doesn't dominate the melody.
                 for midi in notes {
-                    strudelBridge.playNote(midi: midi, waveform: selectedWaveform, velocity: vel * 0.5, duration: 0.5)
+                    soundFontEngine.oneShot(midi: midi, velocity: vel * 0.6, duration: 0.5)
                     loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel * 0.5), currentTime: elapsed)
                 }
                 haptics.noteTrigger()
             case .melodyOn(let hand, let midi, let name, let vel):
-                strudelBridge.noteOn(hand: hand, midi: midi, waveform: selectedWaveform, velocity: vel)
+                soundFontEngine.noteOn(voice: hand, midi: midi, velocity: vel)
                 haptics.noteTrigger()
                 lastGridNote = name
                 loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel), currentTime: elapsed)
             case .melodyOff(let hand):
-                strudelBridge.noteOff(hand: hand)
+                soundFontEngine.noteOff(voice: hand)
                 loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
             case .melodySlide(let hand, let midi, let name):
-                strudelBridge.noteSlide(hand: hand, midi: midi)
+                soundFontEngine.slide(voice: hand, midi: midi)
                 lastGridNote = name
             }
         }
 
-        // Publish UI state.
+        // Publish UI state (shared with the chord+melody overlay).
         let zones = chordMelodyModeManager.currentZones(hands: currentHands)
         chordMelodyChordHandLane = zones.chordDegree
         chordMelodyMelodyLane = zones.melodyLane
         chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
         if let deg = zones.chordDegree, chordMelodyCurrentDegree == nil {
-            // Preview chord name even before the user pinches.
             chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: deg)
         }
 
-        // Right-hand X → low-pass filter cutoff (timbre modulation).
-        // Hand left = dark/muffled, hand right = bright/open. Affects pad +
-        // melody voices since Strudel's voices read the global __hp.lpf.
-        let melodyHandData = chordMelodySwapHands ? currentHands.left : currentHands.right
-        if let mh = melodyHandData, let lpfDef = PARAM_MAP["lpf"] {
-            let mapped = lpfDef.min + max(0, min(1, mh.pinchX)) * (lpfDef.max - lpfDef.min)
-            smoothed["lpf"] = mapped
-            strudelBridge.setSynthParam("lpf", value: mapped)
-        }
-
-        // Auto-strum: re-articulate the held chord on each beat so the player
-        // doesn't have to pulse-pinch. Only fires while the chord hand is in
-        // frame and a chord is voiced.
+        // Auto-strum: re-articulate the held chord on each beat.
         if chordMelodyAutoStrum,
            chordMelodyModeManager.currentChordMidi.isEmpty == false,
            currentBeat != lastChordMelodyBeat {
             lastChordMelodyBeat = currentBeat
             for midi in chordMelodyModeManager.currentChordMidi {
-                strudelBridge.playNote(midi: midi, waveform: selectedWaveform, velocity: 0.25, duration: 0.4)
+                soundFontEngine.oneShot(midi: midi, velocity: 0.3, duration: 0.4)
             }
         }
 
-        evaluateDrumLoopsIfChanged(modePrefix: "chordmelody")
+        evaluateDrumLoopsIfChanged(modePrefix: "soundfont")
     }
 
     // Drum hand lane tracking for UI
     @Published var drumLeftLane: Int? = nil
     @Published var drumRightLane: Int? = nil
 
-    private func tickDrumMode() {
-        strudelBridge.updateDrumParams(intensity: drumIntensity, complexity: drumComplexity)
-        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
-        let hits = drumModeManager.checkHits(hands: currentHands, currentTime: elapsed)
-        for hit in hits {
-            strudelBridge.playHit(hit.hitType)
-            haptics.drumHit()
-            lastDrumHit = hit.hitType
-            loopRecorder.recordEvent(.drumHit(hitType: hit.hitType), currentTime: elapsed)
-            jamSession.sendEvent(.drumHit(hitType: hit.hitType))
-        }
-
-        // Update lane display for UI
-        drumLeftLane = drumModeManager.leftLane
-        drumRightLane = drumModeManager.rightLane
-
-        evaluateDrumLoopsIfChanged(modePrefix: "drum")
-    }
-
     // MARK: - Learn Mode
-
-    private func tickLearnMode() {
-        // Use same grid infrastructure for lane detection
-        let gridNotes = scaleNotes(key: selectedKey, scale: selectedScale,
-                                   baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
-        guard !gridNotes.isEmpty else { return }
-
-        let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
-
-        // Get current pinch/lane state from grid manager
-        let leftHand = currentHands.left
-        let rightHand = currentHands.right
-        let leftLane = leftHand.map { gridModeManager.yToNoteIndex(y: $0.pinchY, noteCount: gridNotes.count) }
-        let rightLane = rightHand.map { gridModeManager.yToNoteIndex(y: $0.pinchY, noteCount: gridNotes.count) }
-        let leftPinching = (leftHand?.pinch ?? 0) > 0.8
-        let rightPinching = (rightHand?.pinch ?? 0) > 0.8
-
-        gridLeftLane = leftLane
-        gridRightLane = rightLane
-
-        let hitNotes = learnModeManager.tick(
-            elapsed: elapsed,
-            leftLane: leftLane,
-            rightLane: rightLane,
-            leftPinching: leftPinching,
-            rightPinching: rightPinching
-        )
-
-        // Play sound for hit notes
-        for hit in hitNotes {
-            strudelBridge.playNote(midi: hit.midi, waveform: selectedWaveform, velocity: 0.7, duration: 0.3)
-            haptics.learnPerfectHit()
-        }
-
-        // Sync visual state to published properties (at UI timer rate)
-        learnScore = learnModeManager.score
-        learnVisibleNotes = learnModeManager.visibleNotes
-        learnHitEffects = learnModeManager.hitEffects
-        learnSongComplete = learnModeManager.songComplete
-    }
 
     func loadLearnSong(_ song: LearnSong) {
         // Auto-set key and scale to match the song
@@ -694,67 +587,6 @@ final class EngineController: ObservableObject {
         manualBPM = song.bpm
         currentLearnSong = song
         learnSongComplete = false
-    }
-
-    // MARK: - Melodic Mode
-
-    private var lastMelodicSnapshotTime: Double = 0
-
-    private func tickMelodicMode() {
-        // Mute when no hands detected
-        let hasHands = currentHands.left != nil || currentHands.right != nil
-        if !hasHands {
-            smoothed["gain"] = 0
-            strudelBridge.updateParams(smoothed, config: config)
-            return
-        }
-
-        // Record code snapshots for loop recording in melodic mode (~10fps)
-        if loopRecorder.isRecording {
-            let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
-            if elapsed - lastMelodicSnapshotTime > 0.1 {
-                lastMelodicSnapshotTime = elapsed
-                let code = chordMode
-                    ? buildChordSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                    : buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                // Build a static code string with current param values baked in
-                let staticCode = buildCode(smoothed, structIdx: structIdx, config: config, waveform: selectedWaveform)
-                loopRecorder.recordEvent(.codeSnapshot(code: staticCode), currentTime: elapsed)
-            }
-        }
-
-        // Update signal params (key/scale aware)
-        let notes = cachedScaleNotes
-        if chordMode {
-            let noteCount = selectedScale.intervals.count
-            let rawIdx: Double = smoothed["noteIdx"] ?? 0
-            let normalized: Double = rawIdx / Double(max(1, NOTES.count - 1))
-            let degree: Int = max(0, min(noteCount - 1, Int(normalized * Double(noteCount - 1) + 0.5)))
-            let chord = chordNotes(key: selectedKey, scale: selectedScale, degree: degree)
-            strudelBridge.updateChordParams(smoothed, config: config, chordMidi: chord)
-        } else if !notes.isEmpty {
-            let rawIdx: Double = smoothed["noteIdx"] ?? 10
-            let normalized: Double = rawIdx / Double(max(1, NOTES.count - 1))
-            let noteIdx: Int = max(0, min(notes.count - 1, Int(normalized * Double(notes.count - 1) + 0.5)))
-            strudelBridge.updateScaleParams(smoothed, config: config, midi: notes[noteIdx])
-        }
-
-        // Re-evaluate when config changes
-        let harmonyKey = "\(selectedKey.rawValue)|\(selectedScale.rawValue)|\(chordMode)"
-        let structKey = "melodic|\(structIdx)|\(drumStateKey)|\(selectedWaveform)|\(harmonyKey)"
-        if structKey != lastStructKey {
-            lastStructKey = structKey
-            recomputeScaleNotes()
-            let synthCode = chordMode
-                ? buildChordSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                : buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-
-            var parts = [synthCode]
-            parts.append(contentsOf: buildDrumCodeParts())
-            let code = parts.count == 1 ? parts[0] : "stack(\(parts.joined(separator: ", ")))"
-            strudelBridge.evaluate(code)
-        }
-
     }
 
     private static let maxSnippets = 50
@@ -813,7 +645,7 @@ final class EngineController: ObservableObject {
     func startLoopRecording() {
         guard savedLoops.count < Self.maxLoops else { return }
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
-        let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
+        let mode = currentModeString
         loopRecorder.startRecording(currentTime: elapsed, mode: mode)
         isLoopRecording = true
     }
@@ -862,7 +694,8 @@ final class EngineController: ObservableObject {
     private var _lastDrumIds = ("", "")
     private var _lastDrumVals = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
-    private var drumStateKey: String {
+    // `internal` so mode controllers can fold drum state into their struct keys.
+    var drumStateKey: String {
         let ids = (selectedDrumLoop.id, selectedDrumLoop2.id)
         let vals = (drumVolume, drumBPM, drumVolume2, drumBPM2, drumComplexity, drumIntensity)
         if ids != _lastDrumIds || vals != _lastDrumVals {
@@ -873,7 +706,7 @@ final class EngineController: ObservableObject {
         return _cachedDrumKey
     }
 
-    private func buildDrumCodeParts() -> [String] {
+    func buildDrumCodeParts() -> [String] {
         let intensityGain = 0.3 + drumIntensity * 1.2
         let complexitySpeed = 1.0 + drumComplexity * 2.0
 
@@ -898,7 +731,7 @@ final class EngineController: ObservableObject {
         return parts
     }
 
-    private func evaluateDrumLoopsIfChanged(modePrefix: String) {
+    func evaluateDrumLoopsIfChanged(modePrefix: String) {
         let key = "\(modePrefix)|\(drumStateKey)"
         guard key != lastStructKey else { return }
         lastStructKey = key
@@ -1073,7 +906,10 @@ final class EngineController: ObservableObject {
         strudelBridge.noteOff(hand: "right")
         strudelBridge.noteOff(hand: "touch1")
         strudelBridge.noteOff(hand: "touch2")
+        strudelBridge.noteOff(hand: "lead")
+        leadVoiceMidi = nil
         strudelBridge.stop()
+        soundFontEngine.allNotesOff()
         lastStructKey = "" // force re-eval when resuming
     }
 
@@ -1089,17 +925,39 @@ final class EngineController: ObservableObject {
     }
 
     /// Call when switching modes to stop lingering sounds
-    func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false) {
+    func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
+                    lead: Bool = false, hybrid: Bool = false, flow: Bool = false,
+                    soundFont: Bool = false) {
         silenceAll()
         gridModeEnabled = grid
         drumModeEnabled = drums
         learnModeEnabled = learn
         chordMelodyModeEnabled = chordMelody
+        leadModeEnabled = lead
+        hybridModeEnabled = hybrid
+        flowModeEnabled = flow
+        soundFontModeEnabled = soundFont
+        if soundFont {
+            soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
+        }
+    }
+
+    /// Persisted/loop-record label for the current mode.
+    var currentModeString: String {
+        if gridModeEnabled { return "grid" }
+        if drumModeEnabled { return "drum" }
+        if soundFontModeEnabled { return "soundfont" }
+        if chordMelodyModeEnabled { return "chordmelody" }
+        if leadModeEnabled { return "lead" }
+        if hybridModeEnabled { return "hybrid" }
+        if flowModeEnabled { return "flow" }
+        return "melodic"
     }
 
     func stop() {
         // Persist state before teardown
-        let mode = gridModeEnabled ? "grid" : (drumModeEnabled ? "drum" : "melodic")
+        let mode = currentModeString
+        PersistenceManager.shared.lastSoundFont = selectedSoundFontInstrument.id
         PersistenceManager.shared.saveEngineState(
             presetId: nil,
             mode: mode,
@@ -1136,6 +994,11 @@ final class EngineController: ObservableObject {
         jamSession.leaveSession()
         gridModeEnabled = false
         drumModeEnabled = false
+        soundFontModeEnabled = false
+        leadModeEnabled = false
+        hybridModeEnabled = false
+        flowModeEnabled = false
+        leadVoiceMidi = nil
         gridLeftLane = nil
         gridRightLane = nil
         lastGridNote = ""

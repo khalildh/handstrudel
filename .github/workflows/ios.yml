@@ -1,0 +1,54 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+# The web app already builds in pages.yml; this guards the native iOS app so the
+# ~3,900 lines of Swift unit tests actually run on every change instead of only
+# locally. Runs on a macOS runner because xcodebuild needs Xcode + a simulator.
+jobs:
+  test:
+    name: Build & Test
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios/HandStrudel
+    env:
+      SCHEME: HandStrudel
+      PROJECT: HandStrudel.xcodeproj
+      # Bump these if the runner image moves to a newer Xcode / device set.
+      SIMULATOR: platform=iOS Simulator,name=iPhone 16,OS=latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Resolve Swift Package dependencies
+        run: xcodebuild -resolvePackageDependencies -project "$PROJECT" -scheme "$SCHEME"
+
+      - name: Build & run unit tests
+        run: |
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "$SIMULATOR" \
+            -only-testing:HandStrudelTests \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: ios/HandStrudel/TestResults.xcresult
+          if-no-files-found: ignore
