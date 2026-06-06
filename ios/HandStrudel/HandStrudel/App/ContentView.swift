@@ -215,7 +215,7 @@ struct ContentView: View {
                         : engine.jamSession.lastReceivedEvent
                     if !text.isEmpty {
                         Text(text)
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.cyan.opacity(0.8))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
@@ -262,7 +262,7 @@ struct ContentView: View {
                 // Filter name toast
                 if showFilterName {
                     Text(engine.selectedFilter.emoji + " " + engine.selectedFilter.name)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
@@ -273,7 +273,7 @@ struct ContentView: View {
                 // Shake-to-randomize toast
                 if showRandomizedToast {
                     Text("\u{1F3B2} Randomized!")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
@@ -525,7 +525,7 @@ struct ContentView: View {
                             .foregroundColor(.white.opacity(0.15))
                     }
                 }
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(.system(size: 9, weight: .bold))
                 .padding(8)
 
                 // Crosshair lines
@@ -610,7 +610,7 @@ struct ContentView: View {
             ForEach([1, 2, 3], id: \.self) { range in
                 Button(action: { engine.gridOctaveRange = range }) {
                     Text("\(range)")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundColor(engine.gridOctaveRange == range ? .black : .white.opacity(0.6))
                         .frame(width: 26, height: 26)
                         .background(
@@ -799,7 +799,7 @@ struct ContentView: View {
                             Text(lane.emoji)
                                 .font(.system(size: 20))
                             Text(lane.name)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(.system(size: 12, weight: .black))
                                 .foregroundColor(leftActive ? lane.color : .white.opacity(0.4))
                         }
                     }
@@ -833,7 +833,7 @@ struct ContentView: View {
 
                         HStack(spacing: 6) {
                             Text(lane.name)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(.system(size: 12, weight: .black))
                                 .foregroundColor(rightActive ? lane.color : .white.opacity(0.4))
                             Text(lane.emoji)
                                 .font(.system(size: 20))
@@ -946,7 +946,7 @@ struct ContentView: View {
                 // Loop count badge
                 if !engine.savedLoops.isEmpty && !engine.isLoopRecording {
                     Text("\(engine.savedLoops.count)")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.white)
                         .frame(width: 18, height: 18)
                         .background(Circle().fill(accentColor))
@@ -960,7 +960,7 @@ struct ContentView: View {
                     Image(systemName: loopMessage.contains("saved") ? "checkmark.circle.fill" : loopMessage.contains("Recording") ? "record.circle" : "info.circle.fill")
                         .font(.system(size: 12))
                     Text(loopMessage)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11, weight: .semibold))
                 }
                 .foregroundColor(loopMessage.contains("saved") ? .green : loopMessage.contains("Recording") ? .red : .orange)
                 .padding(.horizontal, 12)
@@ -998,7 +998,7 @@ struct ContentView: View {
                                 .rotationEffect(.degrees(-90))
                                 .animation(.linear(duration: 1), value: recordCountdown)
                             Text("\(recordCountdown)")
-                                .font(.system(size: 18, weight: .black, design: .rounded))
+                                .font(.system(size: 18, weight: .black))
                                 .foregroundColor(.white)
                         }
                     } else {
@@ -1021,7 +1021,7 @@ struct ContentView: View {
                                     .foregroundColor(.white)
                             }
                             Text("7s")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(.white.opacity(0.5))
                         }
                     }
@@ -1337,13 +1337,13 @@ struct ControlSheet: View {
             if currentMode == .chordMelody {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Progression")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.primary.opacity(0.7))
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
@@ -1356,14 +1356,14 @@ struct ControlSheet: View {
 
                     Toggle(isOn: $engine.chordMelodySwapHands) {
                         Text("Swap hands (right = chords)")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.primary.opacity(0.8))
                     }
                     .tint(DS.signature)
 
                     Toggle(isOn: $engine.chordMelodyAutoStrum) {
                         Text("Auto-strum (re-articulate on each beat)")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.primary.opacity(0.8))
                     }
                     .tint(DS.signature)
@@ -1371,7 +1371,7 @@ struct ControlSheet: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Pad volume")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.primary.opacity(0.8))
                             Spacer()
                             Text(String(format: "%.0f%%", engine.chordMelodyPadVolume / 0.6 * 100))
@@ -1387,7 +1387,7 @@ struct ControlSheet: View {
 
             if currentMode == .grid {
                 Text("Pinch to play notes. Move hand up/down to change pitch.")
-                    .font(.system(size: 10, design: .rounded))
+                    .font(.system(size: 10))
                     .foregroundColor(.secondary)
                     .padding(.top, 2)
 
@@ -1396,12 +1396,12 @@ struct ControlSheet: View {
                     // Octave range
                     HStack(spacing: 6) {
                         Text("Range")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.secondary)
                         ForEach([1, 2, 3], id: \.self) { range in
                             Button(action: { engine.gridOctaveRange = range }) {
                                 Text("\(range)")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(engine.gridOctaveRange == range ? DS.signature : .secondary)
                                     .frame(width: 28, height: 28)
                                     .background(Circle().fill(engine.gridOctaveRange == range ? DS.signature.opacity(0.15) : Color.primary.opacity(0.04)))
@@ -1414,7 +1414,7 @@ struct ControlSheet: View {
                     // Base octave
                     HStack(spacing: 4) {
                         Text("Oct")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.secondary)
                         Button(action: { if engine.gridBaseOctave > 1 { engine.gridBaseOctave -= 1 } }) {
                             Image(systemName: "minus")
@@ -1466,7 +1466,7 @@ struct ControlSheet: View {
                 Text(prog.emoji)
                     .font(.system(size: 14))
                 Text(prog.name)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(isActive ? DS.signature : .primary.opacity(0.75))
                 Text("\(prog.degrees.count)")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
@@ -1504,7 +1504,7 @@ struct ControlSheet: View {
                             engine.recomputeScaleNotes()
                         }) {
                             Text(key.rawValue)
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(engine.selectedKey == key ? DS.signature : .primary.opacity(0.6))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 9)
@@ -1535,7 +1535,7 @@ struct ControlSheet: View {
                             }
                         }) {
                             Text(scale.rawValue)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(engine.selectedScale == scale ? DS.signature : .primary.opacity(0.6))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -1550,7 +1550,7 @@ struct ControlSheet: View {
                                 .overlay(alignment: .topTrailing) {
                                     if locked {
                                         Text("PRO")
-                                            .font(.system(size: 6, weight: .bold, design: .rounded))
+                                            .font(.system(size: 6, weight: .bold))
                                             .foregroundColor(.white.opacity(0.8))
                                             .padding(.horizontal, 3)
                                             .padding(.vertical, 1)
@@ -1578,7 +1578,7 @@ struct ControlSheet: View {
                 Image(systemName: icon)
                     .font(.system(size: 11))
                 Text(label)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(isOn.wrappedValue ? DS.signature : .primary.opacity(0.5))
             .padding(.horizontal, 12)
@@ -1627,7 +1627,7 @@ struct ControlSheet: View {
                 Text(wf.emoji)
                     .font(.system(size: 20))
                 Text(wf.name)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(isSelected ? DS.signature : .primary.opacity(0.6))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -1647,7 +1647,7 @@ struct ControlSheet: View {
             .overlay(alignment: .topTrailing) {
                 if locked {
                     Text("PRO")
-                        .font(.system(size: 8, weight: .heavy, design: .rounded))
+                        .font(.system(size: 8, weight: .heavy))
                         .foregroundColor(.white.opacity(0.8))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
@@ -1683,7 +1683,7 @@ struct ControlSheet: View {
                             Text(drumLoop.emoji)
                                 .font(.system(size: 22))
                             Text(drumLoop.name)
-                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(loop.wrappedValue.id == drumLoop.id ? DS.signature : .primary.opacity(0.6))
                         }
                         .frame(maxWidth: .infinity)
@@ -1701,7 +1701,7 @@ struct ControlSheet: View {
                         .overlay(alignment: .topTrailing) {
                             if locked {
                                 Text("PRO")
-                                    .font(.system(size: 8, weight: .heavy, design: .rounded))
+                                    .font(.system(size: 8, weight: .heavy))
                                     .foregroundColor(.white.opacity(0.8))
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 2)
@@ -1717,7 +1717,7 @@ struct ControlSheet: View {
             if loop.wrappedValue.id != "none" {
                 HStack(spacing: 8) {
                     Text("VOL")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 28)
                     Slider(value: volume, in: 0.2...2.0)
@@ -1730,7 +1730,7 @@ struct ControlSheet: View {
 
                 HStack(spacing: 8) {
                     Text("BPM")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 28)
                     Slider(value: bpm, in: 40...240, step: 1)
@@ -1760,7 +1760,7 @@ struct ControlSheet: View {
 
             if engine.bpmIsMapped {
                 Text("Controlled by hand")
-                    .font(.system(size: 11, design: .rounded))
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
             } else {
                 HStack(spacing: 10) {
@@ -1828,7 +1828,7 @@ struct ControlSheet: View {
                 .frame(width: 24)
 
                 Text(def.label)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(isLocked ? .orange : .primary)
                     .frame(width: 55, alignment: .leading)
 
@@ -1888,7 +1888,7 @@ struct ControlSheet: View {
                             Text(filter.emoji)
                                 .font(.system(size: 18))
                             Text(filter.name)
-                                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                                .font(.system(size: 8, weight: .semibold))
                                 .foregroundColor(isSelected ? DS.signature : .primary.opacity(0.6))
                                 .lineLimit(1)
                         }
@@ -1905,7 +1905,7 @@ struct ControlSheet: View {
                         .overlay(alignment: .topTrailing) {
                             if locked {
                                 Text("PRO")
-                                    .font(.system(size: 7, weight: .bold, design: .rounded))
+                                    .font(.system(size: 7, weight: .bold))
                                     .foregroundColor(.white.opacity(0.8))
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 2)
@@ -1946,7 +1946,7 @@ struct ControlSheet: View {
                             Text(theme.emoji)
                                 .font(.system(size: 18))
                             Text(theme.name)
-                                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                                .font(.system(size: 8, weight: .semibold))
                                 .foregroundColor(isSelected ? DS.signature : .primary.opacity(0.6))
                                 .lineLimit(1)
                         }
@@ -1963,7 +1963,7 @@ struct ControlSheet: View {
                         .overlay(alignment: .topTrailing) {
                             if locked {
                                 Text("PRO")
-                                    .font(.system(size: 7, weight: .bold, design: .rounded))
+                                    .font(.system(size: 7, weight: .bold))
                                     .foregroundColor(.white.opacity(0.8))
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 2)
@@ -1988,25 +1988,25 @@ struct ControlSheet: View {
                 if !engine.playingLoopIds.isEmpty {
                     Button(action: engine.stopAllLoops) {
                         Text("Stop All")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.red.opacity(0.8))
                     }
                 }
             }
 
             Text("Tap the red circle button to record a loop. Loops auto-play and layer on top of each other.")
-                .font(.system(size: 10, design: .rounded))
+                .font(.system(size: 10))
                 .foregroundColor(.secondary)
 
             // Bar length picker
             HStack(spacing: 6) {
                 Text("Length")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.secondary)
                 ForEach(LoopRecorder.barOptions, id: \.self) { bars in
                     Button(action: { engine.loopRecorder.selectedBars = bars }) {
                         Text("\(bars) bars")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(engine.loopRecorder.selectedBars == bars ? DS.signature : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
@@ -2029,10 +2029,10 @@ struct ControlSheet: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(loop.name)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(.system(size: 13, weight: .semibold))
                         HStack(spacing: 6) {
                             Text(loop.mode)
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(DS.signature)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -2099,7 +2099,7 @@ struct ControlSheet: View {
                     }
                     VStack(alignment: .leading) {
                         Text("Snippet #\(idx + 1)")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .font(.system(size: 14, weight: .semibold))
                         Text("\(snippet.bpm) bpm")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(.secondary)
@@ -2134,7 +2134,7 @@ struct ControlSheet: View {
                 ForEach([0.5, 1.0, 2.0, 4.0], id: \.self) { speed in
                     Button(action: { engine.setTrackSpeed(speed) }) {
                         Text("\(speed == Double(Int(speed)) ? "\(Int(speed))" : String(format: "%.1f", speed))x")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(engine.track.speed == speed ? DS.signature : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
@@ -2149,7 +2149,7 @@ struct ControlSheet: View {
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(.secondary)
                     Text("Snippet #\(snippetIdx + 1)")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(.system(size: 13, weight: .medium))
                     Spacer()
                     Button(action: { engine.removeFromTrack(slotIdx) }) {
                         Image(systemName: "xmark.circle")
