@@ -164,9 +164,10 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody, soundFont }
+    private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody, radialChordMelody, soundFont }
     private var currentMode: AppMode {
         if engine.learnModeEnabled { return .learn }
+        if engine.radialChordMelodyModeEnabled { return .radialChordMelody }
         if engine.chordMelodyModeEnabled { return .chordMelody }
         if engine.soundFontModeEnabled { return .soundFont }
         if engine.gridModeEnabled { return .grid }
@@ -186,7 +187,8 @@ struct ControlSheet: View {
             lead: mode == .lead,
             hybrid: mode == .hybrid,
             flow: mode == .flow,
-            soundFont: mode == .soundFont
+            soundFont: mode == .soundFont,
+            radialChordMelody: mode == .radialChordMelody
         )
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
@@ -197,7 +199,7 @@ struct ControlSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("MODE", icon: "gamecontroller")
 
-            // 9 modes — wrap so each button still has a usable target size.
+            // 10 modes — wrap so each button still has a usable target size.
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     modeButton("Melodic", icon: "pianokeys", mode: .melodic)
@@ -211,15 +213,22 @@ struct ControlSheet: View {
                 }
                 HStack(spacing: 8) {
                     modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
+                    modeButton("Radial", icon: "circle.circle", mode: .radialChordMelody)
                     modeButton("SoundFont", icon: "pianokeys.inverse", mode: .soundFont)
+                }
+                HStack(spacing: 8) {
                     modeButton("Learn", icon: "music.note.list", mode: .learn)
+                    Color.clear.frame(maxWidth: .infinity)
+                    Color.clear.frame(maxWidth: .infinity)
                 }
             }
 
-            if currentMode == .chordMelody {
+            if currentMode == .chordMelody || currentMode == .radialChordMelody {
                 quantizeRow
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
+                    Text(currentMode == .radialChordMelody
+                        ? "Each hand controls a wheel. Rest in the center, then reach out toward any wedge to pick a chord (chord hand) or note (melody hand) — no need to sweep across. On the chord wheel, the outer ring jumps the chord up an octave. Pinch the chord hand for an accent."
+                        : "Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

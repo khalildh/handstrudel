@@ -31,6 +31,25 @@ final class ChordMelodyModeManager {
 
     // MARK: - Config
 
+    /// How the hands select chords/notes:
+    /// - `.grid`: linear half-screen strips — chord by X, octave/melody by Y.
+    /// - `.radial`: a centered wheel — chord/note by *angle*, with a center
+    ///   rest zone. The hand can sit in the middle and dart out toward any
+    ///   wedge in any direction, instead of sweeping a strip from end to end.
+    enum Layout { case grid, radial }
+    var layout: Layout = .grid
+
+    /// Radial geometry, as fractions of the wheel radius.
+    /// Inside `radialDeadzone` the hand is "resting": it sustains the held
+    /// chord/note but makes no new selection, so you can recenter and then
+    /// reach cleanly to any other wedge. `radialOctaveRing` splits the chord
+    /// wheel into an inner (base-octave) ring and an outer (+1) ring.
+    /// `radialRadiusFraction` is the wheel radius as a fraction of the
+    /// chord/melody half-width.
+    static let radialDeadzone: Double = 0.24
+    static let radialOctaveRing: Double = 0.64
+    static let radialRadiusFraction: Double = 0.9
+
     var swapHands: Bool = false
 
     /// The scale degrees that each chord zone resolves to. With "Free" this
@@ -72,6 +91,11 @@ final class ChordMelodyModeManager {
     private(set) var currentChordMidi: [Int] = []
     var isChordHandPinching: Bool { chordPinch.isPinching }
     var isMelodyHandPinching: Bool { melodyPinch.isPinching }
+
+    /// Radial layout only: whether each hand is in the center rest zone (held,
+    /// not selecting). Read by the radial overlay to dim the wheel.
+    private(set) var chordResting: Bool = false
+    private(set) var melodyResting: Bool = false
 
     // MARK: - Hand routing
 
@@ -143,6 +167,79 @@ final class ChordMelodyModeManager {
         return -1                         // hand low on screen
     }
 
+    // MARK: - Radial layout mapping
+
+    /// Hand position → polar coordinates centered on the hand's half of the
+    /// screen. Distances are taken in units of screen height so x and y share
+    /// one pixel scale — the wheel is a true circle, not an aspect-stretched
+    /// ellipse. `angle` is degrees clockwise from 12 o'clock; `radius` is 0 at
+    /// the center and 1 at the wheel's rim.
+    private func radialVector(x: Double, y: Double, chordHand: Bool) -> (angle: Double, radius: Double) {
+        guard screenAspect > 0 else { return (0, 0) }
+        let onLeft = chordHand ? !swapHands : swapHands
+        let sx = visibleX(x) * screenAspect
+        let centerSx = (onLeft ? 0.25 : 0.75) * screenAspect
+        let dx = sx - centerSx
+        let dyUp = 0.5 - y
+        let wheelRadius = 0.5 * screenAspect * Self.radialRadiusFraction
+        guard wheelRadius > 0 else { return (0, 0) }
+        let radius = min(1.0, (dx * dx + dyUp * dyUp).squareRoot() / wheelRadius)
+        var deg = 90 - atan2(dyUp, dx) * 180 / .pi   // clockwise from top
+        deg = deg.truncatingRemainder(dividingBy: 360)
+        if deg < 0 { deg += 360 }
+        return (deg, radius)
+    }
+
+    /// Map an angle (clockwise from 12 o'clock) to a wedge index 0..<count,
+    /// with wedge 0 centered on the top of the wheel.
+    func radialWedgeIndex(angle: Double, count: Int) -> Int {
+        guard count > 0 else { return 0 }
+        let wedge = 360.0 / Double(count)
+        var shifted = (angle + wedge / 2).truncatingRemainder(dividingBy: 360)
+        if shifted < 0 { shifted += 360 }
+        return max(0, min(count - 1, Int(shifted / wedge)))
+    }
+
+    /// Chord-wheel ring → octave shift: inner ring = base octave, outer = +1.
+    private func radiusToOctave(_ radius: Double) -> Int {
+        radius < Self.radialOctaveRing ? 0 : 1
+    }
+
+    /// Resolve the chord hand into a (degree, octave, resting) reading for the
+    /// active layout. In radial layout a hand inside the deadzone is resting —
+    /// it holds whatever the pad is already voicing instead of selecting anew.
+    private func readChordHand(_ h: HandData) -> (degree: Int, octave: Int, resting: Bool) {
+        switch layout {
+        case .grid:
+            return (xToDegree(h.pinchX), yToOctaveShift(h.pinchY), false)
+        case .radial:
+            let v = radialVector(x: h.pinchX, y: h.pinchY, chordHand: true)
+            if v.radius < Self.radialDeadzone {
+                return (padDegree ?? currentChordDegree ?? 0, padOctaveShift, true)
+            }
+            let zone = radialWedgeIndex(angle: v.angle, count: zoneCount)
+            return (degreeForZone(zone), radiusToOctave(v.radius), false)
+        }
+    }
+
+    /// Resolve the melody hand into a (lane, resting) reading for the active
+    /// layout. Resting holds the last lane so a pinch from the center replays
+    /// the most recent note.
+    private func readMelodyHand(_ h: HandData, noteCount: Int) -> (lane: Int, resting: Bool) {
+        guard noteCount > 0 else { return (0, false) }
+        switch layout {
+        case .grid:
+            return (yToMelodyLane(h.pinchY, noteCount: noteCount), false)
+        case .radial:
+            let v = radialVector(x: h.pinchX, y: h.pinchY, chordHand: false)
+            if v.radius < Self.radialDeadzone {
+                let fallback = lastMelodyLane ?? noteCount / 2
+                return (max(0, min(noteCount - 1, fallback)), true)
+            }
+            return (radialWedgeIndex(angle: v.angle, count: noteCount), false)
+        }
+    }
+
     // MARK: - Tick
 
     /// Process one frame of hand state and emit chord/melody actions.
@@ -164,8 +261,9 @@ final class ChordMelodyModeManager {
 
         // -------------------- Chord hand (pad + accent) --------------------
         if let h = chordHand(hands) {
-            let degree = xToDegree(h.pinchX)
-            let octave = yToOctaveShift(h.pinchY)
+            let reading = readChordHand(h)
+            let degree = reading.degree
+            let octave = reading.octave
             currentOctaveShift = octave
             currentChordDegree = degree
             let baseTones = chordTones(degree)
@@ -177,9 +275,10 @@ final class ChordMelodyModeManager {
                 padDegree = degree
                 padOctaveShift = octave
                 actions.append(.padOn(midiNotes: currentChordMidi, degree: degree))
-            } else if (degree != padDegree || octave != padOctaveShift) && (!quantize || gridBoundaryCrossed) {
-                // Hand moved to a new zone or octave — glide the pad. Quantized:
-                // hold the change until the next grid boundary.
+            } else if (degree != padDegree || octave != padOctaveShift) && !reading.resting && (!quantize || gridBoundaryCrossed) {
+                // Hand moved to a new zone or octave — glide the pad. Resting
+                // (radial center) holds the chord. Quantized: hold the change
+                // until the next grid boundary.
                 padDegree = degree
                 padOctaveShift = octave
                 actions.append(.padSlide(midiNotes: currentChordMidi, degree: degree))
@@ -233,7 +332,8 @@ final class ChordMelodyModeManager {
         let melodySnapTargets = melodyTones(snapDegree)
 
         if let h = melodyHand(hands), !melodySnapTargets.isEmpty {
-            let laneIdx = yToMelodyLane(h.pinchY, noteCount: melodySnapTargets.count)
+            let reading = readMelodyHand(h, noteCount: melodySnapTargets.count)
+            let laneIdx = min(melodySnapTargets.count - 1, max(0, reading.lane))
             let midi = melodySnapTargets[laneIdx]
             let allowChange = !quantize || gridBoundaryCrossed
 
@@ -258,7 +358,7 @@ final class ChordMelodyModeManager {
                         name: midiNoteName(midi),
                         velocity: min(1, h.pinch)
                     ))
-                } else if midi != heldMelodyMidi {
+                } else if midi != heldMelodyMidi && !reading.resting {
                     heldMelodyMidi = midi
                     actions.append(.melodySlide(
                         hand: melodyHandName,
@@ -294,11 +394,31 @@ final class ChordMelodyModeManager {
     /// highlight feels "sticky" instead of flickering off.
     func currentZones(hands: HandsState) -> (chordDegree: Int?, melodyLane: Int?) {
         if let h = chordHand(hands) {
-            lastChordZoneIndex = xToZoneIndex(h.pinchX)
+            switch layout {
+            case .grid:
+                lastChordZoneIndex = xToZoneIndex(h.pinchX)
+                chordResting = false
+            case .radial:
+                let v = radialVector(x: h.pinchX, y: h.pinchY, chordHand: true)
+                chordResting = v.radius < Self.radialDeadzone
+                if !chordResting {
+                    lastChordZoneIndex = radialWedgeIndex(angle: v.angle, count: zoneCount)
+                }
+            }
         }
         if let h = melodyHand(hands) {
-            let count = max(currentChordMidi.count, 9)
-            lastMelodyLane = yToMelodyLane(h.pinchY, noteCount: count)
+            switch layout {
+            case .grid:
+                let count = max(currentChordMidi.count, 9)
+                lastMelodyLane = yToMelodyLane(h.pinchY, noteCount: count)
+                melodyResting = false
+            case .radial:
+                let v = radialVector(x: h.pinchX, y: h.pinchY, chordHand: false)
+                melodyResting = v.radius < Self.radialDeadzone
+                if !melodyResting {
+                    lastMelodyLane = radialWedgeIndex(angle: v.angle, count: 9)
+                }
+            }
         }
         return (lastChordZoneIndex, lastMelodyLane)
     }

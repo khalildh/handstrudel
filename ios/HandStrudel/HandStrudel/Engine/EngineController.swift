@@ -163,6 +163,11 @@ final class EngineController: ObservableObject {
 
     // Chord+Melody mode (two-hand harmony)
     @Published var chordMelodyModeEnabled = false
+    /// Radial variant of chord+melody: the chord/melody hands select by *angle*
+    /// around a centered wheel with a rest zone in the middle, rather than
+    /// sweeping a linear strip. Shares all chordMelody* state and the
+    /// ChordMelodyModeController; only the manager's `layout` differs.
+    @Published var radialChordMelodyModeEnabled = false
     @Published var chordMelodySwapHands = false  // left=chords by default; toggle for lefties
     @Published var chordMelodyPadVolume: Double = 0.22  // sustained chord pad gain
     let chordMelodyModeManager = ChordMelodyModeManager()
@@ -264,6 +269,7 @@ final class EngineController: ObservableObject {
         case "grid": gridModeEnabled = true
         case "drum": drumModeEnabled = true
         case "chordmelody": chordMelodyModeEnabled = true
+        case "radialchordmelody": radialChordMelodyModeEnabled = true
         case "soundfont": soundFontModeEnabled = true
         case "lead": leadModeEnabled = true
         case "hybrid": hybridModeEnabled = true
@@ -460,7 +466,7 @@ final class EngineController: ObservableObject {
     private var activeMode: ModeController {
         if learnModeEnabled { return learnMode }
         if soundFontModeEnabled { return soundFontMode }
-        if chordMelodyModeEnabled { return chordMelodyMode }
+        if chordMelodyModeEnabled || radialChordMelodyModeEnabled { return chordMelodyMode }
         if gridModeEnabled { return gridMode }
         if drumModeEnabled { return drumMode }
         return melodicMode
@@ -511,6 +517,7 @@ final class EngineController: ObservableObject {
         // idempotent, so this covers both the mode-switch and restore paths.
         soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
 
+        chordMelodyModeManager.layout = .grid
         chordMelodyModeManager.swapHands = chordMelodySwapHands
         chordMelodyModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
         let bounds = UIScreen.main.bounds
@@ -981,12 +988,13 @@ final class EngineController: ObservableObject {
     /// Call when switching modes to stop lingering sounds
     func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
                     lead: Bool = false, hybrid: Bool = false, flow: Bool = false,
-                    soundFont: Bool = false) {
+                    soundFont: Bool = false, radialChordMelody: Bool = false) {
         silenceAll()
         gridModeEnabled = grid
         drumModeEnabled = drums
         learnModeEnabled = learn
         chordMelodyModeEnabled = chordMelody
+        radialChordMelodyModeEnabled = radialChordMelody
         leadModeEnabled = lead
         hybridModeEnabled = hybrid
         flowModeEnabled = flow
@@ -1001,6 +1009,7 @@ final class EngineController: ObservableObject {
         if gridModeEnabled { return "grid" }
         if drumModeEnabled { return "drum" }
         if soundFontModeEnabled { return "soundfont" }
+        if radialChordMelodyModeEnabled { return "radialchordmelody" }
         if chordMelodyModeEnabled { return "chordmelody" }
         if leadModeEnabled { return "lead" }
         if hybridModeEnabled { return "hybrid" }

@@ -170,6 +170,24 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
 
+            // Radial chord+melody overlay (centered wheels, rest in the middle).
+            if engine.radialChordMelodyModeEnabled {
+                RadialChordMelodyOverlayView(
+                    zoneDegrees: engine.chordMelodyModeManager.zoneDegrees,
+                    currentChordZone: engine.chordMelodyChordHandLane,
+                    chordHandPinching: engine.chordMelodyModeManager.isChordHandPinching,
+                    chordResting: engine.chordMelodyModeManager.chordResting,
+                    currentOctaveShift: engine.chordMelodyOctaveShift,
+                    currentChordName: engine.chordMelodyCurrentChordName,
+                    melodyLane: engine.chordMelodyMelodyLane,
+                    melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
+                    melodyResting: engine.chordMelodyModeManager.melodyResting,
+                    melodyLaneCount: 9,
+                    swapHands: engine.chordMelodySwapHands
+                )
+                .ignoresSafeArea()
+            }
+
             // Learn mode overlay (Guitar Hero scrolling notes)
             if engine.learnModeEnabled {
                 let gridNotes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale,
@@ -226,7 +244,7 @@ struct ContentView: View {
                 }
 
                 // Floating code pill — hide in grid/drum/learn/chord/soundfont mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.soundFontModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     codePill
                         .padding(.horizontal, 20)
                         .padding(.top, 2)
@@ -235,7 +253,7 @@ struct ContentView: View {
                 Spacer()
 
                 // Note badge — hide in grid/drum/learn/chord/soundfont mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.soundFontModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     noteBadge
 
                     beatRing

@@ -13,6 +13,7 @@ final class ChordMelodyModeController: ModeController {
         let haptics = engine.haptics
         let loopRecorder = engine.loopRecorder
 
+        chordMelodyModeManager.layout = engine.radialChordMelodyModeEnabled ? .radial : .grid
         chordMelodyModeManager.swapHands = engine.chordMelodySwapHands
         chordMelodyModeManager.videoAspect = engine.handTracker.videoWidth / engine.handTracker.videoHeight
         let bounds = UIScreen.main.bounds
