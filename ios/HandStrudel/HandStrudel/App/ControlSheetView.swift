@@ -227,7 +227,7 @@ struct ControlSheet: View {
                 quantizeRow
                 VStack(alignment: .leading, spacing: 10) {
                     Text(currentMode == .radialChordMelody
-                        ? "Each hand controls a wheel. Rest in the center, then reach out toward any wedge to pick a chord (chord hand) or note (melody hand) — no need to sweep across. On the chord wheel, the outer ring jumps the chord up an octave. Pinch the chord hand for an accent."
+                        ? "One wheel shared by both hands: reach toward the outer ring (lettered chords) with the chord hand, the inner ring (lettered notes) with the melody hand. Rest in the center to hold — any chord or note is one move away. Pinch the chord hand for an accent."
                         : "Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(.secondary)

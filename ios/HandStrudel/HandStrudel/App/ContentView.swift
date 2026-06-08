@@ -170,20 +170,28 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
 
-            // Radial chord+melody overlay (centered wheels, rest in the middle).
+            // Radial chord+melody overlay (one centered wheel: chords on the
+            // outer ring, melody on the inner ring, rest in the middle).
             if engine.radialChordMelodyModeEnabled {
+                let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
+                let chordNames = zoneDegrees.map {
+                    chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
+                }
+                let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
+                let melodyTriad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
+                let melodyMidis = (0..<3).flatMap { oct in melodyTriad.map { $0 + oct * 12 } }.sorted()
+                let melodyNames = melodyMidis.map { pitchClassName($0) }
                 RadialChordMelodyOverlayView(
-                    zoneDegrees: engine.chordMelodyModeManager.zoneDegrees,
+                    zoneDegrees: zoneDegrees,
+                    chordNames: chordNames,
                     currentChordZone: engine.chordMelodyChordHandLane,
                     chordHandPinching: engine.chordMelodyModeManager.isChordHandPinching,
                     chordResting: engine.chordMelodyModeManager.chordResting,
-                    currentOctaveShift: engine.chordMelodyOctaveShift,
                     currentChordName: engine.chordMelodyCurrentChordName,
+                    melodyNames: melodyNames,
                     melodyLane: engine.chordMelodyMelodyLane,
                     melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
-                    melodyResting: engine.chordMelodyModeManager.melodyResting,
-                    melodyLaneCount: 9,
-                    swapHands: engine.chordMelodySwapHands
+                    melodyResting: engine.chordMelodyModeManager.melodyResting
                 )
                 .ignoresSafeArea()
             }

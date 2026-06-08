@@ -42,13 +42,16 @@ final class ChordMelodyModeManager {
     /// Radial geometry, as fractions of the wheel radius.
     /// Inside `radialDeadzone` the hand is "resting": it sustains the held
     /// chord/note but makes no new selection, so you can recenter and then
-    /// reach cleanly to any other wedge. `radialOctaveRing` splits the chord
-    /// wheel into an inner (base-octave) ring and an outer (+1) ring.
-    /// `radialRadiusFraction` is the wheel radius as a fraction of the
-    /// chord/melody half-width.
+    /// reach cleanly to any other wedge. `radialRadiusFraction` is the wheel
+    /// radius as a fraction of the screen's shorter half-dimension.
+    ///
+    /// Both hands share one wheel centered on the screen: the chord hand's
+    /// angle picks a chord on the outer ring, the melody hand's angle picks a
+    /// note on the inner ring. Distance from the center only distinguishes
+    /// resting from selecting — each hand is bound to its own ring regardless
+    /// of how far out it reaches.
     static let radialDeadzone: Double = 0.24
-    static let radialOctaveRing: Double = 0.64
-    static let radialRadiusFraction: Double = 0.9
+    static let radialRadiusFraction: Double = 0.92
 
     var swapHands: Bool = false
 
@@ -169,19 +172,19 @@ final class ChordMelodyModeManager {
 
     // MARK: - Radial layout mapping
 
-    /// Hand position → polar coordinates centered on the hand's half of the
-    /// screen. Distances are taken in units of screen height so x and y share
-    /// one pixel scale — the wheel is a true circle, not an aspect-stretched
-    /// ellipse. `angle` is degrees clockwise from 12 o'clock; `radius` is 0 at
-    /// the center and 1 at the wheel's rim.
-    private func radialVector(x: Double, y: Double, chordHand: Bool) -> (angle: Double, radius: Double) {
+    /// Hand position → polar coordinates around the screen center (the single
+    /// shared wheel). Distances are taken in units of screen height so x and y
+    /// share one pixel scale — the wheel is a true circle, not an
+    /// aspect-stretched ellipse. `angle` is degrees clockwise from 12 o'clock;
+    /// `radius` is 0 at the center and 1 at the wheel's rim.
+    private func radialVector(x: Double, y: Double) -> (angle: Double, radius: Double) {
         guard screenAspect > 0 else { return (0, 0) }
-        let onLeft = chordHand ? !swapHands : swapHands
         let sx = visibleX(x) * screenAspect
-        let centerSx = (onLeft ? 0.25 : 0.75) * screenAspect
+        let centerSx = 0.5 * screenAspect
         let dx = sx - centerSx
         let dyUp = 0.5 - y
-        let wheelRadius = 0.5 * screenAspect * Self.radialRadiusFraction
+        // Fit inside the shorter half-dimension so the wheel stays on screen.
+        let wheelRadius = min(0.5 * screenAspect, 0.5) * Self.radialRadiusFraction
         guard wheelRadius > 0 else { return (0, 0) }
         let radius = min(1.0, (dx * dx + dyUp * dyUp).squareRoot() / wheelRadius)
         var deg = 90 - atan2(dyUp, dx) * 180 / .pi   // clockwise from top
@@ -200,25 +203,22 @@ final class ChordMelodyModeManager {
         return max(0, min(count - 1, Int(shifted / wedge)))
     }
 
-    /// Chord-wheel ring → octave shift: inner ring = base octave, outer = +1.
-    private func radiusToOctave(_ radius: Double) -> Int {
-        radius < Self.radialOctaveRing ? 0 : 1
-    }
-
     /// Resolve the chord hand into a (degree, octave, resting) reading for the
     /// active layout. In radial layout a hand inside the deadzone is resting —
     /// it holds whatever the pad is already voicing instead of selecting anew.
+    /// Radial keeps the pad at the base octave (the outer wheel ring is chords,
+    /// not octaves); the melody hand covers range across its inner-ring notes.
     private func readChordHand(_ h: HandData) -> (degree: Int, octave: Int, resting: Bool) {
         switch layout {
         case .grid:
             return (xToDegree(h.pinchX), yToOctaveShift(h.pinchY), false)
         case .radial:
-            let v = radialVector(x: h.pinchX, y: h.pinchY, chordHand: true)
+            let v = radialVector(x: h.pinchX, y: h.pinchY)
             if v.radius < Self.radialDeadzone {
-                return (padDegree ?? currentChordDegree ?? 0, padOctaveShift, true)
+                return (padDegree ?? currentChordDegree ?? 0, 0, true)
             }
             let zone = radialWedgeIndex(angle: v.angle, count: zoneCount)
-            return (degreeForZone(zone), radiusToOctave(v.radius), false)
+            return (degreeForZone(zone), 0, false)
         }
     }
 
@@ -231,7 +231,7 @@ final class ChordMelodyModeManager {
         case .grid:
             return (yToMelodyLane(h.pinchY, noteCount: noteCount), false)
         case .radial:
-            let v = radialVector(x: h.pinchX, y: h.pinchY, chordHand: false)
+            let v = radialVector(x: h.pinchX, y: h.pinchY)
             if v.radius < Self.radialDeadzone {
                 let fallback = lastMelodyLane ?? noteCount / 2
                 return (max(0, min(noteCount - 1, fallback)), true)
@@ -399,7 +399,7 @@ final class ChordMelodyModeManager {
                 lastChordZoneIndex = xToZoneIndex(h.pinchX)
                 chordResting = false
             case .radial:
-                let v = radialVector(x: h.pinchX, y: h.pinchY, chordHand: true)
+                let v = radialVector(x: h.pinchX, y: h.pinchY)
                 chordResting = v.radius < Self.radialDeadzone
                 if !chordResting {
                     lastChordZoneIndex = radialWedgeIndex(angle: v.angle, count: zoneCount)
@@ -413,7 +413,7 @@ final class ChordMelodyModeManager {
                 lastMelodyLane = yToMelodyLane(h.pinchY, noteCount: count)
                 melodyResting = false
             case .radial:
-                let v = radialVector(x: h.pinchX, y: h.pinchY, chordHand: false)
+                let v = radialVector(x: h.pinchX, y: h.pinchY)
                 melodyResting = v.radius < Self.radialDeadzone
                 if !melodyResting {
                     lastMelodyLane = radialWedgeIndex(angle: v.angle, count: 9)

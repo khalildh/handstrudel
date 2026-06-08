@@ -56,17 +56,17 @@ final class ChordMelodyModeManagerTests: XCTestCase {
 
     func testChordHandInCenter_isResting() {
         let m = radialManager()
-        // Chord hand (left) at the wheel center: sx = 0.25*screenAspect.
-        // x*screenAspect == 0.25*screenAspect → x = 0.25; y centered.
-        let hands = HandsState(left: makeHand(pinchX: 0.25, pinchY: 0.5), right: nil)
+        // Both hands share one wheel centered on the screen: center is x = 0.5,
+        // y = 0.5 regardless of which hand it is.
+        let hands = HandsState(left: makeHand(pinchX: 0.5, pinchY: 0.5), right: nil)
         _ = m.currentZones(hands: hands)
         XCTAssertTrue(m.chordResting, "hand parked in the middle should be resting")
     }
 
     func testChordHandReachingUp_selectsTopWedge() {
         let m = radialManager()
-        // Straight up from center (dx = 0, dyUp > deadzone) → angle 0 → wedge 0.
-        let hands = HandsState(left: makeHand(pinchX: 0.25, pinchY: 0.15), right: nil)
+        // Straight up from the shared center (dx = 0, dyUp > deadzone) → angle 0 → wedge 0.
+        let hands = HandsState(left: makeHand(pinchX: 0.5, pinchY: 0.1), right: nil)
         let zones = m.currentZones(hands: hands)
         XCTAssertFalse(m.chordResting, "reaching out of the deadzone is not resting")
         XCTAssertEqual(zones.chordDegree, 0, "12 o'clock selects the first wedge")
@@ -74,8 +74,7 @@ final class ChordMelodyModeManagerTests: XCTestCase {
 
     func testMelodyHandInCenter_isResting() {
         let m = radialManager()
-        // Melody hand (right) center: sx = 0.75*screenAspect → x = 0.75.
-        let hands = HandsState(left: nil, right: makeHand(pinchX: 0.75, pinchY: 0.5))
+        let hands = HandsState(left: nil, right: makeHand(pinchX: 0.5, pinchY: 0.5))
         _ = m.currentZones(hands: hands)
         XCTAssertTrue(m.melodyResting, "melody hand parked in the middle should be resting")
     }

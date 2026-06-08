@@ -1,220 +1,182 @@
 import SwiftUI
 
-/// Radial chord+melody overlay.
+/// Radial chord+melody overlay — a single wheel centered on screen, sized to
+/// be easy to read on a phone.
 ///
-/// Instead of the linear half-screen strips of `ChordMelodyOverlayView`, each
-/// hand drives a centered *wheel*. The hand rests in the middle (the deadzone
-/// hole) and reaches out toward a wedge to pick a chord (chord hand) or a note
-/// (melody hand) — so any chord/note is one direct move away, with no need to
-/// sweep across every value in between. The chord wheel has two rings: the
-/// inner ring is the base octave, the outer ring jumps the chord up an octave.
+/// Both hands share one wheel: the **outer ring** is the harmony (chord hand)
+/// and the **inner ring** is the melody (melody hand), with a rest zone in the
+/// hole at the center. Each hand selects by *angle* — rest in the middle, then
+/// reach out toward any wedge — so any chord/note is one direct move away. Keys
+/// are lettered (chord names on the outside, note names on the inside).
 ///
 /// All highlights are driven by state the manager publishes (`currentChordZone`,
-/// `melodyLane`, octave, resting), so the wheels always agree with the audio.
+/// `melodyLane`, resting), so the wheel always agrees with the audio.
 struct RadialChordMelodyOverlayView: View {
-    /// Scale degrees per wedge — drives both the wedge count and the Roman
-    /// numeral label, exactly like the grid overlay.
+    /// Scale degrees per chord wedge — used only for the per-degree colors.
     let zoneDegrees: [Int]
-    /// Currently hovered chord wedge (0..<zoneDegrees.count).
+    /// Lettered chord names per wedge (e.g. "Cmaj", "Am"), length == zoneDegrees.
+    let chordNames: [String]
+    /// Currently hovered chord wedge (0..<chordNames.count).
     let currentChordZone: Int?
     /// Whether the chord hand is pinching (chord actively struck).
     let chordHandPinching: Bool
     /// Chord hand is in the center rest zone (holding, not selecting).
     let chordResting: Bool
-    /// Octave shift from the chord wheel ring: 0 (inner) or +1 (outer).
-    let currentOctaveShift: Int
-    /// Chord display name (e.g. "Cmaj") shown above the wheels.
+    /// Chord display name shown in the wheel's center.
     let currentChordName: String
-    /// Melody hand's current wedge (0..<melodyLaneCount).
+    /// Lettered note names per melody wedge (e.g. "C", "E", "G").
+    let melodyNames: [String]
+    /// Melody hand's current wedge (0..<melodyNames.count).
     let melodyLane: Int?
     /// Whether the melody hand is pinching.
     let melodyHandPinching: Bool
     /// Melody hand is in the center rest zone.
     let melodyResting: Bool
-    /// Number of melody wedges (chord tones expanded across octaves).
-    let melodyLaneCount: Int
-    /// `true` = chord wheel on the right, melody on the left (swap mode).
-    let swapHands: Bool
 
-    private var zoneCount: Int { max(1, zoneDegrees.count) }
-    private var chordsOnLeft: Bool { !swapHands }
+    private var zoneCount: Int { max(1, chordNames.count) }
+    private var melodyCount: Int { max(1, melodyNames.count) }
 
     // Geometry mirrors ChordMelodyModeManager so the drawn wheel lines up with
     // the angle/radius math that selects wedges.
     private let radiusFraction = CGFloat(ChordMelodyModeManager.radialRadiusFraction)
     private let deadzoneFraction = CGFloat(ChordMelodyModeManager.radialDeadzone)
-    private let octaveRingFraction = CGFloat(ChordMelodyModeManager.radialOctaveRing)
+    /// Boundary between the inner melody ring and the outer chord ring.
+    private let ringSplitFraction: CGFloat = 0.60
 
     var body: some View {
         GeometryReader { geo in
-            let outerR = (geo.size.width / 2) * radiusFraction
-            let chordCenter = CGPoint(
-                x: chordsOnLeft ? geo.size.width / 4 : 3 * geo.size.width / 4,
-                y: geo.size.height / 2
-            )
-            let melodyCenter = CGPoint(
-                x: chordsOnLeft ? 3 * geo.size.width / 4 : geo.size.width / 4,
-                y: geo.size.height / 2
-            )
+            let outerR = min(geo.size.width, geo.size.height) / 2 * radiusFraction
+            let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+            let deadR = outerR * deadzoneFraction
+            let splitR = outerR * ringSplitFraction
 
             ZStack {
-                chordWheel(center: chordCenter, outerR: outerR)
-                melodyWheel(center: melodyCenter, outerR: outerR)
-
-                if !currentChordName.isEmpty {
-                    Text(currentChordName)
-                        .font(.system(size: 48, weight: .black, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: chordHandPinching ? [.green, .cyan] : [.white.opacity(0.5), .white.opacity(0.3)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .shadow(color: .black.opacity(0.6), radius: 8)
-                        .position(x: geo.size.width / 2, y: geo.size.height * 0.1)
-                        .animation(.easeOut(duration: 0.15), value: currentChordName)
-                        .animation(.easeOut(duration: 0.15), value: chordHandPinching)
-                }
+                melodyRing(center: center, innerR: deadR, outerR: splitR)
+                chordRing(center: center, innerR: splitR, outerR: outerR)
+                restHole(center: center, radius: deadR)
             }
             .allowsHitTesting(false)
         }
     }
 
-    // MARK: - Chord wheel
+    // MARK: - Chord (outer) ring
 
     @ViewBuilder
-    private func chordWheel(center: CGPoint, outerR: CGFloat) -> some View {
-        let deadR = outerR * deadzoneFraction
-        let ringR = outerR * octaveRingFraction
+    private func chordRing(center: CGPoint, innerR: CGFloat, outerR: CGFloat) -> some View {
         let wedge = 360.0 / Double(zoneCount)
-        let outerRingActive = currentOctaveShift >= 1
-
         ZStack {
             ForEach(0..<zoneCount, id: \.self) { i in
                 let degree = degreeForZone(i)
                 let color = colorForDegree(degree)
-                let isCurrentZone = currentChordZone == i && !chordResting
+                let isCurrent = currentChordZone == i && !chordResting
+                let isHeld = isCurrent && chordHandPinching
                 let start = Angle(degrees: Double(i) * wedge - wedge / 2)
                 let end = Angle(degrees: Double(i) * wedge + wedge / 2)
 
-                // Inner ring = base octave.
-                chordCell(
-                    center: center, innerR: deadR, outerR: ringR, start: start, end: end,
-                    color: color, isCurrentZone: isCurrentZone,
-                    isActive: isCurrentZone && !outerRingActive
-                )
-                // Outer ring = +1 octave.
-                chordCell(
-                    center: center, innerR: ringR, outerR: outerR, start: start, end: end,
-                    color: color, isCurrentZone: isCurrentZone,
-                    isActive: isCurrentZone && outerRingActive
-                )
+                wedgeShape(center: center, innerR: innerR, outerR: outerR, start: start, end: end)
+                    .fill(fillStyle(color: color, isCurrent: isCurrent, isHeld: isHeld))
+                    .overlay(
+                        wedgeShape(center: center, innerR: innerR, outerR: outerR, start: start, end: end)
+                            .stroke(
+                                isHeld ? color.opacity(0.95) :
+                                isCurrent ? color.opacity(0.6) :
+                                Color.white.opacity(0.1),
+                                lineWidth: isHeld ? 2.5 : (isCurrent ? 1.5 : 1)
+                            )
+                    )
+                    .shadow(color: isHeld ? color.opacity(0.5) : .clear, radius: 12)
 
-                // Roman numeral on the inner ring's bisector.
-                let labelPos = polar(center: center, angleDeg: Double(i) * wedge, radius: (deadR + ringR) / 2)
-                VStack(spacing: 1) {
-                    Text(romanNumeral(degree: degree))
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundColor(isCurrentZone ? .white : .white.opacity(0.55))
-                    if !degreeLabel(degree: degree).isEmpty {
-                        Text(degreeLabel(degree: degree))
-                            .font(.system(size: 8, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(isCurrentZone ? 0.7 : 0.4))
-                    }
-                }
-                .position(labelPos)
+                Text(chordLabel(i))
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundColor(isCurrent ? .white : .white.opacity(0.7))
+                    .shadow(color: .black.opacity(0.6), radius: 3)
+                    .position(polar(center: center, angleDeg: Double(i) * wedge, radius: (innerR + outerR) / 2))
             }
-
-            restHole(center: center, radius: deadR, active: chordResting, tint: .green)
         }
     }
 
-    private func chordCell(
-        center: CGPoint, innerR: CGFloat, outerR: CGFloat, start: Angle, end: Angle,
-        color: Color, isCurrentZone: Bool, isActive: Bool
-    ) -> some View {
-        let isHeld = isActive && chordHandPinching
-        return RadialWedge(center: center, innerRadius: innerR, outerRadius: outerR, startAngle: start, endAngle: end)
-            .fill(cellFill(color: color, isCurrentZone: isCurrentZone, isActive: isActive, isHeld: isHeld))
-            .overlay(
-                RadialWedge(center: center, innerRadius: innerR, outerRadius: outerR, startAngle: start, endAngle: end)
-                    .stroke(
-                        isHeld ? color.opacity(0.95) :
-                        isActive ? color.opacity(0.6) :
-                        isCurrentZone ? color.opacity(0.25) :
-                        Color.white.opacity(0.08),
-                        lineWidth: isHeld ? 2.5 : (isActive ? 1.5 : 1)
-                    )
-            )
-            .shadow(color: isHeld ? color.opacity(0.5) : .clear, radius: 12)
-    }
-
-    private func cellFill(color: Color, isCurrentZone: Bool, isActive: Bool, isHeld: Bool) -> some ShapeStyle {
-        if isHeld { return AnyShapeStyle(color.opacity(0.45)) }
-        if isActive { return AnyShapeStyle(color.opacity(0.28)) }
-        if isCurrentZone { return AnyShapeStyle(color.opacity(0.12)) }
-        return AnyShapeStyle(Color.white.opacity(0.04))
-    }
-
-    // MARK: - Melody wheel
+    // MARK: - Melody (inner) ring
 
     @ViewBuilder
-    private func melodyWheel(center: CGPoint, outerR: CGFloat) -> some View {
-        let deadR = outerR * deadzoneFraction
-        let count = max(1, melodyLaneCount)
-        let wedge = 360.0 / Double(count)
-
+    private func melodyRing(center: CGPoint, innerR: CGFloat, outerR: CGFloat) -> some View {
+        let wedge = 360.0 / Double(melodyCount)
         ZStack {
-            ForEach(0..<count, id: \.self) { i in
+            ForEach(0..<melodyCount, id: \.self) { i in
                 let isCurrent = melodyLane == i && !melodyResting
                 let isHeld = isCurrent && melodyHandPinching
                 let start = Angle(degrees: Double(i) * wedge - wedge / 2)
                 let end = Angle(degrees: Double(i) * wedge + wedge / 2)
-                RadialWedge(center: center, innerRadius: deadR, outerRadius: outerR, startAngle: start, endAngle: end)
+
+                wedgeShape(center: center, innerR: innerR, outerR: outerR, start: start, end: end)
                     .fill(
-                        isHeld ? Color.cyan.opacity(0.4) :
-                        isCurrent ? Color.cyan.opacity(0.18) :
-                        Color.white.opacity(0.04)
+                        isHeld ? Color.cyan.opacity(0.45) :
+                        isCurrent ? Color.cyan.opacity(0.2) :
+                        Color.white.opacity(0.05)
                     )
                     .overlay(
-                        RadialWedge(center: center, innerRadius: deadR, outerRadius: outerR, startAngle: start, endAngle: end)
+                        wedgeShape(center: center, innerR: innerR, outerR: outerR, start: start, end: end)
                             .stroke(
-                                isHeld ? Color.cyan.opacity(0.8) :
-                                isCurrent ? Color.cyan.opacity(0.4) :
-                                Color.white.opacity(0.06),
+                                isHeld ? Color.cyan.opacity(0.85) :
+                                isCurrent ? Color.cyan.opacity(0.45) :
+                                Color.white.opacity(0.08),
                                 lineWidth: isHeld ? 2.5 : 1
                             )
                     )
                     .shadow(color: isHeld ? .cyan.opacity(0.4) : .clear, radius: 6)
-            }
 
-            restHole(center: center, radius: deadR, active: melodyResting, tint: .cyan)
+                Text(melodyLabel(i))
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(isCurrent ? .white : .cyan.opacity(0.75))
+                    .shadow(color: .black.opacity(0.6), radius: 2)
+                    .position(polar(center: center, angleDeg: Double(i) * wedge, radius: (innerR + outerR) / 2))
+            }
         }
     }
 
-    // MARK: - Shared bits
+    // MARK: - Center
 
-    /// The center deadzone — a faint disc that brightens while the hand rests
-    /// there, confirming "you're parked, reach out to pick".
-    private func restHole(center: CGPoint, radius: CGFloat, active: Bool, tint: Color) -> some View {
-        Circle()
-            .fill(active ? tint.opacity(0.18) : Color.white.opacity(0.03))
-            .overlay(
-                Circle().stroke(active ? tint.opacity(0.6) : Color.white.opacity(0.12),
-                                lineWidth: active ? 2 : 1)
-            )
-            .frame(width: radius * 2, height: radius * 2)
-            .position(center)
+    /// The rest hole: the chord currently sounding, on a disc that brightens
+    /// when either hand is parked there (confirming "you're holding, reach out
+    /// to pick").
+    private func restHole(center: CGPoint, radius: CGFloat) -> some View {
+        let resting = chordResting || melodyResting
+        return ZStack {
+            Circle()
+                .fill(resting ? Color.green.opacity(0.16) : Color.black.opacity(0.25))
+                .overlay(
+                    Circle().stroke(resting ? Color.green.opacity(0.6) : Color.white.opacity(0.15),
+                                    lineWidth: resting ? 2 : 1)
+                )
+            if !currentChordName.isEmpty {
+                Text(currentChordName)
+                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: chordHandPinching ? [.green, .cyan] : [.white.opacity(0.8), .white.opacity(0.5)],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                    )
+                    .minimumScaleFactor(0.4)
+                    .lineLimit(1)
+                    .padding(.horizontal, 4)
+            }
+        }
+        .frame(width: radius * 2, height: radius * 2)
+        .position(center)
+        .animation(.easeOut(duration: 0.15), value: currentChordName)
     }
 
-    private func polar(center: CGPoint, angleDeg: Double, radius: CGFloat) -> CGPoint {
-        let r = angleDeg * .pi / 180
-        return CGPoint(x: center.x + radius * CGFloat(sin(r)),
-                       y: center.y - radius * CGFloat(cos(r)))
+    // MARK: - Helpers
+
+    private func chordLabel(_ i: Int) -> String {
+        guard i >= 0, i < chordNames.count else { return "" }
+        return chordNames[i]
     }
 
-    // MARK: - Labels & colors (shared with the grid overlay)
+    private func melodyLabel(_ i: Int) -> String {
+        guard i >= 0, i < melodyNames.count else { return "" }
+        return melodyNames[i]
+    }
 
     private func degreeForZone(_ index: Int) -> Int {
         guard !zoneDegrees.isEmpty else { return 0 }
@@ -222,26 +184,20 @@ struct RadialChordMelodyOverlayView: View {
         return zoneDegrees[safe]
     }
 
-    private func romanNumeral(degree: Int) -> String {
-        switch degree {
-        case 0: return "I"
-        case 1: return "ii"
-        case 2: return "iii"
-        case 3: return "IV"
-        case 4: return "V"
-        case 5: return "vi"
-        case 6: return "vii°"
-        default: return "\(degree + 1)"
-        }
+    private func fillStyle(color: Color, isCurrent: Bool, isHeld: Bool) -> some ShapeStyle {
+        if isHeld { return AnyShapeStyle(color.opacity(0.5)) }
+        if isCurrent { return AnyShapeStyle(color.opacity(0.28)) }
+        return AnyShapeStyle(Color.white.opacity(0.05))
     }
 
-    private func degreeLabel(degree: Int) -> String {
-        switch degree {
-        case 0: return "TONIC"
-        case 3: return "SUB"
-        case 4: return "DOM"
-        default: return ""
-        }
+    private func wedgeShape(center: CGPoint, innerR: CGFloat, outerR: CGFloat, start: Angle, end: Angle) -> RadialWedge {
+        RadialWedge(center: center, innerRadius: innerR, outerRadius: outerR, startAngle: start, endAngle: end)
+    }
+
+    private func polar(center: CGPoint, angleDeg: Double, radius: CGFloat) -> CGPoint {
+        let r = angleDeg * .pi / 180
+        return CGPoint(x: center.x + radius * CGFloat(sin(r)),
+                       y: center.y - radius * CGFloat(cos(r)))
     }
 
     private func colorForDegree(_ degree: Int) -> Color {
