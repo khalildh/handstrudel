@@ -49,7 +49,19 @@ class EngineController(context: Context) {
 
     /// Shared Rust-backed chord+melody state machine. Same struct used by iOS;
     /// drives Split / Radial / Grid layouts with one tick implementation.
-    val chordMelodyManager = ChordMelodyModeManager().apply { setLayout(CoreLayout.SPLIT) }
+    val chordMelodyManager = ChordMelodyModeManager().apply {
+        setLayout(CoreLayout.SPLIT)
+        // Calibrate the wheel's hand-position math to the actual screen
+        // dimensions. The defaults are hard-coded for an iPhone-ish 0.46
+        // aspect; on a taller / wider Android device the wheel center would
+        // land slightly off where the camera reads the hand.
+        val metrics = context.resources.displayMetrics
+        if (metrics.widthPixels > 0 && metrics.heightPixels > 0) {
+            val screenAspect = metrics.widthPixels.toDouble() / metrics.heightPixels.toDouble()
+            // Camera ImageAnalysis is requested at 480x640 = 0.75 portrait.
+            setAspects(videoAspect = 0.75, screenAspect = screenAspect)
+        }
+    }
 
     // State
     val handsState = MutableStateFlow(HandsState())
