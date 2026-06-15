@@ -24,6 +24,7 @@ class EngineController(context: Context) {
     val handTracker = HandTrackingManager(context)
     private val gridManager = GridModeManager()
     private val drumManager = DrumModeManager()
+    val haptics = HapticManager(context)
 
     /// Real-instrument voice for chord-melody mode. Loaded once on startup;
     /// SynthEngine pulls samples from it each chunk via its `soundFont`
@@ -339,7 +340,7 @@ class EngineController(context: Context) {
                 }
                 is ChordMelodyAction.PadOff -> releasePadVoices()
                 is ChordMelodyAction.ChordAccent -> {
-                    // Brief percussive strum on top of the pad — fire and forget.
+                    haptics.chordTrigger()
                     for ((i, midi) in action.midiNotes.withIndex()) {
                         val accentVoice = "cmm-accent-$i"
                         if (sf != null) {
@@ -352,6 +353,7 @@ class EngineController(context: Context) {
                     }
                 }
                 is ChordMelodyAction.MelodyOn -> {
+                    haptics.noteTrigger()
                     if (sf != null) sf.noteOn(melodyVoiceId, action.midi.toInt(), action.velocity.toFloat())
                     else synthEngine.noteOn(melodyVoiceId, action.midi.toInt(), selectedWaveform, action.velocity.toFloat())
                 }
@@ -391,6 +393,7 @@ class EngineController(context: Context) {
     /// chord note keyed off the touch ID, and pushes the chord onto the touch
     /// stack so the camera-driven melody snap follows it.
     fun splitTouchEnterChord(touchId: String, wedge: Int, octave: Int) {
+        haptics.chordTrigger()
         val degree = chordMelodyManager.degreeForZone(wedge.toInt())
         val triad = coreChordNotes(selectedKey.toCoreKey(), selectedScale.toCoreScale(), degree.toInt())
         val tones = triad.map { it.toInt() + octave * 12 }
@@ -409,6 +412,7 @@ class EngineController(context: Context) {
     /// A finger entered a melody lane. Spawns one sustained voice snapped to
     /// the currently active chord (latest touch wins, else camera chord).
     fun splitTouchEnterMelody(touchId: String, lane: Int) {
+        haptics.noteTrigger()
         val degree = splitTouchChordStack.lastOrNull()?.degree
             ?: chordMelodyManager.currentChordDegree()?.toInt()
             ?: 0
