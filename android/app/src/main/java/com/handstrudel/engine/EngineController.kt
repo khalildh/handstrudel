@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.handstrudel.engine.synth.SoundFontEngine
 import com.handstrudel.engine.synth.SynthEngine
 import com.handstrudel.models.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,13 @@ class EngineController(context: Context) {
     val handTracker = HandTrackingManager(context)
     private val gridManager = GridModeManager()
     private val drumManager = DrumModeManager()
+
+    /// Real-instrument voice for chord-melody mode. Loaded once on startup;
+    /// SynthEngine pulls samples from it each chunk via its `soundFont`
+    /// reference. Null if the SF2 asset can't be loaded.
+    private val soundFont: SoundFontEngine? = SoundFontEngine
+        .fromAsset(context, "soundfonts/GeneralUser-GS.sf2", sampleRate = 44100)
+        .also { synthEngine.soundFont = it }
 
     /// Shared Rust-backed chord+melody state machine. Same struct used by iOS;
     /// drives Split / Radial / Grid layouts with one tick implementation.
@@ -277,22 +285,28 @@ class EngineController(context: Context) {
         val coreHands = hands.toCoreHands()
         val actions = chordMelodyManager.tick(coreHands, chordMelodyTones, false, false)
 
+        // Route every chord-melody voice through the SoundFont sampler when
+        // it's available — same path iOS Split mode uses (real instrument
+        // sound instead of a raw oscillator). Falls back to the oscillator
+        // voice path if the SF2 asset failed to load.
+        val sf = soundFont
         for (action in actions) {
             when (action) {
                 is ChordMelodyAction.PadOn -> {
                     releasePadVoices()
                     for ((i, midi) in action.midiNotes.withIndex()) {
                         val voice = "cmm-pad-$i"
-                        synthEngine.noteOn(voice, midi.toInt(), selectedWaveform, 0.5f)
+                        if (sf != null) sf.noteOn(voice, midi.toInt(), 0.55f)
+                        else synthEngine.noteOn(voice, midi.toInt(), selectedWaveform, 0.5f)
                         padVoices.add(voice)
                     }
                 }
                 is ChordMelodyAction.PadSlide -> {
-                    // Re-voice: release old, take new (one voice per tone).
                     releasePadVoices()
                     for ((i, midi) in action.midiNotes.withIndex()) {
                         val voice = "cmm-pad-$i"
-                        synthEngine.noteOn(voice, midi.toInt(), selectedWaveform, 0.5f)
+                        if (sf != null) sf.noteOn(voice, midi.toInt(), 0.55f)
+                        else synthEngine.noteOn(voice, midi.toInt(), selectedWaveform, 0.5f)
                         padVoices.add(voice)
                     }
                 }
@@ -301,15 +315,26 @@ class EngineController(context: Context) {
                     // Brief percussive strum on top of the pad — fire and forget.
                     for ((i, midi) in action.midiNotes.withIndex()) {
                         val accentVoice = "cmm-accent-$i"
-                        synthEngine.noteOn(accentVoice, midi.toInt(), selectedWaveform, action.velocity.toFloat())
-                        mainHandler.postDelayed({ synthEngine.noteOff(accentVoice) }, 250)
+                        if (sf != null) {
+                            sf.noteOn(accentVoice, midi.toInt(), action.velocity.toFloat())
+                            mainHandler.postDelayed({ sf.noteOff(accentVoice) }, 250)
+                        } else {
+                            synthEngine.noteOn(accentVoice, midi.toInt(), selectedWaveform, action.velocity.toFloat())
+                            mainHandler.postDelayed({ synthEngine.noteOff(accentVoice) }, 250)
+                        }
                     }
                 }
                 is ChordMelodyAction.MelodyOn -> {
-                    synthEngine.noteOn(melodyVoiceId, action.midi.toInt(), selectedWaveform, action.velocity.toFloat())
+                    if (sf != null) sf.noteOn(melodyVoiceId, action.midi.toInt(), action.velocity.toFloat())
+                    else synthEngine.noteOn(melodyVoiceId, action.midi.toInt(), selectedWaveform, action.velocity.toFloat())
                 }
-                is ChordMelodyAction.MelodyOff -> synthEngine.noteOff(melodyVoiceId)
-                is ChordMelodyAction.MelodySlide -> synthEngine.noteSlide(melodyVoiceId, action.midi.toInt())
+                is ChordMelodyAction.MelodyOff -> {
+                    if (sf != null) sf.noteOff(melodyVoiceId) else synthEngine.noteOff(melodyVoiceId)
+                }
+                is ChordMelodyAction.MelodySlide -> {
+                    if (sf != null) sf.noteSlide(melodyVoiceId, action.midi.toInt(), 0.7f)
+                    else synthEngine.noteSlide(melodyVoiceId, action.midi.toInt())
+                }
             }
         }
 
@@ -324,7 +349,10 @@ class EngineController(context: Context) {
     }
 
     private fun releasePadVoices() {
-        for (v in padVoices) synthEngine.noteOff(v)
+        val sf = soundFont
+        for (v in padVoices) {
+            if (sf != null) sf.noteOff(v) else synthEngine.noteOff(v)
+        }
         padVoices.clear()
     }
 
@@ -339,9 +367,11 @@ class EngineController(context: Context) {
         val degree = chordMelodyManager.degreeForZone(wedge.toInt())
         val triad = coreChordNotes(selectedKey.toCoreKey(), selectedScale.toCoreScale(), degree.toInt())
         val tones = triad.map { it.toInt() + octave * 12 }
+        val sf = soundFont
         val voices = tones.mapIndexed { i, midi ->
             val v = "$touchId-c$i"
-            synthEngine.noteOn(v, midi, selectedWaveform, 0.7f)
+            if (sf != null) sf.noteOn(v, midi, 0.7f)
+            else synthEngine.noteOn(v, midi, selectedWaveform, 0.7f)
             v
         }
         splitVoiceSubvoices[touchId] = voices
@@ -360,14 +390,19 @@ class EngineController(context: Context) {
         if (lanes.isEmpty()) return
         val safeLane = lane.coerceIn(0, lanes.size - 1)
         val voice = "$touchId-m"
-        synthEngine.noteOn(voice, lanes[safeLane], selectedWaveform, 0.75f)
+        val sf = soundFont
+        if (sf != null) sf.noteOn(voice, lanes[safeLane], 0.75f)
+        else synthEngine.noteOn(voice, lanes[safeLane], selectedWaveform, 0.75f)
         splitVoiceSubvoices[touchId] = listOf(voice)
     }
 
     /// A touch lifted (or drag crossed out of its zone). Releases every voice
     /// that touch had spawned and drops any chord-stack entry.
     fun splitTouchExit(touchId: String) {
-        splitVoiceSubvoices.remove(touchId)?.forEach { synthEngine.noteOff(it) }
+        val sf = soundFont
+        splitVoiceSubvoices.remove(touchId)?.forEach { v ->
+            if (sf != null) sf.noteOff(v) else synthEngine.noteOff(v)
+        }
         if (splitTouchChordStack.any { it.touchId == touchId }) {
             splitTouchChordStack.removeAll { it.touchId == touchId }
             syncTouchChord()
