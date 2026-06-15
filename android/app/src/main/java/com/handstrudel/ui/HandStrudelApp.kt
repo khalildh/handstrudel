@@ -54,6 +54,7 @@ fun HandStrudelApp() {
 fun PerformanceScreen(engine: EngineController) {
     val handsState by engine.handsState.collectAsState()
     val beat by engine.currentBeat.collectAsState()
+    var showSettings by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         // Camera preview (full screen)
@@ -148,6 +149,25 @@ fun PerformanceScreen(engine: EngineController) {
                 fontSize = 24.sp
             )
         }
+
+        // Floating settings button — sits above the mode pill so it doesn't
+        // crowd the beat dots. Tapping opens the Split control sheet.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 100.dp)
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.10f))
+                .clickable { showSettings = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("⚙", fontSize = 22.sp, color = Color.White.copy(alpha = 0.85f))
+        }
+    }
+
+    if (showSettings) {
+        SplitSettingsSheet(engine = engine, onDismiss = { showSettings = false })
     }
 }
 

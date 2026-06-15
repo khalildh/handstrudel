@@ -36,14 +36,54 @@ class EngineController(context: Context) {
     // Configuration
     var selectedPreset: Preset? = null
     var selectedWaveform = "sawtooth"
-    var selectedKey = MusicKey.C
-    var selectedScale = Scale.PENTATONIC
     var gridModeEnabled = false
     var drumModeEnabled = false
     /// Split chord+melody mode — the app's default. Toggle the other modes
     /// off when enabled.
     var chordMelodyModeEnabled = true
     var manualBPM = 120.0
+
+    // Music selection — backed by StateFlows so the settings sheet can
+    // observe live and the engine can react to changes via the setters.
+    private val _selectedKey = MutableStateFlow(MusicKey.C)
+    val selectedKeyFlow: kotlinx.coroutines.flow.StateFlow<MusicKey> = _selectedKey
+    var selectedKey: MusicKey
+        get() = _selectedKey.value
+        set(value) {
+            if (_selectedKey.value == value) return
+            _selectedKey.value = value
+            recomputeScaleNotes()
+        }
+
+    private val _selectedScale = MutableStateFlow(Scale.PENTATONIC)
+    val selectedScaleFlow: kotlinx.coroutines.flow.StateFlow<Scale> = _selectedScale
+    var selectedScale: Scale
+        get() = _selectedScale.value
+        set(value) {
+            if (_selectedScale.value == value) return
+            _selectedScale.value = value
+            recomputeScaleNotes()
+        }
+
+    private val _selectedProgression = MutableStateFlow(FREE_PROGRESSION)
+    val selectedProgressionFlow: kotlinx.coroutines.flow.StateFlow<ChordProgression> = _selectedProgression
+    var selectedProgression: ChordProgression
+        get() = _selectedProgression.value
+        set(value) {
+            if (_selectedProgression.value.id == value.id) return
+            _selectedProgression.value = value
+            chordMelodyManager.setZoneDegrees(value.degrees.map { it })
+        }
+
+    private val _swapHands = MutableStateFlow(false)
+    val swapHandsFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _swapHands
+    var swapHands: Boolean
+        get() = _swapHands.value
+        set(value) {
+            if (_swapHands.value == value) return
+            _swapHands.value = value
+            chordMelodyManager.setSwapHands(value)
+        }
 
     // Grid state
     var gridBaseOctave = 3
