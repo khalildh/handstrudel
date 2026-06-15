@@ -96,7 +96,16 @@ final class ChordMelodyModeController: ModeController {
         engine.chordMelodyChordHandLane = zones.chordDegree
         engine.chordMelodyMelodyLane = zones.melodyLane
         engine.chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
-        if let deg = zones.chordDegree, engine.chordMelodyCurrentDegree == nil {
+        // The action-driven path only sets `currentDegree` on `padOn`/`padSlide`.
+        // Touch overrides (Split mode) mutate the manager's state without
+        // emitting actions, so we also sync the published degree + chord name
+        // from the manager every frame — that's what drives the wheel's inner
+        // note-name labels.
+        if let deg = chordMelodyModeManager.currentChordDegree {
+            engine.chordMelodyCurrentDegree = deg
+            engine.chordMelodyCurrentChordName = chordDisplayName(
+                key: engine.selectedKey, scale: engine.selectedScale, degree: deg)
+        } else if let deg = zones.chordDegree, engine.chordMelodyCurrentDegree == nil {
             // Preview chord name even before the user pinches.
             engine.chordMelodyCurrentChordName = chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: deg)
         }

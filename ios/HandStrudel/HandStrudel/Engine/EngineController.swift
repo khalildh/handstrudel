@@ -610,7 +610,14 @@ final class EngineController: ObservableObject {
         chordMelodyChordHandLane = zones.chordDegree
         chordMelodyMelodyLane = zones.melodyLane
         chordMelodyOctaveShift = chordMelodyModeManager.currentOctaveShift
-        if let deg = zones.chordDegree, chordMelodyCurrentDegree == nil {
+        // Sync from the manager every frame so touch-driven chord changes
+        // (which mutate manager state without emitting an action) still push
+        // the new degree + name to the engine — that's what re-letters the
+        // wheel's inner melody ring.
+        if let deg = chordMelodyModeManager.currentChordDegree {
+            chordMelodyCurrentDegree = deg
+            chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: deg)
+        } else if let deg = zones.chordDegree, chordMelodyCurrentDegree == nil {
             chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: deg)
         }
 

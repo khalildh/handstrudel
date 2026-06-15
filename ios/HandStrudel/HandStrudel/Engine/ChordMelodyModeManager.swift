@@ -449,6 +449,7 @@ final class ChordMelodyModeManager {
             padDegree = td
             padOctaveShift = touchChordOctave
             currentChordDegree = td
+            currentOctaveShift = touchChordOctave
             currentChordMidi = touchChordMidi.isEmpty ? currentChordMidi : touchChordMidi
             chordResting = false
         }

@@ -12,6 +12,10 @@ struct ControlSheet: View {
     @State private var soundFontCategory: GMCategory = DEFAULT_SOUNDFONT_INSTRUMENT.category
     @State private var customProgressionText = ""
     @State private var progressionCategory: ProgressionCategory = .essentials
+    /// "Other modes" disclosure — collapsed by default so the mode picker
+    /// surfaces only Split. Auto-expands on appear when the active mode is one
+    /// of the buried ones, so returning users don't have to dig for their mode.
+    @State private var showOtherModes = false
 
     var body: some View {
         ScrollView {
@@ -34,8 +38,10 @@ struct ControlSheet: View {
                     }
                 }
 
-                modeSection
-                sectionDivider
+                if hasModeContextControls {
+                    modeSection
+                    sectionDivider
+                }
                 harmonySection
 
                 sectionDivider
@@ -86,6 +92,9 @@ struct ControlSheet: View {
                     sectionDivider
                     trackSection
                 }
+
+                sectionDivider
+                otherModesPickerSection
 
             }
             .padding(20)
@@ -197,33 +206,25 @@ struct ControlSheet: View {
         }
     }
 
+    /// Whether the current mode has any contextual controls to surface at the
+    /// top of the sheet. Modes without mode-specific UI in `modeSection`
+    /// (Melodic/Flow/Hybrid/Lead/Drums/Learn) cause the section + divider to
+    /// hide entirely so the sheet doesn't open with a vacant rectangle.
+    private var hasModeContextControls: Bool {
+        switch currentMode {
+        case .chordMelody, .radialChordMelody, .splitChordMelody,
+             .soundFont, .grid:
+            return true
+        default:
+            return false
+        }
+    }
+
     private var modeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("MODE", icon: "gamecontroller")
-
-            // 10 modes — wrap so each button still has a usable target size.
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    modeButton("Melodic", icon: "pianokeys", mode: .melodic)
-                    modeButton("Flow", icon: "waveform", mode: .flow)
-                    modeButton("Hybrid", icon: "waveform.path", mode: .hybrid)
-                }
-                HStack(spacing: 8) {
-                    modeButton("Lead", icon: "guitars", mode: .lead)
-                    modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
-                    modeButton("Drums", icon: "beats.headphones", mode: .drums)
-                }
-                HStack(spacing: 8) {
-                    modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
-                    modeButton("Radial", icon: "circle.circle", mode: .radialChordMelody)
-                    modeButton("Split", icon: "circle.lefthalf.filled", mode: .splitChordMelody)
-                }
-                HStack(spacing: 8) {
-                    modeButton("SoundFont", icon: "pianokeys.inverse", mode: .soundFont)
-                    modeButton("Learn", icon: "music.note.list", mode: .learn)
-                    Color.clear.frame(maxWidth: .infinity)
-                }
-            }
+            // The mode picker lives at the bottom of the sheet now
+            // (`otherModesPickerSection`). This section only carries the
+            // contextual controls for whatever the active mode is.
 
             if currentMode == .chordMelody || currentMode == .radialChordMelody || currentMode == .splitChordMelody {
                 quantizeRow
@@ -493,6 +494,52 @@ struct ControlSheet: View {
                     }
                 }
                 .padding(.top, 4)
+            }
+        }
+    }
+
+    /// All modes — including Split — live behind a disclosure at the very
+    /// bottom of the sheet. A first-run user lands in Split by default and
+    /// never has to think about modes. Anyone curious has to scroll past
+    /// every other section to find this.
+    private var otherModesPickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            DisclosureGroup(isExpanded: $showOtherModes) {
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        modeButton("Split", icon: "circle.lefthalf.filled", mode: .splitChordMelody)
+                        modeButton("Radial", icon: "circle.circle", mode: .radialChordMelody)
+                        modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
+                    }
+                    HStack(spacing: 8) {
+                        modeButton("SoundFont", icon: "pianokeys.inverse", mode: .soundFont)
+                        modeButton("Melodic", icon: "pianokeys", mode: .melodic)
+                        modeButton("Flow", icon: "waveform", mode: .flow)
+                    }
+                    HStack(spacing: 8) {
+                        modeButton("Hybrid", icon: "waveform.path", mode: .hybrid)
+                        modeButton("Lead", icon: "guitars", mode: .lead)
+                        modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
+                    }
+                    HStack(spacing: 8) {
+                        modeButton("Drums", icon: "beats.headphones", mode: .drums)
+                        modeButton("Learn", icon: "music.note.list", mode: .learn)
+                        Color.clear.frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.top, 8)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 11))
+                    Text("Other modes")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                }
+                .foregroundColor(.white.opacity(0.45))
+            }
+            .tint(.white.opacity(0.5))
+            .onAppear {
+                if currentMode != .splitChordMelody { showOtherModes = true }
             }
         }
     }
