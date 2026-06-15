@@ -303,6 +303,20 @@ private fun DrawScope.drawSplitWheel(
             topLeft = Offset(labelP.x - measured.size.width / 2f, labelP.y - measured.size.height / 2f),
             style = labelStyle.copy(color = if (baseActive || upActive || downActive) Color.White else Color.White.copy(alpha = 0.7f)),
         )
+
+        // ↑ / ↓ symbols on the outer band so it's obvious which sub-zone
+        // shifts the chord up or down an octave. The +1 octave half is the
+        // one closer to the top of the arc; -1 is closer to the bottom.
+        val arrowR = (octaveR + outerR) / 2.0
+        val (upRust, downRust) = when (chordSide) {
+            Side.LEFT -> Pair(rustEnd - chordWedge / 4.0, rustStart + chordWedge / 4.0)
+            Side.RIGHT -> Pair(rustStart + chordWedge / 4.0, rustEnd - chordWedge / 4.0)
+        }
+        val arrowStyle = labelStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        drawArrow(measurer, "↑", polar(center, upRust, arrowR),
+            arrowStyle.copy(color = if (upActive) Color.White else Color.White.copy(alpha = 0.35f)))
+        drawArrow(measurer, "↓", polar(center, downRust, arrowR),
+            arrowStyle.copy(color = if (downActive) Color.White else Color.White.copy(alpha = 0.35f)))
     }
 
     // ---- Melody side ----
@@ -338,6 +352,21 @@ private fun DrawScope.drawSplitWheel(
             style = style,
         )
     }
+}
+
+private fun DrawScope.drawArrow(
+    measurer: androidx.compose.ui.text.TextMeasurer,
+    glyph: String,
+    at: Offset,
+    style: TextStyle,
+) {
+    val m = measurer.measure(AnnotatedString(glyph), style)
+    drawText(
+        measurer,
+        text = glyph,
+        topLeft = Offset(at.x - m.size.width / 2f, at.y - m.size.height / 2f),
+        style = style,
+    )
 }
 
 private fun chordWedgeBounds(side: Side, i: Int, wedge: Double): Pair<Double, Double> =
