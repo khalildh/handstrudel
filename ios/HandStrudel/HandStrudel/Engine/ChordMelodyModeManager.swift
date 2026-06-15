@@ -36,8 +36,19 @@ final class ChordMelodyModeManager {
     /// - `.radial`: a centered wheel — chord/note by *angle*, with a center
     ///   rest zone. The hand can sit in the middle and dart out toward any
     ///   wedge in any direction, instead of sweeping a strip from end to end.
-    enum Layout { case grid, radial }
+    /// - `.split`: one centered wheel cut in half — the chord hand owns one
+    ///   semicircle (left by default, right when swapped), the melody hand
+    ///   owns the other. Same center rest zone as radial; each hand fans
+    ///   only across its 180° arc. Hands that stray into the other half are
+    ///   treated as resting (no new selection) so they can't accidentally
+    ///   poach the other voice.
+    enum Layout { case grid, radial, split }
     var layout: Layout = .grid
+
+    /// Which half of the wheel a hand owns in `.split` layout.
+    enum Side { case left, right }
+    private var chordSide: Side { swapHands ? .right : .left }
+    private var melodySide: Side { swapHands ? .left : .right }
 
     /// Radial geometry, as fractions of the wheel radius.
     /// Inside `radialDeadzone` the hand is "resting": it sustains the held
@@ -52,6 +63,22 @@ final class ChordMelodyModeManager {
     /// of how far out it reaches.
     static let radialDeadzone: Double = 0.24
     static let radialRadiusFraction: Double = 0.92
+
+    /// Split layout uses a larger rest hole than radial — the two halves are
+    /// closer to the hand and the screen-divider line passes right through
+    /// the center, so a wider rest zone keeps hands from accidentally
+    /// crossing into the other voice when they recenter.
+    static let splitDeadzone: Double = 0.36
+    /// The split wheel fills more of the screen than radial — both halves are
+    /// useful real estate (no concentric rings to fit), so we push the rim
+    /// out close to the shorter screen edge.
+    static let splitRadiusFraction: Double = 1.0
+    /// Below this radius (within a wedge), the chord plays at the base octave.
+    /// Above it, the wedge is sub-split angularly into a `+1` and `−1` octave
+    /// pair so the player can reach further out to shift octaves. The outer
+    /// band is kept narrow on purpose — most of the wedge's depth belongs to
+    /// the chord proper; the octave-shift ring lives in just the outer rim.
+    static let splitOctaveBandThreshold: Double = 0.80
 
     var swapHands: Bool = false
 
@@ -203,6 +230,64 @@ final class ChordMelodyModeManager {
         return max(0, min(count - 1, Int(shifted / wedge)))
     }
 
+    /// Split layout: octave shift driven by the chord-hand's position within
+    /// its wedge. While the hand stays in the wedge's inner band (radius below
+    /// `splitOctaveBandThreshold`) it plays at the base octave. Reaching
+    /// further out enters the "octave shift" outer band, which is further
+    /// split angularly: the half closer to the **top of the arc** lifts the
+    /// chord by an octave, the half closer to the **bottom** drops it by one.
+    /// This way "reach up" → higher, "reach down" → lower, even though the
+    /// chord wedges fan along a curved arc.
+    func splitOctaveShift(side: Side, angle: Double, radius: Double, wedgeIndex: Int) -> Int {
+        guard radius >= Self.splitOctaveBandThreshold else { return 0 }
+        guard zoneCount > 0 else { return 0 }
+        var a = angle.truncatingRemainder(dividingBy: 360)
+        if a < 0 { a += 360 }
+        let offsetFromTop: Double
+        switch side {
+        case .left:
+            guard a >= 180, a < 360 else { return 0 }
+            offsetFromTop = 360.0 - a
+        case .right:
+            guard a >= 0, a < 180 else { return 0 }
+            offsetFromTop = a
+        }
+        let wedgeLen = 180.0 / Double(zoneCount)
+        let withinWedge = offsetFromTop - Double(wedgeIndex) * wedgeLen
+        // Lower half of the wedge (closer to top of arc) → +1 octave; upper
+        // half (closer to bottom of arc) → −1.
+        return withinWedge < wedgeLen / 2 ? 1 : -1
+    }
+
+    /// Split layout: map an angle to a wedge index on one semicircle, or nil if
+    /// the hand is on the other half.
+    ///
+    /// Wedges fan **counter-clockwise from the top** of the assigned half: index
+    /// 0 sits at the top of the arc, index `count - 1` at the bottom. The
+    /// chord caller reads this directly (zone index → progression degree); the
+    /// melody caller inverts so the top of the arc is the highest pitch.
+    ///
+    /// Returns nil for angles on the wrong half so the controller can hold the
+    /// current voice (rest behaviour) without picking a neighbour by mistake.
+    func splitWedgeIndex(side: Side, angle: Double, count: Int) -> Int? {
+        guard count > 0 else { return nil }
+        var a = angle.truncatingRemainder(dividingBy: 360)
+        if a < 0 { a += 360 }
+        // Position along the arc, 0 at top → 1 at bottom.
+        let t: Double
+        switch side {
+        case .left:
+            // Left arc: top (≈360°) → t=0, bottom (180°) → t=1.
+            guard a >= 180, a < 360 else { return nil }
+            t = (360.0 - a) / 180.0
+        case .right:
+            // Right arc: top (0°) → t=0, bottom (≈180°) → t=1.
+            guard a >= 0, a < 180 else { return nil }
+            t = a / 180.0
+        }
+        return max(0, min(count - 1, Int(t * Double(count))))
+    }
+
     /// Resolve the chord hand into a (degree, octave, resting) reading for the
     /// active layout. In radial layout a hand inside the deadzone is resting —
     /// it holds whatever the pad is already voicing instead of selecting anew.
@@ -219,6 +304,17 @@ final class ChordMelodyModeManager {
             }
             let zone = radialWedgeIndex(angle: v.angle, count: zoneCount)
             return (degreeForZone(zone), 0, false)
+        case .split:
+            let v = radialVector(x: h.pinchX, y: h.pinchY)
+            let holdValue = (padDegree ?? currentChordDegree ?? 0, padOctaveShift, true)
+            guard v.radius >= Self.splitDeadzone else { return holdValue }
+            // Hand strayed onto the melody half → treat as resting so we
+            // don't accidentally re-pick the chord when reaching for melody.
+            guard let zone = splitWedgeIndex(side: chordSide, angle: v.angle, count: zoneCount) else {
+                return holdValue
+            }
+            let octave = splitOctaveShift(side: chordSide, angle: v.angle, radius: v.radius, wedgeIndex: zone)
+            return (degreeForZone(zone), octave, false)
         }
     }
 
@@ -227,16 +323,26 @@ final class ChordMelodyModeManager {
     /// the most recent note.
     private func readMelodyHand(_ h: HandData, noteCount: Int) -> (lane: Int, resting: Bool) {
         guard noteCount > 0 else { return (0, false) }
+        let restValue = {
+            let fallback = self.lastMelodyLane ?? noteCount / 2
+            return (max(0, min(noteCount - 1, fallback)), true)
+        }
         switch layout {
         case .grid:
             return (yToMelodyLane(h.pinchY, noteCount: noteCount), false)
         case .radial:
             let v = radialVector(x: h.pinchX, y: h.pinchY)
-            if v.radius < Self.radialDeadzone {
-                let fallback = lastMelodyLane ?? noteCount / 2
-                return (max(0, min(noteCount - 1, fallback)), true)
-            }
+            if v.radius < Self.radialDeadzone { return restValue() }
             return (radialWedgeIndex(angle: v.angle, count: noteCount), false)
+        case .split:
+            let v = radialVector(x: h.pinchX, y: h.pinchY)
+            guard v.radius >= Self.splitDeadzone else { return restValue() }
+            guard let wedge = splitWedgeIndex(side: melodySide, angle: v.angle, count: noteCount) else {
+                return restValue()
+            }
+            // Wedge 0 sits at the TOP of the arc; invert so top = highest pitch
+            // (matches the grid layout's "up = higher" feel).
+            return (noteCount - 1 - wedge, false)
         }
     }
 
@@ -404,6 +510,18 @@ final class ChordMelodyModeManager {
                 if !chordResting {
                     lastChordZoneIndex = radialWedgeIndex(angle: v.angle, count: zoneCount)
                 }
+            case .split:
+                let v = radialVector(x: h.pinchX, y: h.pinchY)
+                if v.radius < Self.splitDeadzone {
+                    chordResting = true
+                } else if let zone = splitWedgeIndex(side: chordSide, angle: v.angle, count: zoneCount) {
+                    lastChordZoneIndex = zone
+                    chordResting = false
+                } else {
+                    // Strayed onto melody half — read as resting so the overlay
+                    // doesn't flash a wrong-side highlight.
+                    chordResting = true
+                }
             }
         }
         if let h = melodyHand(hands) {
@@ -417,6 +535,17 @@ final class ChordMelodyModeManager {
                 melodyResting = v.radius < Self.radialDeadzone
                 if !melodyResting {
                     lastMelodyLane = radialWedgeIndex(angle: v.angle, count: 9)
+                }
+            case .split:
+                let v = radialVector(x: h.pinchX, y: h.pinchY)
+                if v.radius < Self.splitDeadzone {
+                    melodyResting = true
+                } else if let wedge = splitWedgeIndex(side: melodySide, angle: v.angle, count: 9) {
+                    // Same inversion as readMelodyHand: top of arc = highest pitch.
+                    lastMelodyLane = 9 - 1 - wedge
+                    melodyResting = false
+                } else {
+                    melodyResting = true
                 }
             }
         }

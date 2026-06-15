@@ -164,10 +164,11 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody, radialChordMelody, soundFont }
+    private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody, radialChordMelody, splitChordMelody, soundFont }
     private var currentMode: AppMode {
         if engine.learnModeEnabled { return .learn }
         if engine.radialChordMelodyModeEnabled { return .radialChordMelody }
+        if engine.splitChordMelodyModeEnabled { return .splitChordMelody }
         if engine.chordMelodyModeEnabled { return .chordMelody }
         if engine.soundFontModeEnabled { return .soundFont }
         if engine.gridModeEnabled { return .grid }
@@ -188,7 +189,8 @@ struct ControlSheet: View {
             hybrid: mode == .hybrid,
             flow: mode == .flow,
             soundFont: mode == .soundFont,
-            radialChordMelody: mode == .radialChordMelody
+            radialChordMelody: mode == .radialChordMelody,
+            splitChordMelody: mode == .splitChordMelody
         )
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
@@ -214,20 +216,22 @@ struct ControlSheet: View {
                 HStack(spacing: 8) {
                     modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
                     modeButton("Radial", icon: "circle.circle", mode: .radialChordMelody)
-                    modeButton("SoundFont", icon: "pianokeys.inverse", mode: .soundFont)
+                    modeButton("Split", icon: "circle.lefthalf.filled", mode: .splitChordMelody)
                 }
                 HStack(spacing: 8) {
+                    modeButton("SoundFont", icon: "pianokeys.inverse", mode: .soundFont)
                     modeButton("Learn", icon: "music.note.list", mode: .learn)
-                    Color.clear.frame(maxWidth: .infinity)
                     Color.clear.frame(maxWidth: .infinity)
                 }
             }
 
-            if currentMode == .chordMelody || currentMode == .radialChordMelody {
+            if currentMode == .chordMelody || currentMode == .radialChordMelody || currentMode == .splitChordMelody {
                 quantizeRow
                 VStack(alignment: .leading, spacing: 10) {
                     Text(currentMode == .radialChordMelody
                         ? "One wheel shared by both hands: reach toward the outer ring (lettered chords) with the chord hand, the inner ring (lettered notes) with the melody hand. Rest in the center to hold — any chord or note is one move away. Pinch the chord hand for an accent."
+                        : currentMode == .splitChordMelody
+                        ? "Single circle split in half: chord hand fans across the left semicircle (chords top → bottom), melody hand fans across the right semicircle (high pitch at top, low at bottom). Rest in the center to hold. Each hand stays on its own half — straying to the other side just holds the current voice."
                         : "Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(.secondary)
@@ -304,6 +308,45 @@ struct ControlSheet: View {
                             .foregroundColor(.primary.opacity(0.8))
                     }
                     .tint(.green)
+
+                    if currentMode == .radialChordMelody || currentMode == .splitChordMelody {
+                        let useSF = Binding<Bool>(
+                            get: { currentMode == .radialChordMelody ? engine.radialUseSoundFont : engine.splitUseSoundFont },
+                            set: {
+                                if currentMode == .radialChordMelody { engine.radialUseSoundFont = $0 }
+                                else { engine.splitUseSoundFont = $0 }
+                            }
+                        )
+                        Toggle(isOn: useSF) {
+                            Text("Voice through SoundFont")
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundColor(.primary.opacity(0.8))
+                        }
+                        .tint(.green)
+
+                        if useSF.wrappedValue {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(GMCategory.allCases) { cat in
+                                            soundFontCategoryChip(cat)
+                                        }
+                                    }
+                                }
+                                .onAppear { soundFontCategory = engine.selectedSoundFontInstrument.category }
+                                .onChange(of: engine.selectedSoundFontInstrument) { new in
+                                    soundFontCategory = new.category
+                                }
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(SOUNDFONT_INSTRUMENTS.filter { $0.category == soundFontCategory }) { inst in
+                                            soundFontChip(inst)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
