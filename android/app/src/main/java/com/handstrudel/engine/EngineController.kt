@@ -4,10 +4,18 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.handstrudel.engine.synth.Oscillator
 import com.handstrudel.engine.synth.SynthEngine
 import com.handstrudel.models.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import uniffi.handstrudel_core.ChordMelodyAction
+import uniffi.handstrudel_core.ChordMelodyModeManager
+import uniffi.handstrudel_core.ChordMelodyZones
+import uniffi.handstrudel_core.ChordToneTables
+import uniffi.handstrudel_core.Layout as CoreLayout
+import uniffi.handstrudel_core.MusicKey as CoreKey
+import uniffi.handstrudel_core.Scale as CoreScale
+import uniffi.handstrudel_core.chordNotes as coreChordNotes
+import uniffi.handstrudel_core.scaleNotes as coreScaleNotes
 
 class EngineController(context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -15,6 +23,10 @@ class EngineController(context: Context) {
     val handTracker = HandTrackingManager(context)
     private val gridManager = GridModeManager()
     private val drumManager = DrumModeManager()
+
+    /// Shared Rust-backed chord+melody state machine. Same struct used by iOS;
+    /// drives Split / Radial / Grid layouts with one tick implementation.
+    val chordMelodyManager = ChordMelodyModeManager().apply { setLayout(CoreLayout.SPLIT) }
 
     // State
     val handsState = MutableStateFlow(HandsState())
@@ -28,6 +40,9 @@ class EngineController(context: Context) {
     var selectedScale = Scale.PENTATONIC
     var gridModeEnabled = false
     var drumModeEnabled = false
+    /// Split chord+melody mode — the app's default. Toggle the other modes
+    /// off when enabled.
+    var chordMelodyModeEnabled = true
     var manualBPM = 120.0
 
     // Grid state
@@ -46,8 +61,32 @@ class EngineController(context: Context) {
     var drumIntensity = 0.5
     var drumComplexity = 0.5
 
+    // Chord+melody published state for the Split overlay
+    val chordMelodyCurrentDegree = MutableStateFlow<Int?>(null)
+    val chordMelodyCurrentZoneIndex = MutableStateFlow<Int?>(null)
+    val chordMelodyMelodyLane = MutableStateFlow<Int?>(null)
+    val chordMelodyChordResting = MutableStateFlow(false)
+    val chordMelodyMelodyResting = MutableStateFlow(false)
+    val chordMelodyIsChordHandPinching = MutableStateFlow(false)
+    val chordMelodyIsMelodyHandPinching = MutableStateFlow(false)
+    val chordMelodyTouchedChordZones = MutableStateFlow<Set<ChordSubzone>>(emptySet())
+    val chordMelodyTouchedMelodyLanes = MutableStateFlow<Set<Int>>(emptySet())
+
+    // Touch-driven chord stack (latest finger wins for melody snap)
+    private data class SplitTouchChord(val touchId: String, val degree: Int, val octave: Int, val tones: List<Int>)
+    private val splitTouchChordStack = mutableListOf<SplitTouchChord>()
+    private val splitVoiceSubvoices = mutableMapOf<String, List<String>>()
+
     // Cached scale notes
     private var cachedScaleNotes = listOf<Int>()
+    /// `chordMelodyTones.chordTones[degree]` → triad MIDI notes;
+    /// `chordMelodyTones.melodyTones[degree]` → snap targets for the melody hand.
+    private var chordMelodyTones: ChordToneTables = buildChordToneTables(MusicKey.C, Scale.PENTATONIC)
+
+    /// Sustained voice IDs that the chord-melody tick currently has noteOn-ed.
+    /// Indexed by chord pitch, so PadSlide can release the previous voicing.
+    private val padVoices = mutableListOf<String>()
+    private val melodyVoiceId = "cmm-melody"
 
     // Smoothed params
     private val smoothedParams = mutableMapOf<String, Double>()
@@ -85,6 +124,7 @@ class EngineController(context: Context) {
 
     fun recomputeScaleNotes() {
         cachedScaleNotes = scaleNotes(selectedKey, selectedScale, gridBaseOctave, gridOctaveRange)
+        chordMelodyTones = buildChordToneTables(selectedKey, selectedScale)
     }
 
     private fun tick(hands: HandsState) {
@@ -100,6 +140,7 @@ class EngineController(context: Context) {
         when {
             gridModeEnabled -> tickGridMode(hands)
             drumModeEnabled -> tickDrumMode(hands)
+            chordMelodyModeEnabled -> tickChordMelodyMode(hands)
             else -> tickMelodicMode(hands)
         }
     }
@@ -109,7 +150,6 @@ class EngineController(context: Context) {
     private fun tickMelodicMode(hands: HandsState) {
         val preset = selectedPreset ?: return
 
-        // Debug log hand positions every 30 frames
         if (logCounter++ % 30 == 0) {
             hands.left?.let { Log.d("Engine", "LEFT y=${String.format("%.2f", it.y)} x=${String.format("%.2f", it.x)} pinch=${String.format("%.2f", it.pinch)}") }
             hands.right?.let { Log.d("Engine", "RIGHT y=${String.format("%.2f", it.y)} x=${String.format("%.2f", it.x)} pinch=${String.format("%.2f", it.pinch)}") }
@@ -117,7 +157,6 @@ class EngineController(context: Context) {
 
         val rawParams = mutableMapOf<String, Double>()
 
-        // Map hand axes to params
         for ((axis, paramId) in preset.leftMapping) {
             if (paramId == "none") continue
             val def = PARAM_MAP[paramId] ?: continue
@@ -131,13 +170,11 @@ class EngineController(context: Context) {
             rawParams[paramId] = def.min + value * (def.max - def.min)
         }
 
-        // Smooth params
         for ((id, raw) in rawParams) {
             val prev = smoothedParams[id] ?: raw
             smoothedParams[id] = prev + alpha * (raw - prev)
         }
 
-        // Update synth engine directly
         val noteIdx = smoothedParams["noteIdx"]?.toInt()?.coerceIn(0, NOTES.size - 1) ?: 10
         val midiNote = MIDI_NOTES.getOrElse(noteIdx) { 60 }
 
@@ -188,6 +225,120 @@ class EngineController(context: Context) {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Chord+melody (Split) mode
+    // -----------------------------------------------------------------------
+
+    private fun tickChordMelodyMode(hands: HandsState) {
+        val coreHands = hands.toCoreHands()
+        val actions = chordMelodyManager.tick(coreHands, chordMelodyTones, false, false)
+
+        for (action in actions) {
+            when (action) {
+                is ChordMelodyAction.PadOn -> {
+                    releasePadVoices()
+                    for ((i, midi) in action.midiNotes.withIndex()) {
+                        val voice = "cmm-pad-$i"
+                        synthEngine.noteOn(voice, midi.toInt(), selectedWaveform, 0.5f)
+                        padVoices.add(voice)
+                    }
+                }
+                is ChordMelodyAction.PadSlide -> {
+                    // Re-voice: release old, take new (one voice per tone).
+                    releasePadVoices()
+                    for ((i, midi) in action.midiNotes.withIndex()) {
+                        val voice = "cmm-pad-$i"
+                        synthEngine.noteOn(voice, midi.toInt(), selectedWaveform, 0.5f)
+                        padVoices.add(voice)
+                    }
+                }
+                is ChordMelodyAction.PadOff -> releasePadVoices()
+                is ChordMelodyAction.ChordAccent -> {
+                    // Brief percussive strum on top of the pad — fire and forget.
+                    for ((i, midi) in action.midiNotes.withIndex()) {
+                        val accentVoice = "cmm-accent-$i"
+                        synthEngine.noteOn(accentVoice, midi.toInt(), selectedWaveform, action.velocity.toFloat())
+                        mainHandler.postDelayed({ synthEngine.noteOff(accentVoice) }, 250)
+                    }
+                }
+                is ChordMelodyAction.MelodyOn -> {
+                    synthEngine.noteOn(melodyVoiceId, action.midi.toInt(), selectedWaveform, action.velocity.toFloat())
+                }
+                is ChordMelodyAction.MelodyOff -> synthEngine.noteOff(melodyVoiceId)
+                is ChordMelodyAction.MelodySlide -> synthEngine.noteSlide(melodyVoiceId, action.midi.toInt())
+            }
+        }
+
+        val zones: ChordMelodyZones = chordMelodyManager.currentZones(coreHands)
+        chordMelodyCurrentDegree.value = chordMelodyManager.currentChordDegree()?.toInt()
+        chordMelodyCurrentZoneIndex.value = zones.chordZoneIndex?.toInt()
+        chordMelodyMelodyLane.value = zones.melodyLane?.toInt()
+        chordMelodyChordResting.value = zones.chordResting
+        chordMelodyMelodyResting.value = zones.melodyResting
+        chordMelodyIsChordHandPinching.value = chordMelodyManager.isChordHandPinching()
+        chordMelodyIsMelodyHandPinching.value = chordMelodyManager.isMelodyHandPinching()
+    }
+
+    private fun releasePadVoices() {
+        for (v in padVoices) synthEngine.noteOff(v)
+        padVoices.clear()
+    }
+
+    // -----------------------------------------------------------------------
+    // Split-mode touch handlers — called by the Compose multitouch overlay
+    // -----------------------------------------------------------------------
+
+    /// A finger entered a chord sub-zone. Spawns sustained voices for each
+    /// chord note keyed off the touch ID, and pushes the chord onto the touch
+    /// stack so the camera-driven melody snap follows it.
+    fun splitTouchEnterChord(touchId: String, wedge: Int, octave: Int) {
+        val degree = chordMelodyManager.degreeForZone(wedge.toInt())
+        val triad = coreChordNotes(selectedKey.toCoreKey(), selectedScale.toCoreScale(), degree.toInt())
+        val tones = triad.map { it.toInt() + octave * 12 }
+        val voices = tones.mapIndexed { i, midi ->
+            val v = "$touchId-c$i"
+            synthEngine.noteOn(v, midi, selectedWaveform, 0.7f)
+            v
+        }
+        splitVoiceSubvoices[touchId] = voices
+        splitTouchChordStack.add(SplitTouchChord(touchId, degree.toInt(), octave, tones))
+        syncTouchChord()
+    }
+
+    /// A finger entered a melody lane. Spawns one sustained voice snapped to
+    /// the currently active chord (latest touch wins, else camera chord).
+    fun splitTouchEnterMelody(touchId: String, lane: Int) {
+        val degree = splitTouchChordStack.lastOrNull()?.degree
+            ?: chordMelodyManager.currentChordDegree()?.toInt()
+            ?: 0
+        val triad = coreChordNotes(selectedKey.toCoreKey(), selectedScale.toCoreScale(), degree)
+        val lanes = (0..2).flatMap { oct -> triad.map { it.toInt() + oct * 12 } }.sorted()
+        if (lanes.isEmpty()) return
+        val safeLane = lane.coerceIn(0, lanes.size - 1)
+        val voice = "$touchId-m"
+        synthEngine.noteOn(voice, lanes[safeLane], selectedWaveform, 0.75f)
+        splitVoiceSubvoices[touchId] = listOf(voice)
+    }
+
+    /// A touch lifted (or drag crossed out of its zone). Releases every voice
+    /// that touch had spawned and drops any chord-stack entry.
+    fun splitTouchExit(touchId: String) {
+        splitVoiceSubvoices.remove(touchId)?.forEach { synthEngine.noteOff(it) }
+        if (splitTouchChordStack.any { it.touchId == touchId }) {
+            splitTouchChordStack.removeAll { it.touchId == touchId }
+            syncTouchChord()
+        }
+    }
+
+    private fun syncTouchChord() {
+        val top = splitTouchChordStack.lastOrNull()
+        if (top != null) {
+            chordMelodyManager.setTouchChord(top.degree.toLong().toInt(), top.octave, top.tones.map { it.toLong().toInt() })
+        } else {
+            chordMelodyManager.setTouchChord(null, 0, emptyList())
+        }
+    }
+
     private fun axisValue(hand: HandData, axis: String): Double {
         return when (axis) {
             "y" -> 1.0 - hand.y
@@ -198,4 +349,14 @@ class EngineController(context: Context) {
             else -> 0.5
         }
     }
+}
+
+private fun buildChordToneTables(key: MusicKey, scale: Scale): ChordToneTables {
+    val coreKey = key.toCoreKey()
+    val coreScale = scale.toCoreScale()
+    val degreeCount = scale.intervals.size
+    val chordTones = (0 until degreeCount).map { d -> coreChordNotes(coreKey, coreScale, d) }
+    val scaleFull = coreScaleNotes(coreKey, coreScale)
+    val melodyTones = List(degreeCount) { scaleFull }
+    return ChordToneTables(chordTones = chordTones, melodyTones = melodyTones)
 }

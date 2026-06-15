@@ -62,6 +62,12 @@ fun PerformanceScreen(engine: EngineController) {
             handTracker = engine.handTracker
         )
 
+        // Split chord+melody overlay — the app's default playable surface.
+        // Sits under the hand skeleton so finger tracking stays visible.
+        if (engine.chordMelodyModeEnabled) {
+            SplitChordMelodyOverlay(engine = engine, modifier = Modifier.fillMaxSize())
+        }
+
         // Hand skeleton overlay
         HandOverlay(
             handsState = handsState,
@@ -114,6 +120,7 @@ fun PerformanceScreen(engine: EngineController) {
             val modeText = when {
                 engine.gridModeEnabled -> "GRID"
                 engine.drumModeEnabled -> "DRUMS"
+                engine.chordMelodyModeEnabled -> "SPLIT"
                 else -> "MELODIC"
             }
             Text(
@@ -171,21 +178,6 @@ fun StartScreen(onStart: (Preset) -> Unit) {
             modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
         )
 
-        // Sanity check that the shared Rust core is loaded and callable. Shows
-        // the I chord of C major as MIDI names — entirely computed in Rust.
-        val rustCoreSample = remember {
-            val notes = chordNotes(CoreKey.C, CoreScale.MAJOR, 0)
-            val label = chordDisplayName(CoreKey.C, CoreScale.MAJOR, 0)
-            val text = "core: $label = ${notes.joinToString(" ") { midiNoteName(it) }}"
-            Log.i("HandStrudelCore", text)
-            text
-        }
-        Text(
-            text = rustCoreSample,
-            fontSize = 11.sp,
-            color = Color(0xFF00FF9E).copy(alpha = 0.6f),
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
 
         // Section header
         Text(

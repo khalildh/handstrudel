@@ -6,6 +6,7 @@ import android.util.Log
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.core.BaseOptions
+import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarker
@@ -37,11 +38,20 @@ class HandTrackingManager(context: Context) {
     var onHandsDetected: ((HandsState) -> Unit)? = null
 
     init {
-        try {
+        // Try the GPU delegate first — typically 2–3× faster than CPU on
+        // current phones. Some devices' drivers can fail to init the GPU
+        // pipeline, so fall back to CPU rather than ship a broken camera.
+        handLandmarker = createLandmarker(context, Delegate.GPU)
+            ?: createLandmarker(context, Delegate.CPU)
+    }
+
+    private fun createLandmarker(context: Context, delegate: Delegate): HandLandmarker? {
+        return try {
             val options = HandLandmarker.HandLandmarkerOptions.builder()
                 .setBaseOptions(
                     BaseOptions.builder()
                         .setModelAssetPath("hand_landmarker.task")
+                        .setDelegate(delegate)
                         .build()
                 )
                 .setRunningMode(RunningMode.LIVE_STREAM)
@@ -53,9 +63,12 @@ class HandTrackingManager(context: Context) {
                 .setErrorListener { e -> Log.e("HandTracking", "Error: $e") }
                 .build()
 
-            handLandmarker = HandLandmarker.createFromOptions(context, options)
+            HandLandmarker.createFromOptions(context, options).also {
+                Log.i("HandTracking", "HandLandmarker initialized on $delegate")
+            }
         } catch (e: Exception) {
-            Log.e("HandTracking", "Failed to init: $e")
+            Log.w("HandTracking", "Failed to init on $delegate, trying fallback", e)
+            null
         }
     }
 
