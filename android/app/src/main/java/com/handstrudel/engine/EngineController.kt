@@ -450,7 +450,13 @@ private fun buildChordToneTables(key: MusicKey, scale: Scale): ChordToneTables {
     val coreScale = scale.toCoreScale()
     val degreeCount = scale.intervals.size
     val chordTones = (0 until degreeCount).map { d -> coreChordNotes(coreKey, coreScale, d) }
-    val scaleFull = coreScaleNotes(coreKey, coreScale)
-    val melodyTones = List(degreeCount) { scaleFull }
+    // Melody snap targets per chord degree: each chord's triad fanned across
+    // 3 octaves and sorted ascending — exactly 9 notes, one per melody lane
+    // on the Split wheel. This is what makes the melody re-snap to whatever
+    // chord is currently sounding (matches iOS Split mode).
+    val melodyTones = (0 until degreeCount).map { d ->
+        val triad = coreChordNotes(coreKey, coreScale, d)
+        (0..2).flatMap { oct -> triad.map { it.toInt() + oct * 12 } }.sorted()
+    }
     return ChordToneTables(chordTones = chordTones, melodyTones = melodyTones)
 }

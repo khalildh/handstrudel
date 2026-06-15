@@ -49,7 +49,6 @@ import uniffi.handstrudel_core.splitOctaveShift
 import uniffi.handstrudel_core.splitRadiusFraction
 import uniffi.handstrudel_core.splitWedgeIndex
 
-private const val ZONE_COUNT = 7
 private const val MELODY_COUNT = 9
 
 /// Split chord+melody overlay: chord wedges on one half of a single wheel,
@@ -70,6 +69,13 @@ fun SplitChordMelodyOverlay(
     val chordHandPinching by engine.chordMelodyIsChordHandPinching.collectAsState()
     val touchedChordZones by engine.chordMelodyTouchedChordZones.collectAsState()
     val touchedMelodyLanes by engine.chordMelodyTouchedMelodyLanes.collectAsState()
+    val progression by engine.selectedProgressionFlow.collectAsState()
+    val selectedKey by engine.selectedKeyFlow.collectAsState()
+    val selectedScale by engine.selectedScaleFlow.collectAsState()
+    // Number of chord wedges in the active progression. Pop has 4, Free has 7,
+    // Two-Chord has 2, etc. The wheel + touch math reuse this so the wedges
+    // resize to fill the chord half-arc regardless of progression length.
+    val zoneCount = progression.degrees.size.coerceAtLeast(1)
 
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
@@ -81,7 +87,7 @@ fun SplitChordMelodyOverlay(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
+                .pointerInput(zoneCount, chordSide, melodySide) {
                     awaitPointerEventScope {
                         val perTouchState = mutableMapOf<Long, TouchState>()
                         while (true) {
@@ -91,7 +97,7 @@ fun SplitChordMelodyOverlay(
                                 val h = size.height.toFloat()
                                 val outerR = min(w, h) / 2f
                                 val center = Offset(w / 2f, h / 2f)
-                                val zone = zoneForPoint(change.position, center, outerR, chordSide, melodySide)
+                                val zone = zoneForPoint(change.position, center, outerR, chordSide, melodySide, zoneCount)
                                 val prev = perTouchState[change.id.value]
                                 if (change.changedToDown()) {
                                     val st = enterZone(engine, zone, change.id.value)
@@ -115,6 +121,7 @@ fun SplitChordMelodyOverlay(
             drawSplitWheel(
                 chordSide = chordSide,
                 melodySide = melodySide,
+                zoneCount = zoneCount,
                 currentZone = currentZone,
                 chordResting = chordResting,
                 chordOctaveShift = engine.chordMelodyManager.currentOctaveShift().toInt(),
@@ -123,7 +130,7 @@ fun SplitChordMelodyOverlay(
                 melodyResting = melodyResting,
                 touchedChordZones = touchedChordZones,
                 touchedMelodyLanes = touchedMelodyLanes,
-                chordLabels = chordLabels(engine.selectedKey, engine.selectedScale),
+                chordLabels = chordLabels(selectedKey, selectedScale, progression.degrees),
                 measurer = measurer,
                 labelStyle = TextStyle(
                     fontSize = 13.sp,
@@ -146,7 +153,7 @@ private sealed class ResolvedZone {
     data class Melody(val lane: Int) : ResolvedZone()
 }
 
-private fun zoneForPoint(p: Offset, center: Offset, outerR: Float, chordSide: Side, melodySide: Side): ResolvedZone? {
+private fun zoneForPoint(p: Offset, center: Offset, outerR: Float, chordSide: Side, melodySide: Side, zoneCount: Int): ResolvedZone? {
     val dx = (p.x - center.x).toDouble()
     val dy = (center.y - p.y).toDouble()  // up positive
     val r = sqrt(dx * dx + dy * dy)
@@ -155,8 +162,8 @@ private fun zoneForPoint(p: Offset, center: Offset, outerR: Float, chordSide: Si
     if (radius < splitDeadzone()) return null
     var deg = 90.0 - Math.atan2(dy, dx) * 180.0 / Math.PI
     deg = ((deg % 360.0) + 360.0) % 360.0
-    splitWedgeIndex(chordSide, deg, ZONE_COUNT.toInt())?.let { wedge ->
-        val oct = splitOctaveShift(chordSide, deg, radius, wedge, ZONE_COUNT.toInt())
+    splitWedgeIndex(chordSide, deg, zoneCount)?.let { wedge ->
+        val oct = splitOctaveShift(chordSide, deg, radius, wedge, zoneCount)
         return ResolvedZone.Chord(wedge.toInt(), oct.toInt())
     }
     splitWedgeIndex(melodySide, deg, MELODY_COUNT.toInt())?.let { wedge ->
@@ -218,6 +225,7 @@ private fun composeAngle(rustDeg: Double): Float =
 private fun DrawScope.drawSplitWheel(
     chordSide: Side,
     melodySide: Side,
+    zoneCount: Int,
     currentZone: Int?,
     chordResting: Boolean,
     chordOctaveShift: Int,
@@ -244,8 +252,8 @@ private fun DrawScope.drawSplitWheel(
     drawCircle(color = outline.copy(alpha = 0.15f), radius = octaveR, center = center, style = Stroke(width = 1f))
 
     // ---- Chord side ----
-    val chordWedge = 180.0 / ZONE_COUNT
-    for (i in 0 until ZONE_COUNT) {
+    val chordWedge = 180.0 / zoneCount
+    for (i in 0 until zoneCount) {
         val (rustStart, rustEnd) = chordWedgeBounds(chordSide, i, chordWedge)
         val composeStart = composeAngle(rustStart)
         val sweep = chordWedge.toFloat()
@@ -397,9 +405,10 @@ private fun DrawScope.drawAnnularSector(
 // ---------------------------------------------------------------------------
 
 /// Display names like "Cmaj", "Am", "Bdim" for the current key/scale,
-/// one per zone — computed in the Rust core.
-private fun chordLabels(key: MusicKey, scale: Scale): List<String> {
+/// one per chord *zone* — so a Pop progression's [I, V, vi, IV] picks 4
+/// labels from the diatonic 7. Computed in the Rust core.
+private fun chordLabels(key: MusicKey, scale: Scale, progressionDegrees: List<Int>): List<String> {
     val coreKey = key.toCoreKey()
     val coreScale = scale.toCoreScale()
-    return List(scale.intervals.size) { d -> coreChordDisplayName(coreKey, coreScale, d) }
+    return progressionDegrees.map { d -> coreChordDisplayName(coreKey, coreScale, d) }
 }
