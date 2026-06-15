@@ -1,14 +1,19 @@
 import SwiftUI
 
+/// First-run overlay shown on top of the performance screen. Mirrors how the
+/// default mode (Split chord+melody) actually plays: the wheel cuts left and
+/// right at the screen divider, hands fall in their own half, and either a
+/// pinch or a touch makes sound. Goal is to get a brand-new user from "I
+/// opened this" to a sustained chord in under twenty seconds.
 struct OnboardingView: View {
     @Binding var hasSeenOnboarding: Bool
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.75)
+            Color.black.opacity(0.78)
                 .ignoresSafeArea()
 
-            VStack(spacing: 32) {
+            VStack(spacing: 28) {
                 Spacer()
 
                 // Title
@@ -27,22 +32,23 @@ struct OnboardingView: View {
                     }
                 }
 
-                // Tips
-                VStack(spacing: 20) {
+                // Tips — each one corresponds directly to a physical thing the
+                // player can do as soon as they dismiss this overlay.
+                VStack(spacing: 18) {
                     tipRow(
-                        icon: "arrow.up.arrow.down",
-                        title: "Move your hands up & down",
-                        subtitle: "Controls pitch & volume"
+                        icon: "hand.point.left.fill",
+                        title: "Left half = chords",
+                        subtitle: "Reach toward a wedge to pick a chord"
                     )
                     tipRow(
-                        icon: "hand.raised.fingers.spread",
-                        title: "Spread your fingers",
-                        subtitle: "Adds reverb, filter & effects"
+                        icon: "hand.point.right.fill",
+                        title: "Right half = melody",
+                        subtitle: "Reach high for high notes, low for low"
                     )
                     tipRow(
-                        icon: "video.circle",
-                        title: "Tap the record button",
-                        subtitle: "Share to Instagram"
+                        icon: "hand.tap.fill",
+                        title: "Pinch — or just tap",
+                        subtitle: "Hold to sustain, drag to slide between zones"
                     )
                 }
                 .padding(.horizontal, 32)
@@ -55,7 +61,7 @@ struct OnboardingView: View {
                         hasSeenOnboarding = true
                     }
                 }) {
-                    Text("GOT IT!")
+                    Text("LET'S PLAY")
                         .font(.system(size: 18, weight: .black, design: .rounded))
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
