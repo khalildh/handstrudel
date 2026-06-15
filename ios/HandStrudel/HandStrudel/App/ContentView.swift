@@ -170,6 +170,59 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
 
+            // Radial chord+melody overlay (one centered wheel: chords on the
+            // outer ring, melody on the inner ring, rest in the middle).
+            if engine.radialChordMelodyModeEnabled {
+                let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
+                let chordNames = zoneDegrees.map {
+                    chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
+                }
+                let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
+                let melodyTriad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
+                let melodyMidis = (0..<3).flatMap { oct in melodyTriad.map { $0 + oct * 12 } }.sorted()
+                let melodyNames = melodyMidis.map { pitchClassName($0) }
+                RadialChordMelodyOverlayView(
+                    zoneDegrees: zoneDegrees,
+                    chordNames: chordNames,
+                    currentChordZone: engine.chordMelodyChordHandLane,
+                    chordHandPinching: engine.chordMelodyModeManager.isChordHandPinching,
+                    chordResting: engine.chordMelodyModeManager.chordResting,
+                    currentChordName: engine.chordMelodyCurrentChordName,
+                    melodyNames: melodyNames,
+                    melodyLane: engine.chordMelodyMelodyLane,
+                    melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
+                    melodyResting: engine.chordMelodyModeManager.melodyResting
+                )
+                .ignoresSafeArea()
+            }
+
+            // Split chord+melody overlay (single circle cut in half).
+            if engine.splitChordMelodyModeEnabled {
+                let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
+                let chordNames = zoneDegrees.map {
+                    chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
+                }
+                let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
+                let melodyTriad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
+                let melodyMidis = (0..<3).flatMap { oct in melodyTriad.map { $0 + oct * 12 } }.sorted()
+                let melodyNames = melodyMidis.map { pitchClassName($0) }
+                SplitChordMelodyOverlayView(
+                    zoneDegrees: zoneDegrees,
+                    chordNames: chordNames,
+                    currentChordZone: engine.chordMelodyChordHandLane,
+                    chordHandPinching: engine.chordMelodyModeManager.isChordHandPinching,
+                    chordResting: engine.chordMelodyModeManager.chordResting,
+                    currentChordName: engine.chordMelodyCurrentChordName,
+                    chordOctaveShift: engine.chordMelodyOctaveShift,
+                    melodyNames: melodyNames,
+                    melodyLane: engine.chordMelodyMelodyLane,
+                    melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
+                    melodyResting: engine.chordMelodyModeManager.melodyResting,
+                    swapHands: engine.chordMelodySwapHands
+                )
+                .ignoresSafeArea()
+            }
+
             // Learn mode overlay (Guitar Hero scrolling notes)
             if engine.learnModeEnabled {
                 let gridNotes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale,
@@ -226,7 +279,7 @@ struct ContentView: View {
                 }
 
                 // Floating code pill — hide in grid/drum/learn/chord/soundfont mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.soundFontModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     codePill
                         .padding(.horizontal, 20)
                         .padding(.top, 2)
@@ -235,7 +288,7 @@ struct ContentView: View {
                 Spacer()
 
                 // Note badge — hide in grid/drum/learn/chord/soundfont mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.soundFontModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     noteBadge
 
                     beatRing

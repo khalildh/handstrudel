@@ -163,6 +163,21 @@ final class EngineController: ObservableObject {
 
     // Chord+Melody mode (two-hand harmony)
     @Published var chordMelodyModeEnabled = false
+    /// Radial variant of chord+melody: the chord/melody hands select by *angle*
+    /// around a centered wheel with a rest zone in the middle, rather than
+    /// sweeping a linear strip. Shares all chordMelody* state and the
+    /// ChordMelodyModeController; only the manager's `layout` differs.
+    @Published var radialChordMelodyModeEnabled = false
+    /// Split variant of chord+melody: same single wheel as radial, but the
+    /// chord hand owns one semicircle and the melody hand owns the other.
+    /// Shares all chordMelody* state; only the manager's `layout` differs.
+    @Published var splitChordMelodyModeEnabled = false
+    /// Route radial mode through the native SoundFont sampler instead of the
+    /// WebView synth. Only consulted when `radialChordMelodyModeEnabled` is on.
+    @Published var radialUseSoundFont: Bool = false
+    /// Route split mode through the native SoundFont sampler. Only consulted
+    /// when `splitChordMelodyModeEnabled` is on.
+    @Published var splitUseSoundFont: Bool = false
     @Published var chordMelodySwapHands = false  // left=chords by default; toggle for lefties
     @Published var chordMelodyPadVolume: Double = 0.22  // sustained chord pad gain
     let chordMelodyModeManager = ChordMelodyModeManager()
@@ -264,6 +279,8 @@ final class EngineController: ObservableObject {
         case "grid": gridModeEnabled = true
         case "drum": drumModeEnabled = true
         case "chordmelody": chordMelodyModeEnabled = true
+        case "radialchordmelody": radialChordMelodyModeEnabled = true
+        case "splitchordmelody": splitChordMelodyModeEnabled = true
         case "soundfont": soundFontModeEnabled = true
         case "lead": leadModeEnabled = true
         case "hybrid": hybridModeEnabled = true
@@ -460,7 +477,13 @@ final class EngineController: ObservableObject {
     private var activeMode: ModeController {
         if learnModeEnabled { return learnMode }
         if soundFontModeEnabled { return soundFontMode }
-        if chordMelodyModeEnabled { return chordMelodyMode }
+        // Radial mode normally goes through the WebView-synth chord-melody
+        // controller, but flipping the per-mode toggle routes it through the
+        // native SoundFont sampler instead. `tickSoundFontMode` honours the
+        // radial layout flag, so the same controller works for both layouts.
+        if radialChordMelodyModeEnabled && radialUseSoundFont { return soundFontMode }
+        if splitChordMelodyModeEnabled && splitUseSoundFont { return soundFontMode }
+        if chordMelodyModeEnabled || radialChordMelodyModeEnabled || splitChordMelodyModeEnabled { return chordMelodyMode }
         if gridModeEnabled { return gridMode }
         if drumModeEnabled { return drumMode }
         return melodicMode
@@ -511,6 +534,9 @@ final class EngineController: ObservableObject {
         // idempotent, so this covers both the mode-switch and restore paths.
         soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
 
+        chordMelodyModeManager.layout = splitChordMelodyModeEnabled ? .split
+            : radialChordMelodyModeEnabled ? .radial
+            : .grid
         chordMelodyModeManager.swapHands = chordMelodySwapHands
         chordMelodyModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
         let bounds = UIScreen.main.bounds
@@ -532,12 +558,13 @@ final class EngineController: ObservableObject {
             return lanes.sorted()
         }
 
+        // SoundFont mode intentionally runs free-time — passing quantize here
+        // makes the pad/melody/accent strikes wait for grid boundaries, which
+        // feels stiff and laggy with the native sampler.
         let actions = chordMelodyModeManager.tick(
             hands: currentHands,
             chordTones: chordTones,
-            melodyTones: melodyTones,
-            quantize: quantizeEnabled,
-            gridBoundaryCrossed: quantizeBoundaryCrossed()
+            melodyTones: melodyTones
         )
 
         for action in actions {
@@ -981,12 +1008,15 @@ final class EngineController: ObservableObject {
     /// Call when switching modes to stop lingering sounds
     func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
                     lead: Bool = false, hybrid: Bool = false, flow: Bool = false,
-                    soundFont: Bool = false) {
+                    soundFont: Bool = false, radialChordMelody: Bool = false,
+                    splitChordMelody: Bool = false) {
         silenceAll()
         gridModeEnabled = grid
         drumModeEnabled = drums
         learnModeEnabled = learn
         chordMelodyModeEnabled = chordMelody
+        radialChordMelodyModeEnabled = radialChordMelody
+        splitChordMelodyModeEnabled = splitChordMelody
         leadModeEnabled = lead
         hybridModeEnabled = hybrid
         flowModeEnabled = flow
@@ -1001,6 +1031,8 @@ final class EngineController: ObservableObject {
         if gridModeEnabled { return "grid" }
         if drumModeEnabled { return "drum" }
         if soundFontModeEnabled { return "soundfont" }
+        if radialChordMelodyModeEnabled { return "radialchordmelody" }
+        if splitChordMelodyModeEnabled { return "splitchordmelody" }
         if chordMelodyModeEnabled { return "chordmelody" }
         if leadModeEnabled { return "lead" }
         if hybridModeEnabled { return "hybrid" }
@@ -1051,6 +1083,9 @@ final class EngineController: ObservableObject {
         gridModeEnabled = false
         drumModeEnabled = false
         soundFontModeEnabled = false
+        chordMelodyModeEnabled = false
+        radialChordMelodyModeEnabled = false
+        splitChordMelodyModeEnabled = false
         leadModeEnabled = false
         hybridModeEnabled = false
         flowModeEnabled = false

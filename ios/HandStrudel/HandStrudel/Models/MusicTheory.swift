@@ -144,6 +144,12 @@ func midiNoteName(_ midi: Int) -> String {
     return "\(name)\(octave)"
 }
 
+/// Note letter without the octave number (e.g. "C", "Eb"). Used for compact
+/// labels like the radial wheel's lettered keys.
+func pitchClassName(_ midi: Int) -> String {
+    NOTE_NAMES[((midi % 12) + 12) % 12]
+}
+
 /// Find the lane index (into scaleNotes) closest to a given MIDI value
 func midiToLaneIndex(_ midi: Int, scaleNotes: [Int]) -> Int {
     guard !scaleNotes.isEmpty else { return 0 }
