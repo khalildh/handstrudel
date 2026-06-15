@@ -177,9 +177,9 @@ final class EngineController: ObservableObject {
     @Published var radialUseSoundFont: Bool = false
     /// Route split mode through the native SoundFont sampler. Only consulted
     /// when `splitChordMelodyModeEnabled` is on.
-    @Published var splitUseSoundFont: Bool = false
+    @Published var splitUseSoundFont: Bool = true
     @Published var chordMelodySwapHands = false  // left=chords by default; toggle for lefties
-    @Published var chordMelodyPadVolume: Double = 0.22  // sustained chord pad gain
+    @Published var chordMelodyPadVolume: Double = 0.6   // sustained chord pad gain (100% of the 0…0.6 slider range)
     let chordMelodyModeManager = ChordMelodyModeManager()
     @Published var chordMelodyCurrentDegree: Int? = nil
     @Published var chordMelodyCurrentChordName: String = ""

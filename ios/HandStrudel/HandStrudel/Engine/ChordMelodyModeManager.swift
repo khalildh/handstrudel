@@ -122,6 +122,15 @@ final class ChordMelodyModeManager {
     var isChordHandPinching: Bool { chordPinch.isPinching }
     var isMelodyHandPinching: Bool { melodyPinch.isPinching }
 
+    // MARK: - Touch override (Split mode)
+    //
+    // ContentView sets these when a finger is held on a chord wedge so the
+    // melody-snap math (both hand- and touch-driven) sees the touched chord
+    // instead of stale hand state. Cleared when the chord touch lifts.
+    var touchChordDegree: Int? = nil
+    var touchChordOctave: Int = 0
+    var touchChordMidi: [Int] = []
+
     /// Radial layout only: whether each hand is in the center rest zone (held,
     /// not selecting). Read by the radial overlay to dim the wheel.
     private(set) var chordResting: Bool = false
@@ -427,6 +436,21 @@ final class ChordMelodyModeManager {
             }
             chordPinch.reset()
             pendingChordAccent = false
+        }
+
+        // Touch override (Split mode): if a finger is held on a chord wedge,
+        // force the published chord state to that chord so the melody-snap
+        // math — both the hand-tracked branch below and the touch-driven
+        // melody handler in `ContentView` — sees the touched chord rather
+        // than stale hand state. Hand input still wins on the frame it fires;
+        // this kicks in for taps + holds with the chord hand absent.
+        if let td = touchChordDegree {
+            padOn = true
+            padDegree = td
+            padOctaveShift = touchChordOctave
+            currentChordDegree = td
+            currentChordMidi = touchChordMidi.isEmpty ? currentChordMidi : touchChordMidi
+            chordResting = false
         }
 
         // -------------------- Melody hand --------------------

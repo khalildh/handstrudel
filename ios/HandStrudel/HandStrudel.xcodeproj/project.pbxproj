@@ -84,6 +84,8 @@
 		CM4D9E5A8B7C40119EE3A003 /* ChordMelodyOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM4D9E5A8B7C40119EE3A004 /* ChordMelodyOverlayView.swift */; };
 		RADIALCHORDMELODYOVL0003 /* RadialChordMelodyOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = RADIALCHORDMELODYOVL0004 /* RadialChordMelodyOverlayView.swift */; };
 		SPLITCHORDMELODYOVL00001 /* SplitChordMelodyOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SPLITCHORDMELODYOVL00002 /* SplitChordMelodyOverlayView.swift */; };
+		WEAVEVIEW0000000000001 /* WeaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WEAVEVIEW0000000000002 /* WeaveView.swift */; };
+		SPLITTOUCHOVL000000001 /* SplitTouchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = SPLITTOUCHOVL000000002 /* SplitTouchOverlay.swift */; };
 		CM4D9E5A8B7C40119EE3A005 /* ChordProgression.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */; };
 		EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D6C035D4A9EE1A66C31839 /* Loop.swift */; };
 		F1E2FAD696F5D1BAD3542162 /* MusicTheoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DBDD4E70DCF52094865C773 /* MusicTheoryTests.swift */; };
@@ -192,6 +194,8 @@
 		CM4D9E5A8B7C40119EE3A004 /* ChordMelodyOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordMelodyOverlayView.swift; sourceTree = "<group>"; };
 		RADIALCHORDMELODYOVL0004 /* RadialChordMelodyOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialChordMelodyOverlayView.swift; sourceTree = "<group>"; };
 		SPLITCHORDMELODYOVL00002 /* SplitChordMelodyOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitChordMelodyOverlayView.swift; sourceTree = "<group>"; };
+		WEAVEVIEW0000000000002 /* WeaveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeaveView.swift; sourceTree = "<group>"; };
+		SPLITTOUCHOVL000000002 /* SplitTouchOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitTouchOverlay.swift; sourceTree = "<group>"; };
 		CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordProgression.swift; sourceTree = "<group>"; };
 		F81CA2974F2ED11BEA62AC3F /* AudioLooper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLooper.swift; sourceTree = "<group>"; };
 		F82908DBFDBCFC2C1CC7DDA6 /* Snippet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snippet.swift; sourceTree = "<group>"; };
@@ -242,6 +246,8 @@
 				CM4D9E5A8B7C40119EE3A004 /* ChordMelodyOverlayView.swift */,
 				RADIALCHORDMELODYOVL0004 /* RadialChordMelodyOverlayView.swift */,
 				SPLITCHORDMELODYOVL00002 /* SplitChordMelodyOverlayView.swift */,
+				WEAVEVIEW0000000000002 /* WeaveView.swift */,
+				SPLITTOUCHOVL000000002 /* SplitTouchOverlay.swift */,
 				1C85B4858D833EF68AAD427C /* LearnSongPicker.swift */,
 				D986625C7BF30952FBAED619 /* OnboardingView.swift */,
 				A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */,
@@ -541,6 +547,8 @@
 				CM4D9E5A8B7C40119EE3A003 /* ChordMelodyOverlayView.swift in Sources */,
 				RADIALCHORDMELODYOVL0003 /* RadialChordMelodyOverlayView.swift in Sources */,
 				SPLITCHORDMELODYOVL00001 /* SplitChordMelodyOverlayView.swift in Sources */,
+				WEAVEVIEW0000000000001 /* WeaveView.swift in Sources */,
+				SPLITTOUCHOVL000000001 /* SplitTouchOverlay.swift in Sources */,
 				CM4D9E5A8B7C40119EE3A005 /* ChordProgression.swift in Sources */,
 				6871AA438EAC5767702D188F /* LearnSong.swift in Sources */,
 				73E81C762C77D3DB08064674 /* LearnSongPicker.swift in Sources */,

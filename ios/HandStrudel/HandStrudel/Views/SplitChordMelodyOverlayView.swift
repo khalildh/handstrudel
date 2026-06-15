@@ -35,6 +35,11 @@ struct SplitChordMelodyOverlayView: View {
     let melodyResting: Bool
     /// When true, chord = right semicircle, melody = left (lefty users).
     let swapHands: Bool
+    /// Chord sub-zones currently held by a touch (separate from hand state).
+    /// Lights them up the same way as the hand-driven active zone.
+    var touchedChordSubzones: Set<ChordSubzone> = []
+    /// Melody lanes currently held by a touch.
+    var touchedMelodyLanes: Set<Int> = []
 
     private var zoneCount: Int { max(1, chordNames.count) }
     private var melodyCount: Int { max(1, melodyNames.count) }
@@ -88,8 +93,13 @@ struct SplitChordMelodyOverlayView: View {
         let centerAngle = chordCenterAngle(forIndex: i, wedge: wedge)
         let start = Angle(degrees: centerAngle - wedge / 2)
         let end = Angle(degrees: centerAngle + wedge / 2)
-        let baseActive = isCurrent && chordOctaveShift == 0
+        // Hand-driven AND touch-driven highlights for each sub-zone.
+        let baseActive = (isCurrent && chordOctaveShift == 0) || touchedChordSubzones.contains(ChordSubzone(wedge: i, octave: 0))
         let baseHeld = isHeld && chordOctaveShift == 0
+        let upActive = (isCurrent && chordOctaveShift == 1) || touchedChordSubzones.contains(ChordSubzone(wedge: i, octave: 1))
+        let upHeld = isHeld && chordOctaveShift == 1
+        let downActive = (isCurrent && chordOctaveShift == -1) || touchedChordSubzones.contains(ChordSubzone(wedge: i, octave: -1))
+        let downHeld = isHeld && chordOctaveShift == -1
 
         // Inner band (deadzone → octaveR): base octave.
         wedgeShape(center: center, innerR: innerR, outerR: octaveR, start: start, end: end)
@@ -114,30 +124,31 @@ struct SplitChordMelodyOverlayView: View {
         octaveSubzone(center: center, innerR: octaveR, outerR: outerR,
                       start: upRange.0, end: upRange.1,
                       color: color,
-                      isCurrent: isCurrent && chordOctaveShift == 1,
-                      isHeld: isHeld && chordOctaveShift == 1)
+                      isCurrent: upActive,
+                      isHeld: upHeld)
         octaveSubzone(center: center, innerR: octaveR, outerR: outerR,
                       start: downRange.0, end: downRange.1,
                       color: color,
-                      isCurrent: isCurrent && chordOctaveShift == -1,
-                      isHeld: isHeld && chordOctaveShift == -1)
+                      isCurrent: downActive,
+                      isHeld: downHeld)
 
+        let labelActive = baseActive || upActive || downActive
         Text(chordLabel(i))
             .font(.system(size: 14, weight: .black, design: .rounded))
-            .foregroundColor(isCurrent ? .white : .white.opacity(0.7))
+            .foregroundColor(labelActive ? .white : .white.opacity(0.7))
             .shadow(color: .black.opacity(0.6), radius: 3)
             .position(polar(center: center, angleDeg: centerAngle, radius: (innerR + octaveR) / 2))
 
         Text("↑")
             .font(.system(size: 11, weight: .bold))
-            .foregroundColor((isCurrent && chordOctaveShift == 1) ? .white : .white.opacity(0.35))
+            .foregroundColor(upActive ? .white : .white.opacity(0.35))
             .shadow(color: .black.opacity(0.6), radius: 2)
             .position(polar(center: center,
                             angleDeg: chordSubzoneAngle(centerAngle: centerAngle, wedge: wedge, upper: true),
                             radius: (octaveR + outerR) / 2))
         Text("↓")
             .font(.system(size: 11, weight: .bold))
-            .foregroundColor((isCurrent && chordOctaveShift == -1) ? .white : .white.opacity(0.35))
+            .foregroundColor(downActive ? .white : .white.opacity(0.35))
             .shadow(color: .black.opacity(0.6), radius: 2)
             .position(polar(center: center,
                             angleDeg: chordSubzoneAngle(centerAngle: centerAngle, wedge: wedge, upper: false),
@@ -198,8 +209,9 @@ struct SplitChordMelodyOverlayView: View {
             ForEach(0..<melodyCount, id: \.self) { i in
                 // `i` is lane index — 0 = lowest pitch (bottom of arc),
                 // melodyCount-1 = highest (top of arc).
-                let isCurrent = melodyLane == i && !melodyResting
-                let isHeld = isCurrent && melodyHandPinching
+                let handActive = melodyLane == i && !melodyResting
+                let isCurrent = handActive || touchedMelodyLanes.contains(i)
+                let isHeld = handActive && melodyHandPinching
                 let centerAngle = melodyCenterAngle(forLane: i, wedge: wedge)
                 let start = Angle(degrees: centerAngle - wedge / 2)
                 let end = Angle(degrees: centerAngle + wedge / 2)
