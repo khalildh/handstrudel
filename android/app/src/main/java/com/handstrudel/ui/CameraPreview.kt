@@ -1,5 +1,7 @@
 package com.handstrudel.ui
 
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
@@ -80,11 +82,31 @@ fun CameraPreview(
 
 private fun processFrame(imageProxy: ImageProxy, handTracker: HandTrackingManager) {
     try {
-        // Pass raw bitmap + rotation to MediaPipe — no bitmap manipulation needed
-        val bitmap = imageProxy.toBitmap()
-        val rotation = imageProxy.imageInfo.rotationDegrees
-        handTracker.detectAsync(bitmap, rotation, imageProxy.imageInfo.timestamp / 1_000_000)
-        bitmap.recycle()
+        // Canonical MediaPipe HandLandmarker camera-frame prep, matching the
+        // google-ai-edge/mediapipe-samples helper: rotate the bitmap to the
+        // device's display orientation ourselves and horizontally mirror it for
+        // selfie view BEFORE handing it to MediaPipe.
+        //
+        // Relying on ImageProcessingOptions.setRotationDegrees gives flaky
+        // results (hands rendered sideways) — passing a pre-oriented bitmap is
+        // the supported path. After this transform, landmarks come back in the
+        // same coordinate space as what the PreviewView shows, so we don't need
+        // to mirror x ourselves anymore.
+        val raw = imageProxy.toBitmap()
+        val rotation = imageProxy.imageInfo.rotationDegrees.toFloat()
+        val w = imageProxy.width
+        val h = imageProxy.height
+
+        val matrix = Matrix().apply {
+            postRotate(rotation)
+            // Mirror horizontally so MediaPipe sees the same selfie-view image
+            // the user is looking at on PreviewView (CameraX visually mirrors
+            // the front camera preview but ImageAnalysis frames stay raw).
+            postScale(-1f, 1f, w.toFloat(), h.toFloat())
+        }
+        val oriented = Bitmap.createBitmap(raw, 0, 0, w, h, matrix, true)
+        handTracker.detectAsync(oriented, imageProxy.imageInfo.timestamp / 1_000_000)
+        raw.recycle()
     } finally {
         imageProxy.close()
     }

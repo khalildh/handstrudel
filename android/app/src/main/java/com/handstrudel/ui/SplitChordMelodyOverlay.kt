@@ -237,19 +237,11 @@ private fun DrawScope.drawSplitWheel(
     val deadR = outerR * splitDeadzone().toFloat()
     val octaveR = outerR * splitOctaveBandThreshold().toFloat()
 
-    // Background ring outline.
-    drawCircle(
-        color = Color.White.copy(alpha = 0.08f),
-        radius = outerR,
-        center = center,
-        style = Stroke(width = 2f)
-    )
-    drawCircle(
-        color = Color.White.copy(alpha = 0.05f),
-        radius = deadR,
-        center = center,
-        style = Stroke(width = 1.5f)
-    )
+    // Wheel + deadzone outlines. Solid enough to read on top of the camera feed.
+    val outline = Color.White.copy(alpha = 0.35f)
+    drawCircle(color = outline, radius = outerR, center = center, style = Stroke(width = 2.5f))
+    drawCircle(color = outline, radius = deadR, center = center, style = Stroke(width = 1.5f))
+    drawCircle(color = outline.copy(alpha = 0.15f), radius = octaveR, center = center, style = Stroke(width = 1f))
 
     // ---- Chord side ----
     val chordWedge = 180.0 / ZONE_COUNT
@@ -268,7 +260,7 @@ private fun DrawScope.drawSplitWheel(
         val downActive = (isCurrent && chordOctaveShift == -1) || downTouched
 
         val accent = Color(0xFF00FF9E)
-        val baseFill = if (baseActive) accent.copy(alpha = if (chordHandPinching && isCurrent) 0.55f else 0.35f) else Color.White.copy(alpha = 0.06f)
+        val baseFill = if (baseActive) accent.copy(alpha = if (chordHandPinching && isCurrent) 0.55f else 0.35f) else Color.White.copy(alpha = 0.10f)
         drawAnnularSector(center, deadR, octaveR, composeStart, sweep, baseFill)
 
         // Outer band split into +1 octave (closer to top of arc) and -1 (closer to bottom).
@@ -276,8 +268,8 @@ private fun DrawScope.drawSplitWheel(
         val upSweep = sweep / 2f
         val downStart = composeStart + sweep / 2f
         val downSweep = sweep / 2f
-        val upFill = if (upActive) accent.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.04f)
-        val downFill = if (downActive) accent.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.04f)
+        val upFill = if (upActive) accent.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.06f)
+        val downFill = if (downActive) accent.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.06f)
         // For Right side, the "top of arc" is at lower compose angle (90° earlier).
         // For Left side, the "top of arc" is at higher compose angle (the END of the wedge).
         if (chordSide == Side.LEFT) {
@@ -307,10 +299,10 @@ private fun DrawScope.drawSplitWheel(
 
     // ---- Melody side ----
     val melodyWedge = 180.0 / MELODY_COUNT
+    val melodyAccent = Color(0xFFFF9E00)
     for (i in 0 until MELODY_COUNT) {
         // Lane i: top of arc = highest pitch. The wedge at the top of the arc
         // corresponds to lane (MELODY_COUNT - 1). So wedge index `w_idx` = MELODY_COUNT - 1 - lane.
-        // Equivalently, iterate by wedge index and derive lane.
         val laneFromWedge = MELODY_COUNT - 1 - i
         val (rustStart, rustEnd) = melodyWedgeBounds(melodySide, i, melodyWedge)
         val composeStart = composeAngle(rustStart)
@@ -318,9 +310,25 @@ private fun DrawScope.drawSplitWheel(
 
         val handActive = melodyLane == laneFromWedge && !melodyResting
         val isActive = handActive || touchedMelodyLanes.contains(laneFromWedge)
-        val accent = Color(0xFFFF9E00)
-        val fill = if (isActive) accent.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.05f)
+        val fill = if (isActive) melodyAccent.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.10f)
         drawAnnularSector(center, deadR, outerR, composeStart, sweep, fill)
+
+        // Lane number — small label so the player can see how many lanes there are.
+        val labelAngleRust = (rustStart + rustEnd) / 2.0
+        val labelR = (deadR + outerR) / 2f
+        val labelP = polar(center, labelAngleRust, labelR.toDouble())
+        val text = (laneFromWedge + 1).toString()
+        val style = labelStyle.copy(
+            fontSize = 11.sp,
+            color = if (isActive) Color.White else Color.White.copy(alpha = 0.55f),
+        )
+        val measured = measurer.measure(AnnotatedString(text), style)
+        drawText(
+            measurer,
+            text = text,
+            topLeft = Offset(labelP.x - measured.size.width / 2f, labelP.y - measured.size.height / 2f),
+            style = style,
+        )
     }
 }
 

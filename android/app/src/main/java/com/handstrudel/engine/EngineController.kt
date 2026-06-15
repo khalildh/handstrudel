@@ -230,6 +230,10 @@ class EngineController(context: Context) {
     // -----------------------------------------------------------------------
 
     private fun tickChordMelodyMode(hands: HandsState) {
+        // Silence the continuous melodic oscillator — chord-melody mode owns
+        // the voice stack, the always-on hum from melodic mode would muddy it.
+        synthEngine.melodicActive = false
+
         val coreHands = hands.toCoreHands()
         val actions = chordMelodyManager.tick(coreHands, chordMelodyTones, false, false)
 
