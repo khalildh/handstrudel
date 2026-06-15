@@ -57,6 +57,35 @@ final class HandStrudelUITests: XCTestCase {
         }
     }
 
+    /// All modes live behind an "Other modes" disclosure at the bottom of the
+    /// settings sheet now. Tests that switch modes need to scroll there and
+    /// expand it first. Assumes the sheet is already open.
+    private func expandOtherModes() {
+        // SwiftUI's DisclosureGroup label can show up as either a static text
+        // or a button depending on iOS version — match both.
+        var attempts = 0
+        while attempts < 8 {
+            let asText = app.staticTexts["Other modes"]
+            let asButton = app.buttons["Other modes"]
+            if asText.isHittable { asText.tap(); return }
+            if asButton.isHittable { asButton.tap(); return }
+            app.swipeUp()
+            attempts += 1
+        }
+    }
+
+    /// Switch to a mode that's hidden behind the "Other modes" disclosure.
+    /// Returns the mode element after expansion + tapping.
+    @discardableResult
+    private func switchToMode(_ identifier: String) -> XCUIElement {
+        expandOtherModes()
+        let mode = element(identifier)
+        if mode.waitForExistence(timeout: 2), mode.isHittable {
+            mode.tap()
+        }
+        return mode
+    }
+
     // MARK: - Start Overlay Tests
 
     func testLaunch_showsStartOverlay() {
@@ -160,9 +189,10 @@ final class HandStrudelUITests: XCTestCase {
     func testOnboarding_showsTips() {
         launchToSessionWithOnboarding()
         _ = element("onboarding-got-it").waitForExistence(timeout: 5)
-        XCTAssertTrue(app.staticTexts["Move your hands up & down"].exists)
-        XCTAssertTrue(app.staticTexts["Spread your fingers"].exists)
-        XCTAssertTrue(app.staticTexts["Tap the record button"].exists)
+        // Onboarding was rewritten to match Split (the new default mode).
+        XCTAssertTrue(app.staticTexts["Left half = chords"].exists)
+        XCTAssertTrue(app.staticTexts["Right half = melody"].exists)
+        XCTAssertTrue(app.staticTexts["Pinch — or just tap"].exists)
     }
 
     func testOnboarding_gotItDismisses() {
@@ -181,22 +211,29 @@ final class HandStrudelUITests: XCTestCase {
         let settingsBtn = element("settings-button")
         XCTAssertTrue(settingsBtn.waitForExistence(timeout: 3))
         settingsBtn.tap()
-        XCTAssertTrue(app.staticTexts["MODE"].waitForExistence(timeout: 5))
+        // HARMONY is the first section header that's always present (the
+        // top-of-sheet MODE header was removed when the mode picker moved
+        // into the bottom-of-sheet "Other modes" disclosure).
+        XCTAssertTrue(app.staticTexts["HARMONY"].waitForExistence(timeout: 5))
     }
 
     func testControlSheet_showsHarmonySection() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
         let harmony = app.staticTexts["HARMONY"]
-        if !harmony.exists { app.swipeUp() }
-        XCTAssertTrue(harmony.waitForExistence(timeout: 3))
+        XCTAssertTrue(harmony.waitForExistence(timeout: 5))
     }
 
     func testControlSheet_showsSoundSection() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        // Sound + BPM hide in chord-melody-family modes (the default Split is
+        // routed through the SoundFont sampler). Switch to Melodic to bring
+        // them back; that's the mode whose entire point is the Strudel synth.
+        switchToMode("mode-melodic")
+        app.swipeDown()   // dismiss + reopen so the sheet redraws past hidden sections
+        element("settings-button").tap()
         let sound = app.staticTexts["SOUND"]
         if !sound.exists { app.swipeUp() }
         XCTAssertTrue(sound.waitForExistence(timeout: 3))
@@ -205,7 +242,10 @@ final class HandStrudelUITests: XCTestCase {
     func testControlSheet_showsBPMSection() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-melodic")
+        app.swipeDown()
+        element("settings-button").tap()
         let bpm = app.staticTexts["BPM"]
         if !bpm.exists { app.swipeUp() }
         XCTAssertTrue(bpm.waitForExistence(timeout: 3))
@@ -216,8 +256,10 @@ final class HandStrudelUITests: XCTestCase {
     func testModeSection_showsAllModes() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        XCTAssertTrue(element("mode-melodic").exists)
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        // All modes live in the bottom-of-sheet "Other modes" disclosure now.
+        expandOtherModes()
+        XCTAssertTrue(element("mode-melodic").waitForExistence(timeout: 2))
         XCTAssertTrue(element("mode-grid").exists)
         XCTAssertTrue(element("mode-drums").exists)
         XCTAssertTrue(element("mode-learn").exists)
@@ -226,35 +268,45 @@ final class HandStrudelUITests: XCTestCase {
     func testModeSwitching_tapGrid() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        element("mode-grid").tap()
-        XCTAssertTrue(app.staticTexts["Range"].waitForExistence(timeout: 2))
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-grid")
+        app.swipeDown()
+        XCTAssertTrue(app.staticTexts["Range"].waitForExistence(timeout: 3))
     }
 
     func testModeSwitching_tapDrums() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        element("mode-drums").tap()
-        XCTAssertTrue(element("mode-drums").exists)
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-drums")
+        // Reopen the sheet so we can confirm the mode chip is now selected.
+        app.swipeDown()
+        element("settings-button").tap()
+        expandOtherModes()
+        XCTAssertTrue(element("mode-drums").waitForExistence(timeout: 2))
     }
 
     func testModeSwitching_tapLearn_showsSongPicker() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        element("mode-learn").tap()
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-learn")
         XCTAssertTrue(app.staticTexts["LEARN"].waitForExistence(timeout: 3))
     }
 
     func testModeSwitching_backToMelodic() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        element("mode-grid").tap()
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-grid")
         sleep(1)
-        element("mode-melodic").tap()
-        XCTAssertTrue(element("mode-melodic").exists)
+        element("settings-button").tap()
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-melodic")
+        sleep(1)
+        element("settings-button").tap()
+        expandOtherModes()
+        XCTAssertTrue(element("mode-melodic").waitForExistence(timeout: 2))
     }
 
     // MARK: - Harmony Tests
@@ -262,9 +314,7 @@ final class HandStrudelUITests: XCTestCase {
     func testHarmony_keySelection() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
         let harmony = app.staticTexts["HARMONY"]
-        if !harmony.exists { app.swipeUp() }
         _ = harmony.waitForExistence(timeout: 3)
         let keyD = app.staticTexts["D"].firstMatch
         if keyD.exists { keyD.tap() }
@@ -274,9 +324,7 @@ final class HandStrudelUITests: XCTestCase {
     func testHarmony_scaleSelection() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
         let harmony = app.staticTexts["HARMONY"]
-        if !harmony.exists { app.swipeUp() }
         _ = harmony.waitForExistence(timeout: 3)
         let minor = app.staticTexts["Minor"].firstMatch
         if minor.exists { minor.tap() }
@@ -288,7 +336,12 @@ final class HandStrudelUITests: XCTestCase {
     func testBPM_showsValue() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        // BPM is hidden in chord-melody-family modes (the default Split). Pop
+        // into Melodic where the tempo slider belongs.
+        switchToMode("mode-melodic")
+        app.swipeDown()
+        element("settings-button").tap()
         let bpm = app.staticTexts["BPM"]
         if !bpm.exists { app.swipeUp() }
         XCTAssertTrue(bpm.waitForExistence(timeout: 3))
@@ -300,8 +353,8 @@ final class HandStrudelUITests: XCTestCase {
     func testLearnSongPicker_showsMelodies() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        element("mode-learn").tap()
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-learn")
         _ = app.staticTexts["LEARN"].waitForExistence(timeout: 3)
         XCTAssertTrue(app.staticTexts["MELODIES"].exists)
     }
@@ -309,8 +362,8 @@ final class HandStrudelUITests: XCTestCase {
     func testLearnSongPicker_showsPractice() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        element("mode-learn").tap()
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-learn")
         _ = app.staticTexts["LEARN"].waitForExistence(timeout: 3)
         let practice = app.staticTexts["PRACTICE"]
         if !practice.exists { app.swipeUp() }
@@ -320,8 +373,8 @@ final class HandStrudelUITests: XCTestCase {
     func testLearnSongPicker_showsSongCards() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        element("mode-learn").tap()
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-learn")
         _ = app.staticTexts["LEARN"].waitForExistence(timeout: 3)
         XCTAssertTrue(element("song-Twinkle Twinkle").waitForExistence(timeout: 3))
     }
@@ -329,8 +382,8 @@ final class HandStrudelUITests: XCTestCase {
     func testLearnSongPicker_showsPracticeButtons() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        element("mode-learn").tap()
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-learn")
         _ = app.staticTexts["LEARN"].waitForExistence(timeout: 3)
         let practice = app.staticTexts["PRACTICE"]
         if !practice.exists { app.swipeUp() }
@@ -342,8 +395,8 @@ final class HandStrudelUITests: XCTestCase {
     func testLearnSongPicker_showsImportSection() {
         launchToSession()
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
-        element("mode-learn").tap()
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
+        switchToMode("mode-learn")
         _ = app.staticTexts["LEARN"].waitForExistence(timeout: 3)
         let importSection = app.staticTexts["IMPORT"]
         if !importSection.exists { app.swipeUp() }
