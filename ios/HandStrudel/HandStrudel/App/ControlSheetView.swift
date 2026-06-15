@@ -44,14 +44,30 @@ struct ControlSheet: View {
                 }
                 harmonySection
 
-                sectionDivider
-                soundSection
+                // The Strudel waveform / sampled-instrument picker only has
+                // an audible effect when the active mode is voiced through the
+                // WebView synth. SoundFont-routed modes have their own
+                // instrument picker tucked inside the chord+melody block.
+                if !activePathUsesSoundFont {
+                    sectionDivider
+                    soundSection
+                }
 
-                sectionDivider
-                bpmSection
+                // BPM and the parameter strip only matter for modes that play
+                // Strudel patterns or feed the effect chain. Chord-melody
+                // family modes (Split / Radial / Chord+Melody / SoundFont) are
+                // direct noteOn/noteOff against the sampler or synth, so the
+                // smoothed musical params aren't doing anything — hide them.
+                // BPM still feeds drums / quantize / auto-strum but it's noise
+                // for the first-run user; they can dig into Melodic mode if
+                // they actually need tempo control without drums.
+                if !isChordMelodyFamily {
+                    sectionDivider
+                    bpmSection
 
-                sectionDivider
-                paramsSection
+                    sectionDivider
+                    paramsSection
+                }
 
                 sectionDivider
                 drumTrackSection(
@@ -217,6 +233,31 @@ struct ControlSheet: View {
             return true
         default:
             return false
+        }
+    }
+
+    /// The chord+melody family: shared two-hand interaction, direct noteOn/Off
+    /// against either the SoundFont sampler or the Strudel synth (no patterns,
+    /// no effect chain in play). Used to prune sections of the settings sheet
+    /// that have no audible effect in these modes.
+    private var isChordMelodyFamily: Bool {
+        switch currentMode {
+        case .chordMelody, .radialChordMelody, .splitChordMelody, .soundFont:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether the active mode routes through the SoundFont sampler — in
+    /// which case the `selectedWaveform` picker (Strudel synth voices /
+    /// bundled samples) is decorative and should be hidden.
+    private var activePathUsesSoundFont: Bool {
+        switch currentMode {
+        case .soundFont: return true
+        case .splitChordMelody: return engine.splitUseSoundFont
+        case .radialChordMelody: return engine.radialUseSoundFont
+        default: return false
         }
     }
 

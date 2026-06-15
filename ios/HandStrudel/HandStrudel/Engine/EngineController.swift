@@ -190,7 +190,10 @@ final class EngineController: ObservableObject {
 
     /// Currently selected chord progression (subset of diatonic degrees the
     /// chord hand cycles through). Defaults to "Free" — all 7 diatonic chords.
-    @Published var chordMelodyProgression: ChordProgression = CHORD_PROGRESSIONS.first(where: { $0.isFree }) ?? CHORD_PROGRESSIONS[0] {
+    @Published var chordMelodyProgression: ChordProgression =
+        (CHORD_PROGRESSIONS.first(where: { $0.id == "pop" })
+         ?? CHORD_PROGRESSIONS.first(where: { $0.isFree })
+         ?? CHORD_PROGRESSIONS[0]) {
         didSet { chordMelodyModeManager.zoneDegrees = chordMelodyProgression.degrees }
     }
 
@@ -241,7 +244,7 @@ final class EngineController: ObservableObject {
 
     // Harmony
     @Published var selectedKey: MusicKey = .C
-    @Published var selectedScale: Scale = .pentatonic
+    @Published var selectedScale: Scale = .major
     @Published var chordMode: Bool = false
     @Published var circleOfFifthsEnabled: Bool = false
     @Published var chordDisplay: String = ""
