@@ -115,4 +115,31 @@ private fun DrawScope.drawHand(hand: HandData, color: Color) {
         val p = pt(i)
         drawCircle(color = color.copy(alpha = 0.3f), radius = 2.5f, center = p)
     }
+
+    // Pinch indicator — the spot where the wheel actually reads the hand.
+    // Sits at the midpoint of the thumb tip (4) and index tip (8), exactly
+    // matching the (pinch_x, pinch_y) coordinate driving the chord-melody
+    // manager. Ring radius and glow scale with how closed the pinch is, so
+    // it pops the moment thumb and index touch.
+    val thumb = pt(4)
+    val index = pt(8)
+    val pinchPoint = Offset((thumb.x + index.x) / 2f, (thumb.y + index.y) / 2f)
+    val pinchAmt = hand.pinch.toFloat().coerceIn(0f, 1f)
+    val baseRadius = 9f
+    val activeRadius = baseRadius + pinchAmt * 7f
+    drawCircle(
+        color = color.copy(alpha = 0.25f + pinchAmt * 0.5f),
+        radius = activeRadius + 6f,
+        center = pinchPoint
+    )
+    drawCircle(
+        color = color.copy(alpha = 0.85f),
+        radius = activeRadius,
+        center = pinchPoint
+    )
+    drawCircle(
+        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f + pinchAmt * 0.6f),
+        radius = activeRadius * 0.4f,
+        center = pinchPoint
+    )
 }

@@ -28,9 +28,24 @@ class EngineController(context: Context) {
     /// Real-instrument voice for chord-melody mode. Loaded once on startup;
     /// SynthEngine pulls samples from it each chunk via its `soundFont`
     /// reference. Null if the SF2 asset can't be loaded.
-    private val soundFont: SoundFontEngine? = SoundFontEngine
+    val soundFont: SoundFontEngine? = SoundFontEngine
         .fromAsset(context, "soundfonts/GeneralUser-GS.sf2", sampleRate = 44100)
         .also { synthEngine.soundFont = it }
+
+    private val _selectedInstrument = MutableStateFlow(DEFAULT_SOUNDFONT_INSTRUMENT)
+    val selectedInstrumentFlow: kotlinx.coroutines.flow.StateFlow<SoundFontInstrument> = _selectedInstrument
+    var selectedInstrument: SoundFontInstrument
+        get() = _selectedInstrument.value
+        set(value) {
+            if (_selectedInstrument.value.id == value.id) return
+            _selectedInstrument.value = value
+            // Switching instruments mid-play would otherwise leave the old
+            // preset's notes ringing. Cut everything cleanly first.
+            soundFont?.allNotesOff()
+            padVoices.clear()
+            splitVoiceSubvoices.clear()
+            soundFont?.setDefaultPreset(value.program)
+        }
 
     /// Shared Rust-backed chord+melody state machine. Same struct used by iOS;
     /// drives Split / Radial / Grid layouts with one tick implementation.

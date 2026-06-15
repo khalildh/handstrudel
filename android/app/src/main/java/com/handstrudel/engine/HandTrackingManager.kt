@@ -114,10 +114,14 @@ class HandTrackingManager(context: Context) {
             }
 
             // Frame is already rotated + mirrored upstream (selfie view), so
-            // landmark coordinates map directly onto the PreviewView — no need
-            // to mirror x or swap chirality.
+            // landmark *coordinates* map directly onto the PreviewView with no
+            // extra mirror. But mirroring the image also flips the visual
+            // cues MediaPipe uses to classify handedness (thumb side, palm
+            // orientation), so its "Left" is actually the user's right hand
+            // and vice versa. Swap to match the on-screen side / the user's
+            // anatomical hand. Matches the iOS Vision flow.
             val landmarks = raw.map { lm -> HandLandmark(lm.x(), lm.y(), lm.z()) }
-            val chirality = rawChirality
+            val chirality = if (rawChirality == "Left") "Right" else "Left"
             val handData = computeHandData(landmarks, chirality)
 
             if (chirality == "Left") left = handData

@@ -36,7 +36,9 @@ import com.handstrudel.engine.EngineController
 import com.handstrudel.models.CHORD_PROGRESSIONS
 import com.handstrudel.models.ChordProgression
 import com.handstrudel.models.MusicKey
+import com.handstrudel.models.SOUNDFONT_INSTRUMENTS
 import com.handstrudel.models.Scale
+import com.handstrudel.models.SoundFontInstrument
 
 private val ACCENT = Color(0xFF00FF9E)
 private val SURFACE = Color(0xFF181818)
@@ -59,6 +61,9 @@ fun SplitSettingsSheet(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
+            SectionLabel("INSTRUMENT")
+            InstrumentRow(engine)
+
             SectionLabel("KEY")
             KeyRow(engine)
 
@@ -120,6 +125,41 @@ private fun ScaleRow(engine: EngineController) {
                 onClick = { engine.selectedScale = scale },
             )
         }
+    }
+}
+
+@Composable
+private fun InstrumentRow(engine: EngineController) {
+    val selected by engine.selectedInstrumentFlow.collectAsState()
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(SOUNDFONT_INSTRUMENTS) { instrument ->
+            InstrumentChip(
+                instrument = instrument,
+                isSelected = instrument.id == selected.id,
+                onClick = { engine.selectedInstrument = instrument },
+            )
+        }
+    }
+}
+
+@Composable
+private fun InstrumentChip(instrument: SoundFontInstrument, isSelected: Boolean, onClick: () -> Unit) {
+    val bg = if (isSelected) ACCENT.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f)
+    val fg = if (isSelected) ACCENT else Color.White.copy(alpha = 0.85f)
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(instrument.emoji, fontSize = 14.sp)
+        Text(instrument.name, color = fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
