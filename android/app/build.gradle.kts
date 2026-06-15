@@ -38,6 +38,9 @@ android {
 }
 
 dependencies {
+    // Shared music logic compiled from Rust via UniFFI.
+    implementation(project(":core"))
+
     // Compose
     val composeBom = platform("androidx.compose:compose-bom:2024.10.00")
     implementation(composeBom)

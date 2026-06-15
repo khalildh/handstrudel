@@ -19,10 +19,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.util.Log
 import com.handstrudel.engine.EngineController
 import com.handstrudel.engine.HandsState
 import com.handstrudel.models.PRESETS
 import com.handstrudel.models.Preset
+import uniffi.handstrudel_core.MusicKey as CoreKey
+import uniffi.handstrudel_core.Scale as CoreScale
+import uniffi.handstrudel_core.chordDisplayName
+import uniffi.handstrudel_core.chordNotes
+import uniffi.handstrudel_core.midiNoteName
 
 @Composable
 fun HandStrudelApp() {
@@ -162,7 +168,23 @@ fun StartScreen(onStart: (Preset) -> Unit) {
             text = "your hands are the instrument",
             fontSize = 14.sp,
             color = Color.White.copy(alpha = 0.5f),
-            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+        )
+
+        // Sanity check that the shared Rust core is loaded and callable. Shows
+        // the I chord of C major as MIDI names — entirely computed in Rust.
+        val rustCoreSample = remember {
+            val notes = chordNotes(CoreKey.C, CoreScale.MAJOR, 0)
+            val label = chordDisplayName(CoreKey.C, CoreScale.MAJOR, 0)
+            val text = "core: $label = ${notes.joinToString(" ") { midiNoteName(it) }}"
+            Log.i("HandStrudelCore", text)
+            text
+        }
+        Text(
+            text = rustCoreSample,
+            fontSize = 11.sp,
+            color = Color(0xFF00FF9E).copy(alpha = 0.6f),
+            modifier = Modifier.padding(bottom = 16.dp)
         )
 
         // Section header

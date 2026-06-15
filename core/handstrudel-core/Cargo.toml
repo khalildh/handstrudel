@@ -1,0 +1,16 @@
+[package]
+name = "handstrudel-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "handstrudel_core"
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+uniffi = { version = "0.28", features = ["cli"] }
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
