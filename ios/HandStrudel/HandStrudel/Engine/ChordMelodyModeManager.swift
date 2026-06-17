@@ -42,7 +42,12 @@ final class ChordMelodyModeManager {
     ///   only across its 180° arc. Hands that stray into the other half are
     ///   treated as resting (no new selection) so they can't accidentally
     ///   poach the other voice.
-    enum Layout { case grid, radial, split }
+    /// `scale` is a richer cousin of `split`: same wheel geometry and chord
+    /// half, but the melody hand picks from the **full diatonic scale** (7
+    /// wedges = one octave), and the chord pad is voiced as a 7th chord
+    /// (root / 3rd / 5th / 7th) instead of a plain triad. The outer melody
+    /// band shifts the melody octave by ±1, mirroring the chord side.
+    enum Layout { case grid, radial, split, scale }
     var layout: Layout = .grid
 
     /// Which half of the wheel a hand owns in `.split` layout.
@@ -109,6 +114,13 @@ final class ChordMelodyModeManager {
     private var padOctaveShift: Int = 0
     /// Latest chord-hand Y read, published for UI.
     private(set) var currentOctaveShift: Int = 0
+    /// Latest melody-hand octave shift (Scale mode only). 0 in other layouts.
+    private(set) var currentMelodyOctaveShift: Int = 0
+    /// Number of melody snap targets the last `tick` saw. Used by
+    /// `currentZones` so the published highlight wedge count matches the
+    /// audio wedge count when the melody arc isn't fixed-width (Scale mode,
+    /// which fans the active scale — 5 wedges for pentatonic, 7 for major).
+    private var lastMelodyTargetCount: Int = 9
 
     // MARK: - Aspect-fill correction (set from EngineController each tick)
 
@@ -248,8 +260,15 @@ final class ChordMelodyModeManager {
     /// This way "reach up" → higher, "reach down" → lower, even though the
     /// chord wedges fan along a curved arc.
     func splitOctaveShift(side: Side, angle: Double, radius: Double, wedgeIndex: Int) -> Int {
+        return splitOctaveShift(side: side, angle: angle, radius: radius,
+                                wedgeIndex: wedgeIndex, count: zoneCount)
+    }
+
+    /// Variant that takes an explicit wedge count, used by Scale mode's melody
+    /// side (where the wedge count is the scale length, not `zoneCount`).
+    func splitOctaveShift(side: Side, angle: Double, radius: Double, wedgeIndex: Int, count: Int) -> Int {
         guard radius >= Self.splitOctaveBandThreshold else { return 0 }
-        guard zoneCount > 0 else { return 0 }
+        guard count > 0 else { return 0 }
         var a = angle.truncatingRemainder(dividingBy: 360)
         if a < 0 { a += 360 }
         let offsetFromTop: Double
@@ -261,7 +280,7 @@ final class ChordMelodyModeManager {
             guard a >= 0, a < 180 else { return 0 }
             offsetFromTop = a
         }
-        let wedgeLen = 180.0 / Double(zoneCount)
+        let wedgeLen = 180.0 / Double(count)
         let withinWedge = offsetFromTop - Double(wedgeIndex) * wedgeLen
         // Lower half of the wedge (closer to top of arc) → +1 octave; upper
         // half (closer to bottom of arc) → −1.
@@ -313,7 +332,11 @@ final class ChordMelodyModeManager {
             }
             let zone = radialWedgeIndex(angle: v.angle, count: zoneCount)
             return (degreeForZone(zone), 0, false)
-        case .split:
+        case .split, .scale:
+            // Same chord-side math for both — what differs between Split and
+            // Scale lives on the melody half (full diatonic vs chord tones)
+            // and in the chord *voicing* (triad vs 7th), handled by the
+            // controller — not in the wedge selection here.
             let v = radialVector(x: h.pinchX, y: h.pinchY)
             let holdValue = (padDegree ?? currentChordDegree ?? 0, padOctaveShift, true)
             guard v.radius >= Self.splitDeadzone else { return holdValue }
@@ -327,22 +350,25 @@ final class ChordMelodyModeManager {
         }
     }
 
-    /// Resolve the melody hand into a (lane, resting) reading for the active
-    /// layout. Resting holds the last lane so a pinch from the center replays
-    /// the most recent note.
-    private func readMelodyHand(_ h: HandData, noteCount: Int) -> (lane: Int, resting: Bool) {
-        guard noteCount > 0 else { return (0, false) }
-        let restValue = {
+    /// Resolve the melody hand into a `(lane, octaveShift, resting)` reading
+    /// for the active layout. Resting holds the last lane so a pinch from the
+    /// center replays the most recent note. `octaveShift` is meaningful only
+    /// for `.scale` (whose outer band shifts the melody by ±1 octave);
+    /// other layouts always return 0 there because the octave is baked into
+    /// the snap-target list.
+    private func readMelodyHand(_ h: HandData, noteCount: Int) -> (lane: Int, octave: Int, resting: Bool) {
+        guard noteCount > 0 else { return (0, 0, false) }
+        let restValue: () -> (Int, Int, Bool) = {
             let fallback = self.lastMelodyLane ?? noteCount / 2
-            return (max(0, min(noteCount - 1, fallback)), true)
+            return (max(0, min(noteCount - 1, fallback)), 0, true)
         }
         switch layout {
         case .grid:
-            return (yToMelodyLane(h.pinchY, noteCount: noteCount), false)
+            return (yToMelodyLane(h.pinchY, noteCount: noteCount), 0, false)
         case .radial:
             let v = radialVector(x: h.pinchX, y: h.pinchY)
             if v.radius < Self.radialDeadzone { return restValue() }
-            return (radialWedgeIndex(angle: v.angle, count: noteCount), false)
+            return (radialWedgeIndex(angle: v.angle, count: noteCount), 0, false)
         case .split:
             let v = radialVector(x: h.pinchX, y: h.pinchY)
             guard v.radius >= Self.splitDeadzone else { return restValue() }
@@ -351,7 +377,21 @@ final class ChordMelodyModeManager {
             }
             // Wedge 0 sits at the TOP of the arc; invert so top = highest pitch
             // (matches the grid layout's "up = higher" feel).
-            return (noteCount - 1 - wedge, false)
+            return (noteCount - 1 - wedge, 0, false)
+        case .scale:
+            // Same wedge math as `.split`, but the outer band on the melody
+            // side now drives a ±1 octave shift (same idea as the chord
+            // side's octave band). The melodySnapTargets passed in are one
+            // octave of the scale; the controller applies the shift.
+            let v = radialVector(x: h.pinchX, y: h.pinchY)
+            guard v.radius >= Self.splitDeadzone else { return restValue() }
+            guard let wedge = splitWedgeIndex(side: melodySide, angle: v.angle, count: noteCount) else {
+                return restValue()
+            }
+            let lane = noteCount - 1 - wedge
+            let octave = splitOctaveShift(side: melodySide, angle: v.angle, radius: v.radius,
+                                          wedgeIndex: wedge, count: noteCount)
+            return (lane, octave, false)
         }
     }
 
@@ -461,11 +501,22 @@ final class ChordMelodyModeManager {
         // chord, then degree 0, so the melody hand always makes sound.
         let snapDegree = padDegree ?? currentChordDegree ?? 0
         let melodySnapTargets = melodyTones(snapDegree)
+        // Record for `currentZones` so the visual wedge count matches the
+        // count actually used to pick a note (matters in Scale mode where
+        // the arc fans the active scale: 5 wedges for pentatonic, 7 for
+        // major, etc.).
+        if !melodySnapTargets.isEmpty {
+            lastMelodyTargetCount = melodySnapTargets.count
+        }
 
         if let h = melodyHand(hands), !melodySnapTargets.isEmpty {
             let reading = readMelodyHand(h, noteCount: melodySnapTargets.count)
             let laneIdx = min(melodySnapTargets.count - 1, max(0, reading.lane))
-            let midi = melodySnapTargets[laneIdx]
+            // Scale mode passes a single octave of scale notes here and uses
+            // `reading.octave` to shift the chosen note by ±12 — the other
+            // layouts bake the octave into `melodySnapTargets` and always read
+            // `reading.octave == 0`.
+            let midi = melodySnapTargets[laneIdx] + reading.octave * 12
             let allowChange = !quantize || gridBoundaryCrossed
 
             switch melodyPinch.update(pinch: h.pinch) {
@@ -535,7 +586,7 @@ final class ChordMelodyModeManager {
                 if !chordResting {
                     lastChordZoneIndex = radialWedgeIndex(angle: v.angle, count: zoneCount)
                 }
-            case .split:
+            case .split, .scale:
                 let v = radialVector(x: h.pinchX, y: h.pinchY)
                 if v.radius < Self.splitDeadzone {
                     chordResting = true
@@ -571,6 +622,24 @@ final class ChordMelodyModeManager {
                     melodyResting = false
                 } else {
                     melodyResting = true
+                }
+            case .scale:
+                let v = radialVector(x: h.pinchX, y: h.pinchY)
+                // Use the count `tick` actually fanned — that matches both
+                // the audio wedge picker and the overlay's wedge rendering.
+                let scaleCount = max(1, lastMelodyTargetCount)
+                if v.radius < Self.splitDeadzone {
+                    melodyResting = true
+                    currentMelodyOctaveShift = 0
+                } else if let wedge = splitWedgeIndex(side: melodySide, angle: v.angle, count: scaleCount) {
+                    lastMelodyLane = scaleCount - 1 - wedge
+                    melodyResting = false
+                    currentMelodyOctaveShift = splitOctaveShift(side: melodySide, angle: v.angle,
+                                                                radius: v.radius,
+                                                                wedgeIndex: wedge, count: scaleCount)
+                } else {
+                    melodyResting = true
+                    currentMelodyOctaveShift = 0
                 }
             }
         }

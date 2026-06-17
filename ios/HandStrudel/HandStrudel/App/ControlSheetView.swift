@@ -189,11 +189,12 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody, radialChordMelody, splitChordMelody, soundFont }
+    private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody, radialChordMelody, splitChordMelody, scaleChordMelody, soundFont }
     private var currentMode: AppMode {
         if engine.learnModeEnabled { return .learn }
         if engine.radialChordMelodyModeEnabled { return .radialChordMelody }
         if engine.splitChordMelodyModeEnabled { return .splitChordMelody }
+        if engine.scaleChordMelodyModeEnabled { return .scaleChordMelody }
         if engine.chordMelodyModeEnabled { return .chordMelody }
         if engine.soundFontModeEnabled { return .soundFont }
         if engine.gridModeEnabled { return .grid }
@@ -215,7 +216,8 @@ struct ControlSheet: View {
             flow: mode == .flow,
             soundFont: mode == .soundFont,
             radialChordMelody: mode == .radialChordMelody,
-            splitChordMelody: mode == .splitChordMelody
+            splitChordMelody: mode == .splitChordMelody,
+            scaleChordMelody: mode == .scaleChordMelody
         )
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
@@ -228,7 +230,7 @@ struct ControlSheet: View {
     /// hide entirely so the sheet doesn't open with a vacant rectangle.
     private var hasModeContextControls: Bool {
         switch currentMode {
-        case .chordMelody, .radialChordMelody, .splitChordMelody,
+        case .chordMelody, .radialChordMelody, .splitChordMelody, .scaleChordMelody,
              .soundFont, .grid:
             return true
         default:
@@ -242,7 +244,7 @@ struct ControlSheet: View {
     /// that have no audible effect in these modes.
     private var isChordMelodyFamily: Bool {
         switch currentMode {
-        case .chordMelody, .radialChordMelody, .splitChordMelody, .soundFont:
+        case .chordMelody, .radialChordMelody, .splitChordMelody, .scaleChordMelody, .soundFont:
             return true
         default:
             return false
@@ -256,6 +258,7 @@ struct ControlSheet: View {
         switch currentMode {
         case .soundFont: return true
         case .splitChordMelody: return engine.splitUseSoundFont
+        case .scaleChordMelody: return engine.scaleUseSoundFont
         case .radialChordMelody: return engine.radialUseSoundFont
         default: return false
         }
@@ -267,13 +270,15 @@ struct ControlSheet: View {
             // (`otherModesPickerSection`). This section only carries the
             // contextual controls for whatever the active mode is.
 
-            if currentMode == .chordMelody || currentMode == .radialChordMelody || currentMode == .splitChordMelody {
+            if currentMode == .chordMelody || currentMode == .radialChordMelody || currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
                 quantizeRow
                 VStack(alignment: .leading, spacing: 10) {
                     Text(currentMode == .radialChordMelody
                         ? "One wheel shared by both hands: reach toward the outer ring (lettered chords) with the chord hand, the inner ring (lettered notes) with the melody hand. Rest in the center to hold — any chord or note is one move away. Pinch the chord hand for an accent."
                         : currentMode == .splitChordMelody
                         ? "Single circle split in half: chord hand fans across the left semicircle (chords top → bottom), melody hand fans across the right semicircle (high pitch at top, low at bottom). Rest in the center to hold. Each hand stays on its own half — straying to the other side just holds the current voice."
+                        : currentMode == .scaleChordMelody
+                        ? "Like Split, but the melody half plays the full diatonic scale (7 notes per octave instead of just chord tones) and the chord half voices 7th chords. The outer ring on the melody side shifts the note up or down an octave."
                         : "Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(.secondary)
@@ -351,12 +356,23 @@ struct ControlSheet: View {
                     }
                     .tint(.green)
 
-                    if currentMode == .radialChordMelody || currentMode == .splitChordMelody {
+                    if currentMode == .radialChordMelody || currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
                         let useSF = Binding<Bool>(
-                            get: { currentMode == .radialChordMelody ? engine.radialUseSoundFont : engine.splitUseSoundFont },
+                            get: {
+                                switch currentMode {
+                                case .radialChordMelody: return engine.radialUseSoundFont
+                                case .splitChordMelody: return engine.splitUseSoundFont
+                                case .scaleChordMelody: return engine.scaleUseSoundFont
+                                default: return false
+                                }
+                            },
                             set: {
-                                if currentMode == .radialChordMelody { engine.radialUseSoundFont = $0 }
-                                else { engine.splitUseSoundFont = $0 }
+                                switch currentMode {
+                                case .radialChordMelody: engine.radialUseSoundFont = $0
+                                case .splitChordMelody: engine.splitUseSoundFont = $0
+                                case .scaleChordMelody: engine.scaleUseSoundFont = $0
+                                default: break
+                                }
                             }
                         )
                         Toggle(isOn: useSF) {
@@ -549,23 +565,23 @@ struct ControlSheet: View {
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
                         modeButton("Split", icon: "circle.lefthalf.filled", mode: .splitChordMelody)
+                        modeButton("Scale", icon: "music.quarternote.3", mode: .scaleChordMelody)
                         modeButton("Radial", icon: "circle.circle", mode: .radialChordMelody)
-                        modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
                     }
                     HStack(spacing: 8) {
+                        modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
                         modeButton("SoundFont", icon: "pianokeys.inverse", mode: .soundFont)
                         modeButton("Melodic", icon: "pianokeys", mode: .melodic)
-                        modeButton("Flow", icon: "waveform", mode: .flow)
                     }
                     HStack(spacing: 8) {
+                        modeButton("Flow", icon: "waveform", mode: .flow)
                         modeButton("Hybrid", icon: "waveform.path", mode: .hybrid)
                         modeButton("Lead", icon: "guitars", mode: .lead)
-                        modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
                     }
                     HStack(spacing: 8) {
+                        modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
                         modeButton("Drums", icon: "beats.headphones", mode: .drums)
                         modeButton("Learn", icon: "music.note.list", mode: .learn)
-                        Color.clear.frame(maxWidth: .infinity)
                     }
                 }
                 .padding(.top, 8)

@@ -172,12 +172,17 @@ final class EngineController: ObservableObject {
     /// chord hand owns one semicircle and the melody hand owns the other.
     /// Shares all chordMelody* state; only the manager's `layout` differs.
     @Published var splitChordMelodyModeEnabled = false
+    /// Scale variant of Split — full diatonic scale on the melody side, 7th
+    /// chords on the chord side, melody octave shift on the outer band.
+    @Published var scaleChordMelodyModeEnabled = false
     /// Route radial mode through the native SoundFont sampler instead of the
     /// WebView synth. Only consulted when `radialChordMelodyModeEnabled` is on.
     @Published var radialUseSoundFont: Bool = false
     /// Route split mode through the native SoundFont sampler. Only consulted
     /// when `splitChordMelodyModeEnabled` is on.
     @Published var splitUseSoundFont: Bool = true
+    /// Route Scale mode through the native SoundFont sampler.
+    @Published var scaleUseSoundFont: Bool = true
     @Published var chordMelodySwapHands = false  // left=chords by default; toggle for lefties
     @Published var chordMelodyPadVolume: Double = 0.6   // sustained chord pad gain (100% of the 0…0.6 slider range)
     let chordMelodyModeManager = ChordMelodyModeManager()
@@ -284,6 +289,7 @@ final class EngineController: ObservableObject {
         case "chordmelody": chordMelodyModeEnabled = true
         case "radialchordmelody": radialChordMelodyModeEnabled = true
         case "splitchordmelody": splitChordMelodyModeEnabled = true
+        case "scalechordmelody": scaleChordMelodyModeEnabled = true
         case "soundfont": soundFontModeEnabled = true
         case "lead": leadModeEnabled = true
         case "hybrid": hybridModeEnabled = true
@@ -486,7 +492,9 @@ final class EngineController: ObservableObject {
         // radial layout flag, so the same controller works for both layouts.
         if radialChordMelodyModeEnabled && radialUseSoundFont { return soundFontMode }
         if splitChordMelodyModeEnabled && splitUseSoundFont { return soundFontMode }
-        if chordMelodyModeEnabled || radialChordMelodyModeEnabled || splitChordMelodyModeEnabled { return chordMelodyMode }
+        if scaleChordMelodyModeEnabled && scaleUseSoundFont { return soundFontMode }
+        if chordMelodyModeEnabled || radialChordMelodyModeEnabled
+            || splitChordMelodyModeEnabled || scaleChordMelodyModeEnabled { return chordMelodyMode }
         if gridModeEnabled { return gridMode }
         if drumModeEnabled { return drumMode }
         return melodicMode
@@ -537,7 +545,8 @@ final class EngineController: ObservableObject {
         // idempotent, so this covers both the mode-switch and restore paths.
         soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
 
-        chordMelodyModeManager.layout = splitChordMelodyModeEnabled ? .split
+        chordMelodyModeManager.layout = scaleChordMelodyModeEnabled ? .scale
+            : splitChordMelodyModeEnabled ? .split
             : radialChordMelodyModeEnabled ? .radial
             : .grid
         chordMelodyModeManager.swapHands = chordMelodySwapHands
@@ -546,13 +555,19 @@ final class EngineController: ObservableObject {
         chordMelodyModeManager.screenAspect = bounds.width / bounds.height
 
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
+        let scaleMode = scaleChordMelodyModeEnabled
 
         let chordTones: (Int) -> [Int] = { [weak self] degree in
             guard let self else { return [] }
-            return chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
+            return scaleMode
+                ? chordNotesWithSeventh(key: self.selectedKey, scale: self.selectedScale, degree: degree)
+                : chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
         }
         let melodyTones: (Int) -> [Int] = { [weak self] degree in
             guard let self else { return [] }
+            if scaleMode {
+                return scaleNotesOneOctave(key: self.selectedKey, scale: self.selectedScale)
+            }
             let triad = chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
             var lanes: [Int] = []
             for octave in 0..<3 {
@@ -1019,7 +1034,8 @@ final class EngineController: ObservableObject {
     func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
                     lead: Bool = false, hybrid: Bool = false, flow: Bool = false,
                     soundFont: Bool = false, radialChordMelody: Bool = false,
-                    splitChordMelody: Bool = false) {
+                    splitChordMelody: Bool = false,
+                    scaleChordMelody: Bool = false) {
         silenceAll()
         gridModeEnabled = grid
         drumModeEnabled = drums
@@ -1027,6 +1043,7 @@ final class EngineController: ObservableObject {
         chordMelodyModeEnabled = chordMelody
         radialChordMelodyModeEnabled = radialChordMelody
         splitChordMelodyModeEnabled = splitChordMelody
+        scaleChordMelodyModeEnabled = scaleChordMelody
         leadModeEnabled = lead
         hybridModeEnabled = hybrid
         flowModeEnabled = flow
@@ -1043,6 +1060,7 @@ final class EngineController: ObservableObject {
         if soundFontModeEnabled { return "soundfont" }
         if radialChordMelodyModeEnabled { return "radialchordmelody" }
         if splitChordMelodyModeEnabled { return "splitchordmelody" }
+        if scaleChordMelodyModeEnabled { return "scalechordmelody" }
         if chordMelodyModeEnabled { return "chordmelody" }
         if leadModeEnabled { return "lead" }
         if hybridModeEnabled { return "hybrid" }
@@ -1096,6 +1114,7 @@ final class EngineController: ObservableObject {
         chordMelodyModeEnabled = false
         radialChordMelodyModeEnabled = false
         splitChordMelodyModeEnabled = false
+        scaleChordMelodyModeEnabled = false
         leadModeEnabled = false
         hybridModeEnabled = false
         flowModeEnabled = false
