@@ -35,6 +35,24 @@ struct SplitChordMelodyOverlayView: View {
     let melodyResting: Bool
     /// When true, chord = right semicircle, melody = left (lefty users).
     let swapHands: Bool
+    /// Chord sub-zones currently held by a touch (separate from hand state).
+    /// Lights them up the same way as the hand-driven active zone.
+    var touchedChordSubzones: Set<ChordSubzone> = []
+    /// Melody lanes currently held by a touch.
+    var touchedMelodyLanes: Set<Int> = []
+    /// Lane indices that are *chord tones* of the currently-held chord —
+    /// drawn with the chord's accent color so the player can see which
+    /// scale notes are consonant landing targets. Only set in Scale mode;
+    /// empty in Split (where every melody lane is already a chord tone).
+    var chordToneLanes: Set<Int> = []
+    /// Melody-side octave shift driven by the outer radial band (Scale mode).
+    /// 0 in Split since the melody side doesn't have an octave band.
+    var melodyOctaveShift: Int = 0
+
+    /// In Scale mode the melody half gets the same inner-band + outer-octave
+    /// treatment as the chord side. Detected by the presence of either
+    /// chord-tone lanes or a non-zero octave shift.
+    private var isScaleMode: Bool { !chordToneLanes.isEmpty || melodyOctaveShift != 0 }
 
     private var zoneCount: Int { max(1, chordNames.count) }
     private var melodyCount: Int { max(1, melodyNames.count) }
@@ -57,7 +75,11 @@ struct SplitChordMelodyOverlayView: View {
 
             ZStack {
                 chordHalf(center: center, innerR: deadR, outerR: outerR, octaveR: octaveR)
-                melodyHalf(center: center, innerR: deadR, outerR: outerR)
+                if isScaleMode {
+                    melodyHalfWithOctaveBand(center: center, innerR: deadR, outerR: outerR, octaveR: octaveR)
+                } else {
+                    melodyHalf(center: center, innerR: deadR, outerR: outerR)
+                }
                 divider(center: center, innerR: deadR, outerR: outerR)
                 restHole(center: center, radius: deadR)
             }
@@ -88,8 +110,13 @@ struct SplitChordMelodyOverlayView: View {
         let centerAngle = chordCenterAngle(forIndex: i, wedge: wedge)
         let start = Angle(degrees: centerAngle - wedge / 2)
         let end = Angle(degrees: centerAngle + wedge / 2)
-        let baseActive = isCurrent && chordOctaveShift == 0
+        // Hand-driven AND touch-driven highlights for each sub-zone.
+        let baseActive = (isCurrent && chordOctaveShift == 0) || touchedChordSubzones.contains(ChordSubzone(wedge: i, octave: 0))
         let baseHeld = isHeld && chordOctaveShift == 0
+        let upActive = (isCurrent && chordOctaveShift == 1) || touchedChordSubzones.contains(ChordSubzone(wedge: i, octave: 1))
+        let upHeld = isHeld && chordOctaveShift == 1
+        let downActive = (isCurrent && chordOctaveShift == -1) || touchedChordSubzones.contains(ChordSubzone(wedge: i, octave: -1))
+        let downHeld = isHeld && chordOctaveShift == -1
 
         // Inner band (deadzone → octaveR): base octave.
         wedgeShape(center: center, innerR: innerR, outerR: octaveR, start: start, end: end)
@@ -114,30 +141,31 @@ struct SplitChordMelodyOverlayView: View {
         octaveSubzone(center: center, innerR: octaveR, outerR: outerR,
                       start: upRange.0, end: upRange.1,
                       color: color,
-                      isCurrent: isCurrent && chordOctaveShift == 1,
-                      isHeld: isHeld && chordOctaveShift == 1)
+                      isCurrent: upActive,
+                      isHeld: upHeld)
         octaveSubzone(center: center, innerR: octaveR, outerR: outerR,
                       start: downRange.0, end: downRange.1,
                       color: color,
-                      isCurrent: isCurrent && chordOctaveShift == -1,
-                      isHeld: isHeld && chordOctaveShift == -1)
+                      isCurrent: downActive,
+                      isHeld: downHeld)
 
+        let labelActive = baseActive || upActive || downActive
         Text(chordLabel(i))
             .font(.system(size: 14, weight: .black, design: .rounded))
-            .foregroundColor(isCurrent ? .white : .white.opacity(0.7))
+            .foregroundColor(labelActive ? .white : .white.opacity(0.7))
             .shadow(color: .black.opacity(0.6), radius: 3)
             .position(polar(center: center, angleDeg: centerAngle, radius: (innerR + octaveR) / 2))
 
         Text("↑")
             .font(.system(size: 11, weight: .bold))
-            .foregroundColor((isCurrent && chordOctaveShift == 1) ? .white : .white.opacity(0.35))
+            .foregroundColor(upActive ? .white : .white.opacity(0.35))
             .shadow(color: .black.opacity(0.6), radius: 2)
             .position(polar(center: center,
                             angleDeg: chordSubzoneAngle(centerAngle: centerAngle, wedge: wedge, upper: true),
                             radius: (octaveR + outerR) / 2))
         Text("↓")
             .font(.system(size: 11, weight: .bold))
-            .foregroundColor((isCurrent && chordOctaveShift == -1) ? .white : .white.opacity(0.35))
+            .foregroundColor(downActive ? .white : .white.opacity(0.35))
             .shadow(color: .black.opacity(0.6), radius: 2)
             .position(polar(center: center,
                             angleDeg: chordSubzoneAngle(centerAngle: centerAngle, wedge: wedge, upper: false),
@@ -198,8 +226,9 @@ struct SplitChordMelodyOverlayView: View {
             ForEach(0..<melodyCount, id: \.self) { i in
                 // `i` is lane index — 0 = lowest pitch (bottom of arc),
                 // melodyCount-1 = highest (top of arc).
-                let isCurrent = melodyLane == i && !melodyResting
-                let isHeld = isCurrent && melodyHandPinching
+                let handActive = melodyLane == i && !melodyResting
+                let isCurrent = handActive || touchedMelodyLanes.contains(i)
+                let isHeld = handActive && melodyHandPinching
                 let centerAngle = melodyCenterAngle(forLane: i, wedge: wedge)
                 let start = Angle(degrees: centerAngle - wedge / 2)
                 let end = Angle(degrees: centerAngle + wedge / 2)
@@ -228,6 +257,134 @@ struct SplitChordMelodyOverlayView: View {
                     .position(polar(center: center, angleDeg: centerAngle, radius: (innerR + outerR) / 2))
             }
         }
+    }
+
+    // MARK: - Scale-mode melody half (inner band + octave shift outer band)
+
+    @ViewBuilder
+    private func melodyHalfWithOctaveBand(center: CGPoint, innerR: CGFloat, outerR: CGFloat, octaveR: CGFloat) -> some View {
+        let wedge = 180.0 / Double(melodyCount)
+        ZStack {
+            ForEach(0..<melodyCount, id: \.self) { i in
+                scaleMelodyWedge(lane: i, wedge: wedge,
+                                 center: center, innerR: innerR, outerR: outerR, octaveR: octaveR)
+            }
+        }
+    }
+
+    /// One melody wedge in Scale mode: inner band = base octave at that scale
+    /// degree, outer band split angularly into ±1 octave halves (same pattern
+    /// as a chord wedge). Chord-tone lanes get the chord's accent color so
+    /// the player can see consonant landing targets at a glance.
+    @ViewBuilder
+    private func scaleMelodyWedge(lane i: Int, wedge: Double,
+                                  center: CGPoint, innerR: CGFloat, outerR: CGFloat, octaveR: CGFloat) -> some View {
+        let isChordTone = chordToneLanes.contains(i)
+        let toneColor: Color = isChordTone ? Color.green : Color.cyan
+        let handActive = melodyLane == i && !melodyResting
+        let isCurrent = handActive || touchedMelodyLanes.contains(i)
+        let isHeld = handActive && melodyHandPinching
+
+        // The melody side mirrors the chord side: index 0 sits at the bottom
+        // (lowest pitch) — same `melodyCenterAngle` math as Split.
+        let centerAngle = melodyCenterAngle(forLane: i, wedge: wedge)
+        let start = Angle(degrees: centerAngle - wedge / 2)
+        let end = Angle(degrees: centerAngle + wedge / 2)
+
+        let baseActive = isCurrent && melodyOctaveShift == 0
+        let baseHeld = isHeld && melodyOctaveShift == 0
+
+        // Inner band — base octave. Resting fill is bumped + we stack a black
+        // outline behind the color stroke so the wedge reads cleanly against
+        // the live camera feed.
+        wedgeShape(center: center, innerR: innerR, outerR: octaveR, start: start, end: end)
+            .fill(
+                baseHeld ? toneColor.opacity(0.6) :
+                baseActive ? toneColor.opacity(0.4) :
+                isChordTone ? toneColor.opacity(0.30) : Color.cyan.opacity(0.16)
+            )
+            .overlay(
+                wedgeShape(center: center, innerR: innerR, outerR: octaveR, start: start, end: end)
+                    .stroke(Color.black.opacity(0.65), lineWidth: 2.5)
+            )
+            .overlay(
+                wedgeShape(center: center, innerR: innerR, outerR: octaveR, start: start, end: end)
+                    .stroke(
+                        baseHeld ? toneColor :
+                        baseActive ? toneColor.opacity(0.9) :
+                        isChordTone ? toneColor.opacity(0.85) : Color.cyan.opacity(0.55),
+                        lineWidth: baseHeld ? 2.5 : (baseActive ? 1.8 : 1.2)
+                    )
+            )
+            .shadow(color: baseHeld ? toneColor.opacity(0.6) : .clear, radius: 10)
+
+        // Outer ±1 octave sub-zones. The "closer-to-top-of-arc" half is +1.
+        // Melody side's chordIsRightHalf is the opposite of the chord side
+        // (different semicircle), so up/down map the other way.
+        let melodyIsRightHalf = !chordIsRightHalf
+        let mid = Angle(degrees: centerAngle)
+        let upRange: (Angle, Angle) = melodyIsRightHalf ? (start, mid) : (mid, end)
+        let downRange: (Angle, Angle) = melodyIsRightHalf ? (mid, end) : (start, mid)
+
+        scaleMelodyOctaveSubzone(center: center, innerR: octaveR, outerR: outerR,
+                                 start: upRange.0, end: upRange.1, toneColor: toneColor,
+                                 isCurrent: isCurrent && melodyOctaveShift == 1,
+                                 isHeld: isHeld && melodyOctaveShift == 1,
+                                 isChordTone: isChordTone)
+        scaleMelodyOctaveSubzone(center: center, innerR: octaveR, outerR: outerR,
+                                 start: downRange.0, end: downRange.1, toneColor: toneColor,
+                                 isCurrent: isCurrent && melodyOctaveShift == -1,
+                                 isHeld: isHeld && melodyOctaveShift == -1,
+                                 isChordTone: isChordTone)
+
+        Text(melodyLabel(i))
+            .font(.system(size: 12, weight: .black, design: .rounded))
+            .foregroundColor(.white)
+            .shadow(color: .black.opacity(0.85), radius: 3)
+            .position(polar(center: center, angleDeg: centerAngle, radius: (innerR + octaveR) / 2))
+
+        // ±1 octave hint arrows near the rim.
+        let upMidpoint = melodyIsRightHalf ? (centerAngle - wedge / 4) : (centerAngle + wedge / 4)
+        let downMidpoint = melodyIsRightHalf ? (centerAngle + wedge / 4) : (centerAngle - wedge / 4)
+        Text("↑")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundColor(isCurrent && melodyOctaveShift == 1 ? .white : toneColor.opacity(0.35))
+            .position(polar(center: center, angleDeg: wrappedAngle(upMidpoint), radius: (octaveR + outerR) / 2))
+        Text("↓")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundColor(isCurrent && melodyOctaveShift == -1 ? .white : toneColor.opacity(0.35))
+            .position(polar(center: center, angleDeg: wrappedAngle(downMidpoint), radius: (octaveR + outerR) / 2))
+    }
+
+    private func wrappedAngle(_ a: Double) -> Double {
+        var x = a
+        if x < 0 { x += 360 }
+        if x >= 360 { x -= 360 }
+        return x
+    }
+
+    /// One outer-band sub-zone in the Scale-mode melody half — black backing
+    /// stroke for contrast against the camera feed, then a colored stroke and
+    /// fill that brightens when active.
+    @ViewBuilder
+    private func scaleMelodyOctaveSubzone(
+        center: CGPoint, innerR: CGFloat, outerR: CGFloat,
+        start: Angle, end: Angle,
+        toneColor: Color,
+        isCurrent: Bool, isHeld: Bool, isChordTone: Bool
+    ) -> some View {
+        let fillOpacity: Double = isCurrent ? (isHeld ? 0.55 : 0.35) : (isChordTone ? 0.16 : 0.10)
+        let strokeOpacity: Double = isCurrent ? 0.95 : (isChordTone ? 0.55 : 0.35)
+        wedgeShape(center: center, innerR: innerR, outerR: outerR, start: start, end: end)
+            .fill(toneColor.opacity(fillOpacity))
+            .overlay(
+                wedgeShape(center: center, innerR: innerR, outerR: outerR, start: start, end: end)
+                    .stroke(Color.black.opacity(0.65), lineWidth: 2)
+            )
+            .overlay(
+                wedgeShape(center: center, innerR: innerR, outerR: outerR, start: start, end: end)
+                    .stroke(toneColor.opacity(strokeOpacity), lineWidth: isCurrent ? 1.8 : 1)
+            )
     }
 
     // MARK: - Divider line

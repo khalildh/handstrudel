@@ -230,7 +230,8 @@ let SOUNDFONT_INSTRUMENTS: [SoundFontInstrument] = [
     SoundFontInstrument(id: "gunshot",           name: "Gunshot",            emoji: "💥", program: 127, category: .soundFX),
 ]
 
-let DEFAULT_SOUNDFONT_INSTRUMENT = SOUNDFONT_INSTRUMENTS[0]
+let DEFAULT_SOUNDFONT_INSTRUMENT: SoundFontInstrument =
+    SOUNDFONT_INSTRUMENTS.first(where: { $0.id == "violin" }) ?? SOUNDFONT_INSTRUMENTS[0]
 
 /// Look up an instrument by id, falling back to the default.
 func soundFontInstrument(id: String) -> SoundFontInstrument {

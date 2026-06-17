@@ -12,6 +12,10 @@ struct ControlSheet: View {
     @State private var soundFontCategory: GMCategory = DEFAULT_SOUNDFONT_INSTRUMENT.category
     @State private var customProgressionText = ""
     @State private var progressionCategory: ProgressionCategory = .essentials
+    /// "Other modes" disclosure — collapsed by default so the mode picker
+    /// surfaces only Split. Auto-expands on appear when the active mode is one
+    /// of the buried ones, so returning users don't have to dig for their mode.
+    @State private var showOtherModes = false
 
     var body: some View {
         ScrollView {
@@ -34,18 +38,36 @@ struct ControlSheet: View {
                     }
                 }
 
-                modeSection
-                sectionDivider
+                if hasModeContextControls {
+                    modeSection
+                    sectionDivider
+                }
                 harmonySection
 
-                sectionDivider
-                soundSection
+                // The Strudel waveform / sampled-instrument picker only has
+                // an audible effect when the active mode is voiced through the
+                // WebView synth. SoundFont-routed modes have their own
+                // instrument picker tucked inside the chord+melody block.
+                if !activePathUsesSoundFont {
+                    sectionDivider
+                    soundSection
+                }
 
-                sectionDivider
-                bpmSection
+                // BPM and the parameter strip only matter for modes that play
+                // Strudel patterns or feed the effect chain. Chord-melody
+                // family modes (Split / Radial / Chord+Melody / SoundFont) are
+                // direct noteOn/noteOff against the sampler or synth, so the
+                // smoothed musical params aren't doing anything — hide them.
+                // BPM still feeds drums / quantize / auto-strum but it's noise
+                // for the first-run user; they can dig into Melodic mode if
+                // they actually need tempo control without drums.
+                if !isChordMelodyFamily {
+                    sectionDivider
+                    bpmSection
 
-                sectionDivider
-                paramsSection
+                    sectionDivider
+                    paramsSection
+                }
 
                 sectionDivider
                 drumTrackSection(
@@ -86,6 +108,9 @@ struct ControlSheet: View {
                     sectionDivider
                     trackSection
                 }
+
+                sectionDivider
+                otherModesPickerSection
 
             }
             .padding(20)
@@ -164,11 +189,12 @@ struct ControlSheet: View {
 
     // MARK: - Mode
 
-    private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody, radialChordMelody, splitChordMelody, soundFont }
+    private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody, radialChordMelody, splitChordMelody, scaleChordMelody, soundFont }
     private var currentMode: AppMode {
         if engine.learnModeEnabled { return .learn }
         if engine.radialChordMelodyModeEnabled { return .radialChordMelody }
         if engine.splitChordMelodyModeEnabled { return .splitChordMelody }
+        if engine.scaleChordMelodyModeEnabled { return .scaleChordMelody }
         if engine.chordMelodyModeEnabled { return .chordMelody }
         if engine.soundFontModeEnabled { return .soundFont }
         if engine.gridModeEnabled { return .grid }
@@ -190,48 +216,69 @@ struct ControlSheet: View {
             flow: mode == .flow,
             soundFont: mode == .soundFont,
             radialChordMelody: mode == .radialChordMelody,
-            splitChordMelody: mode == .splitChordMelody
+            splitChordMelody: mode == .splitChordMelody,
+            scaleChordMelody: mode == .scaleChordMelody
         )
         if mode == .learn && engine.currentLearnSong == nil {
             showLearnPicker = true
         }
     }
 
+    /// Whether the current mode has any contextual controls to surface at the
+    /// top of the sheet. Modes without mode-specific UI in `modeSection`
+    /// (Melodic/Flow/Hybrid/Lead/Drums/Learn) cause the section + divider to
+    /// hide entirely so the sheet doesn't open with a vacant rectangle.
+    private var hasModeContextControls: Bool {
+        switch currentMode {
+        case .chordMelody, .radialChordMelody, .splitChordMelody, .scaleChordMelody,
+             .soundFont, .grid:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// The chord+melody family: shared two-hand interaction, direct noteOn/Off
+    /// against either the SoundFont sampler or the Strudel synth (no patterns,
+    /// no effect chain in play). Used to prune sections of the settings sheet
+    /// that have no audible effect in these modes.
+    private var isChordMelodyFamily: Bool {
+        switch currentMode {
+        case .chordMelody, .radialChordMelody, .splitChordMelody, .scaleChordMelody, .soundFont:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether the active mode routes through the SoundFont sampler — in
+    /// which case the `selectedWaveform` picker (Strudel synth voices /
+    /// bundled samples) is decorative and should be hidden.
+    private var activePathUsesSoundFont: Bool {
+        switch currentMode {
+        case .soundFont: return true
+        case .splitChordMelody: return engine.splitUseSoundFont
+        case .scaleChordMelody: return engine.scaleUseSoundFont
+        case .radialChordMelody: return engine.radialUseSoundFont
+        default: return false
+        }
+    }
+
     private var modeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("MODE", icon: "gamecontroller")
+            // The mode picker lives at the bottom of the sheet now
+            // (`otherModesPickerSection`). This section only carries the
+            // contextual controls for whatever the active mode is.
 
-            // 10 modes — wrap so each button still has a usable target size.
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    modeButton("Melodic", icon: "pianokeys", mode: .melodic)
-                    modeButton("Flow", icon: "waveform", mode: .flow)
-                    modeButton("Hybrid", icon: "waveform.path", mode: .hybrid)
-                }
-                HStack(spacing: 8) {
-                    modeButton("Lead", icon: "guitars", mode: .lead)
-                    modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
-                    modeButton("Drums", icon: "beats.headphones", mode: .drums)
-                }
-                HStack(spacing: 8) {
-                    modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
-                    modeButton("Radial", icon: "circle.circle", mode: .radialChordMelody)
-                    modeButton("Split", icon: "circle.lefthalf.filled", mode: .splitChordMelody)
-                }
-                HStack(spacing: 8) {
-                    modeButton("SoundFont", icon: "pianokeys.inverse", mode: .soundFont)
-                    modeButton("Learn", icon: "music.note.list", mode: .learn)
-                    Color.clear.frame(maxWidth: .infinity)
-                }
-            }
-
-            if currentMode == .chordMelody || currentMode == .radialChordMelody || currentMode == .splitChordMelody {
+            if currentMode == .chordMelody || currentMode == .radialChordMelody || currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
                 quantizeRow
                 VStack(alignment: .leading, spacing: 10) {
                     Text(currentMode == .radialChordMelody
                         ? "One wheel shared by both hands: reach toward the outer ring (lettered chords) with the chord hand, the inner ring (lettered notes) with the melody hand. Rest in the center to hold — any chord or note is one move away. Pinch the chord hand for an accent."
                         : currentMode == .splitChordMelody
                         ? "Single circle split in half: chord hand fans across the left semicircle (chords top → bottom), melody hand fans across the right semicircle (high pitch at top, low at bottom). Rest in the center to hold. Each hand stays on its own half — straying to the other side just holds the current voice."
+                        : currentMode == .scaleChordMelody
+                        ? "Like Split, but the melody half plays the full diatonic scale (7 notes per octave instead of just chord tones) and the chord half voices 7th chords. The outer ring on the melody side shifts the note up or down an octave."
                         : "Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(.secondary)
@@ -309,12 +356,23 @@ struct ControlSheet: View {
                     }
                     .tint(.green)
 
-                    if currentMode == .radialChordMelody || currentMode == .splitChordMelody {
+                    if currentMode == .radialChordMelody || currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
                         let useSF = Binding<Bool>(
-                            get: { currentMode == .radialChordMelody ? engine.radialUseSoundFont : engine.splitUseSoundFont },
+                            get: {
+                                switch currentMode {
+                                case .radialChordMelody: return engine.radialUseSoundFont
+                                case .splitChordMelody: return engine.splitUseSoundFont
+                                case .scaleChordMelody: return engine.scaleUseSoundFont
+                                default: return false
+                                }
+                            },
                             set: {
-                                if currentMode == .radialChordMelody { engine.radialUseSoundFont = $0 }
-                                else { engine.splitUseSoundFont = $0 }
+                                switch currentMode {
+                                case .radialChordMelody: engine.radialUseSoundFont = $0
+                                case .splitChordMelody: engine.splitUseSoundFont = $0
+                                case .scaleChordMelody: engine.scaleUseSoundFont = $0
+                                default: break
+                                }
                             }
                         )
                         Toggle(isOn: useSF) {
@@ -493,6 +551,52 @@ struct ControlSheet: View {
                     }
                 }
                 .padding(.top, 4)
+            }
+        }
+    }
+
+    /// All modes — including Split — live behind a disclosure at the very
+    /// bottom of the sheet. A first-run user lands in Split by default and
+    /// never has to think about modes. Anyone curious has to scroll past
+    /// every other section to find this.
+    private var otherModesPickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            DisclosureGroup(isExpanded: $showOtherModes) {
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        modeButton("Split", icon: "circle.lefthalf.filled", mode: .splitChordMelody)
+                        modeButton("Scale", icon: "music.quarternote.3", mode: .scaleChordMelody)
+                        modeButton("Radial", icon: "circle.circle", mode: .radialChordMelody)
+                    }
+                    HStack(spacing: 8) {
+                        modeButton("Chord+Melody", icon: "hand.raised.fingers.spread", mode: .chordMelody)
+                        modeButton("SoundFont", icon: "pianokeys.inverse", mode: .soundFont)
+                        modeButton("Melodic", icon: "pianokeys", mode: .melodic)
+                    }
+                    HStack(spacing: 8) {
+                        modeButton("Flow", icon: "waveform", mode: .flow)
+                        modeButton("Hybrid", icon: "waveform.path", mode: .hybrid)
+                        modeButton("Lead", icon: "guitars", mode: .lead)
+                    }
+                    HStack(spacing: 8) {
+                        modeButton("Grid", icon: "square.grid.3x3", mode: .grid)
+                        modeButton("Drums", icon: "beats.headphones", mode: .drums)
+                        modeButton("Learn", icon: "music.note.list", mode: .learn)
+                    }
+                }
+                .padding(.top, 8)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 11))
+                    Text("Other modes")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                }
+                .foregroundColor(.white.opacity(0.45))
+            }
+            .tint(.white.opacity(0.5))
+            .onAppear {
+                if currentMode != .splitChordMelody { showOtherModes = true }
             }
         }
     }

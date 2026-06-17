@@ -22,6 +22,18 @@ struct ContentView: View {
     @State private var showLearnPicker = false
     @State private var watermarkView: UIView?
     @State private var showRandomizedToast = false
+    /// In melodic mode, tapping the screen toggles the floating chrome (top
+    /// bar, code pill, note badge, beat ring) off so the camera + Weave
+    /// reads clean. Tap again to bring it back. Other modes always show
+    /// their chrome since the controls are essential.
+    @State private var chromeVisible = true
+    /// Touch-driven highlights for Split mode (UIKit multitouch overlay).
+    @State private var splitTouchChordZones: Set<ChordSubzone> = []
+    @State private var splitTouchMelodyLanes: Set<Int> = []
+    /// Stack of currently-held chord touches (parent voice ID + chord data).
+    /// The last entry is the "live" touch chord — it overrides the camera so
+    /// the melody snap follows whatever the player is touching.
+    @State private var splitTouchChordStack: [SplitTouchChord] = []
     // Song mode removed
 
     var body: some View {
@@ -88,6 +100,195 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Weave inputs & melodic-active probe
+
+    /// Music-reactive accent color, derived from the existing `strudelHue`.
+    /// Saturation/brightness fixed so the color stays legible on black at any
+    /// hue.
+    private var accentColor: Color {
+        let h = strudelHue
+        return Color(hue: h < 0 ? h + 1 : h, saturation: 0.68, brightness: 1.0)
+    }
+
+    /// Normalize a live musical parameter to 0…1 using its `PARAM_DEFS` range.
+    /// Falls back to 0.5 when the param isn't registered (Weave keeps moving).
+    private func normalizedParam(_ id: String) -> Double {
+        guard let def = PARAM_DEFS.first(where: { $0.id == id }) else { return 0.5 }
+        let v = engine.smoothedParams[id] ?? def.defaultValue
+        let range = def.max - def.min
+        guard range > 0 else { return 0.5 }
+        return max(0, min(1, (v - def.min) / range))
+    }
+
+    /// True when the active mode is a "melodic-family" mode (vanilla Melodic,
+    /// Flow, Hybrid, Lead). These share the Weave + center-note display and
+    /// support tap-to-hide HUD. All other modes have their own spatial UI.
+    private var melodicActive: Bool {
+        !engine.gridModeEnabled && !engine.drumModeEnabled
+            && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled
+            && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.scaleChordMelodyModeEnabled
+            && !engine.soundFontModeEnabled
+    }
+
+    // MARK: - Split / Scale overlay data helpers
+
+    /// Lettered chord names per zone, with a "⁷" suffix in Scale mode to
+    /// signal the 7th-chord voicing.
+    private func splitChordNames(zoneDegrees: [Int], scaleMode: Bool) -> [String] {
+        zoneDegrees.map {
+            chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
+                + (scaleMode ? "⁷" : "")
+        }
+    }
+
+    /// MIDI notes the melody side maps to. Split: triad × 3 octaves (9 notes,
+    /// chord-tone snap). Scale: one octave of the full diatonic scale (7).
+    private func splitMelodyMidis(melodyDegree: Int, scaleMode: Bool) -> [Int] {
+        if scaleMode {
+            return scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
+        }
+        let triad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
+        return (0..<3).flatMap { oct in triad.map { $0 + oct * 12 } }.sorted()
+    }
+
+    /// Lane indices that are chord tones of the active chord (Scale mode only).
+    /// The overlay colors these with the chord accent so the player can see
+    /// safe targets — Split returns an empty set since every lane is already
+    /// a chord tone.
+    private func splitChordToneLanes(melodyMidis: [Int], melodyDegree: Int, scaleMode: Bool) -> Set<Int> {
+        guard scaleMode else { return [] }
+        let triad7 = chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
+        let toneClasses = Set(triad7.map { $0 % 12 })
+        return Set(melodyMidis.enumerated().compactMap { idx, midi in
+            toneClasses.contains(midi % 12) ? idx : nil
+        })
+    }
+
+    // MARK: - Split mode touch handlers
+
+    /// Sustained voice IDs spawned per touch zone, so we can `noteOff` exactly
+    /// what we started when the touch lifts or moves to a new zone. Each entry
+    /// is the list of underlying voice strings (one per chord note for chord
+    /// touches; one entry for melody touches).
+    @State private var splitVoiceSubvoices: [String: [String]] = [:]
+
+    /// Snapshot of a single live chord touch, kept on `splitTouchChordStack`
+    /// so the melody-snap math can read whichever chord is currently held.
+    private struct SplitTouchChord {
+        let parentVoice: String
+        let degree: Int
+        let octave: Int
+        let tones: [Int]   // absolute MIDI notes including octave shift
+    }
+
+    /// Push the touch chord state into the manager so the camera-side melody
+    /// snap (and the engine's published `chordMelodyCurrentDegree`) follow
+    /// whichever chord the player is touching. `clearWhenEmpty` lets exit
+    /// callers wipe the override when the stack drains.
+    private func syncSplitTouchChordToManager() {
+        if let top = splitTouchChordStack.last {
+            engine.chordMelodyModeManager.touchChordDegree = top.degree
+            engine.chordMelodyModeManager.touchChordOctave = top.octave
+            engine.chordMelodyModeManager.touchChordMidi = top.tones
+        } else {
+            engine.chordMelodyModeManager.touchChordDegree = nil
+            engine.chordMelodyModeManager.touchChordOctave = 0
+            engine.chordMelodyModeManager.touchChordMidi = []
+        }
+    }
+
+    /// The chord degree the melody-touch handler should snap to: the most
+    /// recent touched chord if any, else whatever the camera last set.
+    private var splitMelodySnapDegree: Int {
+        splitTouchChordStack.last?.degree
+            ?? engine.chordMelodyCurrentDegree
+            ?? engine.chordMelodyModeManager.zoneDegrees.first
+            ?? 0
+    }
+
+    /// Start a sustained voice for one MIDI note. Routes to the SoundFont
+    /// sampler or the WebView synth depending on `splitUseSoundFont`.
+    private func splitNoteOn(voice: String, midi: Int, velocity: Double = 0.7) {
+        if engine.splitUseSoundFont {
+            engine.soundFontEngine.noteOn(voice: voice, midi: midi, velocity: velocity)
+        } else {
+            engine.strudelBridge.noteOn(hand: voice, midi: midi,
+                                        waveform: engine.selectedWaveform, velocity: velocity)
+        }
+    }
+
+    /// Stop a sustained voice started by `splitNoteOn`.
+    private func splitNoteOff(voice: String) {
+        if engine.splitUseSoundFont {
+            engine.soundFontEngine.noteOff(voice: voice)
+        } else {
+            engine.strudelBridge.noteOff(hand: voice)
+        }
+    }
+
+    /// Touch entered a Split-mode zone — spawn sustained voices and remember
+    /// them under `parentVoice` so the matching `splitTouchExit` can stop them.
+    private func splitTouchEnter(parentVoice: String, zone: SplitTouchZone) {
+        let scaleMode = engine.scaleChordMelodyModeEnabled
+        switch zone {
+        case .chord(let sub):
+            let degree = engine.chordMelodyModeManager.degreeForZone(sub.wedge)
+            // Scale mode voices the chord as a 7th — root / 3rd / 5th / 7th.
+            let voicing = scaleMode
+                ? chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
+                : chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
+            let absoluteTones = voicing.map { $0 + sub.octave * 12 }
+            var subs: [String] = []
+            for (i, note) in absoluteTones.enumerated() {
+                let sv = "\(parentVoice)-c\(i)"
+                splitNoteOn(voice: sv, midi: note, velocity: 0.7)
+                subs.append(sv)
+            }
+            splitVoiceSubvoices[parentVoice] = subs
+            // Tell the manager about the touched chord so the melody hand —
+            // and the live `chordMelodyCurrentDegree` published var — follow
+            // it the same way they follow the camera-driven chord.
+            splitTouchChordStack.append(
+                SplitTouchChord(parentVoice: parentVoice, degree: degree,
+                                octave: sub.octave, tones: absoluteTones)
+            )
+            syncSplitTouchChordToManager()
+        case .melody(let lane):
+            let lanes: [Int]
+            if scaleMode {
+                // Scale mode: one octave of the diatonic scale.
+                lanes = scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
+            } else {
+                let degree = splitMelodySnapDegree
+                let triad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
+                lanes = (0..<3).flatMap { oct in triad.map { $0 + oct * 12 } }.sorted()
+            }
+            guard !lanes.isEmpty else { return }
+            let safe = max(0, min(lanes.count - 1, lane))
+            // The touch UIView doesn't track the outer-band octave shift on
+            // the melody side yet — for now, a touch lands at base octave.
+            // The hand-tracked path still gets the ±1 octave from the radial
+            // band; touch is an explicit-tap experience.
+            let sv = "\(parentVoice)-m"
+            splitNoteOn(voice: sv, midi: lanes[safe], velocity: 0.75)
+            splitVoiceSubvoices[parentVoice] = [sv]
+        }
+        engine.haptics.noteTrigger()
+    }
+
+    /// Touch left a Split-mode zone — release all voices spawned for it.
+    private func splitTouchExit(parentVoice: String) {
+        if let subs = splitVoiceSubvoices[parentVoice] {
+            for sv in subs { splitNoteOff(voice: sv) }
+            splitVoiceSubvoices.removeValue(forKey: parentVoice)
+        }
+        // Drop this chord touch from the stack (if it was one) and resync.
+        if splitTouchChordStack.contains(where: { $0.parentVoice == parentVoice }) {
+            splitTouchChordStack.removeAll { $0.parentVoice == parentVoice }
+            syncSplitTouchChordToManager()
+        }
+    }
+
     // MARK: - Performance View
 
     private func randomizeSettings() {
@@ -129,6 +330,33 @@ struct ContentView: View {
             .brightness(engine.selectedFilter.brightness)
             .hueRotation(.degrees(engine.selectedFilter.hueRotation))
             .ignoresSafeArea()
+
+            // The Weave — the music made visible. Lives under the hand
+            // skeleton so your hands stay the clear instrument. Melodic-family
+            // modes only; the other modes have their own spatial UI.
+            if melodicActive {
+                WeaveView(
+                    hue: strudelHue,
+                    energy: normalizedParam("gain"),
+                    space: normalizedParam("reverb"),
+                    brightness: normalizedParam("lpf"),
+                    speed: max(0, min(1, (engine.bpm - 50) / 155)),
+                    complexity: max(normalizedParam("crush"), normalizedParam("shape"))
+                )
+                .ignoresSafeArea()
+            }
+
+            // Current note at the heart of the weave. Stays visible when the
+            // HUD is hidden — it's content, not chrome.
+            if melodicActive {
+                Text(engine.noteDisplay)
+                    .font(.system(size: 72, weight: .ultraLight))
+                    .foregroundColor(.white.opacity(0.92))
+                    .shadow(color: accentColor.opacity(0.6), radius: 24)
+                    .scaleEffect(engine.currentBeat == 0 ? 1.06 : 1.0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.6), value: engine.currentBeat)
+                    .allowsHitTesting(false)
+            }
 
             // Hand skeleton overlay with glow (aspect-corrected)
             HandOverlayView(
@@ -196,16 +424,20 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
 
-            // Split chord+melody overlay (single circle cut in half).
-            if engine.splitChordMelodyModeEnabled {
+            // Split / Scale chord+melody overlay (single circle cut in half).
+            // Scale mode has 7 melody wedges = one octave of the scale; Split
+            // has 9 melody wedges = 3 octaves of chord tones. The overlay
+            // takes the same shape either way; what differs is the melody
+            // labels + the count.
+            if engine.splitChordMelodyModeEnabled || engine.scaleChordMelodyModeEnabled {
+                let scaleMode = engine.scaleChordMelodyModeEnabled
                 let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
-                let chordNames = zoneDegrees.map {
-                    chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
-                }
+                let chordNames = splitChordNames(zoneDegrees: zoneDegrees, scaleMode: scaleMode)
                 let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
-                let melodyTriad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
-                let melodyMidis = (0..<3).flatMap { oct in melodyTriad.map { $0 + oct * 12 } }.sorted()
+                let melodyMidis = splitMelodyMidis(melodyDegree: melodyDegree, scaleMode: scaleMode)
                 let melodyNames = melodyMidis.map { pitchClassName($0) }
+                let melodyCount = melodyMidis.count
+                let chordToneLanes = splitChordToneLanes(melodyMidis: melodyMidis, melodyDegree: melodyDegree, scaleMode: scaleMode)
                 SplitChordMelodyOverlayView(
                     zoneDegrees: zoneDegrees,
                     chordNames: chordNames,
@@ -218,7 +450,26 @@ struct ContentView: View {
                     melodyLane: engine.chordMelodyMelodyLane,
                     melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
                     melodyResting: engine.chordMelodyModeManager.melodyResting,
-                    swapHands: engine.chordMelodySwapHands
+                    swapHands: engine.chordMelodySwapHands,
+                    touchedChordSubzones: splitTouchChordZones,
+                    touchedMelodyLanes: splitTouchMelodyLanes,
+                    chordToneLanes: chordToneLanes,
+                    melodyOctaveShift: engine.chordMelodyModeManager.currentMelodyOctaveShift
+                )
+                .ignoresSafeArea()
+
+                // Multitouch / drag layer on top of the visualization. Each
+                // finger lights up its zone and re-fires when it crosses into
+                // a new one — same feel as the grid mode multitouch.
+                SplitTouchOverlay(
+                    zoneCount: max(1, zoneDegrees.count),
+                    melodyCount: melodyCount,
+                    degreeForZone: { engine.chordMelodyModeManager.degreeForZone($0) },
+                    swapHands: engine.chordMelodySwapHands,
+                    onZoneEnter: { voice, zone in splitTouchEnter(parentVoice: voice, zone: zone) },
+                    onZoneExit: { voice in splitTouchExit(parentVoice: voice) },
+                    touchedChordSubzones: $splitTouchChordZones,
+                    touchedMelodyLanes: $splitTouchMelodyLanes
                 )
                 .ignoresSafeArea()
             }
@@ -252,6 +503,19 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
 
+            // Tap an empty area (melodic mode only) to hide/show the HUD for a
+            // clean view of the camera + Weave. Sits below the floating UI so
+            // buttons still receive their own taps; when the HUD is hidden it
+            // captures the next tap to bring it back.
+            if melodicActive {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.25)) { chromeVisible.toggle() }
+                    }
+            }
+
             // Floating UI overlays
             VStack {
                 // Top bar: close button + beat dots
@@ -279,7 +543,7 @@ struct ContentView: View {
                 }
 
                 // Floating code pill — hide in grid/drum/learn/chord/soundfont mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.soundFontModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.scaleChordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     codePill
                         .padding(.horizontal, 20)
                         .padding(.top, 2)
@@ -288,7 +552,7 @@ struct ContentView: View {
                 Spacer()
 
                 // Note badge — hide in grid/drum/learn/chord/soundfont mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.soundFontModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.scaleChordMelodyModeEnabled && !engine.soundFontModeEnabled {
                     noteBadge
 
                     beatRing
@@ -336,6 +600,8 @@ struct ContentView: View {
                         .transition(.opacity)
                 }
             }
+            .opacity(melodicActive && !chromeVisible ? 0 : 1)
+            .allowsHitTesting(chromeVisible || !melodicActive)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 50)
                     .onEnded { value in

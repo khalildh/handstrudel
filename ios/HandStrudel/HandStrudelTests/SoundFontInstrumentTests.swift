@@ -19,8 +19,13 @@ final class SoundFontInstrumentTests: XCTestCase {
         }
     }
 
-    func testDefaultIsFirst() {
-        XCTAssertEqual(DEFAULT_SOUNDFONT_INSTRUMENT.id, SOUNDFONT_INSTRUMENTS.first?.id)
+    func testDefaultIsViolin() {
+        // First-run users land in Split mode voiced through the SoundFont
+        // sampler; Violin is a more inviting starting timbre than the
+        // first-in-list piano playing a freeform progression.
+        XCTAssertEqual(DEFAULT_SOUNDFONT_INSTRUMENT.id, "violin")
+        XCTAssertTrue(SOUNDFONT_INSTRUMENTS.contains(where: { $0.id == "violin" }),
+                      "violin must exist in the instrument list to be the default")
     }
 
     func testLookupReturnsMatch() {

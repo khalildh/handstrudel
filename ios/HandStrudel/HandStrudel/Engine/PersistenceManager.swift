@@ -15,7 +15,9 @@ final class PersistenceManager {
     }
 
     var lastMode: String {
-        get { defaults.string(forKey: "lastMode") ?? "melodic" }
+        // Split chord+melody is the app's default mode on first launch.
+        // Existing users keep whichever mode they last used.
+        get { defaults.string(forKey: "lastMode") ?? "splitchordmelody" }
         set { defaults.set(newValue, forKey: "lastMode") }
     }
 

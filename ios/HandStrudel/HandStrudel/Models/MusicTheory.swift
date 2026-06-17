@@ -134,6 +134,29 @@ func chordNotes(key: MusicKey, scale: Scale, degree: Int) -> [Int] {
     return [root, third, fifth]
 }
 
+/// 7th chord from a scale degree — root + 3rd + 5th + 7th, all diatonic.
+/// I → Imaj7, ii → ii⁷, V → V7, etc. for the major scale. Used by Scale mode
+/// where the richer voicing is part of the point.
+func chordNotesWithSeventh(key: MusicKey, scale: Scale, degree: Int) -> [Int] {
+    let triad = chordNotes(key: key, scale: scale, degree: degree)
+    let scaleIntervals = scale.intervals
+    let count = scaleIntervals.count
+    guard count > 0, let fifth = triad.last else { return triad }
+    let safeDegree = ((degree % count) + count) % count
+    // 7th = 6 scale steps up
+    let seventhDeg = (safeDegree + 6) % count
+    var seventh = 48 + key.semitone + scaleIntervals[seventhDeg]
+    while seventh <= fifth { seventh += 12 }
+    return triad + [seventh]
+}
+
+/// One octave of scale notes starting at the given MIDI octave. Used by Scale
+/// mode's melody side, where the 7 wedges fan one diatonic octave.
+func scaleNotesOneOctave(key: MusicKey, scale: Scale, octave: Int = 4) -> [Int] {
+    let base = (octave + 1) * 12 + key.semitone
+    return scale.intervals.map { base + $0 }
+}
+
 // MARK: - Display Helpers
 
 private let NOTE_NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
