@@ -59,7 +59,8 @@ struct ContentView: View {
                         // scale, and progression selected on the start screen
                         // are already live on the engine via @Published bindings.
                         engine.start(config: DEFAULT_MAPPING, advanced: false)
-                        engine.switchMode(grid: false, drums: false, learn: false, soundFont: true)
+                        engine.switchMode(grid: false, drums: false, learn: false,
+                                          scaleChordMelody: true)
                     }
                 )
             }

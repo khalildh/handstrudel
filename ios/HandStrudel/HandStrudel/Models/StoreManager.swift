@@ -199,6 +199,15 @@ final class StoreManager: ObservableObject {
     }
 
     func isUnlocked(_ packId: String) -> Bool {
+        // Dev override: launch with `--force-locked` (via Xcode scheme arguments)
+        // to force-report every pack as locked regardless of real entitlements.
+        // Lets us see the paywall UI even when signed into an account that
+        // already owns Pro. Not compiled into release builds.
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--force-locked") {
+            return false
+        }
+        #endif
         // NOTE: DEBUG bypass disabled for testing purchase flows.
         // Re-enable by wrapping the body below in `#if DEBUG\nreturn true\n#else ... #endif`.
         guard let info = customerInfo else { return false }

@@ -64,7 +64,25 @@ struct SoundFontInstrument: Identifiable, Equatable {
     let category: GMCategory
 
     var displayName: String { "\(emoji) \(name)" }
+
+    /// A small curated free tier — one hero instrument per major family so a
+    /// non-paying user can still express a piano piece, a guitar riff, and an
+    /// ensemble arrangement without hitting the paywall. Everything else in
+    /// the 128-instrument GM set is behind the Pro unlock.
+    var isPremium: Bool { !FREE_SOUNDFONT_INSTRUMENT_IDS.contains(id) }
+    var packId: String? { isPremium ? "pro" : nil }
 }
+
+private let FREE_SOUNDFONT_INSTRUMENT_IDS: Set<String> = [
+    "grand_piano",
+    "electric_piano_1",  // Rhodes EP
+    "nylon_guitar",
+    "clean_guitar",
+    "acoustic_bass",     // Upright Bass
+    "violin",
+    "strings",           // Strings Ensemble
+    "choir",             // Choir Aahs
+]
 
 /// All 128 General MIDI programs, in order. The category for program N is
 /// always `N / 8` mapped to `GMCategory.allCases[N / 8]`.

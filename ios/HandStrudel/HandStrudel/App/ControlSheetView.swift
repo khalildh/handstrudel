@@ -182,7 +182,7 @@ struct ControlSheet: View {
         case StoreManager.partyPack: return ("Party Pack", "9 high-energy party presets", ["EDM", "DnB", "Dubstep", "Rave", "Reggaeton", "Future Bass", "Techno", "Garage", "Phonk"])
         case StoreManager.kit808: return ("808 Kit", "8 hip-hop & urban drum patterns", ["Boom Bap", "Drill", "Lo-Fi Hip Hop", "R&B", "Afrobeat", "Bounce", "Jersey Club", "Memphis"])
         case StoreManager.kitElectronic: return ("Electronic Kit", "8 electronic drum patterns", ["Techno", "Breakbeat", "IDM", "Jungle", "Ambient", "Industrial", "2-Step", "Synthwave"])
-        case StoreManager.pro: return ("Pro Upgrade", "Unlock everything: 10 scales, 13 filters, 5 hand themes, watermark removal", ["Premium scales", "Camera filters", "Hand themes", "Remove watermark"])
+        case StoreManager.pro: return ("Pro Upgrade", "Unlock every instrument, scale, and chord progression.", ["120+ additional GM instruments", "Every scale — modes, harmonic minor, exotic", "Every chord progression — jazz, cinematic, world, and more", "Premium camera filters + hand themes"])
         default: return ("Pack", "Premium content", [])
         }
     }

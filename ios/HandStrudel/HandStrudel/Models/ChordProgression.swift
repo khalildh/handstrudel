@@ -67,6 +67,13 @@ struct ChordProgression: Identifiable, Equatable, Hashable {
     /// True for progressions the user typed in by hand rather than picked from
     /// the built-in list. Custom progressions aren't part of `CHORD_PROGRESSIONS`.
     var isCustom: Bool { id.hasPrefix("custom") }
+
+    /// Everything outside the Essentials category (and any user-typed custom
+    /// progression) is behind the Pro unlock. Essentials keeps the 9 most
+    /// idiomatic pop/blues/jazz shapes free so a new user can still play
+    /// something song-shaped on day one.
+    var isPremium: Bool { category != .essentials && !isCustom }
+    var packId: String? { isPremium ? "pro" : nil }
 }
 
 // MARK: - Free-text parsing

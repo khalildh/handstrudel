@@ -9,6 +9,7 @@ struct StartOverlayView: View {
     @State private var starting = false
     @State private var showInstrumentSheet = false
     @State private var showProgressionSheet = false
+    @State private var showScaleSheet = false
 
     var body: some View {
         GeometryReader { _ in
@@ -42,14 +43,27 @@ struct StartOverlayView: View {
             }
         }
         .sheet(isPresented: $showInstrumentSheet) {
-            InstrumentPickerSheet(selected: $engine.selectedSoundFontInstrument)
+            InstrumentPickerSheet(selected: $engine.selectedSoundFontInstrument,
+                                  storeManager: storeManager)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showProgressionSheet) {
-            ProgressionPickerSheet(selected: $engine.chordMelodyProgression)
+            ProgressionPickerSheet(selected: $engine.chordMelodyProgression,
+                                   storeManager: storeManager)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showScaleSheet) {
+            ScalePickerSheet(selected: $engine.selectedScale,
+                             storeManager: storeManager)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .task {
+            if storeManager.products.isEmpty {
+                await storeManager.loadProducts()
+            }
         }
     }
 
@@ -171,18 +185,10 @@ struct StartOverlayView: View {
         }
     }
 
+    /// Scale chip opens a sheet (not a Menu) because premium scales need a
+    /// visible lock badge, which SwiftUI menus can't render.
     private var scaleChip: some View {
-        Menu {
-            ForEach(Scale.allCases) { scale in
-                Button(action: { engine.selectedScale = scale }) {
-                    if engine.selectedScale == scale {
-                        Label(scale.rawValue, systemImage: "checkmark")
-                    } else {
-                        Text(scale.rawValue)
-                    }
-                }
-            }
-        } label: {
+        Button(action: { showScaleSheet = true }) {
             chipBody(emoji: nil, caption: "SCALE", value: engine.selectedScale.rawValue)
         }
     }
@@ -260,15 +266,63 @@ struct StartOverlayView: View {
     }
 }
 
+// MARK: - Shared row bits
+
+/// Small "PRO" pill drawn on locked rows. Kept in one place so instrument,
+/// progression, and scale sheets all badge the same way.
+private struct ProBadge: View {
+    var body: some View {
+        Text("PRO")
+            .font(.system(size: 9, weight: .heavy, design: .rounded))
+            .foregroundColor(.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(
+                Capsule().fill(
+                    LinearGradient(
+                        colors: [Color.orange, Color.pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+            )
+    }
+}
+
+/// Build the paywall the sheet pickers should show when the user taps a
+/// locked row. All pickers gate against the single "pro" product, so the
+/// copy lives in one place.
+@MainActor
+private func proPaywall(storeManager: StoreManager) -> some View {
+    let resolved = StoreManager.productId(for: "pro")
+    let product = storeManager.products.first(where: { $0.productIdentifier == resolved })
+    return PaywallOverlay(
+        packId: resolved,
+        packName: "Pro Upgrade",
+        packDescription: "Unlock every instrument, scale, and chord progression.",
+        price: product?.localizedPriceString ?? "---",
+        items: [
+            "120+ additional GM instruments",
+            "Every scale — modes, harmonic minor, exotic",
+            "Every chord progression — jazz, cinematic, world, and more",
+            "Premium camera filters + hand themes",
+        ],
+        storeManager: storeManager
+    )
+}
+
 // MARK: - Instrument picker sheet
 
 private struct InstrumentPickerSheet: View {
     @Binding var selected: SoundFontInstrument
+    @ObservedObject var storeManager: StoreManager
     @Environment(\.dismiss) private var dismiss
     @State private var category: GMCategory
+    @State private var showPaywall = false
 
-    init(selected: Binding<SoundFontInstrument>) {
+    init(selected: Binding<SoundFontInstrument>, storeManager: StoreManager) {
         self._selected = selected
+        self.storeManager = storeManager
         self._category = State(initialValue: selected.wrappedValue.category)
     }
 
@@ -287,28 +341,45 @@ private struct InstrumentPickerSheet: View {
                 .background(Color(white: 0.08))
 
                 List(SOUNDFONT_INSTRUMENTS.filter { $0.category == category }) { inst in
-                    Button(action: {
-                        selected = inst
-                        dismiss()
-                    }) {
-                        HStack(spacing: 12) {
-                            Text(inst.emoji).font(.system(size: 22))
-                            Text(inst.name)
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundColor(.primary)
-                            Spacer()
-                            if selected.id == inst.id {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.green)
-                            }
-                        }
-                    }
+                    row(for: inst)
                 }
                 .listStyle(.plain)
             }
             .navigationTitle("Instrument")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showPaywall) {
+                proPaywall(storeManager: storeManager)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    private func row(for inst: SoundFontInstrument) -> some View {
+        let locked = inst.isPremium && !storeManager.isUnlocked(inst.packId ?? "")
+        return Button(action: {
+            if locked {
+                showPaywall = true
+            } else {
+                selected = inst
+                dismiss()
+            }
+        }) {
+            HStack(spacing: 12) {
+                Text(inst.emoji)
+                    .font(.system(size: 22))
+                    .opacity(locked ? 0.55 : 1.0)
+                Text(inst.name)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundColor(locked ? .primary.opacity(0.55) : .primary)
+                if locked { ProBadge() }
+                Spacer()
+                if selected.id == inst.id && !locked {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.green)
+                }
+            }
         }
     }
 
@@ -334,11 +405,14 @@ private struct InstrumentPickerSheet: View {
 
 private struct ProgressionPickerSheet: View {
     @Binding var selected: ChordProgression
+    @ObservedObject var storeManager: StoreManager
     @Environment(\.dismiss) private var dismiss
     @State private var category: ProgressionCategory
+    @State private var showPaywall = false
 
-    init(selected: Binding<ChordProgression>) {
+    init(selected: Binding<ChordProgression>, storeManager: StoreManager) {
         self._selected = selected
+        self.storeManager = storeManager
         let cat = selected.wrappedValue.category
         self._category = State(initialValue: cat == .custom ? .essentials : cat)
     }
@@ -358,33 +432,50 @@ private struct ProgressionPickerSheet: View {
                 .background(Color(white: 0.08))
 
                 List(CHORD_PROGRESSIONS.filter { $0.category == category }) { prog in
-                    Button(action: {
-                        selected = prog
-                        dismiss()
-                    }) {
-                        HStack(spacing: 12) {
-                            Text(prog.emoji).font(.system(size: 22))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(prog.name)
-                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                    .foregroundColor(.primary)
-                                Text("\(prog.degrees.count) chords")
-                                    .font(.system(size: 11, design: .rounded))
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            if selected.id == prog.id {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.green)
-                            }
-                        }
-                    }
+                    row(for: prog)
                 }
                 .listStyle(.plain)
             }
             .navigationTitle("Chord Progression")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showPaywall) {
+                proPaywall(storeManager: storeManager)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    private func row(for prog: ChordProgression) -> some View {
+        let locked = prog.isPremium && !storeManager.isUnlocked(prog.packId ?? "")
+        return Button(action: {
+            if locked {
+                showPaywall = true
+            } else {
+                selected = prog
+                dismiss()
+            }
+        }) {
+            HStack(spacing: 12) {
+                Text(prog.emoji)
+                    .font(.system(size: 22))
+                    .opacity(locked ? 0.55 : 1.0)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(prog.name)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundColor(locked ? .primary.opacity(0.55) : .primary)
+                    Text("\(prog.degrees.count) chords")
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+                if locked { ProBadge() }
+                Spacer()
+                if selected.id == prog.id && !locked {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.green)
+                }
+            }
         }
     }
 
@@ -402,6 +493,56 @@ private struct ProgressionPickerSheet: View {
             .background(
                 Capsule().fill(isActive ? Color.green.opacity(0.15) : Color.primary.opacity(0.05))
             )
+        }
+    }
+}
+
+// MARK: - Scale picker sheet
+
+private struct ScalePickerSheet: View {
+    @Binding var selected: Scale
+    @ObservedObject var storeManager: StoreManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var showPaywall = false
+
+    var body: some View {
+        NavigationStack {
+            List(Scale.allCases) { scale in
+                row(for: scale)
+            }
+            .listStyle(.plain)
+            .navigationTitle("Scale")
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showPaywall) {
+                proPaywall(storeManager: storeManager)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    private func row(for scale: Scale) -> some View {
+        let locked = scale.isPremium && !storeManager.isUnlocked(scale.packId ?? "")
+        return Button(action: {
+            if locked {
+                showPaywall = true
+            } else {
+                selected = scale
+                dismiss()
+            }
+        }) {
+            HStack(spacing: 12) {
+                Text(scale.rawValue)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundColor(locked ? .primary.opacity(0.55) : .primary)
+                if locked { ProBadge() }
+                Spacer()
+                if selected == scale && !locked {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.green)
+                }
+            }
         }
     }
 }

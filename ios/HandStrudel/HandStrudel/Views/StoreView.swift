@@ -14,23 +14,6 @@ struct StoreView: View {
                     .foregroundColor(.white)
                     .padding(.top, 16)
 
-                // Preset Packs
-                sectionHeader("PRESET PACKS")
-                packRow(
-                    id: StoreManager.studioPack,
-                    name: "Studio Pack",
-                    emoji: "🎛️",
-                    contents: ["Tape", "Glass", "Deep", "Foggy", "Pulse", "Cosmic", "Glitch"],
-                    description: "7 professional studio presets"
-                )
-                packRow(
-                    id: StoreManager.partyPack,
-                    name: "Party Pack",
-                    emoji: "🎉",
-                    contents: ["EDM", "DnB", "Dubstep", "Rave", "Reggaeton", "Future Bass", "Techno", "Garage", "Phonk"],
-                    description: "9 high-energy party presets"
-                )
-
                 // Drum Kits
                 sectionHeader("DRUM KITS")
                 packRow(
@@ -165,9 +148,11 @@ struct StoreView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                featureItem("All preset packs")
-                featureItem("All sound packs")
+                featureItem("120+ instruments")
+                featureItem("Every scale — modes, harmonic minor, exotic")
+                featureItem("Every chord progression")
                 featureItem("All drum kits")
+                featureItem("Premium camera filters + hand themes")
                 featureItem("One-time purchase")
             }
 
