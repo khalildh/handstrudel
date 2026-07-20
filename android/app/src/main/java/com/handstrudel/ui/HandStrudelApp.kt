@@ -19,10 +19,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.util.Log
 import com.handstrudel.engine.EngineController
 import com.handstrudel.engine.HandsState
 import com.handstrudel.models.PRESETS
 import com.handstrudel.models.Preset
+import uniffi.handstrudel_core.MusicKey as CoreKey
+import uniffi.handstrudel_core.Scale as CoreScale
+import uniffi.handstrudel_core.chordDisplayName
+import uniffi.handstrudel_core.chordNotes
+import uniffi.handstrudel_core.midiNoteName
 
 @Composable
 fun HandStrudelApp() {
@@ -48,6 +54,7 @@ fun HandStrudelApp() {
 fun PerformanceScreen(engine: EngineController) {
     val handsState by engine.handsState.collectAsState()
     val beat by engine.currentBeat.collectAsState()
+    var showSettings by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         // Camera preview (full screen)
@@ -55,6 +62,12 @@ fun PerformanceScreen(engine: EngineController) {
             modifier = Modifier.fillMaxSize(),
             handTracker = engine.handTracker
         )
+
+        // Split chord+melody overlay — the app's default playable surface.
+        // Sits under the hand skeleton so finger tracking stays visible.
+        if (engine.chordMelodyModeEnabled) {
+            SplitChordMelodyOverlay(engine = engine, modifier = Modifier.fillMaxSize())
+        }
 
         // Hand skeleton overlay
         HandOverlay(
@@ -108,6 +121,7 @@ fun PerformanceScreen(engine: EngineController) {
             val modeText = when {
                 engine.gridModeEnabled -> "GRID"
                 engine.drumModeEnabled -> "DRUMS"
+                engine.chordMelodyModeEnabled -> "SPLIT"
                 else -> "MELODIC"
             }
             Text(
@@ -135,6 +149,25 @@ fun PerformanceScreen(engine: EngineController) {
                 fontSize = 24.sp
             )
         }
+
+        // Floating settings button — sits above the mode pill so it doesn't
+        // crowd the beat dots. Tapping opens the Split control sheet.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 100.dp)
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.10f))
+                .clickable { showSettings = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("⚙", fontSize = 22.sp, color = Color.White.copy(alpha = 0.85f))
+        }
+    }
+
+    if (showSettings) {
+        SplitSettingsSheet(engine = engine, onDismiss = { showSettings = false })
     }
 }
 
@@ -162,8 +195,9 @@ fun StartScreen(onStart: (Preset) -> Unit) {
             text = "your hands are the instrument",
             fontSize = 14.sp,
             color = Color.White.copy(alpha = 0.5f),
-            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
         )
+
 
         // Section header
         Text(

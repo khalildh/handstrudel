@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "HandStrudel"
-include(":app")
+include(":app", ":core")

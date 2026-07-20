@@ -6,6 +6,7 @@ import android.util.Log
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.core.BaseOptions
+import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarker
@@ -37,11 +38,20 @@ class HandTrackingManager(context: Context) {
     var onHandsDetected: ((HandsState) -> Unit)? = null
 
     init {
-        try {
+        // Try the GPU delegate first — typically 2–3× faster than CPU on
+        // current phones. Some devices' drivers can fail to init the GPU
+        // pipeline, so fall back to CPU rather than ship a broken camera.
+        handLandmarker = createLandmarker(context, Delegate.GPU)
+            ?: createLandmarker(context, Delegate.CPU)
+    }
+
+    private fun createLandmarker(context: Context, delegate: Delegate): HandLandmarker? {
+        return try {
             val options = HandLandmarker.HandLandmarkerOptions.builder()
                 .setBaseOptions(
                     BaseOptions.builder()
                         .setModelAssetPath("hand_landmarker.task")
+                        .setDelegate(delegate)
                         .build()
                 )
                 .setRunningMode(RunningMode.LIVE_STREAM)
@@ -53,19 +63,32 @@ class HandTrackingManager(context: Context) {
                 .setErrorListener { e -> Log.e("HandTracking", "Error: $e") }
                 .build()
 
-            handLandmarker = HandLandmarker.createFromOptions(context, options)
+            HandLandmarker.createFromOptions(context, options).also {
+                Log.i("HandTracking", "HandLandmarker initialized on $delegate")
+            }
         } catch (e: Exception) {
-            Log.e("HandTracking", "Failed to init: $e")
+            Log.w("HandTracking", "Failed to init on $delegate, trying fallback", e)
+            null
         }
     }
 
-    fun detectAsync(bitmap: Bitmap, rotationDegrees: Int, timestampMs: Long) {
+    private var dimsLogged = false
+
+    /// Bitmap is expected to already be rotated to the device's display
+    /// orientation and horizontally mirrored for selfie view (handled by
+    /// `CameraPreview.processFrame`). This avoids
+    /// `ImageProcessingOptions.setRotationDegrees`, which produces inconsistent
+    /// results across delegates / devices.
+    fun detectAsync(bitmap: Bitmap, timestampMs: Long) {
+        if (!dimsLogged) {
+            Log.i("HandTracking", "First oriented frame: ${bitmap.width}x${bitmap.height}")
+            dimsLogged = true
+        }
         val mpImage = BitmapImageBuilder(bitmap).build()
-        val options = ImageProcessingOptions.builder()
-            .setRotationDegrees(rotationDegrees)
-            .build()
-        handLandmarker?.detectAsync(mpImage, options, timestampMs)
+        handLandmarker?.detectAsync(mpImage, timestampMs)
     }
+
+    private var landmarkLogCounter = 0
 
     private fun processResult(result: HandLandmarkerResult) {
         if (result.landmarks().isEmpty()) {
@@ -77,18 +100,28 @@ class HandTrackingManager(context: Context) {
         var right: HandData? = null
 
         for (i in result.landmarks().indices) {
-            // Landmarks come back in portrait coordinate space (rotation applied by MediaPipe)
-            // Mirror X for front camera selfie view
-            val landmarks = result.landmarks()[i].map { lm ->
-                HandLandmark(1f - lm.x(), lm.y(), lm.z())
-            }
-
-            // Swap chirality because we mirror X
+            val raw = result.landmarks()[i]
             val rawChirality = if (i < result.handednesses().size) {
                 result.handednesses()[i][0].categoryName()
             } else "Left"
-            val chirality = if (rawChirality == "Left") "Right" else "Left"
 
+            if (landmarkLogCounter++ % 60 == 0) {
+                val w = raw[0]
+                Log.i(
+                    "HandTracking",
+                    "chirality=$rawChirality wrist x=${"%.3f".format(w.x())} y=${"%.3f".format(w.y())}"
+                )
+            }
+
+            // Frame is already rotated + mirrored upstream (selfie view), so
+            // landmark *coordinates* map directly onto the PreviewView with no
+            // extra mirror. But mirroring the image also flips the visual
+            // cues MediaPipe uses to classify handedness (thumb side, palm
+            // orientation), so its "Left" is actually the user's right hand
+            // and vice versa. Swap to match the on-screen side / the user's
+            // anatomical hand. Matches the iOS Vision flow.
+            val landmarks = raw.map { lm -> HandLandmark(lm.x(), lm.y(), lm.z()) }
+            val chirality = if (rawChirality == "Left") "Right" else "Left"
             val handData = computeHandData(landmarks, chirality)
 
             if (chirality == "Left") left = handData

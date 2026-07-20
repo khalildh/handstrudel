@@ -51,9 +51,15 @@ struct ContentView: View {
             } else {
                 StartOverlayView(
                     status: engine.status,
+                    engine: engine,
                     storeManager: storeManager,
-                    onStart: { cfg, adv in
-                        engine.start(config: cfg, advanced: adv)
+                    onStart: {
+                        // Boot straight into Scale mode — the SoundFont-backed
+                        // two-hand chord+melody wheel. The instrument, key,
+                        // scale, and progression selected on the start screen
+                        // are already live on the engine via @Published bindings.
+                        engine.start(config: DEFAULT_MAPPING, advanced: false)
+                        engine.switchMode(grid: false, drums: false, learn: false, soundFont: true)
                     }
                 )
             }

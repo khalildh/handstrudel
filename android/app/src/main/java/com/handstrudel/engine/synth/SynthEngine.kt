@@ -20,6 +20,16 @@ class SynthEngine(private val sampleRate: Int = 44100) {
     // Grid mode voices
     private val noteVoices = mutableMapOf<String, NoteVoice>()
 
+    /// Optional SoundFont engine. When set, its samples are mixed into the
+    /// output buffer for every chunk — used for Split chord+melody so the
+    /// pad + melody voices come out of a real instrument instead of a raw
+    /// oscillator. Caller is responsible for invoking [SoundFontEngine.noteOn]
+    /// etc. before mixing; the audio thread just drains samples.
+    @Volatile var soundFont: SoundFontEngine? = null
+    /// Scratch buffer for [SoundFontEngine.renderInto] each chunk. Sized for
+    /// 256 stereo frames (matches the audio thread's chunk).
+    private val sfBuffer = ShortArray(256 * 2)
+
     // Drums
     val drumSynth = DrumSynth(sampleRate)
 
@@ -133,6 +143,19 @@ class SynthEngine(private val sampleRate: Int = 44100) {
                     buffer[i * 2] = (left * 32000).toInt().coerceIn(-32768, 32767).toShort()
                     buffer[i * 2 + 1] = (right * 32000).toInt().coerceIn(-32768, 32767).toShort()
                 }
+
+                // SoundFont mix-in. Render TSF into its own buffer, then add
+                // to ours sample-by-sample (saturate to avoid clipping).
+                soundFont?.let { sf ->
+                    sf.renderInto(sfBuffer, chunk, mix = false)
+                    var i = 0
+                    while (i < buffer.size) {
+                        val combined = buffer[i].toInt() + sfBuffer[i].toInt()
+                        buffer[i] = combined.coerceIn(-32768, 32767).toShort()
+                        i++
+                    }
+                }
+
                 audioTrack?.write(buffer, 0, buffer.size)
             }
         }, "SynthAudio").apply { priority = Thread.MAX_PRIORITY }

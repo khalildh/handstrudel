@@ -14,6 +14,24 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+
+        // Build the TinySoundFont JNI wrapper (`libhandstrudel_tsf.so`) for
+        // every ABI we ship. The .cpp lives in src/main/cpp and shares the
+        // abiFilters declared in the `ndk { ... }` block above with the Rust
+        // core's jniLibs.
+        externalNativeBuild {
+            cmake { cppFlags += listOf("-std=c++17") }
+        }
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildTypes {
@@ -38,6 +56,9 @@ android {
 }
 
 dependencies {
+    // Shared music logic compiled from Rust via UniFFI.
+    implementation(project(":core"))
+
     // Compose
     val composeBom = platform("androidx.compose:compose-bom:2024.10.00")
     implementation(composeBom)
