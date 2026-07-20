@@ -682,7 +682,7 @@
 				CODE_SIGN_ENTITLEMENTS = HandStrudel/HandStrudel.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				DEVELOPMENT_TEAM = TVAG3T3Y65;
 				INFOPLIST_FILE = HandStrudel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -841,7 +841,7 @@
 				CODE_SIGN_ENTITLEMENTS = HandStrudel/HandStrudel.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				DEVELOPMENT_TEAM = TVAG3T3Y65;
 				INFOPLIST_FILE = HandStrudel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
