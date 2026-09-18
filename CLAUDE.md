@@ -50,6 +50,37 @@ The melody's sound source is selectable from `INSTRUMENTS` in `music.ts` — bui
 
 Saved snippets appear in the Sidebar with play/pause buttons. Multiple snippets can play simultaneously via `playingSetRef` (a `Set<number>`). When any snippet is playing, the 60fps loop skips live code evaluation. Stacked snippets are combined with `stack()`. Toggling all snippets off resumes live hand-controlled code (clears `lastCodeRef` to force re-eval).
 
+### Jev Director (optional)
+
+An opt-in layer that replaces two blind decisions with a model call. [Jev](https://docs.typesafe.ai)
+is TypeSafe's "System One" decision model: you post application state plus
+questions whose answers come from a closed option list, and it returns a choice,
+a probability distribution and a confidence in one forward pass (70–500 ms), with
+no text to parse.
+
+- `jev.ts` — transport, localStorage config, tolerant response parsing, nucleus
+  sampling with novelty weighting. The wire format follows Jev's public
+  description and is **unverified against the live API**; all of it is confined
+  to `parseAnswer`/`parseAnswers`
+- `jev-director.ts` — accumulates a cheap per-frame gesture summary (hands seen,
+  motion band, pitch centre/span, tempo, loudness, brightness, space, grit) and
+  asks two independent questions per window: which struct pattern to play next
+  (over `STRUCTS`, via readable labels) and which instrument would suit the
+  playing (over `INSTRUMENTS`)
+- **The 60fps hot path is untouched.** Continuous axis→param mapping is control,
+  not decision; a round trip has no place in a 16 ms frame
+- **Timing:** at each 8 s boundary the decision fetched during the *previous*
+  window is applied and the next is prefetched, so latency is never on the
+  critical path. Stale responses are dropped by generation counter
+- **Fallbacks are total:** disabled, unconfigured, late, rate-limited or offline
+  all fall back to the original round-robin (`structIdxRef + 1`) and
+  `nextInstrument()`. The struct choice applies automatically; the instrument is
+  only ever a *suggestion* — applied when the player fires the instrument gesture
+  or clicks "use" in the sidebar, so agency stays with the performer
+- Config and live status live in `JevPanel` (sidebar). A key set there is stored
+  in the browser and sent straight from the page — a `proxyUrl` is the option for
+  anything shared, since `output: "export"` rules out an API route here
+
 ### Track Sequencer
 
 Saved snippets can be arranged into an ordered track via the Sidebar's track builder. Uses `slowcat()` to play each snippet for one cycle before advancing. Speed control (0.25×–4×) applies `.slow(1/speed)` to the overall pattern. State is in `track` (slots + speed) with a mirrored `trackRef` for the 60fps loop. `trackPlayingRef` gates code evaluation alongside `playingSetRef`. Track and individual snippet playback are mutually exclusive — starting one stops the other. `buildTrackCode()` (module-level helper) generates the Strudel code.
@@ -67,6 +98,7 @@ src/
     StartOverlay.tsx  ← Pre-session config screen (axis→param mapping dropdowns)
     Sidebar.tsx       ← Code display, param meters, saved snippets
     HandPanel.tsx     ← Per-hand param visualization bars
+    JevPanel.tsx      ← Jev on/off, key/proxy setup, live decision readout
     Header.tsx        ← Status bar with beat indicator
     CameraView.tsx    ← Video + canvas overlay wrapper
   lib/
@@ -74,6 +106,8 @@ src/
     music.ts          ← PARAM_DEFS, buildCode/buildCodeHL, notes, structs
     params.ts         ← buildDefaultParams, smoothParams (EMA α=0.1)
     strudel.ts        ← Strudel REPL initialization (evalScope, webaudio)
+    jev.ts            ← Jev client: config, typed choice questions, sampling
+    jev-director.ts   ← Gesture summary → struct/instrument decisions per window
     mediapipe.ts      ← MediaPipe Hands setup, landmark→axis computation
     drawing.ts        ← Canvas hand skeleton renderer
   types/

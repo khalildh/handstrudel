@@ -28,6 +28,18 @@ import {
   getInstrumentAxes,
 } from "../lib/hand-mapping";
 import { initializeStrudel } from "../lib/strudel";
+import {
+  DEFAULT_JEV_CONFIG,
+  loadJevConfig,
+  saveJevConfig,
+  type JevConfig,
+} from "../lib/jev";
+import {
+  createJevDirector,
+  IDLE_JEV_STATUS,
+  type JevDirector,
+  type JevStatus,
+} from "../lib/jev-director";
 import { initializeMediaPipe } from "../lib/mediapipe";
 import { createRecorder, downloadBlob, type Recorder, type AspectRatio } from "../lib/recorder";
 import StartOverlay from "./StartOverlay";
@@ -66,6 +78,8 @@ export default function HandStrudel() {
   const [hydraConfig, setHydraConfig] = useState<MappingConfig>(DEFAULT_HYDRA_MAPPING);
   const [advanced, setAdvanced] = useState(false);
   const [instrument, setInstrument] = useState<string>(DEFAULT_INSTRUMENT);
+  const [jevConfig, setJevConfig] = useState<JevConfig>(DEFAULT_JEV_CONFIG);
+  const [jevStatus, setJevStatus] = useState<JevStatus>(IDLE_JEV_STATUS);
 
   const defaults = buildDefaultParams(DEFAULT_MAPPING);
   const defaultNI = Math.round(defaults.noteIdx ?? 10);
@@ -101,6 +115,11 @@ export default function HandStrudel() {
   const saveArmedRef = useRef<Map<string, boolean>>(new Map());
   const lastSaveTimeRef = useRef(0);
   const [savedSnippets, setSavedSnippets] = useState<SavedSnippet[]>([]);
+
+  // Jev director (decides the struct rotation / suggests instruments)
+  const jevDirectorRef = useRef<JevDirector | null>(null);
+  const jevConfigRef = useRef<JevConfig>(DEFAULT_JEV_CONFIG);
+  const jevStatusSigRef = useRef("");
 
   // Instrument-gesture refs (cycle instruments via a mapped hand axis)
   const instArmedRef = useRef<Map<string, boolean>>(new Map());
@@ -141,6 +160,23 @@ export default function HandStrudel() {
   const animFrameRef = useRef(0);
   const uiTimerRef = useRef(0);
   const structTimerRef = useRef(0);
+
+  // Jev config lives in localStorage — read it once on mount (the page is
+  // client-only, but keep it out of render anyway).
+  useEffect(() => {
+    const cfg = loadJevConfig();
+    jevConfigRef.current = cfg;
+    setJevConfig(cfg);
+    jevDirectorRef.current?.setConfig(cfg);
+  }, []);
+
+  const handleJevConfigChange = useCallback((cfg: JevConfig) => {
+    jevConfigRef.current = cfg;
+    setJevConfig(cfg);
+    saveJevConfig(cfg);
+    jevDirectorRef.current?.setConfig(cfg);
+    if (!cfg.enabled) setJevStatus(IDLE_JEV_STATUS);
+  }, []);
 
   const handleImportSnippets = useCallback((snippets: SavedSnippet[]) => {
     savedSnippetsRef.current = [...savedSnippetsRef.current, ...snippets];
@@ -339,10 +375,19 @@ export default function HandStrudel() {
       setStatus("running — wave your hands");
       setCanRecord(true);
 
-      // Rotate struct every 8s
+      // Rotate struct every 8s. With Jev enabled the next pattern is whatever
+      // it chose during the window that just ended; otherwise (disabled, late,
+      // offline) this falls back to the original round-robin.
+      jevDirectorRef.current = createJevDirector(jevConfigRef.current);
+      jevDirectorRef.current.beginWindow(structIdxRef.current, instrumentRef.current);
       structTimerRef.current = window.setInterval(() => {
+        const director = jevDirectorRef.current;
+        const chosen = director?.takeStruct() ?? null;
         structIdxRef.current =
-          (structIdxRef.current + 1) % STRUCTS.length;
+          chosen !== null ? chosen : (structIdxRef.current + 1) % STRUCTS.length;
+        // Close the window and prefetch the next decision — giving Jev a full
+        // 8s of slack, so its 70-500ms never lands on the critical path.
+        director?.beginWindow(structIdxRef.current, instrumentRef.current);
       }, 8000);
 
       // 60fps animation loop (mapHandsToParams runs in MediaPipe callback, not here)
@@ -375,6 +420,9 @@ export default function HandStrudel() {
         // Update signal params (near-zero cost — just writes to __hp global)
         if (playingSetRef.current.size === 0 && !trackPlayingRef.current) {
           updateSignalParams(smoothedRef.current, configRef.current);
+
+          // Accumulate gesture stats for the next Jev question (no-op when off)
+          jevDirectorRef.current?.sample(handsRef.current, smoothedRef.current);
 
           // Only re-eval when struct pattern rotates (every 8s)
           const structKey = getStructuralKey(structIdxRef.current);
@@ -436,7 +484,13 @@ export default function HandStrudel() {
           const armKey = `${side}:${axisKey}`;
           const armed = instArmedRef.current.get(armKey) ?? true;
           if (raw > 0.8 && armed && now - lastInstTimeRef.current > 600) {
-            const next = nextInstrument(instrumentRef.current);
+            // Jev's suggestion is already cached from the last window, so the
+            // gesture stays instant; without one, walk the list as before.
+            const suggested = jevDirectorRef.current?.suggestedInstrument() ?? null;
+            const next =
+              suggested && suggested !== instrumentRef.current
+                ? suggested
+                : nextInstrument(instrumentRef.current);
             instrumentRef.current = next;
             setInstrument(next);
             lastStructKeyRef.current = ""; // force live re-eval with new sound
@@ -468,6 +522,15 @@ export default function HandStrudel() {
           bpm: s.bpm ?? 120,
         });
         setSavedSnippets(savedSnippetsRef.current);
+
+        const st = jevDirectorRef.current?.status();
+        if (st) {
+          const sig = `${st.phase}|${st.message}|${st.patternChoice}|${st.instrumentId}|${st.calls}`;
+          if (sig !== jevStatusSigRef.current) {
+            jevStatusSigRef.current = sig;
+            setJevStatus(st);
+          }
+        }
       }, 66);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -484,6 +547,7 @@ export default function HandStrudel() {
       if (uiTimerRef.current) clearInterval(uiTimerRef.current);
       if (structTimerRef.current) clearInterval(structTimerRef.current);
       if (recTimerRef.current) clearInterval(recTimerRef.current);
+      jevDirectorRef.current?.dispose();
     };
   }, []);
 
@@ -532,6 +596,9 @@ export default function HandStrudel() {
         onImportSnippets={handleImportSnippets}
         instrument={instrument}
         onInstrumentChange={handleInstrumentChange}
+        jevConfig={jevConfig}
+        jevStatus={jevStatus}
+        onJevConfigChange={handleJevConfigChange}
       />
     </div>
   );

@@ -4,6 +4,9 @@ import { useState, useRef } from "react";
 import { MusicParams, PARAM_MAP, NOTES, NOTE_DISPLAY, INSTRUMENTS } from "../lib/music";
 import { HandsState, MappingConfig } from "../lib/hand-mapping";
 import HandPanel from "./HandPanel";
+import JevPanel from "./JevPanel";
+import type { JevConfig } from "../lib/jev";
+import type { JevStatus } from "../lib/jev-director";
 import type { SavedSnippet } from "./HandStrudel";
 
 interface SidebarProps {
@@ -30,6 +33,9 @@ interface SidebarProps {
   onImportSnippets: (snippets: SavedSnippet[]) => void;
   instrument: string;
   onInstrumentChange: (id: string) => void;
+  jevConfig: JevConfig;
+  jevStatus: JevStatus;
+  onJevConfigChange: (cfg: JevConfig) => void;
 }
 
 function paramRow(id: string, value: number) {
@@ -69,6 +75,9 @@ export default function Sidebar({
   onImportSnippets,
   instrument,
   onInstrumentChange,
+  jevConfig,
+  jevStatus,
+  onJevConfigChange,
 }: SidebarProps) {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -132,6 +141,13 @@ export default function Sidebar({
           ))}
         </select>
       </div>
+
+      <JevPanel
+        config={jevConfig}
+        status={jevStatus}
+        onConfigChange={onJevConfigChange}
+        onApplyInstrument={onInstrumentChange}
+      />
 
       {hydraCodeHL && (
         <div id="hydra-code-wrap">
