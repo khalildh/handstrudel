@@ -67,15 +67,23 @@ final class StoreManagerTests: XCTestCase {
         XCTAssertEqual(StoreManager.entitlementId(for: "pro"), StoreManager.entitlementPro)
     }
 
-    func testEntitlementId_filterAndVisual_mapToPlusFeatures() {
-        XCTAssertEqual(StoreManager.entitlementId(for: "filter_pack"), StoreManager.entitlementPlusFeatures)
-        XCTAssertEqual(StoreManager.entitlementId(for: "visual_pack"), StoreManager.entitlementPlusFeatures)
-        XCTAssertEqual(StoreManager.entitlementId(for: "theme_pack"), StoreManager.entitlementPlusFeatures)
-        XCTAssertEqual(StoreManager.entitlementId(for: "scale_pack"), StoreManager.entitlementPlusFeatures)
+    /// The paywall passes the resolved product ID; it must map to `pro`, not
+    /// fall through, or the sheet never dismisses after a successful purchase.
+    func testEntitlementId_proProductId() {
+        XCTAssertEqual(StoreManager.entitlementId(for: StoreManager.pro), StoreManager.entitlementPro)
+        XCTAssertEqual(StoreManager.entitlementId(for: StoreManager.productId(for: "pro")), StoreManager.entitlementPro)
     }
 
-    func testEntitlementId_unknownDefaultsToPlusFeatures() {
-        XCTAssertEqual(StoreManager.entitlementId(for: "unknown_thing"), StoreManager.entitlementPlusFeatures)
+    /// Filters and hand themes are advertised as part of Pro.
+    func testEntitlementId_filterAndVisual_mapToPro() {
+        XCTAssertEqual(StoreManager.entitlementId(for: "filter_pack"), StoreManager.entitlementPro)
+        XCTAssertEqual(StoreManager.entitlementId(for: "visual_pack"), StoreManager.entitlementPro)
+        XCTAssertEqual(StoreManager.entitlementId(for: "theme_pack"), StoreManager.entitlementPro)
+        XCTAssertEqual(StoreManager.entitlementId(for: "scale_pack"), StoreManager.entitlementPro)
+    }
+
+    func testEntitlementId_unknownDefaultsToPro() {
+        XCTAssertEqual(StoreManager.entitlementId(for: "unknown_thing"), StoreManager.entitlementPro)
     }
 
     // MARK: - productId(for:) legacy mapping

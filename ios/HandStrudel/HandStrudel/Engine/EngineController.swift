@@ -1,5 +1,6 @@
 import SwiftUI
 import QuartzCore
+import AVFoundation
 
 struct Waveform: Identifiable {
     let id: String
@@ -89,6 +90,8 @@ final class EngineController: ObservableObject {
     @Published var isRunning = false
     @Published var isPaused = false  // true when control sheet is open
     @Published var status = "tap start"
+    /// Set when the camera can't start (permission denied, no front camera).
+    @Published var cameraError: String?
 
     // UI state (updated at ~15fps)
     @Published var handsState = HandsState()
@@ -233,6 +236,17 @@ final class EngineController: ObservableObject {
 
     // Manual controls
     @Published var manualBPM: Double = 120
+
+    /// Playback-rate multiplier for slow-mo video recording (1 = normal).
+    /// Everything tempo-driven — the melodic pattern, drum loops and the beat
+    /// clock — runs at this rate; the recorded clip is sped back up afterwards.
+    var tempoScale: Double = 1 {
+        didSet {
+            guard tempoScale != oldValue else { return }
+            strudelBridge.tempoScale = tempoScale
+            lastStructKey = "" // re-evaluate patterns at the new tempo
+        }
+    }
     @Published var currentStructIdx = 0
     @Published var autoRotateStructs = true
     @Published var lockedParams = Set<String>()
@@ -263,6 +277,7 @@ final class EngineController: ObservableObject {
 
     init() {
         loadPersistedState()
+        observeAudioSession()
     }
 
     private func loadPersistedState() {
@@ -344,6 +359,7 @@ final class EngineController: ObservableObject {
     var structIdx = 0
     var lastStructKey = ""
     private var displayLink: CADisplayLink?
+    private var audioObservers: [NSObjectProtocol] = []
     private var uiTimer: Timer?
     private var structTimer: Timer?
     private(set) var startTime: Date?
@@ -395,6 +411,9 @@ final class EngineController: ObservableObject {
                 // Start camera + hand tracking
                 handTracker.onHandsUpdate = { [weak self] hands in
                     self?.handleHandsUpdate(hands)
+                }
+                handTracker.onCameraError = { [weak self] message in
+                    DispatchQueue.main.async { self?.cameraError = message }
                 }
                 handTracker.startSession()
                 debugLog("camera started")
@@ -602,7 +621,8 @@ final class EngineController: ObservableObject {
                     soundFontEngine.slide(voice: "pad\(i)", midi: midi)
                 }
             case .padOff:
-                for i in 0..<3 { soundFontEngine.noteOff(voice: "pad\(i)") }
+                // 4 voices: Scale mode voices 7th chords.
+                for i in 0..<4 { soundFontEngine.noteOff(voice: "pad\(i)") }
             case .chordAccent(let notes, _, let vel):
                 for midi in notes {
                     soundFontEngine.oneShot(midi: midi, velocity: vel * 0.6, duration: 0.5)
@@ -822,7 +842,7 @@ final class EngineController: ObservableObject {
             let vol = drumVolume * intensityGain
             code1 = "(\(code1)).gain(\(String(format: "%.2f", vol)))"
             // BPM via cpm (cycles per minute = BPM / 4)
-            let cpm1 = drumBPM / 4.0 * complexitySpeed
+            let cpm1 = drumBPM / 4.0 * complexitySpeed * tempoScale
             code1 = "(\(code1)).cpm(\(String(format: "%.1f", cpm1)))"
             parts.append(code1)
         }
@@ -830,7 +850,7 @@ final class EngineController: ObservableObject {
         if !code2.isEmpty {
             let vol = drumVolume2 * intensityGain
             code2 = "(\(code2)).gain(\(String(format: "%.2f", vol)))"
-            let cpm2 = drumBPM2 / 4.0 * complexitySpeed
+            let cpm2 = drumBPM2 / 4.0 * complexitySpeed * tempoScale
             code2 = "(\(code2)).cpm(\(String(format: "%.1f", cpm2)))"
             parts.append(code2)
         }
@@ -1013,6 +1033,7 @@ final class EngineController: ObservableObject {
         strudelBridge.noteOff(hand: "touch1")
         strudelBridge.noteOff(hand: "touch2")
         strudelBridge.noteOff(hand: "lead")
+        for i in 0..<4 { strudelBridge.noteOff(hand: "pad\(i)") }
         leadVoiceMidi = nil
         strudelBridge.stop()
         soundFontEngine.allNotesOff()
@@ -1101,10 +1122,13 @@ final class EngineController: ObservableObject {
         strudelBridge.stop()
         handTracker.stopSession()
         handTracker.onHandsUpdate = nil
+        handTracker.onCameraError = nil
+        cameraError = nil
         strudelBridge.onBeat = nil
         strudelBridge.onLog = nil
 
         // Reset all state
+        tempoScale = 1
         saveDetector.reset()
         loopRecorder.reset()
         jamSession.leaveSession()
@@ -1133,6 +1157,59 @@ final class EngineController: ObservableObject {
         displayLink?.invalidate()
         uiTimer?.invalidate()
         structTimer?.invalidate()
+        for observer in audioObservers { NotificationCenter.default.removeObserver(observer) }
+    }
+
+    // MARK: - Audio session
+
+    /// `.allowBluetoothA2DP` is needed for AirPods etc. to get stereo playback
+    /// under `.playAndRecord` (otherwise iOS falls back to the HFP headset
+    /// profile).
+    static func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playAndRecord, mode: .default,
+                                 options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+        try? session.setActive(true)
+    }
+
+    /// iOS stops both audio paths (the WebView's AudioContext and the native
+    /// SoundFont engine) on interruptions — phone calls, Siri, alarms — and on
+    /// some route changes, and neither restarts by itself.
+    private func observeAudioSession() {
+        let nc = NotificationCenter.default
+        let session = AVAudioSession.sharedInstance()
+        let handler: (Notification) -> Void = { [weak self] note in
+            let typeRaw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let began = note.name == AVAudioSession.interruptionNotification
+                && typeRaw == AVAudioSession.InterruptionType.began.rawValue
+            let reset = note.name == AVAudioSession.mediaServicesWereResetNotification
+            Task { @MainActor in self?.handleAudioSessionEvent(began: began, reset: reset) }
+        }
+        audioObservers = [
+            nc.addObserver(forName: AVAudioSession.interruptionNotification, object: session, queue: .main, using: handler),
+            nc.addObserver(forName: AVAudioSession.routeChangeNotification, object: session, queue: .main, using: handler),
+            nc.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: session, queue: .main, using: handler),
+            nc.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: .main, using: handler),
+            // The "interruption ended" notification isn't guaranteed (e.g. the
+            // user ignores a call), so also recover when the app is foregrounded.
+            nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main, using: handler),
+        ]
+    }
+
+    private func handleAudioSessionEvent(began: Bool, reset: Bool) {
+        guard isRunning else { return }
+        if began {
+            // Release held voices so nothing is stuck when audio comes back.
+            silenceAll()
+            return
+        }
+        if reset {
+            Self.configureAudioSession()
+        } else {
+            try? AVAudioSession.sharedInstance().setActive(true)
+        }
+        soundFontEngine.restartIfStopped()
+        strudelBridge.resumeAudio()
     }
 }
 

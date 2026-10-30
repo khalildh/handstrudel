@@ -12,6 +12,14 @@ struct ContentView: View {
     @State private var showSheet = false
     @State private var isRecording = false
     @State private var recordCountdown = 0
+    /// Slow-mo recording: the music runs at half speed while you record, then
+    /// the clip is sped back up — the music plays at normal tempo and your
+    /// hands look fast.
+    @AppStorage("slowMoRecording") private var slowMoRecording = false
+    /// Real seconds the current recording lasts (longer in slow-mo).
+    @State private var recordTotalSeconds = 7
+    /// The slow-mo clip is being sped up after recording.
+    @State private var isProcessingVideo = false
     @State private var showShareSheet = false
     @State private var showSharePicker = false
     @State private var recordedVideoURL: URL?
@@ -43,7 +51,9 @@ struct ContentView: View {
             if engine.isRunning {
                 performanceView
                     .overlay {
-                        if !hasSeenOnboarding {
+                        if let message = engine.cameraError {
+                            cameraErrorView(message)
+                        } else if !hasSeenOnboarding {
                             OnboardingView(hasSeenOnboarding: $hasSeenOnboarding)
                                 .transition(.opacity)
                         }
@@ -300,8 +310,11 @@ struct ContentView: View {
 
     private func randomizeSettings() {
         let allKeys = MusicKey.allCases
-        let allScales = Scale.allCases
-        let waveformIds = WAVEFORMS.map(\.id)
+        // Only draw from content the user has unlocked.
+        let allScales = Scale.allCases.filter { !$0.isPremium || storeManager.isUnlocked($0.packId ?? "") }
+        let waveformIds = WAVEFORMS
+            .filter { !$0.isPremium || storeManager.isUnlocked($0.packId ?? "") }
+            .map(\.id)
 
         engine.selectedKey = allKeys.randomElement() ?? .C
         engine.selectedScale = allScales.randomElement() ?? .pentatonic
@@ -313,6 +326,38 @@ struct ContentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             withAnimation(.easeOut(duration: 0.3)) { showRandomizedToast = false }
         }
+    }
+
+    /// Shown instead of a silent black screen when the camera can't start.
+    private func cameraErrorView(_ message: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "video.slash.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.white.opacity(0.7))
+            Text(message)
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+            Button(action: {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }) {
+                Text("Open Settings")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Capsule().fill(Color.white))
+            }
+            .accessibilityIdentifier("camera-settings-button")
+            Button("Back") { engine.stop() }
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundColor(.white.opacity(0.6))
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.opacity(0.85).ignoresSafeArea())
     }
 
     private var performanceView: some View {
@@ -1234,7 +1279,10 @@ struct ContentView: View {
             Spacer()
 
             // Video record button
-            recordButton
+            VStack(spacing: 6) {
+                slowMoToggle
+                recordButton
+            }
 
             Spacer()
 
@@ -1338,14 +1386,18 @@ struct ContentView: View {
         // Instagram share button
             Button(action: startRecording) {
                 ZStack {
-                    if isRecording {
+                    if isProcessingVideo {
+                        ProgressView()
+                            .tint(.white)
+                            .frame(width: 62, height: 62)
+                    } else if isRecording {
                         // Recording indicator with countdown
                         ZStack {
                             Circle()
                                 .stroke(Color.red.opacity(0.3), lineWidth: 3)
                                 .frame(width: 62, height: 62)
                             Circle()
-                                .trim(from: 0, to: CGFloat(7 - recordCountdown) / 7.0)
+                                .trim(from: 0, to: CGFloat(recordTotalSeconds - recordCountdown) / CGFloat(recordTotalSeconds))
                                 .stroke(Color.red, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                                 .frame(width: 62, height: 62)
                                 .rotationEffect(.degrees(-90))
@@ -1373,25 +1425,53 @@ struct ContentView: View {
                                     .font(.system(size: 20))
                                     .foregroundColor(.white)
                             }
-                            Text("7s")
+                            Text(slowMoRecording ? "7s · slow-mo" : "7s")
                                 .font(.system(size: 9, weight: .bold, design: .rounded))
                                 .foregroundColor(.white.opacity(0.5))
                         }
                     }
                 }
             }
-            .disabled(isRecording)
+            .disabled(isRecording || isProcessingVideo)
             .accessibilityIdentifier("record-button")
     }
 
+    private var slowMoToggle: some View {
+        Button(action: { slowMoRecording.toggle() }) {
+            HStack(spacing: 3) {
+                Image(systemName: "tortoise.fill")
+                    .font(.system(size: 9))
+                Text("½×")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+            }
+            .foregroundColor(slowMoRecording ? .black : .white.opacity(0.6))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(slowMoRecording ? Color.yellow : Color.black.opacity(0.35)))
+        }
+        .disabled(isRecording || isProcessingVideo)
+        .opacity(isRecording || isProcessingVideo ? 0 : 1)
+        .accessibilityLabel("Slow-mo recording")
+        .accessibilityValue(slowMoRecording ? "On" : "Off")
+        .accessibilityIdentifier("slowmo-toggle")
+    }
+
     // MARK: - Recording
+
+    /// Music speed while recording in slow-mo; the clip is sped up by 1/this.
+    private static let slowMoSpeed = 0.5
 
     private func startRecording() {
         let recorder = RPScreenRecorder.shared()
         guard recorder.isAvailable && !isRecording else { return }
 
         isRecording = true
-        recordCountdown = 7
+        // Output clip is always 7s; in slow-mo we record twice as long at half
+        // tempo and compress it afterwards.
+        let speed = slowMoRecording ? Self.slowMoSpeed : 1
+        recordTotalSeconds = Int((7 / speed).rounded())
+        recordCountdown = recordTotalSeconds
+        engine.tempoScale = speed
 
         // Enable microphone to capture Strudel audio from speaker
         // (WebView audio runs in a separate process so ReplayKit can't capture it directly)
@@ -1411,6 +1491,7 @@ struct ContentView: View {
                 debugPrint("Recording failed:", error)
                 DispatchQueue.main.async {
                     isRecording = false
+                    engine.tempoScale = 1
                     watermarkView?.removeFromSuperview()
                     watermarkView = nil
                 }
@@ -1434,6 +1515,9 @@ struct ContentView: View {
         let recorder = RPScreenRecorder.shared()
         let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("handstrudel_\(Int(Date().timeIntervalSince1970)).mp4")
 
+        let speed = engine.tempoScale
+        engine.tempoScale = 1
+
         recorder.stopRecording(withOutput: outputURL) { error in
             DispatchQueue.main.async {
                 isRecording = false
@@ -1444,8 +1528,24 @@ struct ContentView: View {
                     debugPrint("Stop recording failed:", error)
                     return
                 }
-                recordedVideoURL = outputURL
-                showSharePicker = true
+                guard speed < 1 else {
+                    recordedVideoURL = outputURL
+                    showSharePicker = true
+                    return
+                }
+                isProcessingVideo = true
+                Task { @MainActor in
+                    do {
+                        recordedVideoURL = try await SlowMoExporter.speedUp(outputURL, by: 1 / speed)
+                        try? FileManager.default.removeItem(at: outputURL)
+                    } catch {
+                        // Fall back to the slow clip rather than losing the take.
+                        debugPrint("Slow-mo export failed:", error)
+                        recordedVideoURL = outputURL
+                    }
+                    isProcessingVideo = false
+                    showSharePicker = true
+                }
             }
         }
     }

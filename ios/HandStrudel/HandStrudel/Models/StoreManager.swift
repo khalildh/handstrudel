@@ -157,20 +157,20 @@ final class StoreManager: ObservableObject {
     // MARK: - Access Checks
 
     /// Map content packIds to the RevenueCat entitlement that unlocks them.
-    /// - Music content (packs, kits) → individual entitlements granted by Pro or Plus.
-    /// - Cosmetic / premium features (filters, themes, premium scales) → `plus_features`,
-    ///   which only Plus subscriptions grant. Pro one-time buyers do NOT get these.
+    /// Pro is the single all-access unlock (see `isUnlocked`), so everything
+    /// that isn't a legacy pack/kit maps to `pro` — including filters and hand
+    /// themes, which the Pro paywall copy advertises.
     static func entitlementId(for packId: String) -> String {
         switch packId {
         case "studio", studioPack: return entitlementStudio
         case "party", partyPack: return entitlementParty
         case "kit_808", kit808: return entitlementKit808
         case "kit_electronic", kitElectronic: return entitlementKitElectronic
-        case "pro": return entitlementPro
-        // Filters, hand themes, premium scales — Plus-only features
+        // Callers pass either the short "pro" or the resolved product ID.
+        case "pro", pro: return entitlementPro
         case "filter_pack", "visual_pack", "theme_pack", "scale_pack":
-            return entitlementPlusFeatures
-        default: return entitlementPlusFeatures
+            return entitlementPro
+        default: return entitlementPro
         }
     }
 
@@ -211,6 +211,9 @@ final class StoreManager: ObservableObject {
         // NOTE: DEBUG bypass disabled for testing purchase flows.
         // Re-enable by wrapping the body below in `#if DEBUG\nreturn true\n#else ... #endif`.
         guard let info = customerInfo else { return false }
+        // Pro unlocks everything, regardless of how the per-pack entitlements
+        // are wired in the RevenueCat dashboard.
+        if hasProAccess { return true }
         let entId = Self.entitlementId(for: packId)
         return info.entitlements[entId]?.isActive == true
     }

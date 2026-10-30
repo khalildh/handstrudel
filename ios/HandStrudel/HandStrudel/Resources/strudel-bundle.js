@@ -19454,6 +19454,14 @@ registerProcessor('${n2}', MyProcessor);
     console.log("[strudel]", msg);
     window.webkit?.messageHandlers?.strudelBridge?.postMessage({ log: msg });
   }
+  // Called by the native side after an audio interruption (phone call, Siri) or
+  // route change: iOS suspends the AudioContext and never resumes it on its own.
+  window.resumeAudio = function() {
+      try {
+          if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume();
+      } catch (e) { log('resume failed: ' + e); }
+  };
+
   window.initStrudel = async function() {
     if (_ready) return "ok";
     try {
@@ -19478,7 +19486,7 @@ registerProcessor('${n2}', MyProcessor);
         let lastBeat = -1;
         const checkBeat = () => {
           try {
-            const cpm = window.__hp._cpm || 30;
+            const cpm = window.__hp._cpm || 30 * (window.__hp._tempoScale || 1);
             const beat = Math.floor(_audioCtx.currentTime * cpm / 60 * 4) % 4;
             if (beat !== lastBeat) {
               lastBeat = beat;

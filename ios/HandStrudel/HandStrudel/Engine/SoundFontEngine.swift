@@ -85,6 +85,19 @@ final class SoundFontEngine {
         return true
     }
 
+    /// Restart the audio graph if the system stopped it (interruption, route
+    /// change, media-services reset). Notes that were held are dropped.
+    func restartIfStopped() {
+        guard isAvailable, !engine.isRunning else { return }
+        activeNotes.removeAll()
+        do {
+            try engine.start()
+            log("restarted after interruption")
+        } catch {
+            log("restart failed: \(error)")
+        }
+    }
+
     /// Switch the GM instrument. No-op if it's already loaded.
     func setInstrument(program: UInt8) {
         guard program != currentProgram || !isAvailable else { return }
