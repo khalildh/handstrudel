@@ -5,10 +5,7 @@ import RevenueCat
 @main
 struct HandStrudelApp: App {
     init() {
-        // Configure audio session for playback + recording compatibility
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
-        try? session.setActive(true)
+        EngineController.configureAudioSession()
 
         // Configure RevenueCat
         Purchases.logLevel = .error

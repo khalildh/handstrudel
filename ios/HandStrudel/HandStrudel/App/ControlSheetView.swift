@@ -650,12 +650,24 @@ struct ControlSheet: View {
 
     private func soundFontChip(_ inst: SoundFontInstrument) -> some View {
         let isActive = engine.selectedSoundFontInstrument.id == inst.id
-        return Button(action: { engine.selectedSoundFontInstrument = inst }) {
+        let locked = inst.isPremium && !storeManager.isUnlocked(inst.packId ?? "")
+        return Button(action: {
+            if locked, let packId = inst.packId {
+                paywallPackId = packId
+            } else {
+                engine.selectedSoundFontInstrument = inst
+            }
+        }) {
             HStack(spacing: 6) {
                 Text(inst.emoji).font(.system(size: 14))
                 Text(inst.name)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundColor(isActive ? .green : .primary.opacity(0.75))
+                if locked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(.orange.opacity(0.8))
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
@@ -751,13 +763,25 @@ struct ControlSheet: View {
 
     private func progressionChip(_ prog: ChordProgression) -> some View {
         let isActive = engine.chordMelodyProgression.id == prog.id
-        return Button(action: { engine.chordMelodyProgression = prog }) {
+        let locked = prog.isPremium && !storeManager.isUnlocked(prog.packId ?? "")
+        return Button(action: {
+            if locked, let packId = prog.packId {
+                paywallPackId = packId
+            } else {
+                engine.chordMelodyProgression = prog
+            }
+        }) {
             HStack(spacing: 6) {
                 Text(prog.emoji)
                     .font(.system(size: 14))
                 Text(prog.name)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundColor(isActive ? .green : .primary.opacity(0.75))
+                if locked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(.orange.opacity(0.8))
+                }
                 Text("\(prog.degrees.count)")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(isActive ? 0.7 : 0.35))

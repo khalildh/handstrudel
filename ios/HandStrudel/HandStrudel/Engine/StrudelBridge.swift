@@ -174,10 +174,18 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         }
     }
 
+    /// Tempo multiplier for slow-mo recording (1 = normal). Applied to every
+    /// `cpm` this bridge sends; the JS beat clock reads it too.
+    var tempoScale: Double = 1 {
+        didSet {
+            webView.evaluateJavaScript("__hp._tempoScale=\(String(format: "%.4f", tempoScale))", completionHandler: nil)
+        }
+    }
+
     func updateParams(_ params: MusicParams, config: MappingConfig) {
         let ni = max(0, min(NOTES.count - 1, Int((params["noteIdx"] ?? 10).rounded())))
         let midi = MIDI_NOTES[ni]
-        let cpm = (params["bpm"] ?? 120) / 4
+        let cpm = (params["bpm"] ?? 120) / 4 * tempoScale
 
         var parts = ["__hp._midi=\(midi)", "__hp._cpm=\(String(format: "%.2f", cpm))"]
         for id in extraParamIds(config) {
@@ -189,7 +197,7 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     func updateScaleParams(_ params: MusicParams, config: MappingConfig, midi: Int) {
-        let cpm = (params["bpm"] ?? 120) / 4
+        let cpm = (params["bpm"] ?? 120) / 4 * tempoScale
         var parts = ["__hp._midi=\(midi)", "__hp._cpm=\(String(format: "%.2f", cpm))"]
         for id in extraParamIds(config) {
             guard let def = PARAM_MAP[id] else { continue }
@@ -199,7 +207,7 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     func updateChordParams(_ params: MusicParams, config: MappingConfig, chordMidi: [Int]) {
-        let cpm = (params["bpm"] ?? 120) / 4
+        let cpm = (params["bpm"] ?? 120) / 4 * tempoScale
         var parts = ["__hp._cpm=\(String(format: "%.2f", cpm))", "__hp._midi=\(chordMidi.first ?? 60)"]
         for i in 0..<3 {
             let midi = i < chordMidi.count ? chordMidi[i] : (chordMidi.first ?? 60)
@@ -244,6 +252,11 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     func playNote(midi: Int, waveform: String = "sawtooth", velocity: Double = 0.6, duration: Double = 0.3) {
         let safeMidi = max(0, min(127, midi))
         webView.evaluateJavaScript("playNote(\(safeMidi),'\(waveform)',\(String(format: "%.2f", velocity)),\(String(format: "%.2f", duration)))", completionHandler: nil)
+    }
+
+    /// Resume the WebView's AudioContext after iOS suspended it.
+    func resumeAudio() {
+        webView.evaluateJavaScript("window.resumeAudio && resumeAudio()", completionHandler: nil)
     }
 
     func stop() {

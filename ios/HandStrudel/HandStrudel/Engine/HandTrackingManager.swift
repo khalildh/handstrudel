@@ -85,9 +85,11 @@ final class HandTrackingManager: NSObject, ObservableObject {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-                if granted {
-                    DispatchQueue.main.async {
+                DispatchQueue.main.async {
+                    if granted {
                         self?.setupAndStart()
+                    } else {
+                        self?.onCameraError?(Self.deniedMessage)
                     }
                 }
             }
@@ -95,7 +97,7 @@ final class HandTrackingManager: NSObject, ObservableObject {
         case .authorized:
             setupAndStart()
         case .denied, .restricted:
-            onCameraError?("Camera access denied. Go to Settings → HandStrudel to enable.")
+            onCameraError?(Self.deniedMessage)
             return
         @unknown default:
             return
@@ -107,6 +109,7 @@ final class HandTrackingManager: NSObject, ObservableObject {
 
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
               let input = try? AVCaptureDeviceInput(device: device) else {
+            onCameraError?("Couldn't open the front camera.")
             return
         }
 
@@ -149,6 +152,8 @@ final class HandTrackingManager: NSObject, ObservableObject {
             }
         }
     }
+
+    static let deniedMessage = "HandStrudel needs the camera to see your hands. Turn on camera access in Settings."
 
     func stopSession() {
         captureSession.stopRunning()

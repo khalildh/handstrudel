@@ -79,6 +79,7 @@
 		E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */; };
 		CM4D9E5A8B7C40119EE3A001 /* ChordMelodyModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM4D9E5A8B7C40119EE3A002 /* ChordMelodyModeManager.swift */; };
 		5F0E9E5A8B7C40119EE3B001 /* SoundFontEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F0E9E5A8B7C40119EE3B002 /* SoundFontEngine.swift */; };
+		D0ABCD5A91DD33AE57BD4766 /* SlowMoExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C9E9E3260BE5F07ECEDF7F /* SlowMoExporter.swift */; };
 		5F0E9E5A8B7C40119EE3B003 /* SoundFontInstrument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F0E9E5A8B7C40119EE3B004 /* SoundFontInstrument.swift */; };
 		5F0E9E5A8B7C40119EE3B005 /* soundfonts in Resources */ = {isa = PBXBuildFile; fileRef = 5F0E9E5A8B7C40119EE3B006 /* soundfonts */; };
 		CM4D9E5A8B7C40119EE3A003 /* ChordMelodyOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM4D9E5A8B7C40119EE3A004 /* ChordMelodyOverlayView.swift */; };
@@ -189,6 +190,7 @@
 		F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeManager.swift; sourceTree = "<group>"; };
 		CM4D9E5A8B7C40119EE3A002 /* ChordMelodyModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordMelodyModeManager.swift; sourceTree = "<group>"; };
 		5F0E9E5A8B7C40119EE3B002 /* SoundFontEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFontEngine.swift; sourceTree = "<group>"; };
+		D4C9E9E3260BE5F07ECEDF7F /* SlowMoExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlowMoExporter.swift; sourceTree = "<group>"; };
 		5F0E9E5A8B7C40119EE3B004 /* SoundFontInstrument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFontInstrument.swift; sourceTree = "<group>"; };
 		5F0E9E5A8B7C40119EE3B006 /* soundfonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Resources/soundfonts"; sourceTree = "<group>"; };
 		CM4D9E5A8B7C40119EE3A004 /* ChordMelodyOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordMelodyOverlayView.swift; sourceTree = "<group>"; };
@@ -275,6 +277,7 @@
 				F3126B5C266947BE7BE0A8DD /* GridModeManager.swift */,
 				CM4D9E5A8B7C40119EE3A002 /* ChordMelodyModeManager.swift */,
 				5F0E9E5A8B7C40119EE3B002 /* SoundFontEngine.swift */,
+				D4C9E9E3260BE5F07ECEDF7F /* SlowMoExporter.swift */,
 				18B0EF83FDEC95F58B860F5A /* HandMapper.swift */,
 				C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */,
 				B4DA0ADC715E90CEC52CCB18 /* HapticManager.swift */,
@@ -533,6 +536,7 @@
 				E2EF03305F34C9B0A0956E46 /* GridModeManager.swift in Sources */,
 				CM4D9E5A8B7C40119EE3A001 /* ChordMelodyModeManager.swift in Sources */,
 				5F0E9E5A8B7C40119EE3B001 /* SoundFontEngine.swift in Sources */,
+				D0ABCD5A91DD33AE57BD4766 /* SlowMoExporter.swift in Sources */,
 				5F0E9E5A8B7C40119EE3B003 /* SoundFontInstrument.swift in Sources */,
 				B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */,
 				195DD1E54AF41FC7CDEE307E /* HandMapper.swift in Sources */,

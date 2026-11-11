@@ -79,7 +79,8 @@ final class ChordMelodyModeController: ModeController {
                     strudelBridge.noteSlide(hand: "pad\(i)", midi: midi)
                 }
             case .padOff:
-                for i in 0..<3 {
+                // 4 voices: Scale mode voices 7th chords.
+                for i in 0..<4 {
                     strudelBridge.noteOff(hand: "pad\(i)")
                 }
             case .chordAccent(let notes, _, let vel):
