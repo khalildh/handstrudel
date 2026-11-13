@@ -1,0 +1,9 @@
+# Only the Next.js website deploys to Vercel. Keep secrets and native apps out.
+supabase/
+ios/
+android/
+promo/
+rust/
+**/.env
+**/.env.*
+core/

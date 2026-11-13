@@ -8,6 +8,11 @@ extension String: @retroactive Identifiable {
 struct ContentView: View {
     @StateObject private var engine = EngineController()
     @StateObject private var storeManager = StoreManager()
+    @StateObject private var auth = AuthManager()
+    @State private var showSignIn = false
+    @State private var showProfile = false
+    @State private var showFeed = false
+    @State private var composingPost: URL?
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var showSheet = false
     @State private var isRecording = false
@@ -63,6 +68,33 @@ struct ContentView: View {
                                           scaleChordMelody: true)
                     }
                 )
+                .overlay(alignment: .top) {
+                    if SocialConfig.isConfigured {
+                        HStack {
+                            Button { showFeed = true } label: {
+                                Image(systemName: "play.rectangle.on.rectangle")
+                                    .font(.title2)
+                                    .foregroundStyle(.white.opacity(0.85))
+                                    .padding(16)
+                            }
+                            .accessibilityLabel("Feed")
+                            Spacer()
+                            Button { showProfile = true } label: {
+                                Image(systemName: auth.isSignedIn ? "person.crop.circle.fill" : "person.crop.circle")
+                                    .font(.title2)
+                                    .foregroundStyle(.white.opacity(0.85))
+                                    .padding(16)
+                            }
+                            .accessibilityLabel("Profile")
+                        }
+                    }
+                }
+                .sheet(isPresented: $showProfile) {
+                    ProfileView(auth: auth)
+                }
+                .fullScreenCover(isPresented: $showFeed) {
+                    FeedView(auth: auth)
+                }
             }
 
             // Hidden WebView for audio (must be in view hierarchy)
@@ -75,6 +107,27 @@ struct ContentView: View {
             if ProcessInfo.processInfo.arguments.contains("--reset-onboarding") {
                 hasSeenOnboarding = false
             }
+            #if DEBUG
+            // Simulator testing of the posting flow (it can't record the camera):
+            // HANDSTRUDEL_TEST_CLIP=/path/to/clip.mp4 starts "Post to HandStrudel" with that clip.
+            if let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
+                recordedVideoURL = URL(fileURLWithPath: path)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { postToHandStrudel() }
+            }
+            #endif
+        }
+        // Posting sheets live at the root so they work from any screen.
+        .sheet(isPresented: $showSignIn, onDismiss: {
+            // Finished signing in from the share dialog → continue to the composer.
+            if auth.isSignedIn && !auth.needsProfileSetup, let url = recordedVideoURL { composingPost = url }
+        }) {
+            SignInView(auth: auth)
+        }
+        .sheet(item: $composingPost) { url in
+            PostComposerView(clip: url, instrument: engine.selectedSoundFontInstrument.name,
+                             mode: currentModeName, auth: auth)
+                .onAppear { engine.pause() }
+                .onDisappear { engine.resume() }
         }
         .statusBarHidden(engine.isRunning)
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
@@ -653,6 +706,11 @@ struct ContentView: View {
             }
         }
         .confirmationDialog("Share to", isPresented: $showSharePicker, titleVisibility: .visible) {
+            if SocialConfig.isConfigured {
+                Button(action: postToHandStrudel) {
+                    Label("Post to HandStrudel", systemImage: "hand.raised.fingers.spread")
+                }
+            }
             Button(action: shareToInstagramStories) {
                 Label("Instagram Story", systemImage: "camera.circle")
             }
@@ -676,6 +734,30 @@ struct ContentView: View {
                 .onAppear { engine.pause() }
                 .onDisappear { engine.resume() }
         }
+    }
+
+    // MARK: - Posting
+
+    private func postToHandStrudel() {
+        showSharePicker = false
+        guard let url = recordedVideoURL else { return }
+        if auth.isSignedIn && !auth.needsProfileSetup {
+            composingPost = url
+        } else {
+            showSignIn = true
+        }
+    }
+
+    /// Short label for the play mode a clip was recorded in (shown on posts).
+    private var currentModeName: String {
+        if engine.scaleChordMelodyModeEnabled { return "scale" }
+        if engine.splitChordMelodyModeEnabled { return "split" }
+        if engine.radialChordMelodyModeEnabled { return "radial" }
+        if engine.chordMelodyModeEnabled { return "chord-melody" }
+        if engine.gridModeEnabled { return "grid" }
+        if engine.drumModeEnabled { return "drums" }
+        if engine.learnModeEnabled { return "learn" }
+        return "melodic"
     }
 
     // MARK: - Top Bar

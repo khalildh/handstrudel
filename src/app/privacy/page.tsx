@@ -1,45 +1,61 @@
 export default function Privacy() {
+  const link = { color: '#00ff9d' } as const;
   return (
-    <div style={{ maxWidth: 700, margin: '0 auto', padding: '40px 20px', fontFamily: 'system-ui', color: '#fff', background: '#000', minHeight: '100vh' }}>
+    <div style={{ maxWidth: 700, margin: '0 auto', padding: '40px 20px', fontFamily: 'system-ui', color: '#fff', background: '#000', minHeight: '100vh', lineHeight: 1.55 }}>
       <h1 style={{ color: '#00ff9d' }}>Privacy Policy</h1>
-      <p><strong>Last updated:</strong> May 2026</p>
+      <p><strong>Last updated:</strong> November 2026</p>
 
       <h2>Overview</h2>
-      <p>HandStrudel is a hand-tracking musical instrument app. Your privacy matters to us. This policy explains what data we collect and how we use it.</p>
+      <p>HandStrudel is a hand-tracking musical instrument app. Your privacy matters to us. This policy explains what data we collect and how we use it. You can play HandStrudel without an account; an account is only needed to post videos.</p>
 
-      <h2>Data We Collect</h2>
-      <h3>Camera Data</h3>
-      <p>HandStrudel uses your device&apos;s camera to track hand gestures in real-time. Camera images are processed <strong>entirely on your device</strong> using Apple&apos;s Vision framework. No camera data, images, or hand tracking data is ever sent to our servers or any third party.</p>
+      <h2>Data processed only on your device</h2>
+      <h3>Camera</h3>
+      <p>HandStrudel uses your camera to track hand gestures in real time. Camera frames are processed <strong>entirely on your device</strong> using Apple&apos;s Vision framework and are never sent to us or anyone else. The only video that leaves your device is a recording you explicitly choose to post or share.</p>
 
-      <h3>Microphone Data</h3>
-      <p>When you record a video to share, the microphone captures audio. This audio stays on your device and is only shared when you explicitly choose to share the recording.</p>
+      <h3>Microphone</h3>
+      <p>When you record a clip, the microphone captures the app&apos;s audio. The recording stays on your device unless you post or share it.</p>
 
-      <h3>App Settings</h3>
-      <p>Your preferences (selected preset, key, scale, BPM, etc.) are stored locally on your device using UserDefaults. This data never leaves your device.</p>
+      <h3>App settings</h3>
+      <p>Your preferences (instrument, key, scale, BPM, and so on) are stored locally on your device.</p>
 
-      <h3>In-App Purchases</h3>
-      <p>Purchases are handled entirely by Apple&apos;s App Store. We do not collect or store any payment information.</p>
-
-      <h2>Data We Do NOT Collect</h2>
+      <h2>If you create an account</h2>
+      <p>When you sign in and post, we collect:</p>
       <ul>
-        <li>No personal information (name, email, phone number)</li>
-        <li>No location data</li>
-        <li>No analytics or tracking</li>
-        <li>No advertising identifiers</li>
-        <li>No data shared with third parties</li>
+        <li><strong>Account identifiers:</strong> a user ID, and your email address (or Apple&apos;s private relay address if you use Sign in with Apple and hide your email).</li>
+        <li><strong>Profile:</strong> the username you choose and when you accepted our terms.</li>
+        <li><strong>Your posts:</strong> the videos, thumbnails, and captions you post, plus the instrument and play mode used. <strong>Posts are public.</strong></li>
+        <li><strong>Activity:</strong> likes, follows, blocks, and reports you make.</li>
+      </ul>
+      <p>We use this only to run HandStrudel: to sign you in, show your posts, power the feed, keep the community safe, and contact you about your account. We don&apos;t sell your data, show ads, or track you across other apps or websites.</p>
+
+      <h2>Service providers</h2>
+      <p>We use a small number of providers to run the service, who process data only on our behalf:</p>
+      <ul>
+        <li><strong>Supabase</strong> — accounts, sign-in, and the database.</li>
+        <li><strong>Cloudflare R2</strong> — storing and serving posted videos and thumbnails.</li>
+        <li><strong>Resend</strong> — sending sign-in code emails.</li>
+        <li><strong>Apple</strong> — Sign in with Apple and in-app purchases (we never see payment details).</li>
+        <li><strong>RevenueCat</strong> — managing in-app purchase status, linked to your account ID when you&apos;re signed in.</li>
+      </ul>
+
+      <h2>Your choices</h2>
+      <ul>
+        <li>Delete any of your posts at any time from your profile.</li>
+        <li>Delete your account from your profile (<strong>⋯ → Delete account</strong>). This permanently removes your profile, posts, and files from our systems.</li>
+        <li>Email us to ask for a copy of your data or to correct it.</li>
       </ul>
 
       <h2>SharePlay / Jam Sessions</h2>
-      <p>When using SharePlay for jam sessions, musical note events are shared between participants via Apple&apos;s GroupActivities framework. Only note/drum hit data is transmitted — no camera, audio, or personal data.</p>
+      <p>During SharePlay jam sessions, musical note events are shared between participants via Apple&apos;s GroupActivities framework. No camera, audio, or personal data is transmitted.</p>
 
-      <h2>Children&apos;s Privacy</h2>
-      <p>HandStrudel does not knowingly collect any personal information from children under 13.</p>
+      <h2>Children</h2>
+      <p>Accounts are for people 13 and older. We don&apos;t knowingly collect personal information from children under 13; if you believe a child has created an account, contact us and we&apos;ll delete it.</p>
 
       <h2>Changes</h2>
-      <p>We may update this policy from time to time. Changes will be posted on this page.</p>
+      <p>We may update this policy. Changes will be posted on this page, and significant changes will be announced in the app.</p>
 
       <h2>Contact</h2>
-      <p>Questions? Email us at <a href="mailto:support@handstrudel.com" style={{ color: '#00ff9d' }}>support@handstrudel.com</a></p>
+      <p>Questions or requests: <a href="mailto:hello@handstrudel.com" style={link}>hello@handstrudel.com</a></p>
     </div>
   );
 }
