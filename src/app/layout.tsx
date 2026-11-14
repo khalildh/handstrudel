@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono } from "next/font/google";
+import { Fraunces, JetBrains_Mono, Manrope } from "next/font/google";
 import "./globals.css";
+import "./watch/watch.css";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -8,6 +9,8 @@ const jetbrainsMono = JetBrains_Mono({
   style: ["normal", "italic"],
   variable: "--font-jetbrains-mono",
 });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap" });
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", display: "swap" });
 
 export const metadata: Metadata = {
   title: "HandStrudel",
@@ -18,8 +21,6 @@ export const metadata: Metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover" as const,
   themeColor: "#05050a",
 };
@@ -31,7 +32,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={jetbrainsMono.variable}>{children}</body>
+      <body className={`${jetbrainsMono.variable} ${fraunces.variable} ${manrope.variable}`}>{children}</body>
     </html>
   );
 }

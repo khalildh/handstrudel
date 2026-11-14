@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { isCreatorHandle, loadPublicCreator, loadPublicVideos, mediaURL, PAGE_SIZE, type PublicCreator, type PublicVideo } from "../../lib/public-feed";
+import { clipTitle, WatchArtwork, WatchFooter, WatchHeader, WatchIcon, WatchThumbnail } from "../watch/watch-design";
 
 export default function CreatorProfile() {
   const handle = useSearchParams().get("u")?.toLowerCase() ?? "";
@@ -60,17 +61,17 @@ function CreatorView({ handle }: { handle: string }) {
 
   return (
     <main className="watch-page">
-      <header className="watch-top">
-        <Link className="watch-wordmark" href="/">hand<strong>strudel</strong></Link>
-        <Link className="watch-action" href="/watch">Browse performances</Link>
-      </header>
+      <WatchHeader creator />
+      <Link className="creator-back" href="/watch"><WatchIcon name="back" /> All performances</Link>
       {isCreatorHandle(handle) && state.status === "ready" ? (
         <>
-          <div className="watch-heading creator-heading">
+          <div className="watch-heading watch-hero creator-heading">
+            <WatchArtwork id="creator-hero" />
             <CreatorAvatar key={state.creator.avatar_key} creator={state.creator} />
-            <div>
-              <p>{state.creator.display_name ? `@${state.creator.username}` : "HandStrudel creator"}</p>
+            <div className="watch-hero-copy">
+              <p className="watch-eyebrow"><span /> ARTIST PROFILE</p>
               <h1>{state.creator.display_name || `@${state.creator.username}`}</h1>
+              {state.creator.display_name && <p className="watch-intro">@{state.creator.username}</p>}
             </div>
           </div>
           <section className="creator-performances" aria-labelledby="creator-performances-title">
@@ -79,11 +80,10 @@ function CreatorView({ handle }: { handle: string }) {
             <div className="creator-grid">
               {state.videos.map((video) => (
                 <Link className="creator-clip" key={video.id} href={`/watch?v=${encodeURIComponent(video.id)}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={mediaURL(video.thumb_key)} alt="" loading="lazy" />
-                  <div>
-                    <strong>{video.caption || video.instrument || "Performance"}</strong>
-                    {video.duration_s != null && <small>{Math.ceil(video.duration_s)}s</small>}
+                  <WatchThumbnail video={video} showPlay />
+                  <div className="creator-clip-copy">
+                    <strong>{clipTitle(video)}</strong>
+                    {video.instrument && <small>{video.instrument}</small>}
                   </div>
                 </Link>
               ))}
@@ -104,6 +104,7 @@ function CreatorView({ handle }: { handle: string }) {
           }}>Try again</button>}
         </div>
       )}
+      <WatchFooter />
     </main>
   );
 }
