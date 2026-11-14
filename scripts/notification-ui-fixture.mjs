@@ -6,9 +6,15 @@ const video = "30000000-0000-0000-0000-000000000001";
 const root = "40000000-0000-0000-0000-000000000001";
 const reply = "40000000-0000-0000-0000-000000000002";
 const now = new Date().toISOString();
+const demoThumb = "thumbs/76c9a372-7439-48dc-94ec-75a06cb6f1d7/385e21ab-7160-4378-b897-c602de952140.jpg";
 const post = {
   id: video, user_id: creator, username: "loopmaker", caption: "Evening loop", comments_enabled: true,
-  video_key: "test/clip.mp4", thumb_key: "test/thumb.jpg", like_count: 0, created_at: now,
+  video_key: "test/clip.mp4", thumb_key: demoThumb, like_count: 0, created_at: now,
+  instrument: "Grand Piano",
+  sound_setup: {
+    version: 1, instrument: "grand_piano", waveform: "sine", key: "D", scale: "Minor", progression: "free",
+    mode: "soundfont", bpm: 96, useSoundFont: true, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
+  },
 };
 const secondPost = {
   ...post, id: "30000000-0000-0000-0000-000000000002", username: "secondartist",
@@ -24,12 +30,20 @@ const answer = {
 };
 let readAt = null;
 let videoLikeReadAt = null;
+let displayName = "Studio Viewer";
+let following = false;
 const liked = new Set();
 const withLikes = (comment) => ({ ...comment, like_count: liked.has(comment.id) ? 1 : 0, liked_by_me: liked.has(comment.id) });
 
 createServer((request, response) => {
   const url = new URL(request.url, "http://localhost");
-  const send = (value) => response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(value));
+  const send = (value) => {
+    if (request.method === "HEAD") {
+      const count = value.length;
+      return response.writeHead(200, { "Content-Range": count ? `0-${count - 1}/${count}` : "*/0" }).end();
+    }
+    response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(value));
+  };
   switch (url.pathname) {
     case "/auth/v1/otp": return send({});
     case "/auth/v1/verify": return send({
@@ -37,11 +51,35 @@ createServer((request, response) => {
       expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: "fixture-refresh",
       user: { id: viewer, aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: now, updated_at: now },
     });
-    case "/rest/v1/profiles": return send({ id: viewer, username: "viewer", accepted_terms_at: now });
+    case "/rest/v1/profiles": {
+      if (request.method === "PATCH") {
+        let body = "";
+        request.on("data", (chunk) => { body += chunk; });
+        request.on("end", () => {
+          displayName = JSON.parse(body).display_name;
+          response.writeHead(204).end();
+        });
+        return;
+      }
+      return send({ id: viewer, username: "viewer", display_name: displayName, accepted_terms_at: now });
+    }
+    case "/rest/v1/videos": return send([]);
+    case "/rest/v1/follows": {
+      if (request.method === "POST" || request.method === "DELETE") {
+        following = request.method === "POST";
+        return response.writeHead(following ? 201 : 204).end();
+      }
+      const follower = url.searchParams.get("follower_id")?.slice(3).toLowerCase();
+      const followee = url.searchParams.get("followee_id")?.slice(3).toLowerCase();
+      return send(following && (!follower || follower === viewer) && (!followee || followee === creator)
+        ? [{ follower_id: viewer, followee_id: creator }] : []);
+    }
     case "/rest/v1/feed_videos": {
       const id = url.searchParams.get("id")?.slice(3).toLowerCase();
       const handle = url.searchParams.get("username")?.slice(3);
-      return send([post, secondPost].filter((item) => (!id || item.id === id) && (!handle || item.username === handle)));
+      const author = url.searchParams.get("user_id")?.slice(3).toLowerCase();
+      return send([post, secondPost].filter((item) => (!id || item.id === id) && (!handle || item.username === handle)
+        && (!author || item.user_id === author)));
     }
     case "/rest/v1/public_creators": {
       const handle = url.searchParams.get("username")?.slice(3);

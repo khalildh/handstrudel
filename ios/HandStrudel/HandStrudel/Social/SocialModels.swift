@@ -43,6 +43,7 @@ struct Video: Codable, Equatable, Identifiable {
     // Joined in the `feed_videos` view only.
     var username: String?
     var displayName: String?
+    var avatarKey: String?
     var likedByMe: Bool?
     var soundSetup: SoundSetup?
     var commentsEnabled: Bool?
@@ -62,6 +63,7 @@ struct Video: Codable, Equatable, Identifiable {
         case createdAt = "created_at"
         case likedByMe = "liked_by_me"
         case displayName = "display_name"
+        case avatarKey = "avatar_key"
         case soundSetup = "sound_setup"
         case commentsEnabled = "comments_enabled"
         case commentCount = "comment_count"
@@ -89,6 +91,7 @@ struct Video: Codable, Equatable, Identifiable {
         rawCreatedAt = try? row.decode(String.self, forKey: .createdAt)
         username = try row.decodeIfPresent(String.self, forKey: .username)
         displayName = try row.decodeIfPresent(String.self, forKey: .displayName)
+        avatarKey = try row.decodeIfPresent(String.self, forKey: .avatarKey)
         likedByMe = try row.decodeIfPresent(Bool.self, forKey: .likedByMe)
         let setup = try? row.decode(SoundSetup.self, forKey: .soundSetup)
         soundSetup = setup?.isValid == true ? setup : nil

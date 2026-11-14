@@ -4,6 +4,26 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    func testReviewMilestonesOnlyCountDistinctSuccessfulTakes() throws {
+        var milestones = CreatorReviewMilestones()
+        let first = UUID()
+        let now = Date(timeIntervalSince1970: 2_000_000)
+        XCTAssertTrue(milestones.record(first))
+        XCTAssertFalse(milestones.record(first))
+        XCTAssertTrue(milestones.record(UUID()))
+        XCTAssertFalse(milestones.canRequest(version: "1.0", now: now))
+        XCTAssertTrue(milestones.record(UUID()))
+        XCTAssertTrue(milestones.canRequest(version: "1.0", now: now))
+        milestones.requested(version: "1.0", now: now)
+        milestones = try JSONDecoder().decode(CreatorReviewMilestones.self, from: JSONEncoder().encode(milestones))
+        XCTAssertFalse(milestones.record(first))
+        for _ in 0..<3 { XCTAssertTrue(milestones.record(UUID())) }
+        XCTAssertFalse(milestones.canRequest(version: "1.1", now: now))
+        let afterCooldown = now.addingTimeInterval(90 * 24 * 60 * 60)
+        XCTAssertFalse(milestones.canRequest(version: "1.0", now: afterCooldown))
+        XCTAssertTrue(milestones.canRequest(version: "1.1", now: afterCooldown))
+    }
+
     func testUniversalPerformanceLinksOnlyOpenCanonicalVideoURLs() throws {
         let id = try XCTUnwrap(UUID(uuidString: "52000000-0000-0000-0000-000000000001"))
         func link(_ value: String) throws -> PerformanceLink? {

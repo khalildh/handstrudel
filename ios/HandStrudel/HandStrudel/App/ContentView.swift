@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 import ReplayKit
 import GroupActivities
 import Combine
@@ -8,6 +9,31 @@ import AVFoundation
 
 extension String: @retroactive Identifiable {
     public var id: String { self }
+}
+
+struct CreatorReviewMilestones: Codable {
+    private(set) var completedTakes: [UUID] = []
+    private(set) var newTakes = 0
+    private(set) var lastRequest: Date?
+    private(set) var lastVersion: String?
+
+    mutating func record(_ id: UUID) -> Bool {
+        guard !completedTakes.contains(id) else { return false }
+        completedTakes = Array((completedTakes + [id]).suffix(100))
+        newTakes = min(newTakes + 1, 3)
+        return true
+    }
+
+    func canRequest(version: String, now: Date) -> Bool {
+        newTakes >= 3 && lastVersion != version
+            && (lastRequest.map { now.timeIntervalSince($0) >= 90 * 24 * 60 * 60 } ?? true)
+    }
+
+    mutating func requested(version: String, now: Date) {
+        newTakes = 0
+        lastRequest = now
+        lastVersion = version
+    }
 }
 
 struct ContentView: View {
@@ -32,6 +58,9 @@ struct ContentView: View {
     @StateObject private var drafts = RecordingDrafts()
     @State private var recorderEvents = RecorderEvents()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
+    @AppStorage("creatorReviewMilestones") private var reviewData = Data()
+    @State private var reviewReadyThisSession = false
     @State private var destination: Destination = .music
     @State private var hasOpenedFeed = false
     @State private var startingSession = false
@@ -84,6 +113,13 @@ struct ContentView: View {
     /// the melody snap follows whatever the player is touching.
     @State private var splitTouchChordStack: [SplitTouchChord] = []
     // Song mode removed
+
+    private var canShowReview: Bool {
+        reviewReadyThisSession && scenePhase == .active && destination == .music
+            && !engine.isRunning && !startingSession && !showDrafts && !showSetups && reviewingDraft == nil
+            && linkedComments == nil && linkedPerformance == nil && soundError == nil && recordingError == nil
+            && jamInvitation == nil && jamError == nil
+    }
 
     var body: some View {
         ZStack {
@@ -147,7 +183,8 @@ struct ContentView: View {
             #endif
         }
         .sheet(isPresented: $showDrafts) {
-            RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil)
+            RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil,
+                                onSuccessfulTake: recordReviewMilestone)
         }
         .sheet(isPresented: $showSetups, onDismiss: {
             if engine.isRunning { engine.resume() }
@@ -200,7 +237,7 @@ struct ContentView: View {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: draft, onRetake: engine.isRunning ? {
                 retakeRequested = true
                 reviewingDraft = nil
-            } : nil)
+            } : nil, onSuccessfulTake: recordReviewMilestone)
                 .onAppear { engine.pause() }
         }
         .alert("Recording", isPresented: Binding(
@@ -219,6 +256,19 @@ struct ContentView: View {
             Text(jamError ?? "")
         }
         .task { await engine.jamSession.listenForSessions() }
+        .task(id: canShowReview) {
+            guard canShowReview else { return }
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+            guard canShowReview, !Task.isCancelled else { return }
+            let now = Date()
+            let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+            var milestones = (try? JSONDecoder().decode(CreatorReviewMilestones.self, from: reviewData)) ?? .init()
+            guard milestones.canRequest(version: version, now: now) else { return }
+            milestones.requested(version: version, now: now)
+            reviewData = (try? JSONEncoder().encode(milestones)) ?? reviewData
+            reviewReadyThisSession = false
+            requestReview()
+        }
         .onReceive(engine.jamSession.$isActive.removeDuplicates()) { active in
             guard active else { return }
             if activeDraft?.recordedAtHalfSpeed == true { stopRecording() }
@@ -311,7 +361,8 @@ struct ContentView: View {
                     )
                 case .account:
                     if SocialConfig.isConfigured {
-                        ProfileView(auth: auth)
+                        ProfileView(auth: auth, onMakeMusic: { destination = .music },
+                                    onTrySound: trySharedSound, onPlayAlong: prepareBacking)
                     } else {
                         socialUnavailable("Account", icon: "person.crop.circle")
                     }
@@ -391,6 +442,14 @@ struct ContentView: View {
             return
         }
         startSession(setup: setup)
+    }
+
+    private func recordReviewMilestone(_ id: UUID) {
+        guard !ProcessInfo.processInfo.arguments.contains("--uitesting") else { return }
+        var milestones = (try? JSONDecoder().decode(CreatorReviewMilestones.self, from: reviewData)) ?? .init()
+        guard milestones.record(id) else { return }
+        reviewData = (try? JSONEncoder().encode(milestones)) ?? reviewData
+        reviewReadyThisSession = true
     }
 
     private func prepareBacking(_ video: Video) {

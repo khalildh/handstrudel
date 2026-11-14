@@ -185,6 +185,7 @@ struct RecordingDraftsView: View {
     @ObservedObject var auth: AuthManager
     let openedDraft: RecordingDraft?
     let onRetake: (() -> Void)?
+    var onSuccessfulTake: (UUID) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -228,7 +229,7 @@ struct RecordingDraftsView: View {
     }
 
     private func editor(_ draft: RecordingDraft) -> some View {
-        RecordingDraftEditor(store: store, auth: auth, draft: draft, onRetake: onRetake)
+        RecordingDraftEditor(store: store, auth: auth, draft: draft, onRetake: onRetake, onSuccessfulTake: onSuccessfulTake)
     }
 }
 
@@ -238,6 +239,7 @@ private struct RecordingDraftEditor: View {
     @ObservedObject var auth: AuthManager
     @State var draft: RecordingDraft
     let onRetake: (() -> Void)?
+    let onSuccessfulTake: (UUID) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer?
     @State private var duration = 0.0
@@ -324,6 +326,7 @@ private struct RecordingDraftEditor: View {
             PostComposerView(clip: url, instrument: draft.instrument, mode: draft.mode, soundSetup: draft.soundSetup,
                              backingCredit: draft.backingCredit, auth: auth) {
                 message = "Posted. The original is still in Private drafts."
+                onSuccessfulTake(draft.id)
             }
             .onDisappear { removeExport(url) }
         }
@@ -406,6 +409,7 @@ private struct RecordingDraftEditor: View {
             PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: url, options: nil)
         }
         message = "Saved to Photos."
+        onSuccessfulTake(draft.id)
     }
 
     private func removeExport(_ url: URL) {
