@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct OnboardingView: View {
+    @Environment(\.studioPalette) private var palette
     @Binding var hasSeenOnboarding: Bool
     let noteName: String
     let melodyLaneCount: Int
@@ -24,9 +25,9 @@ struct OnboardingView: View {
                     } label: {
                         Text(noteName)
                             .font(.title3.bold())
-                            .foregroundStyle(StudioStyle.background)
+                            .foregroundStyle(palette.onAccent)
                             .frame(width: 53, height: 53)
-                            .background(StudioStyle.accent, in: Circle())
+                            .background(palette.accent, in: Circle())
                             .overlay { Circle().strokeBorder(.white.opacity(0.6)) }
                     }
                     .buttonStyle(.plain)
@@ -45,15 +46,15 @@ struct OnboardingView: View {
                              ? "Hold your hand over a note and pinch your thumb and index finger. You can also tap or drag on the wheel."
                              : "Tap the highlighted note on the wheel.")
                             .font(.subheadline)
-                            .foregroundStyle(StudioStyle.muted)
+                            .foregroundStyle(palette.muted)
                         Button(played ? "Keep playing" : "Skip") { hasSeenOnboarding = true }
                             .buttonStyle(.bordered)
-                            .tint(StudioStyle.accent)
+                            .tint(palette.accent)
                             .accessibilityIdentifier("onboarding-got-it")
                     }
                     .frame(maxWidth: 430, alignment: .leading)
                     .padding(17)
-                    .background(StudioStyle.surface, in: RoundedRectangle(cornerRadius: 20))
+                    .background(palette.surface, in: RoundedRectangle(cornerRadius: 20))
                     .padding(.horizontal, 20)
                     .padding(.bottom, 18)
                 }

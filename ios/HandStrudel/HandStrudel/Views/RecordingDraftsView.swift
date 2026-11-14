@@ -180,6 +180,7 @@ private enum DraftError: LocalizedError {
 }
 
 struct RecordingDraftsView: View {
+    @Environment(\.studioPalette) private var palette
     @ObservedObject var store: RecordingDrafts
     @ObservedObject var auth: AuthManager
     let openedDraft: RecordingDraft?
@@ -193,7 +194,7 @@ struct RecordingDraftsView: View {
                     editor(openedDraft)
                 } else if store.drafts.isEmpty {
                     VStack(spacing: 12) {
-                        Image(systemName: "film.stack").font(.largeTitle).foregroundStyle(StudioStyle.accent)
+                        Image(systemName: "film.stack").font(.largeTitle).foregroundStyle(palette.accent)
                         Text(store.loadError == nil ? "No drafts yet" : "Drafts couldn’t load").font(.headline)
                         Text(store.loadError ?? "Your recordings stay here until you delete them.")
                             .foregroundStyle(.secondary)
@@ -221,9 +222,9 @@ struct RecordingDraftsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
-            .background(StudioStyle.background)
+            .background(palette.background)
         }
-        .tint(StudioStyle.accent)
+        .tint(palette.accent)
     }
 
     private func editor(_ draft: RecordingDraft) -> some View {
@@ -232,6 +233,7 @@ struct RecordingDraftsView: View {
 }
 
 private struct RecordingDraftEditor: View {
+    @Environment(\.studioPalette) private var palette
     let store: RecordingDrafts
     @ObservedObject var auth: AuthManager
     @State var draft: RecordingDraft
@@ -289,7 +291,7 @@ private struct RecordingDraftEditor: View {
             .padding(20)
             .disabled(busy)
         }
-        .background(StudioStyle.background)
+        .background(palette.background)
         .task {
             let url = store.videoURL(for: draft.id)
             do {

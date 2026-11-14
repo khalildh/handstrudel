@@ -1,4 +1,5 @@
 import AVFoundation
+import Supabase
 import XCTest
 @testable import HandStrudel
 
@@ -11,6 +12,7 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(try link("https://handstrudel.com/watch?v=\(id)"), .watch(id))
         XCTAssertEqual(try link("https://handstrudel.com/watch/?v=\(id)&source=share"), .watch(id))
         XCTAssertEqual(try link("handstrudel://comments/\(id)"), .comments(id))
+        XCTAssertEqual(try link("handstrudel://watch/\(id)"), .watch(id))
         XCTAssertEqual(try link("handstrudel://sound/\(id)"), .sound(id))
         XCTAssertEqual(try link("handstrudel://play/\(id)"), .playAlong(id))
         XCTAssertNil(try link("https://handstrudel.com/watch"))
@@ -126,6 +128,152 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(unsupported.commentCount, 12)
     }
 
+    func testSearchUsesLiteralTextAndHandleScope() throws {
+        XCTAssertNil(PostSearch(" @x "))
+        XCTAssertNil(PostSearch("  "))
+        let handle = try XCTUnwrap(PostSearch(" @cloud_music "))
+        XCTAssertEqual(handle.text, "cloud_music")
+        XCTAssertEqual(handle.filter, "username.imatch.\"cloud_music\"")
+        let search = try XCTUnwrap(PostSearch("hi,.*"))
+        XCTAssertTrue(search.filter.hasPrefix(#"caption.imatch."hi,\\.\\*",instrument.imatch."#))
+        XCTAssertTrue(search.filter.contains("display_name.imatch"))
+        XCTAssertEqual(search.filter(after: "cursor"), "and(or(\(search.filter)),or(cursor))")
+    }
+
+    func testCreatorLoadsFromVisibleFeedWhenCreatorViewIsMissing() async throws {
+        let client = discoveryClient { request in
+            if request.path == "/public_creators" { return Self.missingView }
+            XCTAssertEqual(request.path, "/feed_videos")
+            XCTAssertEqual(request.queryItems?.first(where: { $0.name == "user_id" })?.value?.lowercased(),
+                           "eq.\(Self.discoveryUser.lowercased())")
+            return (200, Self.discoveryVideo)
+        }
+        let user = try XCTUnwrap(UUID(uuidString: Self.discoveryUser))
+        let creator = try await FeedService.creator(id: user, from: client.from)
+        XCTAssertEqual(creator?.id, user)
+        XCTAssertEqual(creator?.username, "musician")
+        XCTAssertEqual(creator?.displayName, "The Musician")
+    }
+
+    func testFollowingWithNoFollowsReturnsEmptyWhenViewIsMissing() async throws {
+        let client = discoveryClient { request in
+            if request.path == "/following_videos" { return Self.missingView }
+            XCTAssertEqual(request.path, "/follows")
+            XCTAssertEqual(request.queryItems?.first(where: { $0.name == "follower_id" })?.value,
+                           "eq.\(Self.discoveryViewer.lowercased())")
+            return (200, "[]")
+        }
+        let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
+        let page = try await FeedService.followingPage(user: user, from: client.from)
+        XCTAssertTrue(page.isEmpty)
+    }
+
+    func testFollowingFallsBackToVisiblePostsWithTheFullPaginationTimestamp() async throws {
+        let client = discoveryClient { request in
+            if request.path == "/following_videos" { return Self.missingView }
+            if request.path == "/follows" { return (200, "[{\"followee_id\":\"\(Self.discoveryUser)\"}]") }
+            XCTAssertEqual(request.path, "/feed_videos")
+            XCTAssertTrue(request.queryItems?.first(where: { $0.name == "user_id" })?.value?
+                .contains(Self.discoveryUser.lowercased()) == true)
+            if let cursor = request.queryItems?.first(where: { $0.name == "or" })?.value {
+                XCTAssertTrue(cursor.contains("2026-11-13T05:00:00.123456+00:00"))
+                return (200, "[]")
+            }
+            return (200, Self.discoveryVideo)
+        }
+        let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
+        let first = try await FeedService.followingPage(user: user, from: client.from)
+        let post = try XCTUnwrap(first.first)
+        let next = try await FeedService.followingPage(user: user, after: post, from: client.from)
+        XCTAssertTrue(next.isEmpty)
+    }
+
+    func testFollowingDoesNotHideAnAuthorizationFailure() async throws {
+        let client = discoveryClient { request in
+            XCTAssertEqual(request.path, "/following_videos")
+            return (403, #"{"code":"42501","message":"permission denied"}"#)
+        }
+        let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
+        do {
+            _ = try await FeedService.followingPage(user: user, from: client.from)
+            XCTFail("An authorization error is not an empty feed")
+        } catch let error as PostgrestError {
+            XCTAssertEqual(error.code, "42501")
+        }
+    }
+
+    func testMissingBookmarkTableAndLibraryReportThatSavingIsUnavailable() async throws {
+        let client = discoveryClient { request in
+            XCTAssertTrue(["/video_bookmarks", "/saved_videos"].contains(request.path))
+            return Self.missingView
+        }
+        let video = try XCTUnwrap(UUID(uuidString: Self.discoveryUser))
+        let viewer = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
+        do {
+            try await FeedService.setBookmark(true, video: video, user: viewer, from: client.from)
+            XCTFail("A bookmark that wasn't saved must not look successful")
+        } catch FeedService.Unavailable.bookmarks {}
+        do {
+            _ = try await FeedService.bookmarks(from: client.from)
+            XCTFail("An unavailable library isn't empty")
+        } catch FeedService.Unavailable.bookmarks {}
+    }
+
+    func testMissingNotificationViewIsDistinctFromAnEmptyInbox() async throws {
+        let missing = discoveryClient { _ in Self.missingView }
+        do {
+            _ = try await FeedService.activity(from: missing.from)
+            XCTFail("An unavailable inbox isn't empty")
+        } catch FeedService.Unavailable.activity {}
+        let empty = discoveryClient { request in
+            if request.path == "/activity_inbox_v2" { return Self.missingView }
+            XCTAssertEqual(request.path, "/activity_inbox")
+            return (200, "[]")
+        }
+        let inbox = try await FeedService.activity(from: empty.from)
+        XCTAssertTrue(inbox.isEmpty)
+    }
+
+    func testGroupedLikesLoadFromVersionedInboxAndKeepExactCursor() async throws {
+        let client = discoveryClient { request in
+            XCTAssertEqual(request.path, "/activity_inbox_v2")
+            if let cursor = request.queryItems?.first(where: { $0.name == "or" })?.value {
+                XCTAssertTrue(cursor.contains("2026-11-14T05:00:00.123456+00:00"))
+                return (200, "[]")
+            }
+            return (200, """
+                [{"id":"33333333-cccc-3333-3333-333333333333","video_id":"\(Self.discoveryUser)",
+                "comment_id":null,"kind":"video_like","created_at":"2026-11-14T05:00:00.123456+00:00",
+                "read_at":null,"username":"listener","body":"A loop","like_count":3}]
+                """)
+        }
+        let page = try await FeedService.activity(from: client.from)
+        let item = try XCTUnwrap(page.first)
+        XCTAssertEqual(item.title, "@listener and 2 others liked your video")
+        XCTAssertNil(item.commentId)
+        XCTAssertTrue(item.kind.isLike)
+        let next = try await FeedService.activity(after: item, from: client.from)
+        XCTAssertTrue(next.isEmpty)
+    }
+
+    private static let discoveryUser = "11111111-aaaa-1111-1111-111111111111"
+    private static let discoveryViewer = "22222222-bbbb-2222-2222-222222222222"
+    private static let missingView = (404, #"{"code":"PGRST205","message":"Missing view"}"#)
+    private static let discoveryVideo = """
+        [{"id":"33333333-cccc-3333-3333-333333333333","user_id":"\(discoveryUser)","video_key":"v.mp4",
+          "thumb_key":"t.jpg","caption":"First loop","like_count":0,"created_at":"2026-11-13T05:00:00.123456+00:00",
+          "username":"musician","display_name":"The Musician"}]
+        """
+
+    private func discoveryClient(_ respond: @escaping @Sendable (URLComponents) -> (Int, String)) -> PostgrestClient {
+        PostgrestClient(url: URL(string: "https://example.test")!, logger: nil, fetch: { request in
+            let url = try XCTUnwrap(request.url)
+            let (status, body) = respond(try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)))
+            return (Data(body.utf8), try XCTUnwrap(HTTPURLResponse(url: url, statusCode: status, httpVersion: nil,
+                                                                  headerFields: ["Content-Type": "application/json"])))
+        })
+    }
+
     @MainActor
     func testFailedLikeDoesNotChangeAnotherVideoAfterFeedChanges() async throws {
         let writes = AsyncStream<Void>.makeStream()
@@ -180,6 +328,20 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(reply.username, "listener")
         XCTAssertEqual(reply.body, "Love this sound!")
         XCTAssertEqual(reply.replyCount, 0)
+        XCTAssertNil(reply.likeCount)
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(row.utf8)) as? [String: Any])
+        payload["like_count"] = 2
+        payload["liked_by_me"] = false
+        var reaction = try decoder.decode(VideoComment.self, from: JSONSerialization.data(withJSONObject: payload))
+        XCTAssertEqual(reaction.likeCount, 2)
+        XCTAssertEqual(reaction.likedByMe, false)
+        reaction.applyLike(true)
+        reaction.applyLike(true)
+        XCTAssertEqual(reaction.likeCount, 3)
+        XCTAssertEqual(reaction.likedByMe, true)
+        reaction.applyLike(false)
+        XCTAssertEqual(reaction.likeCount, 2)
+        XCTAssertEqual(reaction.likedByMe, false)
     }
 
     func testCapturedLoopWritesInstrumentSamplesToWAV() throws {

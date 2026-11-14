@@ -1,28 +1,20 @@
 import SwiftUI
 
-enum StudioStyle {
-    static let background = Color(red: 0.040, green: 0.049, blue: 0.048)
-    static let surface = Color(red: 0.079, green: 0.094, blue: 0.087)
-    static let ink = Color(red: 0.953, green: 0.964, blue: 0.932)
-    static let muted = Color(red: 0.647, green: 0.685, blue: 0.648)
-    static let accent = Color(red: 0.828, green: 0.974, blue: 0.455)
-    static let border = Color.white.opacity(0.12)
-    static let recording = Color(red: 1, green: 0.32, blue: 0.31)
-}
-
 struct StudioActionStyle: ButtonStyle {
+    @Environment(\.studioPalette) private var palette
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
             .frame(maxWidth: .infinity, minHeight: 54)
             .padding(.horizontal, 18)
-            .foregroundStyle(StudioStyle.background)
-            .background(StudioStyle.accent.opacity(configuration.isPressed ? 0.80 : 1),
-                        in: RoundedRectangle(cornerRadius: 17))
+            .foregroundStyle(palette.onAccent)
+            .background(palette.accent, in: RoundedRectangle(cornerRadius: 17))
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
     }
 }
 
 struct StartOverlayView: View {
+    @Environment(\.studioPalette) private var palette
     let status: String
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
@@ -32,6 +24,7 @@ struct StartOverlayView: View {
     let onSetups: () -> Void
 
     @State private var showSounds = false
+    @State private var showAppearance = false
     @State private var showInstrumentSheet = false
     @State private var showProgressionSheet = false
     @State private var showScaleSheet = false
@@ -59,7 +52,7 @@ struct StartOverlayView: View {
                     }
                     .font(.subheadline.weight(.semibold))
                     .buttonStyle(.plain)
-                    .foregroundStyle(StudioStyle.muted)
+                    .foregroundStyle(palette.muted)
                     if status.hasPrefix("error:") {
                         Text(status).font(.footnote).foregroundStyle(.orange)
                     }
@@ -73,9 +66,10 @@ struct StartOverlayView: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(StudioStyle.background.ignoresSafeArea())
-        .foregroundStyle(StudioStyle.ink)
-        .tint(StudioStyle.accent)
+        .background(palette.background.ignoresSafeArea())
+        .foregroundStyle(palette.ink)
+        .tint(palette.accent)
+        .sheet(isPresented: $showAppearance) { StudioThemePicker() }
         .sheet(isPresented: $showSounds) {
             soundsSheet
                 .presentationDetents([.height(344), .large])
@@ -100,13 +94,13 @@ struct StartOverlayView: View {
                     rowDivider
                     scaleChip
                 }
-                .background(StudioStyle.surface, in: RoundedRectangle(cornerRadius: 18))
-                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(StudioStyle.border) }
+                .background(palette.surface, in: RoundedRectangle(cornerRadius: 18))
+                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(palette.border) }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 20)
             }
-            .background(StudioStyle.background)
+            .background(palette.background)
             .navigationTitle("Sounds")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -115,7 +109,7 @@ struct StartOverlayView: View {
                 }
             }
         }
-        .tint(StudioStyle.accent)
+        .tint(palette.accent)
         .sheet(isPresented: $showInstrumentSheet) {
             InstrumentPickerSheet(selected: $engine.selectedSoundFontInstrument,
                                   storeManager: storeManager)
@@ -141,10 +135,22 @@ struct StartOverlayView: View {
             HStack(spacing: 8) {
                 Image(systemName: "waveform")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(StudioStyle.accent)
+                    .foregroundStyle(palette.accent)
                     .accessibilityHidden(true)
                 Text("handstrudel")
                     .font(.subheadline.monospaced().weight(.semibold))
+                Spacer()
+                Button { showAppearance = true } label: {
+                    Image(systemName: "paintpalette")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(palette.accent)
+                        .frame(width: 44, height: 44)
+                        .background(palette.surface, in: Circle())
+                        .overlay { Circle().strokeBorder(palette.border) }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Appearance")
+                .accessibilityIdentifier("music-appearance")
             }
             VStack(alignment: .leading, spacing: 7) {
                 Text("Play the air.")
@@ -153,33 +159,37 @@ struct StartOverlayView: View {
                     .accessibilityAddTraits(.isHeader)
                 Text("Move your hands to make music.")
                     .font(.subheadline)
-                    .foregroundStyle(StudioStyle.muted)
+                    .foregroundStyle(palette.muted)
             }
         }
     }
 
     private var heroCard: some View {
         VStack(spacing: 0) {
-            SoundArtwork(program: Int(engine.selectedSoundFontInstrument.program))
+            SoundArtwork(instrument: engine.selectedSoundFontInstrument, key: engine.selectedKey,
+                         scale: engine.selectedScale, progression: engine.chordMelodyProgression)
                 .frame(height: 225)
-                .accessibilityHidden(true)
-            Rectangle().fill(StudioStyle.border).frame(height: 1)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Sound artwork")
+                .accessibilityValue("\(engine.selectedSoundFontInstrument.name), \(engine.selectedKey.rawValue) \(engine.selectedScale.rawValue), \(engine.chordMelodyProgression.name)")
+                .accessibilityIdentifier("sound-artwork")
+            Rectangle().fill(palette.border).frame(height: 1)
             Button { showSounds = true } label: {
                 HStack(spacing: 14) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(engine.selectedSoundFontInstrument.name)
                             .font(.title2.weight(.semibold))
-                            .foregroundStyle(StudioStyle.ink)
+                            .foregroundStyle(palette.ink)
                         Text("\(engine.selectedKey.rawValue) \(engine.selectedScale.rawValue)  /  \(engine.chordMelodyProgression.name)")
                             .font(.caption.monospaced())
-                            .foregroundStyle(StudioStyle.muted)
+                            .foregroundStyle(palette.muted)
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(StudioStyle.accent)
+                        .foregroundStyle(palette.accent)
                         .frame(width: 44, height: 44)
-                        .background(StudioStyle.accent.opacity(0.09), in: Circle())
+                        .background(palette.accent.opacity(0.09), in: Circle())
                 }
                 .padding(16)
                 .contentShape(Rectangle())
@@ -189,9 +199,9 @@ struct StartOverlayView: View {
             .accessibilityValue(engine.selectedSoundFontInstrument.name)
             .disabled(starting)
         }
-        .background(StudioStyle.surface)
+        .background(palette.surface)
         .clipShape(RoundedRectangle(cornerRadius: 23))
-        .overlay { RoundedRectangle(cornerRadius: 23).strokeBorder(StudioStyle.border).allowsHitTesting(false) }
+        .overlay { RoundedRectangle(cornerRadius: 23).strokeBorder(palette.border).allowsHitTesting(false) }
     }
 
     private var instrumentChip: some View {
@@ -199,6 +209,7 @@ struct StartOverlayView: View {
             soundRow("Instrument", value: engine.selectedSoundFontInstrument.name, icon: "waveform")
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("sounds-instrument")
     }
 
     private var progressionChip: some View {
@@ -234,25 +245,25 @@ struct StartOverlayView: View {
     }
 
     private var rowDivider: some View {
-        Rectangle().fill(StudioStyle.border).frame(height: 1).padding(.leading, 53)
+        Rectangle().fill(palette.border).frame(height: 1).padding(.leading, 53)
     }
 
     private func soundRow(_ title: String, value: String, icon: String, chevron: String = "chevron.right") -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.body.weight(.medium))
-                .foregroundStyle(StudioStyle.accent)
+                .foregroundStyle(palette.accent)
                 .frame(width: 26)
                 .accessibilityHidden(true)
-            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(StudioStyle.ink)
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(palette.ink)
             Spacer(minLength: 0)
             Text(value)
                 .font(.subheadline)
-                .foregroundStyle(StudioStyle.muted)
+                .foregroundStyle(palette.muted)
                 .multilineTextAlignment(.trailing)
             Image(systemName: chevron)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(StudioStyle.muted)
+                .foregroundStyle(palette.muted)
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, 15)
@@ -265,7 +276,7 @@ struct StartOverlayView: View {
         Group {
             if starting {
                 HStack(spacing: 10) {
-                    ProgressView().tint(StudioStyle.accent)
+                    ProgressView().tint(palette.accent)
                     Text(status).font(.caption.monospaced())
                 }
                 .frame(maxWidth: .infinity)
@@ -288,47 +299,127 @@ struct StartOverlayView: View {
 }
 
 private struct SoundArtwork: View {
-    let program: Int
+    @Environment(\.studioPalette) private var palette
+    let instrument: SoundFontInstrument
+    let key: MusicKey
+    let scale: Scale
+    let progression: ChordProgression
 
     var body: some View {
         Canvas { context, size in
-            let field = CGRect(origin: .zero, size: size)
-            context.fill(Path(field), with: .radialGradient(
-                Gradient(colors: [Color(red: 0.17, green: 0.25, blue: 0.12), StudioStyle.background]),
-                center: CGPoint(x: size.width * 0.55, y: size.height * 0.37),
-                startRadius: 0, endRadius: max(size.width * 0.65, size.height)
-            ))
+            drawBackground(context, size: size)
+            drawWeave(context, size: size)
+            drawScale(context, size: size)
+        }
+    }
 
-            var grid = Path()
-            for x in stride(from: 14.0, to: size.width, by: 14) {
-                for y in stride(from: 14.0, to: size.height, by: 14) {
-                    grid.addEllipse(in: CGRect(x: x, y: y, width: 1.3, height: 1.3))
-                }
-            }
-            context.fill(grid, with: .color(StudioStyle.muted.opacity(0.27)))
+    private func drawBackground(_ context: GraphicsContext, size: CGSize) {
+        let field = CGRect(origin: .zero, size: size)
+        context.fill(Path(field), with: .radialGradient(
+            Gradient(colors: [palette.glow, palette.background]),
+            center: CGPoint(x: size.width * 0.55, y: size.height * 0.37),
+            startRadius: 0, endRadius: max(size.width * 0.65, size.height)
+        ))
 
-            // Each GM program changes the phase and harmonics of the weave.
-            let phase = Double(program) * 0.19
-            let harmonic = Double(2 + program % 4)
-            for line in 0..<25 {
-                let layer = Double(line) / 24
-                var trace = Path()
-                for step in 0...120 {
-                    let t = Double(step) / 120
-                    let envelope = pow(max(0, sin(t * .pi)), 0.78)
-                    let fundamental = sin(t * .pi * 3.1 + layer * 2.7 + phase)
-                    let overtone = cos(t * .pi * harmonic + layer * 4 + phase)
-                    let y = size.height * (0.29 + layer * 0.39)
-                        + (fundamental * 43 + overtone * 18) * envelope
-                    let point = CGPoint(x: 17 + t * (size.width - 34), y: y)
-                    if step == 0 { trace.move(to: point) } else { trace.addLine(to: point) }
-                }
-                context.stroke(trace, with: .linearGradient(
-                    Gradient(colors: [StudioStyle.accent.opacity(0.10), StudioStyle.accent.opacity(0.85),
-                                      Color(red: 0.26, green: 0.74, blue: 0.55).opacity(0.34)]),
-                    startPoint: .zero, endPoint: CGPoint(x: size.width, y: size.height * 0.2)
-                ), lineWidth: line.isMultiple(of: 6) ? 1.4 : 0.65)
+        var grid = Path()
+        for x in stride(from: 14.0, to: size.width, by: 14) {
+            for y in stride(from: 14.0, to: size.height, by: 14) {
+                grid.addEllipse(in: CGRect(x: x, y: y, width: 1.3, height: 1.3))
             }
+        }
+        context.fill(grid, with: .color(palette.muted.opacity(0.27)))
+    }
+
+    private func drawWeave(_ context: GraphicsContext, size: CGSize) {
+        let voice = SoundArtworkVoice(instrument)
+        let phase: Double = Double(key.semitone) * .pi / 6
+        let intervals = scale.intervals
+        let chords = Array(progression.degrees.prefix(16))
+        let left = 17.0
+        let width = max(1, Double(size.width) - left * 2)
+
+        for line in 0..<voice.lines {
+            let layer = Double(line) / Double(voice.lines - 1)
+            var trace = Path()
+            for step in 0...120 {
+                let t = Double(step) / 120
+                let envelope = pow(max(0, sin(t * .pi)), voice.envelope)
+                let scalePosition = t * Double(intervals.count - 1)
+                let scaleColor = interpolated(intervals, position: scalePosition) / 12
+                let chordPosition = t * Double(max(0, chords.count - 1))
+                let contour = interpolated(chords, position: chordPosition) / 6
+                let base = 105 + (layer - 0.5) * voice.spread
+                let shape = (scaleColor - 0.5) * 20 - (contour - 0.5) * 30
+                let y = base + shape + voice.wave(t: t, layer: layer, phase: phase) * envelope
+                let point = CGPoint(x: left + t * width, y: y)
+                if step == 0 { trace.move(to: point) } else { trace.addLine(to: point) }
+            }
+            context.stroke(trace, with: .linearGradient(
+                Gradient(colors: [palette.accent.opacity(0.10), palette.accent.opacity(0.85),
+                                  palette.overtone.opacity(0.52)]),
+                startPoint: .zero, endPoint: CGPoint(x: size.width, y: size.height * 0.2)
+            ), lineWidth: line.isMultiple(of: 6) ? 1.4 : 0.65)
+        }
+    }
+
+    private func drawScale(_ context: GraphicsContext, size: CGSize) {
+        let left = 17.0
+        let width = max(1, Double(size.width) - left * 2)
+        let selected = Set(scale.intervals.map { ($0 + key.semitone) % 12 })
+        for pitch in 0..<12 {
+            let height = pitch == key.semitone ? 13.0 : selected.contains(pitch) ? 7 : 2
+            let x = left + Double(pitch) * width / 11
+            let tick = CGRect(x: x - 1, y: Double(size.height) - 18 - height, width: 2, height: height)
+            let color = pitch == key.semitone ? palette.accent : palette.muted.opacity(selected.contains(pitch) ? 0.8 : 0.35)
+            context.fill(Path(roundedRect: tick, cornerRadius: 1), with: .color(color))
+        }
+    }
+
+    private func interpolated(_ values: [Int], position: Double) -> Double {
+        guard !values.isEmpty else { return 3 }
+        let index = min(Int(position), values.count - 1)
+        let raw = position - Double(index)
+        let eased = raw * raw * (3 - 2 * raw)
+        return Double(values[index]) + Double(values[min(index + 1, values.count - 1)] - values[index]) * eased
+    }
+}
+
+struct SoundArtworkVoice {
+    enum Contour: Equatable { case bow, pulse, pluck, breath, ripple }
+
+    let contour: Contour
+    let program: Double
+    let lines: Int
+    let envelope: Double
+    let spread: Double
+
+    init(_ instrument: SoundFontInstrument) {
+        program = Double(instrument.program)
+        switch instrument.category {
+        case .strings, .ensemble, .synthPad:
+            (contour, lines, envelope, spread) = (.bow, 24, 0.7, 78)
+        case .piano, .chromaticPercussion, .percussive:
+            (contour, lines, envelope, spread) = (.pulse, 16, 0.45, 92)
+        case .guitar, .bass, .ethnic:
+            (contour, lines, envelope, spread) = (.pluck, 19, 0.55, 64)
+        case .brass, .reed, .pipe:
+            (contour, lines, envelope, spread) = (.breath, 20, 1.35, 50)
+        default:
+            (contour, lines, envelope, spread) = (.ripple, 22, 0.9, 70)
+        }
+    }
+
+    func wave(t: Double, layer: Double, phase: Double) -> Double {
+        let sweep = t * .pi
+        let color = phase + program * 0.21
+        let carrier = sin(sweep * (2.8 + program.truncatingRemainder(dividingBy: 9) * 0.25) + layer * 2.7 + color)
+        let overtone = cos(sweep * (5 + program.truncatingRemainder(dividingBy: 6)) + layer * 4 + color)
+        switch contour {
+        case .bow: return carrier * 39 + overtone * 11
+        case .pulse: return (pow(abs(carrier), 4) * 2 - 1) * (18 + layer * 17) + overtone * 8
+        case .pluck: return carrier * 19 + overtone * 28 * (1 - t * 0.7)
+        case .breath: return carrier * (23 + layer * 25) + overtone * 5
+        case .ripple: return carrier * 25 + overtone * (9 + layer * 17)
         }
     }
 }
@@ -338,13 +429,14 @@ private struct SoundArtwork: View {
 /// Small "PRO" pill drawn on locked rows. Kept in one place so instrument,
 /// progression, and scale sheets all badge the same way.
 private struct ProBadge: View {
+    @Environment(\.studioPalette) private var palette
     var body: some View {
         Text("PRO")
             .font(.caption2.monospaced().weight(.semibold))
-            .foregroundStyle(StudioStyle.accent)
+            .foregroundStyle(palette.accent)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(StudioStyle.accent.opacity(0.10), in: Capsule())
+            .background(palette.accent.opacity(0.10), in: Capsule())
     }
 }
 
@@ -373,6 +465,7 @@ private func proPaywall(storeManager: StoreManager) -> some View {
 // MARK: - Instrument picker sheet
 
 private struct InstrumentPickerSheet: View {
+    @Environment(\.studioPalette) private var palette
     @Binding var selected: SoundFontInstrument
     @ObservedObject var storeManager: StoreManager
     @Environment(\.dismiss) private var dismiss
@@ -397,7 +490,7 @@ private struct InstrumentPickerSheet: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                 }
-                .background(StudioStyle.surface)
+                .background(palette.surface)
 
                 List(SOUNDFONT_INSTRUMENTS.filter { $0.category == category }) { inst in
                     row(for: inst)
@@ -405,7 +498,7 @@ private struct InstrumentPickerSheet: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
             }
-            .background(StudioStyle.background)
+            .background(palette.background)
             .navigationTitle("Instrument")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showPaywall) {
@@ -429,23 +522,24 @@ private struct InstrumentPickerSheet: View {
             HStack(spacing: 12) {
                 Text(inst.name)
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(locked ? StudioStyle.muted : StudioStyle.ink)
+                    .foregroundStyle(locked ? palette.muted : palette.ink)
                 if locked { ProBadge() }
                 Spacer()
                 if selected.id == inst.id && !locked {
                     Image(systemName: "checkmark")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(StudioStyle.accent)
+                        .foregroundStyle(palette.accent)
                 }
             }
         }
-        .listRowBackground(StudioStyle.background)
+        .listRowBackground(palette.background)
+        .accessibilityIdentifier("instrument-\(inst.id)")
     }
 
     private func categoryChip(_ cat: GMCategory) -> some View {
         let isActive = category == cat
         return Button(action: { category = cat }) {
-            pickerCategory(cat.displayName, selected: isActive)
+            pickerCategory(cat.displayName, selected: isActive, palette: palette)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isActive ? .isSelected : [])
@@ -455,6 +549,7 @@ private struct InstrumentPickerSheet: View {
 // MARK: - Progression picker sheet
 
 private struct ProgressionPickerSheet: View {
+    @Environment(\.studioPalette) private var palette
     @Binding var selected: ChordProgression
     @ObservedObject var storeManager: StoreManager
     @Environment(\.dismiss) private var dismiss
@@ -480,7 +575,7 @@ private struct ProgressionPickerSheet: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                 }
-                .background(StudioStyle.surface)
+                .background(palette.surface)
 
                 List(CHORD_PROGRESSIONS.filter { $0.category == category }) { prog in
                     row(for: prog)
@@ -488,7 +583,7 @@ private struct ProgressionPickerSheet: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
             }
-            .background(StudioStyle.background)
+            .background(palette.background)
             .navigationTitle("Chord Progression")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showPaywall) {
@@ -513,27 +608,27 @@ private struct ProgressionPickerSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(prog.name)
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(locked ? StudioStyle.muted : StudioStyle.ink)
+                        .foregroundStyle(locked ? palette.muted : palette.ink)
                     Text("\(prog.degrees.count) chords")
                         .font(.caption)
-                        .foregroundStyle(StudioStyle.muted)
+                        .foregroundStyle(palette.muted)
                 }
                 if locked { ProBadge() }
                 Spacer()
                 if selected.id == prog.id && !locked {
                     Image(systemName: "checkmark")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(StudioStyle.accent)
+                        .foregroundStyle(palette.accent)
                 }
             }
         }
-        .listRowBackground(StudioStyle.background)
+        .listRowBackground(palette.background)
     }
 
     private func categoryChip(_ cat: ProgressionCategory) -> some View {
         let isActive = category == cat
         return Button(action: { category = cat }) {
-            pickerCategory(cat.displayName, selected: isActive)
+            pickerCategory(cat.displayName, selected: isActive, palette: palette)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isActive ? .isSelected : [])
@@ -543,6 +638,7 @@ private struct ProgressionPickerSheet: View {
 // MARK: - Scale picker sheet
 
 private struct ScalePickerSheet: View {
+    @Environment(\.studioPalette) private var palette
     @Binding var selected: Scale
     @ObservedObject var storeManager: StoreManager
     @Environment(\.dismiss) private var dismiss
@@ -555,7 +651,7 @@ private struct ScalePickerSheet: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(StudioStyle.background)
+            .background(palette.background)
             .navigationTitle("Scale")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showPaywall) {
@@ -579,27 +675,27 @@ private struct ScalePickerSheet: View {
             HStack(spacing: 12) {
                 Text(scale.rawValue)
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(locked ? StudioStyle.muted : StudioStyle.ink)
+                    .foregroundStyle(locked ? palette.muted : palette.ink)
                 if locked { ProBadge() }
                 Spacer()
                 if selected == scale && !locked {
                     Image(systemName: "checkmark")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(StudioStyle.accent)
+                        .foregroundStyle(palette.accent)
                 }
             }
         }
-        .listRowBackground(StudioStyle.background)
+        .listRowBackground(palette.background)
     }
 }
 
-private func pickerCategory(_ title: String, selected: Bool) -> some View {
+private func pickerCategory(_ title: String, selected: Bool, palette: StudioPalette) -> some View {
     Text(title)
         .font(.subheadline.weight(.medium))
-        .foregroundStyle(selected ? StudioStyle.background : StudioStyle.ink)
+        .foregroundStyle(selected ? palette.onAccent : palette.ink)
         .padding(.horizontal, 13)
         .padding(.vertical, 7)
-        .background(selected ? StudioStyle.accent : Color.white.opacity(0.06), in: Capsule())
+        .background(selected ? palette.accent : palette.ink.opacity(0.06), in: Capsule())
         .frame(minHeight: 44)
         .contentShape(Rectangle())
 }

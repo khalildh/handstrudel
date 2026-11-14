@@ -29,6 +29,12 @@ export interface PublicComment {
   username: string;
   created_at: string;
   reply_count: number;
+  like_count?: number;
+}
+
+export interface PublicCreator {
+  username: string;
+  display_name: string | null;
 }
 
 export const COMMENT_PAGE_SIZE = 20;
@@ -37,19 +43,48 @@ export async function loadPublicComments(video: string, parent?: string, offset 
   if (!isVideoID(video) || (parent && !isVideoID(parent))) throw new Error("Invalid comment thread.");
   const direction = parent ? "asc" : "desc";
   const url = new URL("/rest/v1/video_comments", feedBase);
-  url.searchParams.set("select", "id,body,username,created_at,reply_count");
+  const fields = "id,body,username,created_at,reply_count";
+  url.searchParams.set("select", `${fields},like_count`);
   url.searchParams.set("video_id", `eq.${video}`);
   url.searchParams.set("parent_id", parent ? `eq.${parent}` : "is.null");
   url.searchParams.set("order", `created_at.${direction},id.${direction}`);
   url.searchParams.set("offset", String(offset));
   url.searchParams.set("limit", String(COMMENT_PAGE_SIZE));
-  const response = await fetch(url, { headers: { apikey: publicKey }, signal, cache: "no-store" });
+  const options: RequestInit = { headers: { apikey: publicKey }, signal, cache: "no-store" };
+  let response = await fetch(url, options);
+  if (response.status === 400 && (await response.json().catch(() => null))?.code === "42703") {
+    url.searchParams.set("select", fields);
+    response = await fetch(url, options);
+  }
   if (!response.ok) throw new Error("Couldn't load comments.");
   return response.json();
 }
 
 export function isVideoID(id: string) {
   return /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(id);
+}
+
+export function isCreatorHandle(handle: string) {
+  return /^[a-z0-9_]{3,20}$/.test(handle);
+}
+
+export function creatorHref(handle: string) {
+  const normalized = handle.toLowerCase();
+  return isCreatorHandle(normalized) ? `/creator?u=${encodeURIComponent(normalized)}` : null;
+}
+
+export async function loadPublicCreator(handle: string, signal?: AbortSignal): Promise<PublicCreator | null> {
+  if (!isCreatorHandle(handle)) return null;
+  const options: RequestInit = { headers: { apikey: publicKey }, signal, cache: "no-store" };
+  const params = new URLSearchParams({ select: "username,display_name", username: `eq.${handle}`, limit: "1" });
+  let response = await fetch(new URL(`/rest/v1/public_creators?${params}`, feedBase), options);
+  if (response.status === 404) {
+    // Older deployments expose creator names on visible feed rows.
+    response = await fetch(new URL(`/rest/v1/feed_videos?${params}`, feedBase), options);
+  }
+  if (!response.ok) throw new Error("Couldn't load the creator.");
+  const [creator]: PublicCreator[] = await response.json();
+  return creator ?? null;
 }
 
 export function mediaURL(key: string) {
@@ -59,8 +94,19 @@ export function mediaURL(key: string) {
   return `${mediaBase.replace(/\/$/, "")}/${parts.map(encodeURIComponent).join("/")}`;
 }
 
+export function postSearch(input: string) {
+  const cleaned = input.replace(/\0/g, "").trim();
+  const byHandle = cleaned.startsWith("@");
+  const text = Array.from(byHandle ? cleaned.slice(1) : cleaned).slice(0, 80).join("").trim();
+  if (Array.from(text).length < 2) return null;
+  const literal = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const quoted = literal.replace(/["\\]/g, "\\$&");
+  const columns = byHandle ? ["username"] : ["caption", "instrument", "username", "display_name"];
+  return { text, filter: columns.map((column) => `${column}.imatch."${quoted}"`).join(",") };
+}
+
 export async function loadPublicVideos(
-  { id, after }: { id?: string; after?: PublicVideo },
+  { id, after, search, creator }: { id?: string; after?: PublicVideo; search?: ReturnType<typeof postSearch>; creator?: string },
   signal?: AbortSignal,
 ): Promise<PublicVideo[]> {
   const url = new URL("/rest/v1/feed_videos", feedBase);
@@ -68,10 +114,13 @@ export async function loadPublicVideos(
   url.searchParams.set("order", "created_at.desc,id.desc");
   url.searchParams.set("limit", String(id ? 1 : PAGE_SIZE));
   if (id) url.searchParams.set("id", `eq.${id}`);
-  if (after) {
-    const date = after.created_at;
-    url.searchParams.set("or", `(created_at.lt.${date},and(created_at.eq.${date},id.lt.${after.id}))`);
+  if (creator !== undefined) {
+    if (!isCreatorHandle(creator)) return [];
+    url.searchParams.set("username", `eq.${creator}`);
   }
+  const cursor = after && `created_at.lt.${after.created_at},and(created_at.eq.${after.created_at},id.lt.${after.id})`;
+  if (cursor && search) url.searchParams.set("or", `(and(or(${search.filter}),or(${cursor})))`);
+  else if (search || cursor) url.searchParams.set("or", `(${search?.filter ?? cursor})`);
   const options: RequestInit = { headers: { apikey: publicKey }, signal, cache: "no-store" };
   const supportedSelections = [
     ",sound_setup,comments_enabled,comment_count,backing_enabled,source_video_id,source_username",

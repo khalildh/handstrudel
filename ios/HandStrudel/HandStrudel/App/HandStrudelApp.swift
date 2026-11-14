@@ -4,6 +4,8 @@ import RevenueCat
 
 @main
 struct HandStrudelApp: App {
+    @AppStorage(StudioTheme.storageKey) private var theme: StudioTheme = .volt
+
     init() {
         restoreInstrumentAudio()
 
@@ -15,7 +17,9 @@ struct HandStrudelApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(.dark)
+                .environment(\.studioPalette, theme.palette)
+                .preferredColorScheme(theme.colorScheme)
+                .tint(theme.palette.accent)
                 .persistentSystemOverlays(.hidden)
                 .onAppear {
                     UIApplication.shared.isIdleTimerDisabled = true

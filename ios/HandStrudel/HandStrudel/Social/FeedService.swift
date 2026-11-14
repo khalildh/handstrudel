@@ -8,32 +8,65 @@ enum FeedService {
     static let commentPageSize = 20
     static let activityPageSize = 25
 
-    static func activity(after last: CreatorActivity? = nil) async throws -> [CreatorActivity] {
-        let query = supabase.from("activity_inbox").select()
-        if let last {
-            let date = ISO8601DateFormatter.feed.string(from: last.createdAt)
-            _ = query.or("created_at.lt.\(date),and(created_at.eq.\(date),id.lt.\(last.id.uuidString.lowercased()))")
+    enum Unavailable: LocalizedError {
+        case bookmarks, activity
+
+        var errorDescription: String? {
+            switch self {
+            case .bookmarks: return "Saving posts isn't available yet."
+            case .activity: return "Notifications aren't available yet."
+            }
         }
-        return try await query.order("created_at", ascending: false).order("id", ascending: false)
-            .limit(activityPageSize).execute().value
+    }
+
+    static func activity(after last: CreatorActivity? = nil,
+                         from: (String) -> PostgrestQueryBuilder = supabase.from) async throws -> [CreatorActivity] {
+        func load(_ view: String) async throws -> [CreatorActivity] {
+            let query = from(view).select()
+            if let last {
+                let date = last.timestamp
+                _ = query.or("created_at.lt.\(date),and(created_at.eq.\(date),id.lt.\(last.id.uuidString.lowercased()))")
+            }
+            return try await query.order("created_at", ascending: false).order("id", ascending: false)
+                .limit(activityPageSize).execute().value
+        }
+        do {
+            return try await load("activity_inbox_v2")
+        } catch let error as PostgrestError where isMissingView(error) {
+            do { return try await load("activity_inbox") }
+            catch let legacyError as PostgrestError where isMissingView(legacyError) { throw Unavailable.activity }
+        }
     }
 
     static func hasUnreadActivity() async throws -> Bool {
         struct Item: Decodable { let id: UUID }
-        let items: [Item] = try await supabase.from("activity_inbox").select("id")
-            .is("read_at", value: nil).limit(1).execute().value
-        return !items.isEmpty
+        func check(_ view: String) async throws -> Bool {
+            let items: [Item] = try await supabase.from(view).select("id")
+                .is("read_at", value: nil).limit(1).execute().value
+            return !items.isEmpty
+        }
+        do { return try await check("activity_inbox_v2") }
+        catch let error as PostgrestError where isMissingView(error) { return try await check("activity_inbox") }
     }
 
-    static func markActivityRead(_ id: UUID) async throws {
-        struct Parameters: Encodable { let target_item: UUID }
-        try await supabase.rpc("mark_creator_activity_read", params: Parameters(target_item: id)).execute()
+    static func markActivityRead(_ item: CreatorActivity) async throws {
+        struct Parameters: Encodable { let target_item: UUID; var seen_at: String? = nil }
+        let rpc = item.kind.isLike ? "mark_like_activity_read" : "mark_creator_activity_read"
+        try await supabase.rpc(rpc, params: Parameters(target_item: item.id, seen_at: item.kind.isLike ? item.timestamp : nil)).execute()
     }
 
-    static func creator(id: UUID) async throws -> PublicCreator? {
-        let profiles: [PublicCreator] = try await supabase.from("public_creators").select()
-            .eq("id", value: id).limit(1).execute().value
-        return profiles.first
+    static func creator(id: UUID, from: (String) -> PostgrestQueryBuilder = supabase.from) async throws -> PublicCreator? {
+        do {
+            let profiles: [PublicCreator] = try await from("public_creators").select()
+                .eq("id", value: id).limit(1).execute().value
+            return profiles.first
+        } catch let error as PostgrestError where isMissingView(error) {
+            // Older deployments only expose creator identity on visible feed rows.
+            let videos: [Video] = try await from("feed_videos").select()
+                .eq("user_id", value: id).order("created_at", ascending: false)
+                .limit(1).execute().value
+            return videos.first.flatMap(PublicCreator.init(visibleVideo:))
+        }
     }
 
     static func comment(id: UUID, video: UUID) async throws -> VideoComment? {
@@ -48,14 +81,19 @@ enum FeedService {
         return rows.first
     }
 
-    static func bookmarks(after last: Video? = nil) async throws -> [Video] {
-        let query = supabase.from("saved_videos").select()
+    static func bookmarks(after last: Video? = nil,
+                          from: (String) -> PostgrestQueryBuilder = supabase.from) async throws -> [Video] {
+        let query = from("saved_videos").select()
         if let last, let date = last.savedAt {
             let ts = ISO8601DateFormatter.feed.string(from: date)
             _ = query.or("saved_at.lt.\(ts),and(saved_at.eq.\(ts),id.lt.\(last.id.uuidString.lowercased()))")
         }
-        return try await query.order("saved_at", ascending: false).order("id", ascending: false)
-            .limit(pageSize).execute().value
+        do {
+            return try await query.order("saved_at", ascending: false).order("id", ascending: false)
+                .limit(pageSize).execute().value
+        } catch let error as PostgrestError where isMissingView(error) {
+            throw Unavailable.bookmarks
+        }
     }
 
     static func savedVideoIDs(_ ids: [UUID]) async throws -> Set<UUID> {
@@ -66,15 +104,20 @@ enum FeedService {
         return Set(rows.map(\.video_id))
     }
 
-    static func setBookmark(_ saved: Bool, video: UUID, user: UUID) async throws {
-        if saved {
-            struct Row: Encodable { let video_id: UUID }
-            do {
-                try await supabase.from("video_bookmarks").insert(Row(video_id: video), returning: .minimal).execute()
-            } catch let error as PostgrestError where error.code == "23505" {}
-        } else {
-            try await supabase.from("video_bookmarks").delete()
-                .eq("user_id", value: user).eq("video_id", value: video).execute()
+    static func setBookmark(_ saved: Bool, video: UUID, user: UUID,
+                            from: (String) -> PostgrestQueryBuilder = supabase.from) async throws {
+        do {
+            if saved {
+                struct Row: Encodable { let video_id: UUID }
+                try await from("video_bookmarks").insert(Row(video_id: video), returning: .minimal).execute()
+            } else {
+                try await from("video_bookmarks").delete()
+                    .eq("user_id", value: user).eq("video_id", value: video).execute()
+            }
+        } catch let error as PostgrestError where saved && error.code == "23505" {
+            // An existing bookmark is already saved.
+        } catch let error as PostgrestError where isMissingView(error) {
+            throw Unavailable.bookmarks
         }
     }
 
@@ -114,6 +157,25 @@ enum FeedService {
         try await supabase.rpc("delete_video_comment", params: Params(target_comment: id)).execute()
     }
 
+    static func setCommentLiked(_ liked: Bool, comment: UUID, user: UUID,
+                                from: (String) -> PostgrestQueryBuilder = supabase.from) async throws {
+        let table = from("comment_likes")
+        do {
+            if liked {
+                struct Like: Encodable { let comment_id: UUID }
+                try await table.insert(Like(comment_id: comment), returning: .minimal).execute()
+            } else {
+                try await table.delete().eq("comment_id", value: comment).eq("user_id", value: user).execute()
+            }
+        } catch let error as PostgrestError where liked && error.code == "23505" {
+            // An existing reaction already matches the requested state.
+        } catch let error as PostgrestError where isMissingView(error) {
+            throw SocialError.message("Comment likes aren't available yet.")
+        } catch let error as PostgrestError where error.code == "42501" || error.code == "23503" {
+            throw SocialError.message("You can't like this comment right now.")
+        }
+    }
+
     static func reportComment(_ id: UUID, reason: CommentReportReason) async throws {
         struct Row: Encodable { let comment_id: UUID; let reason: String }
         do {
@@ -135,17 +197,62 @@ enum FeedService {
 
     /// Newest-first page of `feed_videos` (hidden posts and blocked users are
     /// already excluded by the view). Pass the last item of the previous page.
-    static func page(after last: Video? = nil, followingOnly: Bool = false, creator: UUID? = nil,
-                     challenge: UUID? = nil) async throws -> [Video] {
-        let table = challenge != nil ? "weekly_challenge_entries" : followingOnly ? "following_videos" : "feed_videos"
-        var query = supabase.from(table).select()
+    static func page(after last: Video? = nil, creator: UUID? = nil,
+                     challenge: UUID? = nil, search: PostSearch? = nil) async throws -> [Video] {
+        let table = challenge == nil ? "feed_videos" : "weekly_challenge_entries"
+        return try await orderedPage(
+            supabase.from(table).select(), after: last, creator: creator, challenge: challenge, search: search
+        )
+    }
+
+    static func followingPage(user: UUID, after last: Video? = nil,
+                              from: (String) -> PostgrestQueryBuilder = supabase.from) async throws -> [Video] {
+        do {
+            return try await orderedPage(from("following_videos").select(), after: last)
+        } catch let error as PostgrestError where isMissingView(error) {
+            // Query visible feed rows in bounded batches on deployments without the joined view.
+            struct Follow: Decodable { let followee_id: UUID }
+            let batchSize = 100
+            var afterAuthor: UUID?
+            var newest: [Video] = []
+            repeat {
+                try Task.checkCancellation()
+                var query = from("follows").select("followee_id").eq("follower_id", value: user.uuidString.lowercased())
+                if let afterAuthor { query = query.gt("followee_id", value: afterAuthor.uuidString.lowercased()) }
+                let follows: [Follow] = try await query.order("followee_id", ascending: true)
+                    .limit(batchSize).execute().value
+                guard !follows.isEmpty else { break }
+                let videos = from("feed_videos").select()
+                    .in("user_id", values: follows.map { $0.followee_id.uuidString.lowercased() })
+                newest = newestFollowedPosts(newest, try await orderedPage(videos, after: last))
+                afterAuthor = follows.count == batchSize ? follows.last?.followee_id : nil
+            } while afterAuthor != nil
+            return newest
+        }
+    }
+
+    private static func newestFollowedPosts(_ first: [Video], _ second: [Video]) -> [Video] {
+        Array((first + second).sorted { a, b in
+            a.createdAt == b.createdAt ? a.id.uuidString > b.id.uuidString : a.createdAt > b.createdAt
+        }.prefix(pageSize))
+    }
+
+    private static func isMissingView(_ error: PostgrestError) -> Bool {
+        error.code == "PGRST205" || error.code == "42P01"
+    }
+
+    private static func orderedPage(_ base: PostgrestFilterBuilder, after last: Video?, creator: UUID? = nil,
+                                    challenge: UUID? = nil, search: PostSearch? = nil) async throws -> [Video] {
+        var query = base
         if let creator { query = query.eq("user_id", value: creator) }
         if let challenge { query = query.eq("challenge_id", value: challenge) }
-        if let last {
+        let cursor = last.map { last in
             // Keyset pagination on (created_at, id), matching videos_feed_idx.
-            let ts = ISO8601DateFormatter.feed.string(from: last.createdAt)
-            query = query.or("created_at.lt.\(ts),and(created_at.eq.\(ts),id.lt.\(last.id.uuidString.lowercased()))")
+            let ts = last.feedCursorTimestamp
+            return "created_at.lt.\(ts),and(created_at.eq.\(ts),id.lt.\(last.id.uuidString.lowercased()))"
         }
+        if let search { query = query.or(search.filter(after: cursor)) }
+        else if let cursor { query = query.or(cursor) }
         return try await query
             .order("created_at", ascending: false)
             .order("id", ascending: false)

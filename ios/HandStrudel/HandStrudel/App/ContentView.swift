@@ -11,6 +11,7 @@ extension String: @retroactive Identifiable {
 }
 
 struct ContentView: View {
+    @Environment(\.studioPalette) private var palette
     private enum Destination: String, CaseIterable {
         case feed = "Feed"
         case music = "Music"
@@ -86,7 +87,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            (engine.isRunning ? Color.black : StudioStyle.background).ignoresSafeArea()
+            (engine.isRunning ? Color.black : palette.background).ignoresSafeArea()
 
             if !engine.isRunning || hasOpenedFeed {
                 destinations
@@ -331,14 +332,14 @@ struct ContentView: View {
                                 .frame(width: 56, height: 31)
                                 .background {
                                     if tab == .music {
-                                        Capsule().fill(selected ? StudioStyle.accent : StudioStyle.accent.opacity(0.12))
+                                        Capsule().fill(selected ? palette.accent : palette.accent.opacity(0.12))
                                     }
                                 }
-                                .foregroundStyle(tab == .music && selected ? StudioStyle.background
-                                                 : selected || tab == .music ? StudioStyle.accent : StudioStyle.muted)
+                                .foregroundStyle(tab == .music && selected ? palette.onAccent
+                                                 : selected || tab == .music ? palette.accent : palette.muted)
                             Text(tab.rawValue)
                                 .font(.caption2.weight(selected ? .semibold : .medium))
-                                .foregroundStyle(selected ? StudioStyle.ink : StudioStyle.muted)
+                                .foregroundStyle(selected ? palette.ink : palette.muted)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
@@ -355,14 +356,14 @@ struct ContentView: View {
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity)
             .background {
-                StudioStyle.background.ignoresSafeArea(edges: .bottom)
+                palette.background.ignoresSafeArea(edges: .bottom)
             }
-            .overlay(alignment: .top) { Rectangle().fill(StudioStyle.border).frame(height: 1) }
+            .overlay(alignment: .top) { Rectangle().fill(palette.border).frame(height: 1) }
             .disabled(startingSession)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Main navigation")
         }
-        .tint(StudioStyle.accent)
+        .tint(palette.accent)
     }
 
     private func socialUnavailable(_ title: String, icon: String) -> some View {
@@ -560,7 +561,7 @@ struct ContentView: View {
     /// what we started when the touch lifts or moves to a new zone. Each entry
     /// is the list of underlying voice strings (one per chord note for chord
     /// touches; one entry for melody touches).
-    @State private var splitVoiceSubvoices: [String: [String]] = [:]
+    @State private var splitVoiceSubvoices: [String: (native: Bool, voices: [String])] = [:]
 
     /// Snapshot of a single live chord touch, kept on `splitTouchChordStack`
     /// so the melody-snap math can read whichever chord is currently held.
@@ -573,8 +574,7 @@ struct ContentView: View {
 
     /// Push the touch chord state into the manager so the camera-side melody
     /// snap (and the engine's published `chordMelodyCurrentDegree`) follow
-    /// whichever chord the player is touching. `clearWhenEmpty` lets exit
-    /// callers wipe the override when the stack drains.
+    /// whichever chord the player is touching.
     private func syncSplitTouchChordToManager() {
         if let top = splitTouchChordStack.last {
             engine.chordMelodyModeManager.touchChordDegree = top.degree
@@ -598,8 +598,8 @@ struct ContentView: View {
 
     /// Start a sustained voice for one MIDI note. Routes to the SoundFont
     /// sampler or the WebView synth depending on `splitUseSoundFont`.
-    private func splitNoteOn(voice: String, midi: Int, velocity: Double = 0.7) {
-        if splitUsesSoundFont {
+    private func splitNoteOn(voice: String, midi: Int, velocity: Double, native: Bool) {
+        if native {
             engine.soundFontEngine.noteOn(voice: voice, midi: midi, velocity: velocity)
         } else {
             engine.strudelBridge.noteOn(hand: voice, midi: midi,
@@ -608,9 +608,9 @@ struct ContentView: View {
     }
 
     /// Stop a sustained voice started by `splitNoteOn`.
-    private func splitNoteOff(voice: String) {
-        if splitUsesSoundFont {
-            engine.soundFontEngine.noteOff(voice: voice)
+    private func splitNoteOff(voice: String, native: Bool) {
+        if native {
+            engine.soundFontEngine.releaseTemporaryVoice(voice)
         } else {
             engine.strudelBridge.noteOff(hand: voice)
         }
@@ -623,8 +623,9 @@ struct ContentView: View {
     /// Touch entered a Split-mode zone — spawn sustained voices and remember
     /// them under `parentVoice` so the matching `splitTouchExit` can stop them.
     private func splitTouchEnter(parentVoice: String, zone: SplitTouchZone) {
+        guard engine.isRunning, !engine.isPaused, scenePhase == .active else { return }
         let scaleMode = engine.scaleChordMelodyModeEnabled
-        let native = splitUsesSoundFont
+        let native = splitUsesSoundFont && engine.soundFontEngine.startIfNeeded(program: engine.selectedSoundFontInstrument.program)
         switch zone {
         case .chord(let sub):
             let degree = engine.chordMelodyModeManager.degreeForZone(sub.wedge)
@@ -637,10 +638,10 @@ struct ContentView: View {
             var subs: [String] = []
             for (i, note) in absoluteTones.enumerated() {
                 let sv = "\(parentVoice)-c\(i)"
-                splitNoteOn(voice: sv, midi: note, velocity: 0.7)
+                splitNoteOn(voice: sv, midi: note, velocity: 0.7, native: native)
                 subs.append(sv)
             }
-            splitVoiceSubvoices[parentVoice] = subs
+            splitVoiceSubvoices[parentVoice] = (native, subs)
             // Tell the manager about the touched chord so the melody hand —
             // and the live `chordMelodyCurrentDegree` published var — follow
             // it the same way they follow the camera-driven chord.
@@ -666,19 +667,18 @@ struct ContentView: View {
             // The hand-tracked path still gets the ±1 octave from the radial
             // band; touch is an explicit-tap experience.
             let sv = "\(parentVoice)-m"
-            splitNoteOn(voice: sv, midi: lanes[safe], velocity: 0.75)
+            splitNoteOn(voice: sv, midi: lanes[safe], velocity: 0.75, native: native)
             engine.holdJamVoice(parentVoice, pitches: [lanes[safe]], velocity: 0.75, native: native)
-            splitVoiceSubvoices[parentVoice] = [sv]
+            splitVoiceSubvoices[parentVoice] = (native, [sv])
         }
         engine.haptics.noteTrigger()
     }
 
     /// Touch left a Split-mode zone — release all voices spawned for it.
     private func splitTouchExit(parentVoice: String) {
-        engine.releaseJamVoice(parentVoice)
-        if let subs = splitVoiceSubvoices[parentVoice] {
-            for sv in subs { splitNoteOff(voice: sv) }
-            splitVoiceSubvoices.removeValue(forKey: parentVoice)
+        if let route = splitVoiceSubvoices.removeValue(forKey: parentVoice) {
+            engine.releaseJamVoice(parentVoice)
+            for voice in route.voices { splitNoteOff(voice: voice, native: route.native) }
         }
         // Drop this chord touch from the stack (if it was one) and resync.
         if splitTouchChordStack.contains(where: { $0.parentVoice == parentVoice }) {
@@ -862,8 +862,8 @@ struct ContentView: View {
                 SplitTouchOverlay(
                     zoneCount: max(1, zoneDegrees.count),
                     melodyCount: melodyCount,
-                    degreeForZone: { engine.chordMelodyModeManager.degreeForZone($0) },
                     swapHands: engine.chordMelodySwapHands,
+                    enabled: !engine.isPaused && scenePhase == .active,
                     onZoneEnter: { voice, zone in splitTouchEnter(parentVoice: voice, zone: zone) },
                     onZoneExit: { voice in splitTouchExit(parentVoice: voice) },
                     touchedChordSubzones: $splitTouchChordZones,
@@ -1055,7 +1055,7 @@ struct ContentView: View {
                 ForEach(0..<4, id: \.self) { i in
                     Circle()
                         .fill(i == engine.currentBeat
-                              ? StudioStyle.accent
+                              ? palette.mediaAccent
                               : Color.white.opacity(0.15))
                         .frame(width: 7, height: 7)
                         .scaleEffect(i == engine.currentBeat ? 1.5 : 1.0)
@@ -1066,8 +1066,8 @@ struct ContentView: View {
             Spacer(minLength: 8)
 
             HStack(spacing: 6) {
-                Image(systemName: "waveform").foregroundStyle(StudioStyle.accent)
-                Text("handstrudel").foregroundStyle(StudioStyle.ink)
+                Image(systemName: "waveform").foregroundStyle(palette.mediaAccent)
+                Text("handstrudel").foregroundStyle(.white)
                     .lineLimit(1)
             }
             .font(.caption.monospaced().weight(.semibold))
@@ -1611,10 +1611,10 @@ struct ContentView: View {
                     } label: {
                         Label("½×", systemImage: "tortoise")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(recordAtHalfSpeed ? StudioStyle.background : .white)
+                            .foregroundStyle(recordAtHalfSpeed ? palette.mediaOnAccent : .white)
                             .padding(.horizontal, 10)
                             .frame(minHeight: 32)
-                            .background(recordAtHalfSpeed ? StudioStyle.accent : .black.opacity(0.55), in: Capsule())
+                            .background(recordAtHalfSpeed ? palette.mediaAccent : .black.opacity(0.55), in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Half-speed recording")
@@ -1658,7 +1658,7 @@ struct ContentView: View {
                         .rotationEffect(.degrees(-90))
                     Image(systemName: "stop.fill")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(StudioStyle.recording)
+                        .foregroundStyle(palette.recording)
                 } else {
                     Image(systemName: "repeat")
                         .font(.system(size: 17, weight: .semibold))
@@ -1669,9 +1669,9 @@ struct ContentView: View {
                 if !engine.savedLoops.isEmpty && !engine.isLoopRecording {
                     Text("\(engine.savedLoops.count)")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(StudioStyle.background)
+                        .foregroundStyle(palette.mediaOnAccent)
                         .frame(width: 18, height: 18)
-                        .background(Circle().fill(StudioStyle.accent))
+                        .background(Circle().fill(palette.mediaAccent))
                         .offset(x: 16, y: -16)
                 }
             }
@@ -1743,7 +1743,7 @@ struct ContentView: View {
                     Slider(value: $backingVolume, in: 0...1, step: 0.05) {
                         Text("Backing volume")
                     }
-                    .tint(StudioStyle.accent)
+                    .tint(palette.mediaAccent)
                     .frame(minHeight: 44)
                 }
                 .frame(maxWidth: 228)
@@ -1753,7 +1753,7 @@ struct ContentView: View {
         }
         .font(.caption.weight(.semibold))
         .buttonStyle(.plain)
-        .foregroundStyle(StudioStyle.accent)
+        .foregroundStyle(palette.mediaAccent)
         .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 22))
     }
 
@@ -1769,7 +1769,7 @@ struct ContentView: View {
                 if recorderBusy {
                     ProgressView().tint(.white)
                 } else if isRecording {
-                    RoundedRectangle(cornerRadius: 6).fill(StudioStyle.recording).frame(width: 27, height: 27)
+                    RoundedRectangle(cornerRadius: 6).fill(palette.recording).frame(width: 27, height: 27)
                 } else if recordCountdown > 0 {
                     VStack(spacing: 0) {
                         Text("\(recordCountdown)")
@@ -1781,7 +1781,7 @@ struct ContentView: View {
                     }
                     .foregroundStyle(.white)
                 } else {
-                    Circle().fill(StudioStyle.recording).padding(7)
+                    Circle().fill(palette.recording).padding(7)
                 }
             }
             .frame(width: 62, height: 62)
@@ -2196,6 +2196,7 @@ private struct JamInvitation: UIViewControllerRepresentable, Identifiable {
 }
 
 private struct CameraRecoveryBanner: View {
+    @Environment(\.studioPalette) private var palette
     @ObservedObject var tracker: HandTrackingManager
     @Environment(\.openURL) private var openURL
 
@@ -2207,7 +2208,7 @@ private struct CameraRecoveryBanner: View {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }
                 .font(.caption.weight(.semibold))
-                .tint(StudioStyle.accent)
+                .tint(palette.mediaAccent)
             }
             .padding(10)
             .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
@@ -2217,6 +2218,7 @@ private struct CameraRecoveryBanner: View {
 }
 
 private struct JamButton: View {
+    @Environment(\.studioPalette) private var palette
     @ObservedObject var jam: JamSessionManager
     let action: () -> Void
 
@@ -2228,7 +2230,7 @@ private struct JamButton: View {
             } else {
                 Image(systemName: "shareplay")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(jam.isActive ? StudioStyle.accent : .white)
+                    .foregroundStyle(jam.isActive ? palette.mediaAccent : .white)
                     .frame(width: 44, height: 44)
                     .background(.black.opacity(0.55), in: Circle())
             }
@@ -2240,13 +2242,14 @@ private struct JamButton: View {
 }
 
 private struct JamStatus: View {
+    @Environment(\.studioPalette) private var palette
     @ObservedObject var jam: JamSessionManager
 
     var body: some View {
         if jam.isActive {
             Text(jam.participantCount > 1 ? "\(jam.participantCount) people jamming" : "Waiting for friends")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(StudioStyle.accent)
+                .foregroundStyle(palette.mediaAccent)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(.black.opacity(0.65), in: Capsule())

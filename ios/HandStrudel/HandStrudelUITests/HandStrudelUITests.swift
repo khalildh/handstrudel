@@ -89,6 +89,34 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Move your hands to make music."].waitForExistence(timeout: 5))
     }
 
+    func testAppearanceSwitchesAndPersistsAfterRelaunch() {
+        app.launchArguments.append("--uitesting")
+        app.launch()
+        let appearance = app.buttons["music-appearance"]
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5))
+        appearance.tap()
+        let paper = app.buttons["theme-paper"]
+        let tide = app.buttons["theme-tide"]
+        XCTAssertTrue(paper.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["theme-volt"].exists)
+        XCTAssertTrue(tide.exists)
+        XCTAssertTrue(app.buttons["theme-afterglow"].exists)
+        tide.tap()
+        XCTAssertTrue(tide.isSelected)
+        paper.tap()
+        XCTAssertTrue(paper.isSelected)
+        app.buttons["Done"].tap()
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5))
+        appearance.tap()
+        XCTAssertTrue(paper.waitForExistence(timeout: 5))
+        XCTAssertTrue(paper.isSelected)
+        app.buttons["theme-volt"].tap()
+        XCTAssertTrue(app.buttons["theme-volt"].isSelected)
+    }
+
     func testMusic_privateDraftsOpensWithoutAccount() {
         app.launchArguments.append("--uitesting")
         app.launch()
@@ -143,6 +171,148 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Sign in to comment"].exists)
         app.buttons["Close comments"].tap()
         XCTAssertTrue(button.waitForExistence(timeout: 5))
+    }
+
+    func testFeedSearchOpensWithoutAccount() {
+        app.launchArguments.append("--uitesting")
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+
+        let search = app.buttons["search-posts"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        XCTAssertTrue(app.navigationBars["Search posts"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.searchFields.firstMatch.exists)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+    }
+
+    func testFeedSwipesBetweenTwoPerformances() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed API fixture.")
+        }
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let first = app.staticTexts["Evening loop"].firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.31))
+        let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.72))
+        lower.press(forDuration: 0.05, thenDragTo: upper)
+        let second = app.staticTexts["Second performance"].firstMatch
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
+        upper.press(forDuration: 0.05, thenDragTo: lower)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)], timeout: 5), .completed)
+        XCTAssertTrue(app.staticTexts["feed-video-position"].exists)
+        app.buttons["Next video"].tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
+        app.buttons["Previous video"].tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)], timeout: 5), .completed)
+    }
+
+    func testSoundArtworkReflectsInstrumentPickerSelection() {
+        app.launchArguments.append("--uitesting")
+        app.launch()
+        let changeSound = app.buttons["Change sound"]
+        XCTAssertTrue(changeSound.waitForExistence(timeout: 5))
+        let artwork = element("sound-artwork")
+        XCTAssertTrue(artwork.exists)
+        func selectPiano(_ id: String) {
+            changeSound.tap()
+            let instruments = element("sounds-instrument")
+            XCTAssertTrue(instruments.waitForExistence(timeout: 5))
+            instruments.tap()
+            let category = app.buttons["Piano"]
+            if !category.isHittable { app.swipeRight() }
+            category.tap()
+            let choice = element("instrument-\(id)")
+            XCTAssertTrue(choice.waitForExistence(timeout: 5))
+            choice.tap()
+            app.buttons["Done"].tap()
+        }
+        selectPiano("grand_piano")
+        XCTAssertTrue((artwork.value as? String)?.hasPrefix("Grand Piano,") == true)
+        let before = artwork.screenshot().pngRepresentation
+        selectPiano("electric_piano_1")
+        XCTAssertTrue((artwork.value as? String)?.hasPrefix("Rhodes EP,") == true)
+        XCTAssertNotEqual(artwork.screenshot().pngRepresentation, before)
+    }
+
+    func testCommentNotificationOpensVideoAndThenTheExactReply() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the notification API fixture.")
+        }
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let inbox = app.buttons["activity-inbox"]
+        XCTAssertTrue(inbox.waitForExistence(timeout: 5))
+        inbox.tap()
+
+        let email = app.textFields["you@example.com"]
+        if email.waitForExistence(timeout: 3) {
+            email.tap()
+            email.typeText("notification@example.test")
+            app.buttons["Email me a code"].tap()
+            let code = app.textFields["6-digit code"]
+            XCTAssertTrue(code.waitForExistence(timeout: 5))
+            code.tap()
+            code.typeText("123456")
+            app.buttons["Sign in"].tap()
+            XCTAssertTrue(inbox.waitForExistence(timeout: 12))
+            inbox.tap()
+        }
+
+        XCTAssertTrue(app.navigationBars["Notifications"].waitForExistence(timeout: 5))
+        let groupedLike = app.staticTexts["@loopmaker and 2 others liked your video"]
+        XCTAssertTrue(groupedLike.waitForExistence(timeout: 5))
+        groupedLike.tap()
+        let detail = app.navigationBars["@loopmaker"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Evening loop"].exists)
+        XCTAssertFalse(app.buttons["notification-view-comment"].exists)
+        detail.buttons.firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Notifications"].waitForExistence(timeout: 5))
+
+        let notification = app.staticTexts["@loopmaker replied to you"]
+        XCTAssertTrue(notification.waitForExistence(timeout: 5))
+        notification.tap()
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Evening loop"].exists)
+        let reply = app.buttons["notification-view-comment"]
+        if !reply.isHittable { app.swipeUp() }
+        reply.tap()
+        XCTAssertTrue(app.buttons["Close comments"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Try the lower octave"].waitForExistence(timeout: 5))
+        let like = app.buttons["comment-like-40000000-0000-0000-0000-000000000002"]
+        XCTAssertTrue(like.waitForExistence(timeout: 5))
+        if !like.isHittable { app.swipeUp() }
+        like.tap()
+        let liked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "1 like"), object: like)
+        XCTAssertEqual(XCTWaiter.wait(for: [liked], timeout: 5), .completed)
+        app.buttons["Close comments"].tap()
+        XCTAssertTrue(reply.waitForExistence(timeout: 5))
+        reply.tap()
+        XCTAssertTrue(like.waitForExistence(timeout: 5))
+        XCTAssertEqual(like.value as? String, "1 like")
+        if !like.isHittable { app.swipeUp() }
+        like.tap()
+        let unliked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "0 likes"), object: like)
+        XCTAssertEqual(XCTWaiter.wait(for: [unliked], timeout: 5), .completed)
+        app.buttons["Close comments"].tap()
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        detail.buttons.firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Notifications"].waitForExistence(timeout: 5))
     }
 
     func testFeed_creatorProfileAndFollowingGuestState() throws {

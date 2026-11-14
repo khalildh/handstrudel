@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ControlSheet: View {
+    @Environment(\.studioPalette) private var palette
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
     @Binding var hideSkeletonWhenRecording: Bool
@@ -34,11 +35,11 @@ struct ControlSheet: View {
                             Text("Store")
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                         }
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(palette.ink.opacity(0.7))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Capsule().fill(Color.white.opacity(0.08)))
-                        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+                        .background(Capsule().fill(palette.ink.opacity(0.08)))
+                        .overlay(Capsule().stroke(palette.ink.opacity(0.12), lineWidth: 0.5))
                     }
                 }
 
@@ -121,6 +122,7 @@ struct ControlSheet: View {
             }
             .padding(20)
         }
+        .background(palette.background.ignoresSafeArea())
         .sheet(isPresented: $showStore) {
             StoreView(storeManager: storeManager)
         }
@@ -162,7 +164,7 @@ struct ControlSheet: View {
 
     private var sectionDivider: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.06))
+            .fill(palette.ink.opacity(0.06))
             .frame(height: 1)
     }
 
@@ -170,7 +172,7 @@ struct ControlSheet: View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.green.opacity(0.6))
+                .foregroundColor(palette.accent.opacity(0.6))
             Text(title)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundColor(.secondary)
@@ -339,19 +341,19 @@ struct ControlSheet: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)
                                 .background(Capsule().fill(Color.primary.opacity(0.05)))
-                                .overlay(Capsule().stroke(Color.white.opacity(0.07), lineWidth: 0.5))
+                                .overlay(Capsule().stroke(palette.ink.opacity(0.07), lineWidth: 0.5))
                                 .accessibilityIdentifier("progression-input")
 
                             Button(action: applyCustomProgression) {
                                 Text("Set")
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(customProgressionPreview == nil ? .secondary : .green)
+                                    .foregroundColor(customProgressionPreview == nil ? .secondary : palette.accent)
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 8)
                                     .background(
                                         Capsule().fill(customProgressionPreview == nil
                                             ? Color.primary.opacity(0.04)
-                                            : Color.green.opacity(0.12))
+                                            : palette.accent.opacity(0.12))
                                     )
                             }
                             .disabled(customProgressionPreview == nil)
@@ -364,14 +366,14 @@ struct ControlSheet: View {
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundColor(.primary.opacity(0.8))
                     }
-                    .tint(.green)
+                    .tint(palette.accent)
 
                     Toggle(isOn: $engine.chordMelodyAutoStrum) {
                         Text("Auto-strum (re-articulate on each beat)")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundColor(.primary.opacity(0.8))
                     }
-                    .tint(.green)
+                    .tint(palette.accent)
 
                     if currentMode == .radialChordMelody || currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
                         let useSF = Binding<Bool>(
@@ -397,7 +399,7 @@ struct ControlSheet: View {
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
                                 .foregroundColor(.primary.opacity(0.8))
                         }
-                        .tint(.green)
+                        .tint(palette.accent)
 
                         if useSF.wrappedValue {
                             VStack(alignment: .leading, spacing: 6) {
@@ -434,7 +436,7 @@ struct ControlSheet: View {
                                 .foregroundColor(.secondary)
                         }
                         Slider(value: $engine.chordMelodyPadVolume, in: 0...0.6)
-                            .tint(.green)
+                            .tint(palette.accent)
                     }
                 }
                 .padding(.top, 2)
@@ -489,14 +491,14 @@ struct ControlSheet: View {
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundColor(.primary.opacity(0.8))
                     }
-                    .tint(.green)
+                    .tint(palette.accent)
 
                     Toggle(isOn: $engine.chordMelodyAutoStrum) {
                         Text("Auto-strum (re-articulate on each beat)")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundColor(.primary.opacity(0.8))
                     }
-                    .tint(.green)
+                    .tint(palette.accent)
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -509,7 +511,7 @@ struct ControlSheet: View {
                                 .foregroundColor(.secondary)
                         }
                         Slider(value: $engine.chordMelodyPadVolume, in: 0...0.6)
-                            .tint(.green)
+                            .tint(palette.accent)
                     }
                 }
                 .padding(.top, 2)
@@ -533,9 +535,9 @@ struct ControlSheet: View {
                             Button(action: { engine.gridOctaveRange = range }) {
                                 Text("\(range)")
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(engine.gridOctaveRange == range ? .green : .secondary)
+                                    .foregroundColor(engine.gridOctaveRange == range ? palette.accent : .secondary)
                                     .frame(width: 28, height: 28)
-                                    .background(Circle().fill(engine.gridOctaveRange == range ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
+                                    .background(Circle().fill(engine.gridOctaveRange == range ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04)))
                             }
                         }
                     }
@@ -556,7 +558,7 @@ struct ControlSheet: View {
                         }
                         Text("\(engine.gridBaseOctave)")
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green)
+                            .foregroundColor(palette.accent)
                             .frame(width: 20)
                         Button(action: { if engine.gridBaseOctave < 6 { engine.gridBaseOctave += 1 } }) {
                             Image(systemName: "plus")
@@ -609,9 +611,9 @@ struct ControlSheet: View {
                     Text("Other modes")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                 }
-                .foregroundColor(.white.opacity(0.45))
+                .foregroundColor(palette.ink.opacity(0.45))
             }
-            .tint(.white.opacity(0.5))
+            .tint(palette.ink.opacity(0.5))
             .onAppear {
                 if currentMode != .splitChordMelody { showOtherModes = true }
             }
@@ -624,22 +626,22 @@ struct ControlSheet: View {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.5))
+                    .foregroundColor(isActive ? palette.accent : .primary.opacity(0.5))
                 Text(label)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.6))
+                    .foregroundColor(isActive ? palette.accent : .primary.opacity(0.6))
             }
             .frame(maxWidth: .infinity)
             .frame(height: 48)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(isActive
-                        ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                        ? LinearGradient(colors: [palette.accent.opacity(0.2), palette.accent.opacity(0.08)], startPoint: .top, endPoint: .bottom)
                         : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1.5 : 0.5)
+                    .stroke(isActive ? palette.accent.opacity(0.5) : palette.ink.opacity(0.06), lineWidth: isActive ? 1.5 : 0.5)
             )
         }
         .accessibilityIdentifier("mode-\(mode.rawValue)")
@@ -660,7 +662,7 @@ struct ControlSheet: View {
                 Capsule().fill(isActive ? Color.blue.opacity(0.12) : Color.primary.opacity(0.03))
             )
             .overlay(
-                Capsule().stroke(isActive ? Color.blue.opacity(0.5) : Color.white.opacity(0.05), lineWidth: isActive ? 1 : 0.5)
+                Capsule().stroke(isActive ? Color.blue.opacity(0.5) : palette.ink.opacity(0.05), lineWidth: isActive ? 1 : 0.5)
             )
         }
     }
@@ -672,15 +674,15 @@ struct ControlSheet: View {
                 Text(inst.emoji).font(.system(size: 14))
                 Text(inst.name)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.75))
+                    .foregroundColor(isActive ? palette.accent : .primary.opacity(0.75))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(
-                Capsule().fill(isActive ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                Capsule().fill(isActive ? palette.accent.opacity(0.12) : Color.primary.opacity(0.04))
             )
             .overlay(
-                Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
+                Capsule().stroke(isActive ? palette.accent.opacity(0.5) : palette.ink.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
             )
         }
     }
@@ -696,7 +698,7 @@ struct ControlSheet: View {
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(.primary.opacity(0.8))
             }
-            .tint(.green)
+            .tint(palette.accent)
 
             if engine.quantizeEnabled {
                 HStack(spacing: 8) {
@@ -707,10 +709,10 @@ struct ControlSheet: View {
                         Button(action: { engine.quantizeDiv = div }) {
                             Text(label)
                                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .foregroundColor(engine.quantizeDiv == div ? .green : .secondary)
+                                .foregroundColor(engine.quantizeDiv == div ? palette.accent : .secondary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 6)
-                                .background(Capsule().fill(engine.quantizeDiv == div ? Color.green.opacity(0.15) : Color.primary.opacity(0.04)))
+                                .background(Capsule().fill(engine.quantizeDiv == div ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04)))
                         }
                     }
                     Spacer()
@@ -735,7 +737,7 @@ struct ControlSheet: View {
                 Capsule().fill(isActive ? Color.blue.opacity(0.12) : Color.primary.opacity(0.03))
             )
             .overlay(
-                Capsule().stroke(isActive ? Color.blue.opacity(0.5) : Color.white.opacity(0.05), lineWidth: isActive ? 1 : 0.5)
+                Capsule().stroke(isActive ? Color.blue.opacity(0.5) : palette.ink.opacity(0.05), lineWidth: isActive ? 1 : 0.5)
             )
         }
     }
@@ -774,23 +776,23 @@ struct ControlSheet: View {
                     .font(.system(size: 14))
                 Text(prog.name)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.75))
+                    .foregroundColor(isActive ? palette.accent : .primary.opacity(0.75))
                 Text("\(prog.degrees.count)")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(.white.opacity(isActive ? 0.7 : 0.35))
+                    .foregroundColor(palette.ink.opacity(isActive ? 0.7 : 0.35))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
                     .background(
-                        Capsule().fill(isActive ? Color.green.opacity(0.2) : Color.white.opacity(0.06))
+                        Capsule().fill(isActive ? palette.accent.opacity(0.2) : palette.ink.opacity(0.06))
                     )
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(
-                Capsule().fill(isActive ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                Capsule().fill(isActive ? palette.accent.opacity(0.12) : Color.primary.opacity(0.04))
             )
             .overlay(
-                Capsule().stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
+                Capsule().stroke(isActive ? palette.accent.opacity(0.5) : palette.ink.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
             )
         }
     }
@@ -812,16 +814,16 @@ struct ControlSheet: View {
                         }) {
                             Text(key.rawValue)
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundColor(engine.selectedKey == key ? .green : .primary.opacity(0.6))
+                                .foregroundColor(engine.selectedKey == key ? palette.accent : .primary.opacity(0.6))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 9)
                                 .background(
                                     Capsule()
-                                        .fill(engine.selectedKey == key ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                        .fill(engine.selectedKey == key ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(engine.selectedKey == key ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                        .stroke(engine.selectedKey == key ? palette.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
                                 )
                         }
                     }
@@ -843,25 +845,25 @@ struct ControlSheet: View {
                         }) {
                             Text(scale.rawValue)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundColor(engine.selectedScale == scale ? .green : .primary.opacity(0.6))
+                                .foregroundColor(engine.selectedScale == scale ? palette.accent : .primary.opacity(0.6))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .background(
                                     Capsule()
-                                        .fill(engine.selectedScale == scale ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                        .fill(engine.selectedScale == scale ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(engine.selectedScale == scale ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                        .stroke(engine.selectedScale == scale ? palette.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
                                 )
                                 .overlay(alignment: .topTrailing) {
                                     if locked {
                                         Text("PRO")
                                             .font(.system(size: 6, weight: .bold, design: .rounded))
-                                            .foregroundColor(.white.opacity(0.8))
+                                            .foregroundColor(palette.ink.opacity(0.8))
                                             .padding(.horizontal, 3)
                                             .padding(.vertical, 1)
-                                            .background(Capsule().fill(Color.white.opacity(0.15)))
+                                            .background(Capsule().fill(palette.ink.opacity(0.15)))
                                             .offset(x: 4, y: -4)
                                     }
                                 }
@@ -887,16 +889,16 @@ struct ControlSheet: View {
                 Text(label)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
             }
-            .foregroundColor(isOn.wrappedValue ? .green : .primary.opacity(0.5))
+            .foregroundColor(isOn.wrappedValue ? palette.accent : .primary.opacity(0.5))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(isOn.wrappedValue ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                    .fill(isOn.wrappedValue ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
             )
             .overlay(
                 Capsule()
-                    .stroke(isOn.wrappedValue ? Color.green.opacity(0.4) : Color.white.opacity(0.06), lineWidth: isOn.wrappedValue ? 1.5 : 0.5)
+                    .stroke(isOn.wrappedValue ? palette.accent.opacity(0.4) : palette.ink.opacity(0.06), lineWidth: isOn.wrappedValue ? 1.5 : 0.5)
             )
         }
     }
@@ -935,7 +937,7 @@ struct ControlSheet: View {
                     .font(.system(size: 20))
                 Text(wf.name)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                    .foregroundColor(isSelected ? palette.accent : .primary.opacity(0.6))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -944,18 +946,18 @@ struct ControlSheet: View {
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(isSelected
-                        ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                        ? LinearGradient(colors: [palette.accent.opacity(0.2), palette.accent.opacity(0.08)], startPoint: .top, endPoint: .bottom)
                         : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: isSelected ? 1.5 : 0.5)
+                    .stroke(isSelected ? palette.accent.opacity(0.5) : palette.ink.opacity(0.06), lineWidth: isSelected ? 1.5 : 0.5)
             )
             .overlay(alignment: .topTrailing) {
                 if locked {
                     Text("PRO")
                         .font(.system(size: 8, weight: .heavy, design: .rounded))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(palette.ink.opacity(0.8))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(Capsule().fill(.ultraThinMaterial))
@@ -991,25 +993,25 @@ struct ControlSheet: View {
                                 .font(.system(size: 22))
                             Text(drumLoop.name)
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundColor(loop.wrappedValue.id == drumLoop.id ? .green : .primary.opacity(0.6))
+                                .foregroundColor(loop.wrappedValue.id == drumLoop.id ? palette.accent : .primary.opacity(0.6))
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(loop.wrappedValue.id == drumLoop.id
-                                    ? LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+                                    ? LinearGradient(colors: [palette.accent.opacity(0.2), palette.accent.opacity(0.08)], startPoint: .top, endPoint: .bottom)
                                     : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(loop.wrappedValue.id == drumLoop.id ? Color.green.opacity(0.5) : Color.white.opacity(0.06), lineWidth: loop.wrappedValue.id == drumLoop.id ? 1.5 : 0.5)
+                                .stroke(loop.wrappedValue.id == drumLoop.id ? palette.accent.opacity(0.5) : palette.ink.opacity(0.06), lineWidth: loop.wrappedValue.id == drumLoop.id ? 1.5 : 0.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
                                 Text("PRO")
                                     .font(.system(size: 8, weight: .heavy, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .foregroundColor(palette.ink.opacity(0.8))
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 2)
                                     .background(Capsule().fill(.ultraThinMaterial))
@@ -1028,7 +1030,7 @@ struct ControlSheet: View {
                         .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 28)
                     Slider(value: volume, in: 0.2...2.0)
-                        .tint(.green)
+                        .tint(palette.accent)
                     Text(String(format: "%.0f%%", volume.wrappedValue * 100))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
@@ -1041,7 +1043,7 @@ struct ControlSheet: View {
                         .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 28)
                     Slider(value: bpm, in: 40...240, step: 1)
-                        .tint(.green)
+                        .tint(palette.accent)
                     Text("\(Int(bpm.wrappedValue.rounded()))")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
@@ -1061,7 +1063,7 @@ struct ControlSheet: View {
                 Spacer()
                 Text("\(Int(engine.manualBPM.rounded()))")
                     .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .foregroundColor(.green)
+                    .foregroundColor(palette.accent)
                 Spacer()
             }
 
@@ -1083,7 +1085,7 @@ struct ControlSheet: View {
                         get: { engine.manualBPM },
                         set: { engine.manualBPM = $0 }
                     ), in: 50...205, step: 1)
-                    .tint(.green)
+                    .tint(palette.accent)
 
                     Button(action: { engine.manualBPM = min(205, engine.manualBPM + 1) }) {
                         Image(systemName: "plus")
@@ -1151,7 +1153,7 @@ struct ControlSheet: View {
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.primary.opacity(0.08))
                             Capsule()
-                                .fill(Color.green.opacity(0.5))
+                                .fill(palette.accent.opacity(0.5))
                                 .frame(width: geo.size.width * max(0, min(1, normalized)))
                         }
                     }
@@ -1196,27 +1198,27 @@ struct ControlSheet: View {
                                 .font(.system(size: 18))
                             Text(filter.name)
                                 .font(.system(size: 8, weight: .semibold, design: .rounded))
-                                .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                                .foregroundColor(isSelected ? palette.accent : .primary.opacity(0.6))
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(isSelected ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                                .fill(isSelected ? palette.accent.opacity(0.12) : Color.primary.opacity(0.04))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(isSelected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                .stroke(isSelected ? palette.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
                                 Text("PRO")
                                     .font(.system(size: 7, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .foregroundColor(palette.ink.opacity(0.8))
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.white.opacity(0.15)))
+                                    .background(Capsule().fill(palette.ink.opacity(0.15)))
                                     .padding(4)
                             }
                         }
@@ -1254,27 +1256,27 @@ struct ControlSheet: View {
                                 .font(.system(size: 18))
                             Text(theme.name)
                                 .font(.system(size: 8, weight: .semibold, design: .rounded))
-                                .foregroundColor(isSelected ? .green : .primary.opacity(0.6))
+                                .foregroundColor(isSelected ? palette.accent : .primary.opacity(0.6))
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(isSelected ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                                .fill(isSelected ? palette.accent.opacity(0.12) : Color.primary.opacity(0.04))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(isSelected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                .stroke(isSelected ? palette.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
                                 Text("PRO")
                                     .font(.system(size: 7, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .foregroundColor(palette.ink.opacity(0.8))
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.white.opacity(0.15)))
+                                    .background(Capsule().fill(palette.ink.opacity(0.15)))
                                     .padding(4)
                             }
                         }
@@ -1314,11 +1316,11 @@ struct ControlSheet: View {
                     Button(action: { engine.loopRecorder.selectedBars = bars }) {
                         Text("\(bars) bars")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(engine.loopRecorder.selectedBars == bars ? .green : .secondary)
+                            .foregroundColor(engine.loopRecorder.selectedBars == bars ? palette.accent : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(
-                                Capsule().fill(engine.loopRecorder.selectedBars == bars ? Color.green.opacity(0.15) : Color.primary.opacity(0.04))
+                                Capsule().fill(engine.loopRecorder.selectedBars == bars ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
                             )
                     }
                 }
@@ -1331,7 +1333,7 @@ struct ControlSheet: View {
                     Button(action: { engine.toggleLoopPlayback(loop.id) }) {
                         Image(systemName: engine.playingLoopIds.contains(loop.id) ? "stop.circle.fill" : "play.circle.fill")
                             .font(.system(size: 28))
-                            .foregroundColor(engine.playingLoopIds.contains(loop.id) ? .orange : .green)
+                            .foregroundColor(engine.playingLoopIds.contains(loop.id) ? .orange : palette.accent)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -1340,10 +1342,10 @@ struct ControlSheet: View {
                         HStack(spacing: 6) {
                             Text(loop.mode)
                                 .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(.green)
+                                .foregroundColor(palette.accent)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Capsule().fill(Color.green.opacity(0.15)))
+                                .background(Capsule().fill(palette.accent.opacity(0.15)))
                             Text(loop.hasCapturedAudio == true ? "Captured audio" : "Note events")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundColor(.secondary)
@@ -1371,7 +1373,7 @@ struct ControlSheet: View {
                     }) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 14))
-                            .foregroundColor(.green.opacity(0.6))
+                            .foregroundColor(palette.accent.opacity(0.6))
                     }
                     .accessibilityLabel(loop.hasCapturedAudio == true ? "Export WAV" : "Export approximate M4A")
                     .disabled(exportingLoop)
@@ -1408,7 +1410,7 @@ struct ControlSheet: View {
                     Button(action: { engine.toggleSnippet(idx) }) {
                         Image(systemName: engine.playingSet.contains(idx) ? "pause.circle.fill" : "play.circle.fill")
                             .font(.system(size: 24))
-                            .foregroundColor(engine.playingSet.contains(idx) ? .orange : .green)
+                            .foregroundColor(engine.playingSet.contains(idx) ? .orange : palette.accent)
                     }
                     VStack(alignment: .leading) {
                         Text("Snippet #\(idx + 1)")
@@ -1439,7 +1441,7 @@ struct ControlSheet: View {
                 Button(action: engine.toggleTrackPlay) {
                     Image(systemName: engine.trackPlaying ? "stop.circle.fill" : "play.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundColor(engine.trackPlaying ? .orange : .green)
+                        .foregroundColor(engine.trackPlaying ? .orange : palette.accent)
                 }
             }
 
@@ -1448,10 +1450,10 @@ struct ControlSheet: View {
                     Button(action: { engine.setTrackSpeed(speed) }) {
                         Text("\(speed == Double(Int(speed)) ? "\(Int(speed))" : String(format: "%.1f", speed))x")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundColor(engine.track.speed == speed ? .green : .secondary)
+                            .foregroundColor(engine.track.speed == speed ? palette.accent : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(Capsule().fill(engine.track.speed == speed ? Color.green.opacity(0.15) : Color.clear))
+                            .background(Capsule().fill(engine.track.speed == speed ? palette.accent.opacity(0.15) : Color.clear))
                     }
                 }
             }
@@ -1475,6 +1477,7 @@ struct ControlSheet: View {
 }
 
 struct SoundSetupsView: View {
+    @Environment(\.studioPalette) private var palette
     @ObservedObject var engine: EngineController
     @ObservedObject var store: StoreManager
     let onUse: (SoundSetup) -> Void
@@ -1533,6 +1536,6 @@ struct SoundSetupsView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }
         }
-        .tint(StudioStyle.accent)
+        .tint(palette.accent)
     }
 }

@@ -56,6 +56,9 @@ function WatchCommentList({ videoID, parentID }: { videoID: string; parentID?: s
             <li key={item.id}>
               <strong>@{item.username}</strong>
               <p>{item.body}</p>
+              {item.like_count != null && item.like_count > 0 && (
+                <p className="watch-comments-note-inline">{item.like_count} {item.like_count === 1 ? "like" : "likes"}</p>
+              )}
               {item.reply_count > 0 && <WatchReplies videoID={videoID} comment={item} />}
             </li>
           ))}

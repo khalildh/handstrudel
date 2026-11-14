@@ -432,7 +432,17 @@ final class ChordMelodyModeManager {
         // pad — that's what made the pad feel "stuck on" when the hand strayed
         // off the wedge. The chord-accent hit (below) is what strikes on the
         // pinch-began transition; the pad tracks the same held-pinch window.
-        if let h = chordHand(hands) {
+        if let touchDegree = touchChordDegree {
+            if padOn { actions.append(.padOff) }
+            padOn = false
+            padDegree = nil
+            chordPinch.reset()
+            pendingChordAccent = false
+            currentChordDegree = touchDegree
+            currentOctaveShift = touchChordOctave
+            currentChordMidi = touchChordMidi.isEmpty ? chordTones(touchDegree).map { $0 + touchChordOctave * 12 } : touchChordMidi
+            chordResting = false
+        } else if let h = chordHand(hands) {
             chordHandAbsentFrames = 0
             let reading = readChordHand(h)
             let degree = reading.degree
@@ -525,22 +535,6 @@ final class ChordMelodyModeManager {
             }
         }
 
-        // Touch override (Split mode): if a finger is held on a chord wedge,
-        // force the published chord state to that chord so the melody-snap
-        // math — both the hand-tracked branch below and the touch-driven
-        // melody handler in `ContentView` — sees the touched chord rather
-        // than stale hand state. Hand input still wins on the frame it fires;
-        // this kicks in for taps + holds with the chord hand absent.
-        if let td = touchChordDegree {
-            padOn = true
-            padDegree = td
-            padOctaveShift = touchChordOctave
-            currentChordDegree = td
-            currentOctaveShift = touchChordOctave
-            currentChordMidi = touchChordMidi.isEmpty ? currentChordMidi : touchChordMidi
-            chordResting = false
-        }
-
         // -------------------- Melody hand --------------------
         // Melody snaps to the *sounding* chord's tones (the pad degree), so when
         // quantized it stays consonant with the chord you actually hear rather
@@ -622,7 +616,7 @@ final class ChordMelodyModeManager {
     /// When a hand is out of frame, falls back to the last known value so the
     /// highlight feels "sticky" instead of flickering off.
     func currentZones(hands: HandsState) -> (chordDegree: Int?, melodyLane: Int?) {
-        if let h = chordHand(hands) {
+        if touchChordDegree == nil, let h = chordHand(hands) {
             switch layout {
             case .grid:
                 lastChordZoneIndex = xToZoneIndex(h.pinchX)

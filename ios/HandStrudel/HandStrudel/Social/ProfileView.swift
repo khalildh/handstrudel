@@ -5,6 +5,7 @@ import SwiftUI
 /// The signed-in user's profile: their posts, plus account settings
 /// (sign out, delete account).
 struct ProfileView: View {
+    @Environment(\.studioPalette) private var palette
     @ObservedObject var auth: AuthManager
     @State private var videos: [Video] = []
     @State private var loading = false
@@ -13,6 +14,7 @@ struct ProfileView: View {
     @State private var confirmDeleteAccount = false
     @State private var showSignIn = false
     @State private var showBlocked = false
+    @State private var showAppearance = false
 
     private let columns = [GridItem(.adaptive(minimum: 100), spacing: 6)]
 
@@ -29,12 +31,13 @@ struct ProfileView: View {
         }
         .frame(maxWidth: 650)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(StudioStyle.background.ignoresSafeArea())
-        .foregroundStyle(StudioStyle.ink)
-        .tint(StudioStyle.accent)
+        .background(palette.background.ignoresSafeArea())
+        .foregroundStyle(palette.ink)
+        .tint(palette.accent)
         .task(id: auth.userId) { await load() }
         .sheet(isPresented: $showSignIn) { SignInView(auth: auth) }
         .sheet(isPresented: $showBlocked) { BlockedUsersView(auth: auth) }
+        .sheet(isPresented: $showAppearance) { StudioThemePicker() }
         .fullScreenCover(item: $playing) { v in
             ZStack(alignment: .topTrailing) {
                 VideoPlayer(player: AVPlayer(url: v.videoURL)).ignoresSafeArea()
@@ -65,6 +68,7 @@ struct ProfileView: View {
                 .accessibilityAddTraits(.isHeader)
             Spacer()
             Menu {
+                Button("Appearance", systemImage: "paintpalette") { showAppearance = true }
                 if auth.isSignedIn {
                     Button("Blocked users") { showBlocked = true }
                     Button("Sign out") { Task { await auth.signOut() } }
@@ -75,10 +79,10 @@ struct ProfileView: View {
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(StudioStyle.ink)
+                    .foregroundStyle(palette.ink)
                     .frame(width: 44, height: 44)
-                    .background(StudioStyle.surface, in: Circle())
-                    .overlay { Circle().strokeBorder(StudioStyle.border) }
+                    .background(palette.surface, in: Circle())
+                    .overlay { Circle().strokeBorder(palette.border) }
             }
             .accessibilityLabel("Account settings")
         }
@@ -89,16 +93,16 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 17) {
                 Image(systemName: "person.crop.circle")
                     .font(.system(size: 28, weight: .light))
-                    .foregroundStyle(StudioStyle.accent)
+                    .foregroundStyle(palette.accent)
                     .frame(width: 58, height: 58)
-                    .background(StudioStyle.accent.opacity(0.10), in: Circle())
+                    .background(palette.accent.opacity(0.10), in: Circle())
                     .accessibilityHidden(true)
                 Text("Your performances")
                     .font(.system(.largeTitle, design: .serif))
                     .accessibilityAddTraits(.isHeader)
                 Text("Sign in to publish your clips and see them together on your profile.")
                     .font(.subheadline)
-                    .foregroundStyle(StudioStyle.muted)
+                    .foregroundStyle(palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Sign in") { showSignIn = true }
                     .buttonStyle(StudioActionStyle())
@@ -108,10 +112,10 @@ struct ProfileView: View {
             .frame(maxWidth: 480, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 22)
-                    .fill(LinearGradient(colors: [StudioStyle.accent.opacity(0.09), StudioStyle.surface],
+                    .fill(LinearGradient(colors: [palette.accent.opacity(0.09), palette.surface],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
             }
-            .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(StudioStyle.border).allowsHitTesting(false) }
+            .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(palette.border).allowsHitTesting(false) }
             .padding(.horizontal, 21)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
@@ -126,11 +130,11 @@ struct ProfileView: View {
                 }
                 Text("Performances").font(.headline)
                 if loading {
-                    ProgressView().tint(StudioStyle.accent)
+                    ProgressView().tint(palette.accent)
                 } else if videos.isEmpty {
                     Text("No posts yet. Record a clip and choose “Post to HandStrudel”.")
                         .font(.subheadline)
-                        .foregroundStyle(StudioStyle.muted)
+                        .foregroundStyle(palette.muted)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -139,7 +143,7 @@ struct ProfileView: View {
             LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(videos) { v in
                     Button { playing = v } label: {
-                        StudioStyle.surface
+                        palette.surface
                             .aspectRatio(9 / 16, contentMode: .fit)
                             .overlay {
                                 AsyncImage(url: v.thumbURL) { img in img.resizable().scaledToFill() }

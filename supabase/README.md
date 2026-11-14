@@ -14,6 +14,8 @@ a video feed costs.
 - `migrations/20261114030000_bookmarks_and_weekly_challenges.sql`: private saved performances and a manually curated play-along challenge.
 - `migrations/20261114030100_use_server_challenge_submission_time.sql`: uses server publication time for challenge eligibility.
 - `migrations/20261114030200_match_challenges_to_their_source.sql`: checks that a challenge's own source is publicly visible and opted in.
+- `migrations/20261114040000_comment_likes.sql`: one reaction per account per comment or reply, with public counts and private reaction rows.
+- `migrations/20261114050000_like_notifications.sql`: groups new likes by video, comment, or reply in the private in-app inbox. No historical backfill or push alerts. Older clients keep the comment/reply inbox.
 - `tests/database/feed.test.sql`: pgTAP tests for RLS and triggers. Run them with `supabase test db`.
 - `tests/database/comments.test.sql`: pgTAP tests for comment permissions, thread visibility, and moderation.
 - `functions/sign-upload`: presigned R2 PUT URLs for a new post. It checks the caller's JWT and username, limits each user to 20 posts a day, and caps uploads at 15 MB.
@@ -43,6 +45,11 @@ To use the local stack, set `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `MEDIA_BASE_
 
 ## Comment moderation
 Before enabling public comments, assign a reviewer to check `public.comment_reports` in the Supabase dashboard and monitor the community support inbox. Reports are never visible to clients. Three reports from distinct accounts hide a comment and its replies; moderators can set `comments.hidden` to hide or restore a comment after reviewing it. The server checks links and configured harmful phrases in `comment_internal.blocked_patterns` before posting. Treat this as a starter filter, not a replacement for review.
+
+## Creator tools rollout
+Bookmarks (including the Saved library) and comment/reply notifications require the creator tools migrations. Verify the linked project and run `supabase migration list --remote` before deploying. If the original accounts/feed migration was applied manually, first confirm its tables, policies, triggers, and functions already exist. Only then use `supabase migration repair --remote --status applied 20261113000000` to reconcile the history. Do not rerun the initial schema on a database with live accounts and posts.
+
+After the moderation reviewer is assigned, preview the remaining changes with `supabase db push --remote --dry-run --skip-vault`. The pending migrations enable public comments and replies, creator profiles, Following, the private notification inbox and bookmarks, and support for the weekly challenge. Apply only after reviewing that list. Verify with two test accounts: save and reopen a post, confirm the other account cannot read the bookmark, then leave a comment and confirm that only the recipient sees its notification. The rollout does not send push notifications.
 
 ## Weekly play-along pilot
 Choose a source clip with the creator's approval and with play-along already enabled. In the dashboard, add a row to `public.weekly_challenges` with its video ID, a short title and prompt, a one-week UTC window, and `featured = true`. Only one featured window can be active at a time. During the window, attributed public takes on that source appear automatically. Leave the table empty to keep the pilot hidden; revoking the source's opt-in also hides the challenge.
