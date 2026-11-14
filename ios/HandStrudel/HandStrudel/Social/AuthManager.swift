@@ -154,8 +154,22 @@ final class AuthManager: NSObject, ObservableObject {
         }
         try await supabase.from("profiles").update(Update(display_name: displayName))
             .eq("id", value: userId).execute()
-        guard self.userId == userId else { return }
+        guard self.userId == userId, let current = profile, current.id == userId else { return }
+        updated = current
         updated.displayName = displayName
+        profile = updated
+    }
+
+    func updateAvatar(_ jpeg: Data?) async throws {
+        guard let userId, profile?.id == userId else {
+            throw SocialError.message("Sign in again to edit your profile.")
+        }
+        struct Result: Decodable { let avatarKey: String? }
+        let options = jpeg.map { FunctionInvokeOptions(headers: ["Content-Type": "image/jpeg"], body: $0) }
+            ?? FunctionInvokeOptions(method: .delete)
+        let result: Result = try await supabase.functions.invoke("profile-avatar", options: options)
+        guard self.userId == userId, var updated = profile, updated.id == userId else { return }
+        updated.avatarKey = result.avatarKey
         profile = updated
     }
 

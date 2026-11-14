@@ -43,6 +43,15 @@ export async function deleteKeys(keys: string[]) {
   );
 }
 
+export async function putAvatar(key: string, bytes: Uint8Array<ArrayBuffer>) {
+  const response = await r2().fetch(`${bucketUrl()}/${key}`, {
+    method: "PUT",
+    headers: { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=3600" },
+    body: bytes,
+  });
+  if (!response.ok) throw new Error(`R2 avatar upload: ${response.status}`);
+}
+
 /** Every key under a prefix (ListObjectsV2, paginated). */
 export async function listKeys(prefix: string): Promise<string[]> {
   const client = r2();

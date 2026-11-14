@@ -434,3 +434,6 @@ verify_jwt = false
 
 [functions.delete-account]
 verify_jwt = false
+
+[functions.profile-avatar]
+verify_jwt = false

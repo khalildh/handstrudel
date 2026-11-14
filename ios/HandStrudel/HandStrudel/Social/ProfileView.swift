@@ -1,5 +1,8 @@
+import ImageIO
+import PhotosUI
 import Supabase
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ProfileView: View {
     @Environment(\.studioPalette) private var palette
@@ -45,7 +48,7 @@ struct ProfileView: View {
         .sheet(isPresented: $showSignIn) { SignInView(auth: auth) }
         .sheet(isPresented: $showBlocked) { BlockedUsersView(auth: auth) }
         .sheet(isPresented: $showAppearance) { StudioThemePicker() }
-        .sheet(isPresented: $showEdit) { EditCreatorNameView(auth: auth) }
+        .sheet(isPresented: $showEdit) { EditCreatorProfileView(auth: auth) }
         .sheet(item: $playing, onDismiss: {
             let action = pendingAction
             pendingAction = nil
@@ -571,38 +574,142 @@ private struct ProfileThumbnail: View {
     }
 }
 
-private struct EditCreatorNameView: View {
+enum AvatarPhoto {
+    static func jpeg(from input: Data) -> Data? {
+        guard let source = CGImageSourceCreateWithData(input as CFData, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: 1024,
+              ] as CFDictionary) else { return nil }
+        let side = min(image.width, image.height)
+        guard side > 0, let crop = image.cropping(to: CGRect(x: (image.width - side) / 2,
+            y: (image.height - side) / 2, width: side, height: side)),
+              let context = CGContext(data: nil, width: min(side, 512), height: min(side, 512),
+                                      bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+        let bounds = CGRect(x: 0, y: 0, width: context.width, height: context.height)
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(bounds)
+        context.interpolationQuality = .high
+        context.draw(crop, in: bounds)
+        guard let resized = context.makeImage() else { return nil }
+        let data = NSMutableData()
+        guard let writer = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(writer, resized, [kCGImageDestinationLossyCompressionQuality: 0.84] as CFDictionary)
+        return CGImageDestinationFinalize(writer) && data.length <= 384 * 1024 ? data as Data : nil
+    }
+}
+
+private struct EditCreatorProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.studioPalette) private var palette
     @ObservedObject var auth: AuthManager
     @State private var name = ""
     @State private var saving = false
     @State private var error: String?
+    @State private var selection: PhotosPickerItem?
+    @State private var pendingPhoto: Data?
+    @State private var removePhoto = false
+    @State private var loadingPhoto = false
+    @State private var confirmingRemoval = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
+                    HStack(spacing: 14) {
+                        photoPreview
+                        PhotosPicker(selection: $selection, matching: .images) {
+                            Label("Choose photo", systemImage: "photo")
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("profile-choose-photo")
+                        if loadingPhoto { ProgressView() }
+                    }
+                    if pendingPhoto != nil || (!removePhoto && auth.profile?.avatarKey != nil) {
+                        Button("Remove photo", role: .destructive) {
+                            if pendingPhoto != nil && auth.profile?.avatarKey == nil {
+                                pendingPhoto = nil
+                                selection = nil
+                            } else {
+                                confirmingRemoval = true
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Profile photo")
+                } footer: {
+                    Text("Your photo is public. Only the selected image is uploaded, after you tap Save.")
+                }
+                Section {
                     TextField("Display name", text: $name).textContentType(.nickname)
                 } footer: {
                     Text("Leave blank to show your username instead.")
                 }
-                if let error { Text(error).foregroundStyle(palette.muted) }
+                if let error { Text(error).foregroundStyle(palette.muted).accessibilityIdentifier("profile-edit-error") }
             }
+            .disabled(saving)
             .navigationTitle("Edit profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }
-                        .disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count >
+                        .disabled(saving || loadingPhoto || name.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count >
                                   AuthManager.displayNameLimit)
                 }
             }
             .onAppear { name = auth.profile?.displayName ?? "" }
+            .task(id: selection) {
+                guard let item = selection else { loadingPhoto = false; return }
+                loadingPhoto = true
+                error = nil
+                let data = try? await item.loadTransferable(type: Data.self)
+                guard !Task.isCancelled else { return }
+                let jpeg = await Task.detached(priority: .userInitiated) {
+                    data.flatMap(AvatarPhoto.jpeg)
+                }.value
+                guard !Task.isCancelled else { return }
+                loadingPhoto = false
+                if let jpeg {
+                    pendingPhoto = jpeg
+                    removePhoto = false
+                } else {
+                    selection = nil
+                    error = "Couldn't open that image. Choose another photo and try again."
+                }
+            }
+            .confirmationDialog("Remove your profile photo?", isPresented: $confirmingRemoval, titleVisibility: .visible) {
+                Button("Remove photo", role: .destructive) {
+                    selection = nil
+                    pendingPhoto = nil
+                    removePhoto = true
+                }
+                .accessibilityIdentifier("profile-confirm-remove-photo")
+                Button("Cancel", role: .cancel) {}
+            }
             .interactiveDismissDisabled(saving)
         }
         .tint(palette.accent)
+    }
+
+    private var photoPreview: some View {
+        ZStack {
+            Circle().fill(palette.surface)
+            Image(systemName: "person.crop.circle").font(.title2).foregroundStyle(palette.muted)
+            if let pendingPhoto, let image = UIImage(data: pendingPhoto) {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else if !removePhoto, let key = auth.profile?.avatarKey {
+                AsyncImage(url: SocialConfig.mediaURL(key)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: { Color.clear }
+            }
+        }
+        .frame(width: 58, height: 58)
+        .clipShape(Circle())
+        .accessibilityHidden(true)
     }
 
     private func save() async {
@@ -610,7 +717,20 @@ private struct EditCreatorNameView: View {
         error = nil
         defer { saving = false }
         do {
-            try await auth.updateDisplayName(name)
+            if name.trimmingCharacters(in: .whitespacesAndNewlines) != (auth.profile?.displayName ?? "") {
+                try await auth.updateDisplayName(name)
+            }
+            if pendingPhoto != nil || removePhoto {
+                do { try await auth.updateAvatar(pendingPhoto) }
+                catch FunctionsError.httpError(code: 429, data: _) {
+                    self.error = "Wait a few seconds before uploading another photo."
+                    return
+                }
+                catch {
+                    self.error = "Couldn't update your profile photo. Try again."
+                    return
+                }
+            }
             dismiss()
         } catch {
             self.error = "Couldn't save your display name. Try again."

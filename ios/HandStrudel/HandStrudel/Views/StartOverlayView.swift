@@ -15,6 +15,7 @@ struct StudioActionStyle: ButtonStyle {
 
 struct StartOverlayView: View {
     @Environment(\.studioPalette) private var palette
+    @Environment(\.scenePhase) private var scenePhase
     let status: String
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
@@ -28,6 +29,9 @@ struct StartOverlayView: View {
     @State private var showInstrumentSheet = false
     @State private var showProgressionSheet = false
     @State private var showScaleSheet = false
+    @State private var preview: Task<Void, Never>?
+    @State private var isPreviewing = false
+    @State private var previewFailed = false
     @ScaledMetric(relativeTo: .largeTitle) private var headlineSize = 51.0
 
     var body: some View {
@@ -69,6 +73,9 @@ struct StartOverlayView: View {
         .background(palette.background.ignoresSafeArea())
         .foregroundStyle(palette.ink)
         .tint(palette.accent)
+        .onChange(of: scenePhase) { if $0 != .active { stopPreview() } }
+        .onChange(of: starting) { if $0 { stopPreview() } }
+        .onDisappear { stopPreview() }
         .sheet(isPresented: $showAppearance) { StudioThemePicker() }
         .sheet(isPresented: $showSounds) {
             soundsSheet
@@ -140,7 +147,7 @@ struct StartOverlayView: View {
                 Text("handstrudel")
                     .font(.subheadline.monospaced().weight(.semibold))
                 Spacer()
-                Button { showAppearance = true } label: {
+                Button { stopPreview(); showAppearance = true } label: {
                     Image(systemName: "paintpalette")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(palette.accent)
@@ -166,15 +173,9 @@ struct StartOverlayView: View {
 
     private var heroCard: some View {
         VStack(spacing: 0) {
-            SoundArtwork(instrument: engine.selectedSoundFontInstrument, key: engine.selectedKey,
-                         scale: engine.selectedScale, progression: engine.chordMelodyProgression)
-                .frame(height: 225)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Sound artwork")
-                .accessibilityValue("\(engine.selectedSoundFontInstrument.name), \(engine.selectedKey.rawValue) \(engine.selectedScale.rawValue), \(engine.chordMelodyProgression.name)")
-                .accessibilityIdentifier("sound-artwork")
+            instrumentBrowser
             Rectangle().fill(palette.border).frame(height: 1)
-            Button { showSounds = true } label: {
+            Button { stopPreview(); showSounds = true } label: {
                 HStack(spacing: 14) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(engine.selectedSoundFontInstrument.name)
@@ -202,6 +203,123 @@ struct StartOverlayView: View {
         .background(palette.surface)
         .clipShape(RoundedRectangle(cornerRadius: 23))
         .overlay { RoundedRectangle(cornerRadius: 23).strokeBorder(palette.border).allowsHitTesting(false) }
+    }
+
+    private var browsableInstruments: [SoundFontInstrument] {
+        let selected = engine.selectedSoundFontInstrument
+        return SOUNDFONT_INSTRUMENTS.filter {
+            $0 == selected || ($0.packId.map(storeManager.isUnlocked) ?? true)
+        }
+    }
+
+    private var instrumentBrowser: some View {
+        let instruments = browsableInstruments
+        let selected = engine.selectedSoundFontInstrument
+        let index = instruments.firstIndex(of: selected) ?? 0
+        return TabView(selection: Binding(get: { selected.id }, set: { id in
+            if let instrument = instruments.first(where: { $0.id == id }) { selectInstrument(instrument) }
+        })) {
+            ForEach(instruments) { instrument in
+                SoundArtwork(instrument: instrument, key: engine.selectedKey,
+                             scale: engine.selectedScale, progression: engine.chordMelodyProgression)
+                    .tag(instrument.id)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .frame(height: 225)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Sound artwork")
+        .accessibilityValue("\(selected.name), \(engine.selectedKey.rawValue) \(engine.selectedScale.rawValue), \(engine.chordMelodyProgression.name), \(index + 1) of \(instruments.count)")
+        .accessibilityIdentifier("sound-artwork")
+        .accessibilityAdjustableAction { direction in
+            let nextIndex: Int
+            switch direction {
+            case .increment: nextIndex = index + 1
+            case .decrement: nextIndex = index - 1
+            @unknown default: return
+            }
+            guard instruments.indices.contains(nextIndex) else { return }
+            selectInstrument(instruments[nextIndex])
+        }
+        .overlay(alignment: .top) {
+            HStack {
+                Text(previewFailed ? "Preview unavailable" : "‹  Swipe instruments  ›")
+                    .font(.caption2.monospaced().weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(palette.background.opacity(0.9), in: Capsule())
+                    .accessibilityHidden(!previewFailed)
+                    .allowsHitTesting(false)
+                Spacer(minLength: 6)
+                Button {
+                    if isPreviewing { stopPreview() } else { playPreview(selected) }
+                } label: {
+                    Image(systemName: isPreviewing ? "stop.fill" : "speaker.wave.2")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(palette.accent)
+                        .frame(width: 44, height: 44)
+                        .background(palette.background.opacity(0.92), in: Circle())
+                        .overlay { Circle().strokeBorder(palette.border) }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isPreviewing ? "Stop instrument preview" : "Preview instrument")
+                .accessibilityIdentifier("studio-instrument-preview")
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+        }
+        .disabled(starting)
+    }
+
+    private func selectInstrument(_ instrument: SoundFontInstrument) {
+        guard instrument != engine.selectedSoundFontInstrument else { return }
+        stopPreview()
+        engine.selectedSoundFontInstrument = instrument
+        playPreview(instrument)
+    }
+
+    private func playPreview(_ instrument: SoundFontInstrument) {
+        guard !engine.isRunning, !starting else { return }
+        stopPreview()
+        previewFailed = false
+        let notes = SoundArtworkVoice.previewNotes(key: engine.selectedKey, scale: engine.selectedScale,
+                                                   progression: engine.chordMelodyProgression)
+        isPreviewing = true
+        preview = Task { @MainActor in
+            // Let another swipe cancel before loading the sampler.
+            do {
+                try await Task.sleep(for: .milliseconds(120))
+                #if DEBUG
+                let skipAudio = ProcessInfo.processInfo.arguments.contains("--uitesting")
+                #else
+                let skipAudio = false
+                #endif
+                if !skipAudio {
+                    guard engine.soundFontEngine.startIfNeeded(program: instrument.program) else {
+                        previewFailed = true
+                        stopPreview()
+                        return
+                    }
+                    engine.soundFontEngine.setInstrument(program: instrument.program)
+                }
+                for (i, note) in notes.enumerated() {
+                    try Task.checkCancellation()
+                    if !skipAudio { engine.soundFontEngine.noteOn(voice: "studio-preview", midi: note, velocity: 0.7) }
+                    try await Task.sleep(for: .milliseconds(i == notes.count - 1 ? 570 : 250))
+                }
+                stopPreview()
+            } catch {
+                // The caller already released the preview voice when cancelling.
+            }
+        }
+    }
+
+    private func stopPreview() {
+        preview?.cancel()
+        preview = nil
+        isPreviewing = false
+        engine.soundFontEngine.hardStop(voice: "studio-preview")
+        engine.soundFontEngine.releaseTemporaryVoice("studio-preview")
     }
 
     private var instrumentChip: some View {
@@ -283,7 +401,7 @@ struct StartOverlayView: View {
                 .frame(minHeight: 54)
                 .accessibilityElement(children: .combine)
             } else {
-                Button(action: onStart) {
+                Button { stopPreview(); onStart() } label: {
                     HStack {
                         Text("Start playing")
                         Spacer()
@@ -392,6 +510,14 @@ struct SoundArtworkVoice {
     let lines: Int
     let envelope: Double
     let spread: Double
+
+    static func previewNotes(key: MusicKey, scale: Scale, progression: ChordProgression) -> [Int] {
+        guard progression.id != "free", let degree = progression.degrees.first else {
+            return Array(scaleNotesOneOctave(key: key, scale: scale).prefix(4))
+        }
+        let chord = chordNotes(key: key, scale: scale, degree: degree)
+        return chord + chord.prefix(1).map { $0 + 12 }
+    }
 
     init(_ instrument: SoundFontInstrument) {
         program = Double(instrument.program)

@@ -67,7 +67,7 @@ function CreatorView({ handle }: { handle: string }) {
       {isCreatorHandle(handle) && state.status === "ready" ? (
         <>
           <div className="watch-heading creator-heading">
-            <div className="creator-monogram" aria-hidden="true">{state.creator.username[0].toUpperCase()}</div>
+            <CreatorAvatar key={state.creator.avatar_key} creator={state.creator} />
             <div>
               <p>{state.creator.display_name ? `@${state.creator.username}` : "HandStrudel creator"}</p>
               <h1>{state.creator.display_name || `@${state.creator.username}`}</h1>
@@ -105,5 +105,17 @@ function CreatorView({ handle }: { handle: string }) {
         </div>
       )}
     </main>
+  );
+}
+
+function CreatorAvatar({ creator }: { creator: PublicCreator }) {
+  const [failed, setFailed] = useState(false);
+  const src = creator.avatar_key ? mediaURL(creator.avatar_key) : undefined;
+  return (
+    <div className="creator-monogram" aria-hidden="true">
+      {creator.username[0].toUpperCase()}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {src && !failed && <img src={src} alt="" onError={() => setFailed(true)} />}
+    </div>
   );
 }

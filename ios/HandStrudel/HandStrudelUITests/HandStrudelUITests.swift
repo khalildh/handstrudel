@@ -242,6 +242,18 @@ final class HandStrudelUITests: XCTestCase {
         selectPiano("electric_piano_1")
         XCTAssertTrue((artwork.value as? String)?.hasPrefix("Rhodes EP,") == true)
         XCTAssertNotEqual(artwork.screenshot().pngRepresentation, before)
+        let left = artwork.coordinate(withNormalizedOffset: CGVector(dx: 0.18, dy: 0.55))
+        let right = artwork.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.55))
+        left.press(forDuration: 0.05, thenDragTo: right)
+        XCTAssertTrue((artwork.value as? String)?.hasPrefix("Grand Piano,") == true)
+        XCTAssertEqual(changeSound.value as? String, "Grand Piano")
+        let preview = app.buttons["studio-instrument-preview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 3))
+        if preview.label == "Stop instrument preview" { preview.tap() }
+        preview.tap()
+        XCTAssertEqual(preview.label, "Stop instrument preview")
+        preview.tap()
+        XCTAssertEqual(preview.label, "Preview instrument")
     }
 
     func testCommentNotificationOpensVideoAndThenTheExactReply() throws {
@@ -360,6 +372,45 @@ final class HandStrudelUITests: XCTestCase {
 
     func testAccountProfileEditsDisplayNameAndKeepsEmptyState() throws {
         try launchWithProfileFixture()
+        signInToProfile()
+        let edit = app.buttons["Edit profile"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 12))
+        edit.tap()
+        let name = app.textFields["Display name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["profile-choose-photo"].exists)
+        name.tap()
+        let previous = (name.value as? String) ?? ""
+        let edited = previous == "Night Studio" ? "Dawn Studio" : "Night Studio"
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count) + edited)
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts[edited].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No performances yet"].waitForExistence(timeout: 5))
+        captureIfRequested("Account-Artist")
+        app.buttons["Make music"].tap()
+        XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
+    }
+
+    func testProfileCanRemoveExistingPhoto() throws {
+        try launchWithProfileFixture()
+        signInToProfile()
+        let edit = app.buttons["Edit profile"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 12))
+        edit.tap()
+        let remove = app.buttons["Remove photo"]
+        guard remove.waitForExistence(timeout: 3) else { throw XCTSkip("Requires an existing fixture photo.") }
+        remove.tap()
+        let confirm = app.buttons.matching(identifier: "profile-confirm-remove-photo").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        confirm.tap()
+        app.buttons["Save"].tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        edit.tap()
+        XCTAssertTrue(app.buttons["profile-choose-photo"].waitForExistence(timeout: 5))
+        XCTAssertFalse(remove.exists)
+    }
+
+    private func signInToProfile() {
         element("tab-account").tap()
         let emailPrompt = app.buttons["Sign in"]
         if emailPrompt.waitForExistence(timeout: 2) {
@@ -376,21 +427,6 @@ final class HandStrudelUITests: XCTestCase {
             code.typeText("123456")
             app.buttons["verify-sign-in-code"].tap()
         }
-        let edit = app.buttons["Edit profile"]
-        XCTAssertTrue(edit.waitForExistence(timeout: 12))
-        edit.tap()
-        let name = app.textFields["Display name"]
-        XCTAssertTrue(name.waitForExistence(timeout: 5))
-        name.tap()
-        let previous = (name.value as? String) ?? ""
-        let edited = previous == "Night Studio" ? "Dawn Studio" : "Night Studio"
-        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count) + edited)
-        app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts[edited].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["No performances yet"].waitForExistence(timeout: 5))
-        captureIfRequested("Account-Artist")
-        app.buttons["Make music"].tap()
-        XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
     }
 
     private func launchWithProfileFixture() throws {

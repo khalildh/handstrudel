@@ -35,6 +35,7 @@ export interface PublicComment {
 export interface PublicCreator {
   username: string;
   display_name: string | null;
+  avatar_key?: string | null;
 }
 
 export const COMMENT_PAGE_SIZE = 20;
@@ -76,10 +77,11 @@ export function creatorHref(handle: string) {
 export async function loadPublicCreator(handle: string, signal?: AbortSignal): Promise<PublicCreator | null> {
   if (!isCreatorHandle(handle)) return null;
   const options: RequestInit = { headers: { apikey: publicKey }, signal, cache: "no-store" };
-  const params = new URLSearchParams({ select: "username,display_name", username: `eq.${handle}`, limit: "1" });
+  const params = new URLSearchParams({ username: `eq.${handle}`, limit: "1" });
   let response = await fetch(new URL(`/rest/v1/public_creators?${params}`, feedBase), options);
   if (response.status === 404) {
     // Older deployments expose creator names on visible feed rows.
+    params.set("select", "username,display_name,avatar_key");
     response = await fetch(new URL(`/rest/v1/feed_videos?${params}`, feedBase), options);
   }
   if (!response.ok) throw new Error("Couldn't load the creator.");

@@ -744,7 +744,7 @@ private struct PublicCreatorView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     if let creator {
                         CreatorProfileHeader(username: creator.username, displayName: creator.displayName,
-                                             avatarKey: videos.first?.avatarKey, counts: counts,
+                                             avatarKey: creator.avatarKey ?? videos.first?.avatarKey, counts: counts,
                                              isOwner: auth.userId == creatorId) {
                             if auth.userId != creatorId {
                                 Button(action: changeFollow) {
