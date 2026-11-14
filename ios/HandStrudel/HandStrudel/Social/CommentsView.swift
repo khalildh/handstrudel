@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct CommentsView: View {
+    @Environment(\.studioPalette) private var palette
     let video: Video
     let targetComment: UUID?
     @ObservedObject var auth: AuthManager
@@ -21,6 +22,7 @@ struct CommentsView: View {
     @State private var rootOffset = 0
     @State private var replyOffsets: [UUID: Int] = [:]
     @State private var enabled: Bool
+    @State private var pendingLikes: Set<UUID> = []
 
     init(video: Video, auth: AuthManager, targetComment: UUID? = nil, onBlock: @escaping (UUID) -> Void = { _ in }) {
         self.video = video
@@ -46,9 +48,9 @@ struct CommentsView: View {
                 .font(.footnote)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 8)
-                .background(StudioStyle.surface)
+                .background(palette.surface)
             } else if let notice {
-                Text(notice).font(.footnote).foregroundStyle(StudioStyle.accent).padding(8)
+                Text(notice).font(.footnote).foregroundStyle(palette.accent).padding(8)
             }
             thread
             if enabled {
@@ -57,9 +59,9 @@ struct CommentsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(StudioStyle.background.ignoresSafeArea())
-        .foregroundStyle(StudioStyle.ink)
-        .tint(StudioStyle.accent)
+        .background(palette.background.ignoresSafeArea())
+        .foregroundStyle(palette.ink)
+        .tint(palette.accent)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(busy)
@@ -114,7 +116,7 @@ struct CommentsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Comments").font(.system(.title2, design: .serif)).accessibilityAddTraits(.isHeader)
                 if let creator = video.username {
-                    Text("Performance by @\(creator)").font(.caption).foregroundStyle(StudioStyle.muted)
+                    Text("Performance by @\(creator)").font(.caption).foregroundStyle(palette.muted)
                 }
             }
             Spacer()
@@ -140,7 +142,7 @@ struct CommentsView: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark").font(.system(size: 13, weight: .semibold))
                     .frame(width: 44, height: 44)
-                    .background(StudioStyle.surface, in: Circle())
+                    .background(palette.surface, in: Circle())
             }
             .accessibilityLabel("Close comments")
             .disabled(busy)
@@ -215,9 +217,9 @@ struct CommentsView: View {
 
     private func empty(_ title: String, detail: String) -> some View {
         VStack(spacing: 7) {
-            Image(systemName: "bubble.left.and.bubble.right").font(.title2).foregroundStyle(StudioStyle.accent)
+            Image(systemName: "bubble.left.and.bubble.right").font(.title2).foregroundStyle(palette.accent)
             Text(title).font(.headline)
-            Text(detail).font(.subheadline).foregroundStyle(StudioStyle.muted)
+            Text(detail).font(.subheadline).foregroundStyle(palette.muted)
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
@@ -229,16 +231,16 @@ struct CommentsView: View {
             Text(String(comment.username.prefix(1)).uppercased())
                 .font(.caption.bold())
                 .frame(width: 32, height: 32)
-                .background(StudioStyle.surface, in: Circle())
+                .background(palette.surface, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
                     Text("@\(comment.username)").font(.caption.bold())
                     if comment.userId == video.userId {
-                        Text("Creator").font(.caption2.weight(.semibold)).foregroundStyle(StudioStyle.accent)
+                        Text("Creator").font(.caption2.weight(.semibold)).foregroundStyle(palette.accent)
                     }
                     Spacer()
-                    Text(comment.createdAt, style: .relative).font(.caption2).foregroundStyle(StudioStyle.muted)
+                    Text(comment.createdAt, style: .relative).font(.caption2).foregroundStyle(palette.muted)
                 }
                 Text(verbatim: comment.body).font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
                 Button("Reply") {
@@ -246,29 +248,79 @@ struct CommentsView: View {
                     replyTarget = root
                     if canPost { composerFocused = true }
                 }
-                .font(.caption.weight(.semibold)).foregroundStyle(StudioStyle.muted)
+                .font(.caption.weight(.semibold)).foregroundStyle(palette.muted)
                 .padding(.vertical, 4)
             }
-            Menu {
-                if comment.userId == auth.userId || isOwner {
-                    Button("Delete comment", systemImage: "trash", role: .destructive) { action = .delete(comment) }
+            VStack(spacing: 0) {
+                if let count = comment.likeCount {
+                    likeButton(comment, count: count)
                 }
-                if comment.userId != auth.userId {
-                    Button("Report comment", systemImage: "flag") {
-                        if canPost { action = .report(comment) } else { showSignIn = true }
-                    }
-                    Button("Block @\(comment.username)", systemImage: "hand.raised", role: .destructive) {
-                        if canPost { action = .block(comment) } else { showSignIn = true }
-                    }
-                }
-            } label: {
-                Image(systemName: "ellipsis").frame(width: 44, height: 44).foregroundStyle(StudioStyle.muted)
+                commentMenu(comment)
             }
-            .accessibilityLabel("Options for comment by @\(comment.username)")
         }
         .padding(4)
         .background {
-            if highlightedComment == comment.id { StudioStyle.accent.opacity(0.10) }
+            if highlightedComment == comment.id { palette.accent.opacity(0.10) }
+        }
+    }
+
+    private func commentMenu(_ comment: VideoComment) -> some View {
+        Menu {
+            if comment.userId == auth.userId || isOwner {
+                Button("Delete comment", systemImage: "trash", role: .destructive) { action = .delete(comment) }
+            }
+            if comment.userId != auth.userId {
+                Button("Report comment", systemImage: "flag") {
+                    if canPost { action = .report(comment) } else { showSignIn = true }
+                }
+                Button("Block @\(comment.username)", systemImage: "hand.raised", role: .destructive) {
+                    if canPost { action = .block(comment) } else { showSignIn = true }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis").frame(width: 44, height: 44).foregroundStyle(palette.muted)
+        }
+        .accessibilityLabel("Options for comment by @\(comment.username)")
+    }
+
+    private func likeButton(_ comment: VideoComment, count: Int) -> some View {
+        let liked = comment.likedByMe == true
+        return Button { toggleLike(comment) } label: {
+            VStack(spacing: 2) {
+                Image(systemName: liked ? "heart.fill" : "heart").font(.subheadline.weight(.semibold))
+                Text(count.formatted(.number.notation(.compactName))).font(.caption2.monospacedDigit())
+            }
+            .foregroundStyle(liked ? palette.recording : palette.muted)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(pendingLikes.contains(comment.id) || loading)
+        .accessibilityLabel(liked ? "Unlike comment by @\(comment.username)" : "Like comment by @\(comment.username)")
+        .accessibilityValue(count == 1 ? "1 like" : "\(count) likes")
+        .accessibilityIdentifier("comment-like-\(comment.id.uuidString.lowercased())")
+    }
+
+    private func toggleLike(_ comment: VideoComment) {
+        guard enabled, let viewer = auth.userId else { showSignIn = true; return }
+        guard pendingLikes.insert(comment.id).inserted else { return }
+        let liked = comment.likedByMe != true
+        errorMessage = nil
+        Task {
+            defer { pendingLikes.remove(comment.id) }
+            do {
+                try await FeedService.setCommentLiked(liked, comment: comment.id, user: viewer)
+                guard auth.userId == viewer else { return }
+                // Update the displayed row, which may have refreshed while the request was in flight.
+                if let parent = comment.parentId, let index = replies[parent]?.firstIndex(where: { $0.id == comment.id }) {
+                    replies[parent]?[index].applyLike(liked)
+                } else if let index = roots.firstIndex(where: { $0.id == comment.id }) {
+                    roots[index].applyLike(liked)
+                }
+            } catch {
+                guard auth.userId == viewer else { return }
+                errorMessage = (error as? SocialError)?.localizedDescription ?? "Couldn't update this like. Try again."
+            }
         }
     }
 
@@ -280,22 +332,22 @@ struct CommentsView: View {
                     Spacer()
                     Button("Cancel reply", systemImage: "xmark") { self.replyTarget = nil }.labelStyle(.iconOnly)
                 }
-                .foregroundStyle(StudioStyle.muted)
+                .foregroundStyle(palette.muted)
             }
             if canPost {
                 HStack(alignment: .bottom, spacing: 9) {
                     TextField(replyTarget == nil ? "Add a comment…" : "Write a reply…", text: $draft, axis: .vertical)
                         .lineLimit(1...4)
                         .padding(11)
-                        .background(StudioStyle.surface, in: RoundedRectangle(cornerRadius: 16))
+                        .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
                         .focused($composerFocused)
                         .accessibilityIdentifier("comment-text")
                     Button(action: submit) {
                         Image(systemName: "arrow.up")
                             .font(.body.weight(.bold))
                             .frame(width: 44, height: 44)
-                            .foregroundStyle(StudioStyle.background)
-                            .background(StudioStyle.accent, in: Circle())
+                            .foregroundStyle(palette.onAccent)
+                            .background(palette.accent, in: Circle())
                     }
                     .disabled(busy || !VideoComment.isValidBody(draft))
                     .opacity(VideoComment.isValidBody(draft) ? 1 : 0.45)
@@ -304,7 +356,7 @@ struct CommentsView: View {
                 if draft.unicodeScalars.count > 250 {
                     Text("\(draft.unicodeScalars.count)/\(VideoComment.maxLength)")
                         .font(.caption2.monospacedDigit())
-                        .foregroundStyle(VideoComment.isValidBody(draft) ? StudioStyle.muted : StudioStyle.recording)
+                        .foregroundStyle(VideoComment.isValidBody(draft) ? palette.muted : palette.recording)
                 }
             } else {
                 Button("Sign in to comment", systemImage: "bubble.left") { showSignIn = true }

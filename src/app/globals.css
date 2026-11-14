@@ -110,6 +110,7 @@
 .watch-caption h2, .watch-list h2 { font-size: 16px; }
 .watch-caption p, .watch-state p { font-size: 14px; line-height: 1.5; }
 .watch-sound-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+@media (pointer: fine) { .watch-open-ios { display: none; } }
 .watch-comments, .watch-comments-note { border-top: 1px solid var(--watch-line); padding: 15px 18px; }
 .watch-comments summary { cursor: pointer; font-weight: 600; }
 .watch-comments > summary span { margin-inline-start: 6px; color: var(--watch-muted); }
@@ -120,6 +121,7 @@
 .watch-comment-list p { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .watch-comment-replies { margin: 8px 0 0 12px; border-left: 1px solid var(--watch-line); padding-left: 12px; }
 .watch-comment-replies summary, .watch-comments-note { color: var(--watch-muted); font-size: 13px; }
+.watch-comments-note-inline { color: var(--watch-muted); font-size: 12px; }
 .watch-caption span, .watch-list p, .watch-footer a { color: var(--watch-muted); font-size: 12px; }
 
 .watch-state {
@@ -139,6 +141,20 @@
 .watch-state button { background: none; border: 0; cursor: pointer; text-decoration: underline; }
 .watch-list { display: grid; gap: 9px; }
 .watch-list h2 { margin: 5px 0 8px; }
+.watch-search { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; max-width: 540px; }
+.watch-search input {
+  flex: 1 1 185px;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--watch-line);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--watch-surface);
+  color: var(--watch-ink);
+  font: inherit;
+}
+.watch-search input::placeholder { color: var(--watch-muted); }
+.watch-search-hint { margin: -6px 0 14px; color: var(--watch-muted); font-size: 13px; }
 
 .watch-clip {
   display: grid;
@@ -163,6 +179,29 @@
 .watch-clip-text { display: grid; min-width: 0; gap: 5px; font-size: 12px; }
 .watch-clip-text > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .watch-clip-text span, .watch-clip small { color: var(--watch-muted); }
+.watch-author { display: inline-flex; align-items: center; gap: 8px; color: var(--watch-ink); text-underline-offset: 4px; }
+.watch-author span { color: var(--left); }
+.watch-clip-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 5px; }
+.watch-clip-profile { display: grid; place-items: center; min-width: 48px; padding: 6px; color: var(--watch-ink); font-size: 11px; text-underline-offset: 3px; }
+.watch-author:hover, .watch-clip-profile:hover { color: var(--left); }
+.creator-heading { display: flex; align-items: center; gap: clamp(12px, 3vw, 26px); overflow-wrap: anywhere; }
+.creator-heading p { margin-bottom: 6px; color: var(--watch-muted); font-size: 13px; }
+.creator-monogram {
+  display: grid; place-items: center; flex: 0 0 clamp(50px, 10vw, 92px); aspect-ratio: 1;
+  border: 1px solid var(--watch-line); border-radius: 24%; color: var(--left);
+  background: repeating-linear-gradient(150deg, #193126 0 9px, #17291f 10px 18px);
+  font: 400 clamp(26px, 5vw, 51px)/1 Georgia, serif;
+}
+.creator-performances { border-top: 1px solid var(--watch-line); padding-top: 18px; }
+.creator-performances h2 { margin: 0 0 12px; font-size: 16px; }
+.creator-performances > p { margin: 12px 0; color: var(--watch-muted); font-size: 14px; }
+.creator-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(132px, 100%), 1fr)); gap: 14px; margin-bottom: 18px; }
+.creator-clip { display: grid; align-content: start; border: 1px solid var(--watch-line); border-radius: 12px; overflow: hidden; color: var(--watch-ink); background: var(--watch-surface); text-decoration: none; }
+.creator-clip:hover { border-color: var(--left); }
+.creator-clip img { display: block; width: 100%; aspect-ratio: 9 / 15; object-fit: cover; background: #0b120e; }
+.creator-clip div { display: flex; justify-content: space-between; gap: 6px; padding: 10px; font-size: 12px; }
+.creator-clip strong { line-height: 1.4; overflow-wrap: anywhere; }
+.creator-clip small { color: var(--watch-muted); white-space: nowrap; }
 .watch-footer { margin-top: 24px; border-bottom: 0; border-top: 1px solid var(--watch-line); justify-content: flex-start; flex-wrap: wrap; }
 
 @media (max-width: 720px) {

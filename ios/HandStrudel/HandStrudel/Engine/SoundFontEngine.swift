@@ -11,9 +11,8 @@ import AudioToolbox
 /// offline, with proper multi-velocity samples.
 ///
 /// ## Voices and channels
-/// Each logical voice (the three sustained chord-pad notes and the melody
-/// note) is assigned its own MIDI channel so that turning one note off never
-/// silences another that happens to share the same pitch. One-shot accents and
+/// Overlapping sustained voices on the same pitch use separate MIDI channels
+/// so releasing one finger doesn't silence another. One-shot accents and
 /// auto-strum hits go out on a dedicated channel and stop themselves after a
 /// short duration.
 ///
@@ -40,13 +39,10 @@ final class SoundFontEngine {
 
     // MARK: - Voice → channel routing
 
-    /// Sustained voices each own a channel so independent note-offs don't
-    /// collide. Channels 0–6 are reserved for sustained voices; one-shots use
-    /// channel 8 (avoiding 9, the GM percussion channel).
+    private static let sustainedChannels: [UInt8] = (0...15).filter { $0 != 8 && $0 != 9 }
     private var voiceChannels: [String: UInt8] = [:]
     private var activeNotes: [String: (midi: UInt8, channel: UInt8)] = [:]
     private var voiceVelocity: [String: UInt8] = [:]
-    private var nextChannel: UInt8 = 0
     private let oneShotChannel: UInt8 = 8
 
     // GM "melodic" bank selectors used by loadSoundBankInstrument.
@@ -60,7 +56,14 @@ final class SoundFontEngine {
     /// real work. Returns `true` once audio is ready.
     @discardableResult
     func startIfNeeded(program: UInt8) -> Bool {
-        if isAvailable { return true }
+        if isAvailable {
+            if !engine.isRunning {
+                allNotesOff()
+                do { try engine.start() }
+                catch { log("engine restart failed: \(error)"); return false }
+            }
+            return true
+        }
 
         guard let url = Self.locateSoundFont() else {
             log("no .sf2 found in bundle — SoundFont mode will be silent")
@@ -82,11 +85,13 @@ final class SoundFontEngine {
         }
         #endif
 
-        engine.attach(sampler)
-        engine.connect(sampler, to: engine.mainMixerNode, format: nil)
+        if !engine.attachedNodes.contains(sampler) {
+            engine.attach(sampler)
+            engine.connect(sampler, to: engine.mainMixerNode, format: nil)
+        }
 
         do {
-            try engine.start()
+            if !engine.isRunning { try engine.start() }
         } catch {
             log("engine start failed: \(error)")
             return false
@@ -134,12 +139,12 @@ final class SoundFontEngine {
     /// Start (or re-strike) a sustained voice. `velocity` is 0…1.
     func noteOn(voice: String, midi: Int, velocity: Double) {
         guard isAvailable else { return }
-        let channel = channel(for: voice)
         let note = clampMidi(midi)
         let vel = clampVelocity(velocity)
-        if let active = activeNotes[voice] {
+        if let active = activeNotes.removeValue(forKey: voice) {
             sampler.stopNote(active.midi, onChannel: active.channel)
         }
+        guard let channel = channel(for: voice, note: note) else { return }
         sampler.startNote(note, withVelocity: vel, onChannel: channel)
         activeNotes[voice] = (note, channel)
         voiceVelocity[voice] = vel
@@ -165,11 +170,9 @@ final class SoundFontEngine {
     /// hand disappears — so pad-y instruments (Choir, Strings, synth pads
     /// with 2-4s releases) don't linger and read as "still playing."
     func hardStop(voice: String) {
-        guard isAvailable, let ch = voiceChannels[voice] else { return }
-        if let active = activeNotes[voice] {
-            sampler.stopNote(active.midi, onChannel: active.channel)
-            activeNotes[voice] = nil
-        }
+        guard isAvailable, let active = activeNotes.removeValue(forKey: voice) else { return }
+        let ch = active.channel
+        sampler.stopNote(active.midi, onChannel: ch)
         // CC 120 = All Sound Off. Cuts the envelope tail on this channel
         // regardless of the SF2's release time. CC 123 (All Notes Off)
         // would still respect the release; 120 is the hard variant.
@@ -185,10 +188,10 @@ final class SoundFontEngine {
         guard isAvailable else { return }
         let note = clampMidi(midi)
         if let active = activeNotes[voice], active.midi == note { return }
-        let channel = channel(for: voice)
-        if let active = activeNotes[voice] {
+        if let active = activeNotes.removeValue(forKey: voice) {
             sampler.stopNote(active.midi, onChannel: active.channel)
         }
+        guard let channel = channel(for: voice, note: note) else { return }
         let vel = voiceVelocity[voice] ?? clampVelocity(0.6)
         sampler.startNote(note, withVelocity: vel, onChannel: channel)
         activeNotes[voice] = (note, channel)
@@ -224,15 +227,19 @@ final class SoundFontEngine {
 
     // MARK: - Helpers
 
-    private func channel(for voice: String) -> UInt8 {
-        if let ch = voiceChannels[voice] { return ch }
-        // Use an idle channel first to keep overlapping pitches independent.
-        let busy = Set(activeNotes.values.map(\.channel))
-        let ch = (0..<7).map { (nextChannel + UInt8($0)) % 7 }
-            .first { !busy.contains($0) } ?? nextChannel
-        nextChannel = (ch + 1) % 7
+    private func channel(for voice: String, note: UInt8) -> UInt8? {
+        guard let ch = Self.sustainedChannel(for: note, preferred: voiceChannels[voice], active: Array(activeNotes.values)) else { return nil }
         voiceChannels[voice] = ch
         return ch
+    }
+
+    static func sustainedChannel(for note: UInt8, preferred: UInt8?, active: [(midi: UInt8, channel: UInt8)]) -> UInt8? {
+        let busy = Set(active.map(\.channel))
+        if let preferred, sustainedChannels.contains(preferred), !busy.contains(preferred) { return preferred }
+        if let idle = sustainedChannels.first(where: { !busy.contains($0) }) { return idle }
+        let samePitch = Set(active.filter { $0.midi == note }.map(\.channel))
+        if let preferred, sustainedChannels.contains(preferred), !samePitch.contains(preferred) { return preferred }
+        return sustainedChannels.first { !samePitch.contains($0) }
     }
 
     private func clampMidi(_ midi: Int) -> UInt8 {

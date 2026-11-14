@@ -24,6 +24,7 @@
 		372DDDFE5ECB97237C94192A /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 060174F53A17DCA947630D4A /* ProfileView.swift */; };
 		375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D986625C7BF30952FBAED619 /* OnboardingView.swift */; };
 		380966C71A0162507C985C6C /* StartOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74287CD261130ADF57405FF3 /* StartOverlayView.swift */; };
+		1DD4B16EACBE49959B72A4A0 /* StudioTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DD4B16EACBE49959B72A4A1 /* StudioTheme.swift */; };
 		4E3F10DA602E4A40A107F24B /* RecordingDraftsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */; };
 		39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */; };
 		3A9EDA3981D97A38C0BD9C52 /* MotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60006BC6A28FE1029F6097F /* MotionManager.swift */; };
@@ -160,6 +161,7 @@
 		6C89256347633541234267B8 /* SaveGestureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGestureDetector.swift; sourceTree = "<group>"; };
 		6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverlayView.swift; sourceTree = "<group>"; };
 		74287CD261130ADF57405FF3 /* StartOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartOverlayView.swift; sourceTree = "<group>"; };
+		1DD4B16EACBE49959B72A4A1 /* StudioTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioTheme.swift; sourceTree = "<group>"; };
 		5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDraftsView.swift; sourceTree = "<group>"; };
 		7944BC24ED82EBCC08239937 /* SignInView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelApp.swift; sourceTree = "<group>"; };
@@ -279,6 +281,7 @@
 				D986625C7BF30952FBAED619 /* OnboardingView.swift */,
 				A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */,
 				74287CD261130ADF57405FF3 /* StartOverlayView.swift */,
+				1DD4B16EACBE49959B72A4A1 /* StudioTheme.swift */,
 				5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */,
 				F15B500CE35D9D44107CDAC4 /* StoreView.swift */,
 			);
@@ -617,6 +620,7 @@
 				61F3ED12A7BAB424D09491E8 /* Snippet.swift in Sources */,
 				30EEA2665C3FBD9C4CD3A32A /* SpatialAudioManager.swift in Sources */,
 				380966C71A0162507C985C6C /* StartOverlayView.swift in Sources */,
+				1DD4B16EACBE49959B72A4A0 /* StudioTheme.swift in Sources */,
 				4E3F10DA602E4A40A107F24B /* RecordingDraftsView.swift in Sources */,
 				B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */,
 				1D40AE3AA1F2B1FA4B31CBB2 /* StoreView.swift in Sources */,

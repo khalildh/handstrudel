@@ -239,4 +239,50 @@ final class ChordMelodyModeManagerTests: XCTestCase {
         XCTAssertEqual(m.currentChordDegree, 2,
                        "no chord hand + override cleared = last value sticks")
     }
+
+    func testTouchChordDoesNotEmitCameraPadReleasesWithNoHands() {
+        let m = ChordMelodyModeManager()
+        m.layout = .scale
+        m.touchChordDegree = 2
+        for _ in 0..<30 {
+            let actions = m.tick(hands: HandsState(left: nil, right: nil), chordTones: { _ in [60, 64, 67] }, melodyTones: { _ in [] })
+            XCTAssertTrue(actions.isEmpty, "Touch notes are sustained by their own voices, not by the camera pad")
+        }
+        m.touchChordDegree = nil
+        XCTAssertTrue(m.tick(hands: HandsState(left: nil, right: nil), chordTones: { _ in [60, 64, 67] }, melodyTones: { _ in [] }).isEmpty)
+    }
+
+    func testTouchTakesOverFromCameraPadAndPinchCanResumeAfterRelease() {
+        let m = ChordMelodyModeManager()
+        m.layout = .scale
+        let hand = makeHand(pinchX: 0.22, pinchY: 0.45, pinch: 1)
+        let hands = HandsState(left: hand, right: nil)
+        func tick() -> [ChordMelodyModeManager.Action] {
+            m.tick(hands: hands, chordTones: { _ in [60, 64, 67] }, melodyTones: { _ in [] })
+        }
+        func isPadOn(_ action: ChordMelodyModeManager.Action) -> Bool {
+            if case .padOn = action { return true }
+            return false
+        }
+        XCTAssertTrue((0..<6).flatMap { _ in tick() }.contains(where: isPadOn))
+        m.touchChordDegree = 2
+        m.touchChordMidi = [62, 65, 69, 72]
+        let transition = tick()
+        XCTAssertEqual(transition.count, 1)
+        XCTAssertTrue(transition.contains { if case .padOff = $0 { return true }; return false })
+        for _ in 0..<6 { XCTAssertTrue(tick().isEmpty) }
+        XCTAssertEqual(m.currentChordMidi, [62, 65, 69, 72])
+        m.touchChordDegree = nil
+        XCTAssertTrue((0..<6).flatMap { _ in tick() }.contains(where: isPadOn))
+    }
+
+    @MainActor
+    func testSamplerDoesNotReuseBusyChannelForOverlappingPitch() {
+        let touching: [(midi: UInt8, channel: UInt8)] = [(60, 0), (64, 1), (67, 2), (71, 3)]
+        XCTAssertEqual(SoundFontEngine.sustainedChannel(for: 60, preferred: 0, active: touching), 4)
+        let full: [(midi: UInt8, channel: UInt8)] = (0...15).filter { $0 != 8 && $0 != 9 }.map { ($0 == 0 ? 60 : 64, $0) }
+        XCTAssertEqual(SoundFontEngine.sustainedChannel(for: 60, preferred: 0, active: full), 1)
+        XCTAssertEqual(SoundFontEngine.sustainedChannel(for: 64, preferred: 1, active: full), 0)
+        XCTAssertNil(SoundFontEngine.sustainedChannel(for: 60, preferred: nil, active: full.map { (60, $0.channel) }))
+    }
 }

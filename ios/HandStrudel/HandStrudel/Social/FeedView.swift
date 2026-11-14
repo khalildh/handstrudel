@@ -11,6 +11,7 @@ private enum PerformanceStart {
 /// Full-screen, vertically paged feed of public posts (newest first).
 /// Browsable signed out; liking, following, reporting and blocking need an account.
 struct FeedView: View {
+    @Environment(\.studioPalette) private var palette
     @ObservedObject var auth: AuthManager
     let isActive: Bool
     let onMakeMusic: () -> Void
@@ -29,6 +30,7 @@ struct FeedView: View {
     @State private var creatorVideo: Video?
     @State private var sourceVideo: Video?
     @State private var showSaved = false
+    @State private var showSearch = false
     @State private var challenge: WeeklyChallenge?
     @State private var openChallenge: WeeklyChallenge?
     @State private var pendingStart: PerformanceStart?
@@ -39,17 +41,17 @@ struct FeedView: View {
             if let challenge, !model.followingOnly {
                 Button { openChallenge = challenge } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "waveform").foregroundStyle(StudioStyle.accent)
+                        Image(systemName: "waveform").foregroundStyle(palette.accent)
                         VStack(alignment: .leading, spacing: 3) {
                             Text("WEEKLY PLAY-ALONG").font(.caption2.monospaced().weight(.semibold))
-                                .foregroundStyle(StudioStyle.accent)
+                                .foregroundStyle(palette.accent)
                             Text(verbatim: challenge.title).font(.subheadline.bold()).lineLimit(1)
                         }
                         Spacer()
                         Image(systemName: "chevron.right").font(.caption)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(StudioStyle.surface, in: RoundedRectangle(cornerRadius: 13))
+                    .background(palette.surface, in: RoundedRectangle(cornerRadius: 13))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("weekly-challenge")
@@ -61,7 +63,7 @@ struct FeedView: View {
                     PagedFeed(videos: model.videos, current: $model.current) { video, isCurrent in
                         FeedCell(video: video, isCurrent: isActive && scenePhase == .active && isCurrent
                                  && commenting == nil && !showActivity && creatorVideo == nil && sourceVideo == nil
-                                 && !showSaved && openChallenge == nil,
+                                 && !showSaved && !showSearch && openChallenge == nil,
                                  isMine: video.userId == auth.userId,
                                  isFollowing: model.following.contains(video.userId),
                                  isSaved: model.savedIDs.contains(video.id),
@@ -74,10 +76,7 @@ struct FeedView: View {
                                  comments: { openComments(video) },
                                  creator: { creatorVideo = video },
                                  bookmark: {
-                                     act { uid in
-                                         let saved = try await model.toggleBookmark(video.id, user: uid)
-                                         if let saved { show(saved ? "Saved privately." : "Removed from Saved.") }
-                                     }
+                                     toggleBookmark(video)
                                  },
                                  playAlong: { onPlayAlong(video) },
                                  revokeBacking: {
@@ -88,11 +87,16 @@ struct FeedView: View {
                                      }
                                  },
                                  source: { id in Task { await openSource(id) } })
+                            .environment(\.studioPalette, palette)
+                            .environment(\.colorScheme, .dark)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(StudioStyle.border).allowsHitTesting(false) }
-                    .onChange(of: model.current) { i in
-                        if i >= model.videos.count - 3 { Task { await model.loadMore() } }
+                    .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(palette.border).allowsHitTesting(false) }
+                    .overlay(alignment: .topTrailing) { pageControls.padding(10) }
+                    .onChange(of: model.current) { _ in Task { await model.loadMore() } }
+                    .accessibilityScrollAction { edge in
+                        if edge == .bottom { movePage(by: 1) }
+                        if edge == .top { movePage(by: -1) }
                     }
                 }
                 if let toast {
@@ -107,8 +111,8 @@ struct FeedView: View {
         .padding(.horizontal, 12)
         .padding(.top, 9)
         .padding(.bottom, 10)
-        .background(StudioStyle.background.ignoresSafeArea())
-        .foregroundStyle(StudioStyle.ink)
+        .background(palette.background.ignoresSafeArea())
+        .foregroundStyle(palette.ink)
         .task(id: FeedRefresh(user: auth.userId, following: model.followingOnly)) {
             await model.refresh(user: auth.userId)
             await refreshBadge()
@@ -130,6 +134,12 @@ struct FeedView: View {
             if uid == nil { model.followingOnly = false }
         }
         .sheet(isPresented: $showSignIn) { SignInView(auth: auth, reason: "Sign in to save performances and join the community.") }
+        .sheet(isPresented: $showSearch, onDismiss: resumePerformance) {
+            PostSearchView(auth: auth) { start in
+                pendingStart = start
+                showSearch = false
+            }
+        }
         .sheet(isPresented: $showSaved, onDismiss: resumePerformance) {
             PerformanceLibraryView(kind: .saved, auth: auth,
                                    onRemove: { id in model.removedBookmark(id) }) { start in
@@ -182,6 +192,44 @@ struct FeedView: View {
         } message: { Text("Reports are anonymous. Posts with several reports are hidden while we review them.") }
     }
 
+    private func movePage(by amount: Int) {
+        let target = model.current + amount
+        if model.videos.indices.contains(target) { model.current = target }
+    }
+
+    private var pageControls: some View {
+        HStack(spacing: 0) {
+            if model.videos.count > 1 {
+                pageButton("Previous video", icon: "chevron.up", offset: -1)
+            }
+            Text("\(model.current + 1) / \(model.videos.count)")
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .padding(.horizontal, 8)
+                .frame(minHeight: 28)
+                .accessibilityLabel("Video \(model.current + 1) of \(model.videos.count) loaded")
+                .accessibilityIdentifier("feed-video-position")
+            if model.videos.count > 1 {
+                pageButton("Next video", icon: "chevron.down", offset: 1)
+            }
+        }
+        .foregroundStyle(.white)
+        .background(.black.opacity(0.74), in: Capsule())
+    }
+
+    private func pageButton(_ title: String, icon: String, offset: Int) -> some View {
+        let available = model.videos.indices.contains(model.current + offset)
+        return Button { movePage(by: offset) } label: {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .opacity(available ? 1 : 0.35)
+        }
+        .buttonStyle(.plain)
+        .disabled(!available)
+        .accessibilityLabel(title)
+    }
+
     private func resumePerformance() {
         guard let start = pendingStart else { return }
         pendingStart = nil
@@ -221,6 +269,11 @@ struct FeedView: View {
 
     private var feedActions: some View {
         HStack(spacing: 0) {
+            Button { showSearch = true } label: {
+                Image(systemName: "magnifyingglass").font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Search posts")
+            .accessibilityIdentifier("search-posts")
             Button {
                 requireSignIn { _ in showSaved = true }
             } label: {
@@ -234,10 +287,10 @@ struct FeedView: View {
                 Image(systemName: "bell").font(.system(size: 19, weight: .semibold))
                     .frame(width: 44, height: 44)
                     .overlay(alignment: .topTrailing) {
-                        if unreadActivity { Circle().fill(StudioStyle.accent).frame(width: 7, height: 7).padding(7) }
+                        if unreadActivity { Circle().fill(palette.accent).frame(width: 7, height: 7).padding(7) }
                     }
             }
-            .accessibilityLabel(unreadActivity ? "Activity, unread" : "Activity")
+            .accessibilityLabel(unreadActivity ? "Notifications, unread" : "Notifications")
             .accessibilityIdentifier("activity-inbox")
         }
     }
@@ -247,13 +300,17 @@ struct FeedView: View {
             if model.loading {
                 ProgressView("Loading videos")
             } else {
-                Image(systemName: "play.rectangle").font(.system(size: 40)).foregroundStyle(StudioStyle.accent)
+                Image(systemName: "play.rectangle").font(.system(size: 40)).foregroundStyle(palette.accent)
                 Text(model.error ?? (model.followingOnly ? "No performances from creators you follow yet" : "No performances yet"))
                     .font(.title3.bold()).multilineTextAlignment(.center)
                 if model.followingOnly {
                     if !auth.isSignedIn {
                         Button("Sign in to follow creators") { showSignIn = true }.buttonStyle(StudioActionStyle())
                     } else {
+                        if model.error == nil {
+                            Text("Follow a creator from Latest to see their posts here.")
+                                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        }
                         Button("Browse latest") { model.followingOnly = false }.buttonStyle(StudioActionStyle())
                     }
                 } else if model.error == nil {
@@ -277,6 +334,22 @@ struct FeedView: View {
         requireSignIn { uid in
             Task {
                 do { try await op(uid) } catch { show("Couldn't do that — \(error.localizedDescription)") }
+            }
+        }
+    }
+
+    private func toggleBookmark(_ video: Video) {
+        requireSignIn { uid in
+            Task {
+                do {
+                    if let saved = try await model.toggleBookmark(video.id, user: uid) {
+                        show(saved ? "Saved privately." : "Removed from Saved.")
+                    }
+                } catch let error as FeedService.Unavailable {
+                    show(error.localizedDescription)
+                } catch {
+                    show("Couldn't update Saved. Try again.")
+                }
             }
         }
     }
@@ -363,29 +436,55 @@ final class FeedModel: ObservableObject {
         defer { if request == generation { loading = false } }
         guard !followingOnly || user != nil else { return }
         do {
-            let page = try await FeedService.page(followingOnly: followingOnly)
+            let page = try await fetchPage(followingOnly: followingOnly, user: user)
             guard !Task.isCancelled, request == generation else { return }
             videos = page
             reachedEnd = videos.count < FeedService.pageSize
-            await loadBookmarks(in: page, request: request)
-            await loadFollowing(in: page, request: request)
+            await loadPageDetails(page, request: request)
+            while !Task.isCancelled, request == generation, !reachedEnd, current >= videos.count - 3 {
+                guard (try? await appendPage(request: request)) == true else { break }
+            }
         } catch {
-            if !Task.isCancelled && request == generation { self.error = "Couldn't load the feed. Check your connection." }
+            if !Task.isCancelled && request == generation {
+                self.error = followingOnly ? "Couldn't load posts from creators you follow." : "Couldn't load the feed. Try again."
+            }
         }
     }
 
     func loadMore() async {
-        guard !loading, !reachedEnd, let last = videos.last else { return }
+        guard !loading, !reachedEnd, current >= videos.count - 3 else { return }
         let request = generation
         loading = true
         defer { if request == generation { loading = false } }
-        if let more = try? await FeedService.page(after: last, followingOnly: followingOnly), request == generation {
-            let seen = Set(videos.map(\.id))
-            videos += more.filter { !seen.contains($0.id) }
-            reachedEnd = more.count < FeedService.pageSize
-            await loadBookmarks(in: more, request: request)
-            await loadFollowing(in: more, request: request)
+        while !Task.isCancelled, request == generation, !reachedEnd, current >= videos.count - 3 {
+            guard (try? await appendPage(request: request)) == true else { break }
         }
+    }
+
+    private func appendPage(request: Int) async throws -> Bool {
+        guard let last = videos.last else { return false }
+        let page = try await fetchPage(after: last, followingOnly: followingOnly, user: viewer)
+        guard !Task.isCancelled, request == generation else { return false }
+        let seen = Set(videos.map(\.id))
+        let fresh = page.filter { !seen.contains($0.id) }
+        reachedEnd = page.count < FeedService.pageSize || fresh.isEmpty
+        videos += fresh
+        await loadPageDetails(fresh, request: request)
+        return !fresh.isEmpty
+    }
+
+    private func loadPageDetails(_ page: [Video], request: Int) async {
+        async let bookmarks: Void = loadBookmarks(in: page, request: request)
+        async let follows: Void = loadFollowing(in: page, request: request)
+        _ = await (bookmarks, follows)
+    }
+
+    private func fetchPage(after last: Video? = nil, followingOnly: Bool, user: UUID?) async throws -> [Video] {
+        if followingOnly {
+            guard let user else { return [] }
+            return try await FeedService.followingPage(user: user, after: last)
+        }
+        return try await FeedService.page(after: last)
     }
 
     private func loadFollowing(in page: [Video], request: Int) async {
@@ -486,20 +585,14 @@ final class FeedModel: ObservableObject {
 }
 
 private struct ActivityInboxView: View {
+    @Environment(\.studioPalette) private var palette
     @ObservedObject var auth: AuthManager
     @Environment(\.dismiss) private var dismiss
     @State private var items: [CreatorActivity] = []
-    @State private var target: Destination?
+    @State private var cursor: CreatorActivity?
     @State private var loading = false
-    @State private var opening = false
     @State private var more = false
     @State private var error: String?
-
-    struct Destination: Identifiable {
-        let video: Video
-        let comment: UUID
-        var id: UUID { comment }
-    }
 
     var body: some View {
         NavigationStack {
@@ -510,45 +603,47 @@ private struct ActivityInboxView: View {
                 }
                 if items.isEmpty && error == nil {
                     if loading { ProgressView("Loading activity") }
-                    else { Text("New comments and replies will show up here.").foregroundStyle(.secondary) }
+                    else { Text("New likes, comments, and replies will show up here.").foregroundStyle(.secondary) }
                 }
                 ForEach(items) { item in
-                    Button { Task { await open(item) } } label: {
+                    NavigationLink {
+                        NotificationPerformanceView(item: item, auth: auth) {
+                            if let index = items.firstIndex(where: { $0.id == item.id && $0.timestamp == item.timestamp }) {
+                                items[index].readAt = Date()
+                            }
+                        }
+                    } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: item.kind == .reply ? "arrowshape.turn.up.left" : "bubble.left")
-                                .foregroundStyle(StudioStyle.accent).frame(width: 28)
+                            Image(systemName: item.kind.icon)
+                                .foregroundStyle(item.kind.isLike ? palette.recording : palette.accent).frame(width: 28)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(item.kind == .reply ? "@\(item.username) replied to you" : "@\(item.username) commented on your video")
+                                Text(item.title)
                                     .font(.subheadline.weight(item.readAt == nil ? .bold : .regular))
-                                Text(verbatim: item.body).foregroundStyle(.secondary).lineLimit(2)
+                                if !item.body.isEmpty { Text(verbatim: item.body).foregroundStyle(.secondary).lineLimit(2) }
                                 Text(item.createdAt, style: .relative).font(.caption2).foregroundStyle(.secondary)
                             }
                             Spacer()
                             if item.readAt == nil {
-                                Circle().fill(StudioStyle.accent).frame(width: 7, height: 7)
+                                Circle().fill(palette.accent).frame(width: 7, height: 7)
                                     .accessibilityLabel("Unread")
                             }
                         }
+                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .disabled(opening)
+                    .accessibilityHint(item.commentId == nil ? "Opens the video" : "Opens the video and its comment thread")
+                    .accessibilityIdentifier("notification-performance-row")
                 }
                 if more {
                     Button("Load more activity") { Task { await load(append: true) } }.disabled(loading)
                 }
             }
-            .navigationTitle("Activity")
+            .navigationTitle("Notifications")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .refreshable { await load() }
             .task { await load() }
-            .sheet(item: $target, onDismiss: { Task { await load() } }) { destination in
-                CommentsView(video: destination.video, auth: auth, targetComment: destination.comment) { _ in
-                    Task { await load() }
-                }
-            }
         }
-        .tint(StudioStyle.accent)
+        .tint(palette.accent)
     }
 
     private func load(append: Bool = false) async {
@@ -557,36 +652,73 @@ private struct ActivityInboxView: View {
         error = nil
         defer { loading = false }
         do {
-            let page = try await FeedService.activity(after: append ? items.last : nil)
+            let page = try await FeedService.activity(after: append ? cursor : nil)
             guard !Task.isCancelled else { return }
             if !append { items = [] }
-            items += page
+            let existing = Set(items.map(\.id))
+            items += page.filter { !existing.contains($0.id) }
+            cursor = page.last
             more = page.count == FeedService.activityPageSize
+        } catch let error as FeedService.Unavailable {
+            if !Task.isCancelled { self.error = error.localizedDescription }
         } catch {
-            if !Task.isCancelled { self.error = "Couldn't load your activity." }
+            if !Task.isCancelled { self.error = "Couldn't load notifications. Try again." }
+        }
+    }
+}
+
+private struct NotificationPerformanceView: View {
+    let item: CreatorActivity
+    @ObservedObject var auth: AuthManager
+    let onRead: () -> Void
+    @State private var video: Video?
+    @State private var failed = false
+    @State private var unavailable = false
+    @State private var attempt = 0
+
+    var body: some View {
+        if let video {
+            PerformanceDetail(video: video, auth: auth, notification: item)
+                .task { await markRead() }
+        } else {
+            VStack(spacing: 14) {
+                if unavailable {
+                    Label("This video is no longer available.", systemImage: "play.slash")
+                } else if failed {
+                    Text("Couldn't open the video.")
+                    Button("Try again") { attempt += 1 }
+                } else {
+                    ProgressView("Opening video")
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle("Performance")
+            .navigationBarTitleDisplayMode(.inline)
+            .task(id: attempt) { await load() }
         }
     }
 
-    private func open(_ item: CreatorActivity) async {
-        guard !opening else { return }
-        opening = true
-        defer { opening = false }
+    private func load() async {
+        failed = false
         do {
-            guard let video = try await FeedService.video(id: item.videoId) else {
-                await load()
-                error = "This performance is no longer available."
-                return
-            }
-            target = Destination(video: video, comment: item.commentId)
-            if item.readAt == nil, (try? await FeedService.markActivityRead(item.id)) != nil,
-               let index = items.firstIndex(where: { $0.id == item.id }) {
-                items[index].readAt = Date()
-            }
-        } catch { self.error = "Couldn't open that conversation." }
+            let resolved = try await FeedService.video(id: item.videoId)
+            guard !Task.isCancelled else { return }
+            guard let resolved else { unavailable = true; return }
+            video = resolved
+        } catch {
+            if !Task.isCancelled { failed = true }
+        }
+    }
+
+    private func markRead() async {
+        if item.readAt == nil, (try? await FeedService.markActivityRead(item)) != nil {
+            onRead()
+        }
     }
 }
 
 private struct PublicCreatorView: View {
+    @Environment(\.studioPalette) private var palette
     let creatorId: UUID
     @ObservedObject var auth: AuthManager
     let onFollowChange: () -> Void
@@ -611,7 +743,7 @@ private struct PublicCreatorView: View {
                         HStack(spacing: 12) {
                             Text(String(creator.username.prefix(1)).uppercased())
                                 .font(.title2.bold()).frame(width: 56, height: 56)
-                                .background(StudioStyle.surface, in: Circle())
+                                .background(palette.surface, in: Circle())
                             VStack(alignment: .leading) {
                                 Text(creator.displayName ?? "@\(creator.username)").font(.title2.bold())
                                 if creator.displayName != nil { Text("@\(creator.username)").foregroundStyle(.secondary) }
@@ -627,7 +759,7 @@ private struct PublicCreatorView: View {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
                             ForEach(videos) { video in
                                 Button { opened = video } label: {
-                                    Rectangle().fill(StudioStyle.surface).aspectRatio(9 / 16, contentMode: .fit)
+                                    Rectangle().fill(palette.surface).aspectRatio(9 / 16, contentMode: .fit)
                                         .overlay {
                                             AsyncImage(url: video.thumbURL) { image in image.resizable().scaledToFill() }
                                                 placeholder: { Image(systemName: "play.rectangle") }
@@ -644,11 +776,14 @@ private struct PublicCreatorView: View {
                     } else if error == nil {
                         Text("This profile is unavailable.")
                     }
-                    if let error { Text(error).font(.footnote).foregroundStyle(.secondary) }
+                    if let error {
+                        Text(error).font(.footnote).foregroundStyle(.secondary)
+                        Button("Try again") { Task { await load() } }.disabled(loading || busy)
+                    }
                 }
                 .padding(18)
             }
-            .background(StudioStyle.background)
+            .background(palette.background)
             .navigationTitle("Creator")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
@@ -667,7 +802,7 @@ private struct PublicCreatorView: View {
             }
             .sheet(isPresented: $signIn) { SignInView(auth: auth, reason: "Sign in to follow this creator.") }
         }
-        .tint(StudioStyle.accent)
+        .tint(palette.accent)
     }
 
     private func load() async {
@@ -684,13 +819,17 @@ private struct PublicCreatorView: View {
     }
 
     private func loadVideos(append: Bool = false) async {
+        guard !busy else { return }
         busy = true
+        error = nil
         defer { busy = false }
         do {
             let page = try await FeedService.page(after: append ? videos.last : nil, creator: creatorId)
             guard !Task.isCancelled else { return }
-            if !append { videos = [] }
-            videos += page
+            if append {
+                let loaded = Set(videos.map(\.id))
+                videos += page.filter { !loaded.contains($0.id) }
+            } else { videos = page }
             more = page.count == FeedService.pageSize
         } catch { if !Task.isCancelled { self.error = "Couldn't load performances." } }
     }
@@ -709,7 +848,131 @@ private struct PublicCreatorView: View {
     }
 }
 
+private struct PostSearchView: View {
+    @Environment(\.studioPalette) private var palette
+    @ObservedObject var auth: AuthManager
+    let onStart: (PerformanceStart) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var input = ""
+    @State private var requestID = UUID()
+    @State private var results: [Video] = []
+    @State private var cursor: Video?
+    @State private var busy = false
+    @State private var more = false
+    @State private var failed = false
+    @State private var opened: Video?
+    @State private var afterDismiss: PerformanceStart?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if PostSearch(input) == nil {
+                    Text("Search captions, instruments, or creators. Use @ to search by handle.")
+                        .foregroundStyle(.secondary)
+                } else if results.isEmpty && !busy && !failed {
+                    Text("No matching posts.").foregroundStyle(.secondary)
+                }
+                ForEach(results) { video in
+                    Button { opened = video } label: { PerformanceListRow(video: video) }
+                        .buttonStyle(.plain)
+                }
+                if busy { ProgressView("Searching posts") }
+                if failed {
+                    Text("Couldn't load search results.").foregroundStyle(.secondary)
+                    Button("Try again") { loadNextPage() }
+                } else if more && !busy {
+                    Button("Load more") { loadNextPage() }
+                }
+            }
+            .navigationTitle("Search posts")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $input, placement: .navigationBarDrawer(displayMode: .always), prompt: "Caption, instrument, or creator")
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .onChange(of: input) { _ in reset() }
+            .onChange(of: auth.userId) { _ in reset() }
+            .task(id: requestID) {
+                let id = requestID
+                guard let search = PostSearch(input) else { return }
+                do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
+                await load(search, id: id, after: nil)
+            }
+            .sheet(item: $opened, onDismiss: {
+                if let start = afterDismiss { afterDismiss = nil; onStart(start) }
+            }) { video in
+                CreatorVideoView(video: video, auth: auth, onPlayAlong: { source in
+                    afterDismiss = .backing(source)
+                    opened = nil
+                }, onTrySound: { sound in
+                    afterDismiss = .preset(sound)
+                    opened = nil
+                })
+            }
+        }
+        .tint(palette.accent)
+    }
+
+    private func reset() {
+        results = []
+        cursor = nil
+        more = false
+        failed = false
+        busy = PostSearch(input) != nil
+        requestID = UUID()
+    }
+
+    private func loadNextPage() {
+        guard !busy, let search = PostSearch(input) else { return }
+        busy = true
+        let id = requestID
+        let after = cursor
+        Task { await load(search, id: id, after: after) }
+    }
+
+    private func load(_ search: PostSearch, id: UUID, after: Video?) async {
+        guard requestID == id, !Task.isCancelled else { return }
+        defer { if requestID == id { busy = false } }
+        failed = false
+        do {
+            let page = try await FeedService.page(after: after, search: search)
+            guard requestID == id, !Task.isCancelled else { return }
+            let loaded = Set(results.map(\.id))
+            results += page.filter { !loaded.contains($0.id) }
+            cursor = page.last ?? after
+            more = page.count == FeedService.pageSize
+        } catch {
+            if requestID == id && !Task.isCancelled { failed = true }
+        }
+    }
+}
+
+private struct PerformanceListRow: View {
+    @Environment(\.studioPalette) private var palette
+    let video: Video
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Rectangle().fill(palette.surface)
+                .frame(width: 40, height: 56)
+                .overlay {
+                    AsyncImage(url: video.thumbURL) { image in image.resizable().scaledToFill() }
+                        placeholder: { Image(systemName: "play.rectangle").foregroundStyle(.secondary) }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("@\(video.username ?? "creator")").font(.subheadline.bold())
+                Text(verbatim: video.caption.isEmpty ? video.instrument ?? "Performance" : video.caption)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
 private struct ClipPresetCard: View {
+    @Environment(\.studioPalette) private var palette
     let setup: SoundSetup
     let username: String?
     let onPlay: ((SoundSetup) -> Void)?
@@ -722,7 +985,7 @@ private struct ClipPresetCard: View {
         VStack(alignment: .leading, spacing: 4) {
             Label(title, systemImage: "waveform")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(StudioStyle.accent)
+                .foregroundStyle(palette.mediaAccent)
                 .lineLimit(1)
             Text(setup.presetDetails)
                 .font(.caption)
@@ -733,7 +996,7 @@ private struct ClipPresetCard: View {
                         Label("Play sound", systemImage: "play.fill")
                             .padding(.horizontal, 9)
                             .frame(minHeight: 44)
-                            .background(StudioStyle.accent.opacity(0.17), in: RoundedRectangle(cornerRadius: 9))
+                            .background(palette.mediaAccent.opacity(0.17), in: RoundedRectangle(cornerRadius: 9))
                     }
                     .accessibilityIdentifier("play-clip-preset")
                 }
@@ -753,7 +1016,7 @@ private struct ClipPresetCard: View {
             .buttonStyle(.plain)
         }
         .padding(8)
-        .foregroundStyle(StudioStyle.ink)
+        .foregroundStyle(.white)
         .background(.black.opacity(0.70), in: RoundedRectangle(cornerRadius: 12))
         .onAppear {
             saved = PersistenceManager.shared.loadSetups().contains {
@@ -768,16 +1031,41 @@ struct CreatorVideoView: View {
     @ObservedObject var auth: AuthManager
     var onPlayAlong: ((Video) -> Void)? = nil
     var onTrySound: ((SoundSetup) -> Void)? = nil
-    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            PerformanceDetail(video: video, auth: auth, onPlayAlong: onPlayAlong, onTrySound: onTrySound)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                }
+        }
+    }
+}
+
+private struct PerformanceDetail: View {
+    @Environment(\.studioPalette) private var palette
+    @Environment(\.scenePhase) private var scenePhase
+    let video: Video
+    @ObservedObject var auth: AuthManager
+    var notification: CreatorActivity? = nil
+    var onPlayAlong: ((Video) -> Void)? = nil
+    var onTrySound: ((SoundSetup) -> Void)? = nil
     @State private var player: AVPlayer?
     @State private var showComments = false
 
     var body: some View {
-        NavigationStack {
+        ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 VideoPlayer(player: player)
+                    .aspectRatio(4 / 5, contentMode: .fit)
+                    .frame(maxHeight: 430)
+                    .frame(maxWidth: .infinity)
+                    .background(.black, in: RoundedRectangle(cornerRadius: 16))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .accessibilityIdentifier("performance-video")
                 if !video.caption.isEmpty { Text(verbatim: video.caption) }
+                if let notification { notificationCard(notification) }
                 if let setup = video.soundSetup {
                     ClipPresetCard(setup: setup, username: video.username, onPlay: onTrySound)
                 } else if let instrument = video.instrument {
@@ -787,28 +1075,54 @@ struct CreatorVideoView: View {
                     Button("Play along", systemImage: "waveform.badge.plus") { onPlayAlong(video) }
                         .buttonStyle(StudioActionStyle())
                 }
-                if video.commentsEnabled == true {
-                    Button("Comments", systemImage: "bubble") { showComments = true; player?.pause() }
+                if notification?.commentId == nil && video.commentsEnabled == true {
+                    Button("Comments", systemImage: "bubble", action: openComments)
                         .frame(minHeight: 44)
                 }
             }
             .padding(16)
-            .navigationTitle("@\(video.username ?? "creator")")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) { ShareLink(item: video.watchURL) }
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
-            }
-            .sheet(isPresented: $showComments) { CommentsView(video: video, auth: auth) }
+            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
+        }
+        .background(palette.background.ignoresSafeArea())
+        .foregroundStyle(palette.ink)
+        .navigationTitle("@\(video.username ?? "creator")")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .primaryAction) { ShareLink(item: video.watchURL) } }
+        .sheet(isPresented: $showComments) {
+            CommentsView(video: video, auth: auth, targetComment: notification?.commentId)
         }
         .task { player = AVPlayer(url: video.videoURL) }
         .onChange(of: scenePhase) { if $0 != .active { player?.pause() } }
         .onDisappear { player?.pause() }
-        .tint(StudioStyle.accent)
+        .tint(palette.accent)
+    }
+
+    private func notificationCard(_ item: CreatorActivity) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(item.title, systemImage: item.kind.icon).font(.subheadline.weight(.semibold))
+            if item.commentId != nil {
+                Text(verbatim: item.body).font(.subheadline).foregroundStyle(palette.muted).lineLimit(3)
+                Button(item.kind.commentAction, systemImage: "bubble", action: openComments)
+                    .font(.subheadline.bold())
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("notification-view-comment")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.surface, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func openComments() {
+        player?.pause()
+        showComments = true
     }
 }
 
 private struct PerformanceLibraryView: View {
+    @Environment(\.studioPalette) private var palette
     enum Kind {
         case saved, challenge(WeeklyChallenge)
 
@@ -864,22 +1178,7 @@ private struct PerformanceLibraryView: View {
                         }
                     }
                     ForEach(items) { video in
-                        Button { selected = video } label: {
-                            HStack(spacing: 12) {
-                                AsyncImage(url: video.thumbURL) { image in image.resizable().scaledToFill() }
-                                    placeholder: { Image(systemName: "play.rectangle").foregroundStyle(.secondary) }
-                                    .frame(width: 40, height: 56)
-                                    .background(StudioStyle.surface)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("@\(video.username ?? "creator")").font(.subheadline.bold())
-                                    Text(verbatim: video.caption.isEmpty ? video.instrument ?? "Performance" : video.caption)
-                                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
+                        Button { selected = video } label: { PerformanceListRow(video: video) }
                         .buttonStyle(.plain)
                         .swipeActions {
                             if case .saved = kind {
@@ -910,7 +1209,7 @@ private struct PerformanceLibraryView: View {
                 })
             }
         }
-        .tint(StudioStyle.accent)
+        .tint(palette.accent)
     }
 
     private var emptyMessage: String {
@@ -945,6 +1244,8 @@ private struct PerformanceLibraryView: View {
             let seen = Set(previous.map(\.id))
             items = previous + page.filter { !seen.contains($0.id) }
             more = page.count == FeedService.pageSize
+        } catch let error as FeedService.Unavailable {
+            if !Task.isCancelled { self.error = error.localizedDescription }
         } catch { if !Task.isCancelled { self.error = "Couldn't load performances. Try again." } }
     }
 
@@ -956,6 +1257,8 @@ private struct PerformanceLibraryView: View {
             try await FeedService.setBookmark(false, video: video.id, user: uid)
             items.removeAll { $0.id == video.id }
             onRemove(video.id)
+        } catch let error as FeedService.Unavailable {
+            self.error = error.localizedDescription
         } catch { self.error = "Couldn't remove that performance. Try again." }
     }
 }
@@ -963,6 +1266,7 @@ private struct PerformanceLibraryView: View {
 // MARK: - Cell
 
 private struct FeedCell: View {
+    @Environment(\.studioPalette) private var palette
     let video: Video
     let isCurrent: Bool
     let isMine: Bool
@@ -988,7 +1292,8 @@ private struct FeedCell: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             LoopingPlayer(url: video.videoURL, thumb: video.thumbURL, playing: isCurrent && !paused, muted: muted)
-                .onTapGesture { paused.toggle() }
+                .allowsHitTesting(false)
+            Color.clear.contentShape(Rectangle()).onTapGesture { paused.toggle() }
             LinearGradient(colors: [.clear, .black.opacity(0.88)], startPoint: .center, endPoint: .bottom)
                 .allowsHitTesting(false)
             if paused {
@@ -1011,17 +1316,17 @@ private struct FeedCell: View {
                     } else if let instrument = video.instrument {
                         Label(instrument, systemImage: "waveform")
                             .font(.caption.monospaced())
-                            .foregroundStyle(StudioStyle.accent)
+                            .foregroundStyle(palette.mediaAccent)
                     }
                     if video.backingEnabled == true {
                         Button(action: playAlong) { Label("Play along", systemImage: "waveform.badge.plus") }
                             .font(.caption.weight(.semibold)).buttonStyle(.borderedProminent)
-                            .tint(StudioStyle.accent).foregroundStyle(StudioStyle.background)
+                            .tint(palette.mediaAccent).foregroundStyle(palette.mediaOnAccent)
                             .accessibilityIdentifier("play-along")
                     }
                     if let id = video.sourceVideoId, let username = video.sourceUsername {
                         Button("Inspired by @\(username)") { source(id) }
-                            .font(.caption.weight(.semibold)).foregroundStyle(StudioStyle.accent)
+                            .font(.caption.weight(.semibold)).foregroundStyle(palette.mediaAccent)
                     }
                 }
                 Spacer()
@@ -1029,7 +1334,7 @@ private struct FeedCell: View {
                     Button(action: like) {
                         VStack(spacing: 4) {
                             actionIcon(video.likedByMe == true ? "heart.fill" : "heart",
-                                       tint: video.likedByMe == true ? StudioStyle.recording : .white)
+                                       tint: video.likedByMe == true ? palette.recording : .white)
                             Text("\(video.likeCount)").font(.caption.bold())
                         }
                     }
@@ -1095,8 +1400,8 @@ private struct FeedCell: View {
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 11)
                     .padding(.vertical, 6)
-                    .foregroundStyle(isFollowing ? .white : StudioStyle.background)
-                    .background(isFollowing ? Color.white.opacity(0.16) : StudioStyle.accent, in: Capsule())
+                    .foregroundStyle(isFollowing ? .white : palette.mediaOnAccent)
+                    .background(isFollowing ? Color.white.opacity(0.16) : palette.mediaAccent, in: Capsule())
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -1124,11 +1429,14 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> UICollectionView {
-        let layout = UICollectionViewFlowLayout()
+        let layout = PageLayout()
         layout.scrollDirection = .vertical
         layout.minimumLineSpacing = 0
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.isPagingEnabled = true
+        cv.isDirectionalLockEnabled = true
+        cv.delaysContentTouches = false
+        cv.allowsSelection = false
         cv.showsVerticalScrollIndicator = false
         cv.contentInsetAdjustmentBehavior = .never
         cv.backgroundColor = .black
@@ -1145,19 +1453,40 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         let newIDs = videos.map(\.id)
         if oldIDs != newIDs {
             cv.reloadData()
-            // Pagination appends pages; a removal can move the active video to a new index.
-            if !newIDs.starts(with: oldIDs) {
-                cv.layoutIfNeeded()
-                cv.setContentOffset(CGPoint(x: 0, y: CGFloat(current) * cv.bounds.height), animated: false)
-            }
+            if !newIDs.starts(with: oldIDs) { context.coordinator.align(cv) }
         } else {
+            if !cv.isDragging && !cv.isDecelerating { context.coordinator.align(cv) }
             for case let ip in cv.indexPathsForVisibleItems { context.coordinator.configure(cv.cellForItem(at: ip), at: ip) }
+        }
+    }
+
+    private final class PageLayout: UICollectionViewFlowLayout {
+        override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
+            newBounds.size != collectionView?.bounds.size
+        }
+
+        override func invalidationContext(forBoundsChange newBounds: CGRect) -> UICollectionViewLayoutInvalidationContext {
+            let context = super.invalidationContext(forBoundsChange: newBounds)
+            if let cv = collectionView, cv.bounds.height > 0, newBounds.size != cv.bounds.size {
+                let page = (cv.contentOffset.y / cv.bounds.height).rounded()
+                context.contentOffsetAdjustment.y = page * newBounds.height - cv.contentOffset.y
+                (context as? UICollectionViewFlowLayoutInvalidationContext)?.invalidateFlowLayoutDelegateMetrics = true
+            }
+            return context
         }
     }
 
     final class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
         var parent: PagedFeed
         init(_ parent: PagedFeed) { self.parent = parent }
+
+        func align(_ cv: UICollectionView) {
+            guard parent.videos.indices.contains(parent.current), cv.bounds.height > 0 else { return }
+            let target = CGFloat(parent.current) * cv.bounds.height
+            guard abs(cv.contentOffset.y - target) > 1 else { return }
+            cv.layoutIfNeeded()
+            cv.setContentOffset(CGPoint(x: 0, y: target), animated: false)
+        }
 
         func collectionView(_ cv: UICollectionView, numberOfItemsInSection section: Int) -> Int { parent.videos.count }
 
@@ -1175,10 +1504,13 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         }
 
         func collectionView(_ cv: UICollectionView, layout: UICollectionViewLayout,
-                            sizeForItemAt ip: IndexPath) -> CGSize { cv.bounds.size }
+                            sizeForItemAt ip: IndexPath) -> CGSize {
+            CGSize(width: max(1, cv.bounds.width), height: max(1, cv.bounds.height))
+        }
 
         func scrollViewDidEndDecelerating(_ sv: UIScrollView) {
-            let page = Int((sv.contentOffset.y / max(sv.bounds.height, 1)).rounded())
+            guard !parent.videos.isEmpty else { return }
+            let page = min(parent.videos.count - 1, max(0, Int((sv.contentOffset.y / max(sv.bounds.height, 1)).rounded())))
             if page != parent.current { parent.current = page }
         }
 

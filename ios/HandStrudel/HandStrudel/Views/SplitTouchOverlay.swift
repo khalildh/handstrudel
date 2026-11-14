@@ -4,7 +4,7 @@ import UIKit
 /// Multitouch / drag overlay for the Split chord+melody wheel. Mirrors
 /// `GridTouchOverlay`'s shape: a UIKit-backed view that tracks every active
 /// finger, computes which zone it sits over (chord sub-zone or melody wedge),
-/// fires a one-shot when a touch enters a new zone, and reports the set of
+/// starts a voice when a touch enters a new zone, and reports the set of
 /// currently-touched zones back so the visual overlay can light them up.
 ///
 /// Geometry constants come from `ChordMelodyModeManager`, so the touch math
@@ -12,10 +12,8 @@ import UIKit
 struct SplitTouchOverlay: UIViewRepresentable {
     let zoneCount: Int
     let melodyCount: Int
-    /// Maps a wedge index → scale degree via the active progression. Provided
-    /// by the caller so this view doesn't need to know about progressions.
-    let degreeForZone: (Int) -> Int
     let swapHands: Bool
+    let enabled: Bool
 
     /// Fired when a touch enters a zone — either on touch-begin or after a
     /// drag crosses into a new zone. The voice ID is unique per touch+zone
@@ -37,6 +35,8 @@ struct SplitTouchOverlay: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: SplitTouchUIView, context: Context) {
+        uiView.isUserInteractionEnabled = enabled
+        if !enabled { uiView.scheduleRelease() }
         uiView.zoneCount = zoneCount
         uiView.melodyCount = melodyCount
         uiView.swapHands = swapHands
@@ -48,6 +48,10 @@ struct SplitTouchOverlay: UIViewRepresentable {
         uiView.onActiveMelodyChanged = { lanes in
             DispatchQueue.main.async { self.touchedMelodyLanes = lanes }
         }
+    }
+
+    static func dismantleUIView(_ uiView: SplitTouchUIView, coordinator: ()) {
+        uiView.scheduleRelease()
     }
 }
 
@@ -76,8 +80,6 @@ final class SplitTouchUIView: UIView {
     // Geometry mirrors the visual overlay: outer radius fits the shorter
     // dimension, deadzone is the rest hole, octaveR is the inner-band rim.
     private var outerR: CGFloat { min(bounds.width, bounds.height) / 2 * CGFloat(ChordMelodyModeManager.splitRadiusFraction) }
-    private var deadR: CGFloat  { outerR * CGFloat(ChordMelodyModeManager.splitDeadzone) }
-    private var octaveR: CGFloat { outerR * CGFloat(ChordMelodyModeManager.splitOctaveBandThreshold) }
     private var wheelCenter: CGPoint { CGPoint(x: bounds.width / 2, y: bounds.height / 2) }
 
     /// Per-touch state: (current voice ID, current zone). When a touch is
@@ -88,14 +90,14 @@ final class SplitTouchUIView: UIView {
         var zone: SplitTouchZone?
     }
     private var states: [UITouch: TouchState] = [:]
-    private var nextVoiceCounter: Int = 0
+    private static var nextVoiceCounter: Int = 0
 
-    private var activeChord: Set<ChordSubzone> = []
-    private var activeMelody: Set<Int> = []
+    private let probe = ChordMelodyModeManager()
+    private var releaseScheduled = false
 
     private func allocVoice() -> String {
-        nextVoiceCounter &+= 1
-        return "splittouch-\(nextVoiceCounter)"
+        Self.nextVoiceCounter &+= 1
+        return "splittouch-\(Self.nextVoiceCounter)"
     }
 
     // MARK: - Touch → zone
@@ -115,12 +117,9 @@ final class SplitTouchUIView: UIView {
 
         let chordSide: ChordMelodyModeManager.Side = swapHands ? .right : .left
         let melodySide: ChordMelodyModeManager.Side = swapHands ? .left : .right
-        let probe = ChordMelodyModeManager()
-        probe.zoneDegrees = Array(0..<max(1, zoneCount))   // dummy; we only use the side wedge math
-
         // Chord side?
         if let wedge = probe.splitWedgeIndex(side: chordSide, angle: deg, count: zoneCount) {
-            let oct = probe.splitOctaveShift(side: chordSide, angle: deg, radius: radius, wedgeIndex: wedge)
+            let oct = probe.splitOctaveShift(side: chordSide, angle: deg, radius: radius, wedgeIndex: wedge, count: zoneCount)
             return .chord(ChordSubzone(wedge: wedge, octave: oct))
         }
         // Melody side?
@@ -140,7 +139,6 @@ final class SplitTouchUIView: UIView {
                 let voice = allocVoice()
                 st.voice = voice
                 st.zone = z
-                applyEnterHighlight(z)
                 onZoneEnter?(voice, z)
             }
             states[touch] = st
@@ -150,16 +148,14 @@ final class SplitTouchUIView: UIView {
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
-            var st = states[touch] ?? TouchState()
+            guard var st = states[touch] else { continue }
             let z = zoneForTouch(touch)
             if z == st.zone { continue }
-            // Release the old voice (and highlight) before starting a new one.
-            if let prev = st.zone { applyLeaveHighlight(prev) }
+            // Release the old voice before starting a new one.
             if let v = st.voice { onZoneExit?(v); st.voice = nil }
             if let z {
                 let voice = allocVoice()
                 st.voice = voice
-                applyEnterHighlight(z)
                 onZoneEnter?(voice, z)
             }
             st.zone = z
@@ -170,11 +166,7 @@ final class SplitTouchUIView: UIView {
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
-            if let st = states[touch] {
-                if let prev = st.zone { applyLeaveHighlight(prev) }
-                if let v = st.voice { onZoneExit?(v) }
-            }
-            states.removeValue(forKey: touch)
+            if let voice = states.removeValue(forKey: touch)?.voice { onZoneExit?(voice) }
         }
         emit()
     }
@@ -183,22 +175,29 @@ final class SplitTouchUIView: UIView {
         touchesEnded(touches, with: event)
     }
 
-    private func applyEnterHighlight(_ z: SplitTouchZone) {
-        switch z {
-        case .chord(let sub): activeChord.insert(sub)
-        case .melody(let lane): activeMelody.insert(lane)
-        }
-    }
-
-    private func applyLeaveHighlight(_ z: SplitTouchZone) {
-        switch z {
-        case .chord(let sub): activeChord.remove(sub)
-        case .melody(let lane): activeMelody.remove(lane)
+    func scheduleRelease() {
+        guard !states.isEmpty, !releaseScheduled else { return }
+        releaseScheduled = true
+        DispatchQueue.main.async {
+            self.releaseScheduled = false
+            let voices = self.states.values.compactMap(\.voice)
+            self.states.removeAll()
+            for voice in voices { self.onZoneExit?(voice) }
+            self.emit()
         }
     }
 
     private func emit() {
-        onActiveChordChanged?(activeChord)
-        onActiveMelodyChanged?(activeMelody)
+        var chords: Set<ChordSubzone> = []
+        var melody: Set<Int> = []
+        for state in states.values {
+            switch state.zone {
+            case .chord(let sub): chords.insert(sub)
+            case .melody(let lane): melody.insert(lane)
+            case nil: break
+            }
+        }
+        onActiveChordChanged?(chords)
+        onActiveMelodyChanged?(melody)
     }
 }
