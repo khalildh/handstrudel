@@ -6,6 +6,66 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    #if DEBUG
+    @MainActor
+    func testInventedSoundImportsAndTunesDetunedWAVAndRejectsSilence() throws {
+        let rate = InventedSound.sampleRate
+        let source = (0..<Int(rate / 2)).map { Float(sin(Double($0) * 2 * .pi * 282 / rate) * 0.3) }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(source.count)))
+        buffer.frameLength = buffer.frameCapacity
+        let channel = try XCTUnwrap(buffer.floatChannelData?[0])
+        source.withUnsafeBufferPointer { channel.update(from: $0.baseAddress!, count: $0.count) }
+        do {
+            let wav = try AVAudioFile(forWriting: url, settings: format.settings)
+            try wav.write(from: buffer)
+        }
+        let engine = SoundFontEngine()
+        try engine.loadInventedSound(try InventedSound.imported(from: url).caf, offline: true)
+        defer { engine.clearInventedSound() }
+        engine.noteOn(voice: "note", midi: 60, velocity: 0.8)
+        let samples = try engine.renderInventedSound(frames: 12_000)
+        let root = try XCTUnwrap(InventedSound.detectedPitch(samples, rate: 48_000, offset: 0.06))
+        XCTAssertEqual(root, InventedSound.frequency(midi: 60), accuracy: 1)
+        XCTAssertThrowsError(try InventedSound.tuned(Array(repeating: 0, count: 12_000), rate: rate))
+    }
+
+    @MainActor
+    func testInventedSoundRendersOneNoteAndFourChordPitchesThroughNativeSampler() throws {
+        let variants = try InventedSound.variants(for: "glass kalimba with a soft knock")
+        XCTAssertEqual(variants.count, 2)
+        XCTAssertNotEqual(variants[0].caf, variants[1].caf)
+        let engine = SoundFontEngine()
+        try engine.loadInventedSound(variants[0].caf, offline: true)
+        defer { if engine.isPlayingInventedSound { engine.clearInventedSound() } }
+        engine.noteOn(voice: "note", midi: 60, velocity: 0.8)
+        let samples = try engine.renderInventedSound(frames: 12_000)
+        let root = try XCTUnwrap(InventedSound.detectedPitch(samples, rate: 48_000, offset: 0.06))
+        XCTAssertEqual(root, InventedSound.frequency(midi: 60), accuracy: 2)
+        engine.hardStop(voice: "note")
+        let pitches = [60, 64, 67, 71]
+        for midi in pitches { engine.noteOn(voice: "chord\(midi)", midi: midi, velocity: 0.65) }
+        let chord = try engine.renderInventedSound(frames: 16_000)
+        let window = chord.dropFirst(2400).prefix(12_000)
+        for midi in pitches {
+            let radians = InventedSound.frequency(midi: midi) * 2 * .pi / 48_000
+            var real = 0.0, imaginary = 0.0
+            for (i, value) in window.enumerated() {
+                real += Double(value) * cos(Double(i) * radians)
+                imaginary += Double(value) * sin(Double(i) * radians)
+            }
+            XCTAssertGreaterThan(hypot(real, imaginary) / Double(window.count), 0.003, "MIDI \(midi) should sound")
+        }
+        engine.clearInventedSound()
+        XCTAssertFalse(engine.isPlayingInventedSound)
+        XCTAssertTrue(engine.startIfNeeded(program: 0))
+        try engine.loadInventedSound(variants[1].caf, offline: true)
+        XCTAssertTrue(engine.isPlayingInventedSound)
+    }
+    #endif
+
     func testStudioPreviewFollowsSelectedKeyScaleAndChord() throws {
         let free = try XCTUnwrap(CHORD_PROGRESSIONS.first { $0.id == "free" })
         let secondDegree = try XCTUnwrap(ChordProgression.parse("2 5 1"))

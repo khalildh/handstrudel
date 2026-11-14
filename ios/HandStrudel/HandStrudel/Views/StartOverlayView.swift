@@ -23,6 +23,7 @@ struct StartOverlayView: View {
     let onStart: () -> Void
     let onDrafts: () -> Void
     let onSetups: () -> Void
+    var onInventSound: (() -> Void)? = nil
 
     @State private var showSounds = false
     @State private var showAppearance = false
@@ -42,6 +43,17 @@ struct StartOverlayView: View {
                     heroCard
                     Spacer(minLength: 0)
                     startButton
+                    if let onInventSound {
+                        Button {
+                            stopPreview()
+                            onInventSound()
+                        } label: {
+                            Label("Invent a sound", systemImage: "waveform.badge.plus")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("invent-open")
+                    }
                     HStack {
                         Button(action: onDrafts) {
                             Label("Private drafts", systemImage: "film.stack")

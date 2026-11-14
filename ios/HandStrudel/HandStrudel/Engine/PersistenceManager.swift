@@ -214,7 +214,8 @@ struct SoundSetup: Codable, Equatable {
 
 extension EngineController {
     var currentSoundSetup: SoundSetup? {
-        guard !learnModeEnabled, let mode = SoundSetup.Mode(rawValue: currentModeString) else { return nil }
+        guard !soundFontEngine.isPlayingInventedSound, !learnModeEnabled,
+              let mode = SoundSetup.Mode(rawValue: currentModeString) else { return nil }
         return SoundSetup(instrument: selectedSoundFontInstrument.id, waveform: selectedWaveform,
                           key: selectedKey, scale: selectedScale, progression: chordMelodyProgression.id,
                           customDegrees: chordMelodyProgression.isCustom ? chordMelodyProgression.degrees : nil,

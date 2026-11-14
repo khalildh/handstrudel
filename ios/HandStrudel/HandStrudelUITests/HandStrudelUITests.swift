@@ -384,6 +384,49 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
     }
 
+    func testInventASoundRealLocalAIOnSimulator() throws {
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["HANDSTRUDEL_LOCAL_AUDIO_LAB"] = "1"
+        app.launch()
+        let entry = app.buttons["invent-open"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        if !entry.isHittable { app.swipeUp() }
+        entry.tap()
+        let generate = app.buttons["invent-ai-local"]
+        try XCTSkipUnless(generate.waitForExistence(timeout: 5), "Start the local Stable Audio MLX bridge to run this integration test.")
+        app.buttons["Glass kalimba"].tap()
+        generate.tap()
+        let produced = app.staticTexts["New sounds"]
+        XCTAssertTrue(produced.waitForExistence(timeout: 100), "No playable sample appeared. Labels: \(app.staticTexts.allElementsBoundByIndex.map(\.label))")
+        if !produced.isHittable { app.swipeUp() }
+        let play = app.buttons["invent-play"].firstMatch
+        if !play.isHittable { app.swipeUp() }
+        play.tap()
+        XCTAssertTrue(element("invent-session").waitForExistence(timeout: 10))
+    }
+
+    func testInventASoundGeneratesSavesAndOpensPrivateWheel() {
+        app.launchArguments.append("--uitesting")
+        app.launch()
+        let entry = app.buttons["invent-open"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        if !entry.isHittable { app.swipeUp() }
+        entry.tap()
+        let idea = app.buttons["Glass kalimba"]
+        XCTAssertTrue(idea.waitForExistence(timeout: 5))
+        idea.tap()
+        app.buttons["invent-generate"].tap()
+        let save = app.buttons.matching(identifier: "invent-save").firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 8))
+        save.tap()
+        XCTAssertTrue(app.staticTexts["Private library"].exists)
+        app.buttons.matching(identifier: "invent-play").firstMatch.tap()
+        XCTAssertTrue(element("invent-session").waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["record-button"].exists)
+        app.buttons["close-button"].tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+    }
+
     func testAccountProfileEditsDisplayNameAndKeepsEmptyState() throws {
         try launchWithProfileFixture()
         signInToProfile()
