@@ -1,9 +1,34 @@
 import AVFoundation
+import ImageIO
 import Supabase
+import UIKit
 import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    func testStudioPreviewFollowsSelectedKeyScaleAndChord() throws {
+        let free = try XCTUnwrap(CHORD_PROGRESSIONS.first { $0.id == "free" })
+        let secondDegree = try XCTUnwrap(ChordProgression.parse("2 5 1"))
+        XCTAssertEqual(SoundArtworkVoice.previewNotes(key: .D, scale: .minor, progression: free), [62, 64, 65, 67])
+        XCTAssertEqual(SoundArtworkVoice.previewNotes(key: .C, scale: .major, progression: secondDegree), [50, 53, 57, 62])
+    }
+
+    func testProfilePhotoIsCenteredSquareBoundedJPEG() throws {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1600, height: 800))
+        let png = renderer.pngData { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 1600, height: 800))
+        }
+        let jpeg = try XCTUnwrap(AvatarPhoto.jpeg(from: png))
+        XCTAssertEqual(Array(jpeg.prefix(2)), [0xFF, 0xD8])
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(jpeg as CFData, nil))
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        XCTAssertEqual(image.width, 512)
+        XCTAssertEqual(image.height, 512)
+        XCTAssertLessThanOrEqual(jpeg.count, 384 * 1024)
+        XCTAssertNil(AvatarPhoto.jpeg(from: Data("not an image".utf8)))
+    }
+
     func testReviewMilestonesOnlyCountDistinctSuccessfulTakes() throws {
         var milestones = CreatorReviewMilestones()
         let first = UUID()

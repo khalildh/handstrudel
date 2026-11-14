@@ -16,11 +16,13 @@ a video feed costs.
 - `migrations/20261114030200_match_challenges_to_their_source.sql`: checks that a challenge's own source is publicly visible and opted in.
 - `migrations/20261114040000_comment_likes.sql`: one reaction per account per comment or reply, with public counts and private reaction rows.
 - `migrations/20261114050000_like_notifications.sql`: groups new likes by video, comment, or reply in the private in-app inbox. No historical backfill or push alerts. Older clients keep the comment/reply inbox.
+- `migrations/20261114060000_profile_avatars.sql`: exposes avatar keys on public creator profiles and restricts writes to the server.
 - `tests/database/feed.test.sql`: pgTAP tests for RLS and triggers. Run them with `supabase test db`.
 - `tests/database/comments.test.sql`: pgTAP tests for comment permissions, thread visibility, and moderation.
 - `functions/sign-upload`: presigned R2 PUT URLs for a new post. It checks the caller's JWT and username, limits each user to 20 posts a day, and caps uploads at 15 MB.
 - `functions/delete-video`: deletes one of the caller's own videos and its R2 files.
 - `functions/delete-account`: deletes the caller's R2 files and auth user, and the user's rows cascade. Required by App Store Guideline 5.1.1(v).
+- `functions/profile-avatar`: authenticates photo changes, validates and re-encodes square JPEGs, and replaces or removes the user's public R2 avatar. Deploy the migration and this function before shipping the upload UI. Previously shared avatar URLs may remain in CDN caches until they expire.
 
 ## Local development
 ```bash
@@ -33,7 +35,7 @@ To use the local stack, set `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `MEDIA_BASE_
 
 ## Production setup (one time)
 1. Create the Supabase project, then `supabase link --project-ref <ref>` and `supabase db push`.
-2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload delete-video delete-account`.
+2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload delete-video delete-account profile-avatar`.
 3. Auth providers:
    - **Apple:** add the bundle ID `com.handstrudel.app` as a client ID (native sign-in needs no Services ID or key).
    - **Email:** enable it, and change the "Magic Link" email template to include `{{ .Token }}`, so users get a 6-digit code for the in-app code entry.

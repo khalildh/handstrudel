@@ -32,6 +32,7 @@ let readAt = null;
 let videoLikeReadAt = null;
 let displayName = "Studio Viewer";
 let following = false;
+let avatarKey = process.env.FIXTURE_AVATAR === "1" ? demoThumb : null;
 const liked = new Set();
 const withLikes = (comment) => ({ ...comment, like_count: liked.has(comment.id) ? 1 : 0, liked_by_me: liked.has(comment.id) });
 
@@ -61,8 +62,18 @@ createServer((request, response) => {
         });
         return;
       }
-      return send({ id: viewer, username: "viewer", display_name: displayName, accepted_terms_at: now });
+      return send({ id: viewer, username: "viewer", display_name: displayName, avatar_key: avatarKey, accepted_terms_at: now });
     }
+    case "/functions/v1/profile-avatar":
+      if (request.method === "DELETE") {
+        avatarKey = null;
+        return send({ avatarKey });
+      }
+      if (request.method === "POST" && request.headers["content-type"] === "image/jpeg") {
+        avatarKey = demoThumb;
+        return send({ avatarKey });
+      }
+      return response.writeHead(415).end();
     case "/rest/v1/videos": return send([]);
     case "/rest/v1/follows": {
       if (request.method === "POST" || request.method === "DELETE") {
