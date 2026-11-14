@@ -17,6 +17,10 @@ struct InventSoundView: View {
     @State private var auditioning: UUID?
     @State private var importWAV = false
     @State private var error: String?
+    #if targetEnvironment(simulator)
+    @State private var provider: InventedSound.AudioProvider?
+    private var aiEnabled: Bool { ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_AUDIO_LAB"] == "1" }
+    #endif
 
     private let suggestions = ["Glass kalimba", "Soft wooden mallet", "Bright metallic bell"]
     private var cleaned: String { prompt.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -29,7 +33,7 @@ struct InventSoundView: View {
                         Label("SOUND LAB / PROTOTYPE", systemImage: "waveform")
                             .font(.caption.monospaced().weight(.semibold)).foregroundStyle(palette.accent)
                         Text("Invent a sound").font(.system(.largeTitle, design: .serif))
-                        Text("Describe a tone, hear two variations, then play one on the wheel.")
+                        Text("Describe a tone, hear it, then play it on the wheel.")
                             .font(.subheadline).foregroundStyle(palette.muted)
                         TextField("A glass kalimba with a soft knock", text: $prompt)
                             .padding(12)
@@ -46,30 +50,22 @@ struct InventSoundView: View {
                                 }
                             }
                         }
+                        #if targetEnvironment(simulator)
+                        if aiEnabled { aiControls }
+                        #endif
                         Button {
                             let text = cleaned
                             prepare { try InventedSound.variants(for: text) }
                         } label: {
-                            if busy { ProgressView().tint(palette.onAccent) }
-                            else { Text("Generate two sounds") }
+                            Text("Generate two synth variations")
                         }
                         .buttonStyle(StudioActionStyle())
                         .disabled(cleaned.isEmpty || busy)
                         .opacity(cleaned.isEmpty ? 0.55 : 1)
                         .accessibilityIdentifier("invent-generate")
-                        Text("Local synth prototype. No prompt leaves this device.")
+                        Text("The synth works offline and doesn't use AI.")
                             .font(.footnote).foregroundStyle(palette.muted)
-                        #if targetEnvironment(simulator)
-                        if ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_AUDIO_LAB"] == "1" {
-                            Button("Generate with Stable Audio", systemImage: "sparkles") {
-                                let text = cleaned
-                                prepare { [try await InventedSound.generatedByStability(prompt: text)] }
-                            }
-                            .disabled(busy || cleaned.isEmpty)
-                            Text("This sends the prompt to Stability AI through the local bridge and uses one paid generation.")
-                                .font(.footnote).foregroundStyle(palette.muted)
-                        }
-                        #endif
+                        if busy { ProgressView("Preparing sound…").font(.footnote) }
                     }
                     .padding(16)
                     .background(palette.surface, in: RoundedRectangle(cornerRadius: 18))
@@ -111,9 +107,36 @@ struct InventSoundView: View {
             }
         }
         .onAppear { saved = InventedSound.saved() }
+        #if targetEnvironment(simulator)
+        .task { if aiEnabled { provider = await InventedSound.AudioProvider.available() } }
+        #endif
         .onDisappear { preparation?.cancel(); stopPreview() }
         .onChange(of: scenePhase) { if $0 != .active { stopPreview() } }
     }
+
+    #if targetEnvironment(simulator)
+    @ViewBuilder private var aiControls: some View {
+        if let provider {
+            Button("Generate with AI", systemImage: "sparkles") {
+                let text = cleaned
+                prepare { [try await InventedSound.generatedByStability(prompt: text, provider: provider)] }
+            }
+            .buttonStyle(StudioActionStyle())
+            .disabled(busy || cleaned.isEmpty)
+            .accessibilityIdentifier(provider == .local ? "invent-ai-local" : "invent-ai-cloud")
+            Text(provider == .local
+                 ? "Stable Audio runs on this Mac. Your prompt stays here."
+                 : "Sends your prompt to Stability AI and uses one paid generation.")
+                .font(.footnote).foregroundStyle(palette.muted)
+        } else {
+            Button("Reconnect AI bridge", systemImage: "arrow.clockwise") {
+                Task { provider = await InventedSound.AudioProvider.available() }
+            }
+            Text("Start the Sound Lab bridge on this Mac, then reconnect.")
+                .font(.footnote).foregroundStyle(palette.muted)
+        }
+    }
+    #endif
 
     private func soundRow(_ sound: InventedSound, isSaved: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {

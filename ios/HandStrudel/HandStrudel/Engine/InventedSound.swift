@@ -69,11 +69,34 @@ struct InventedSound: Identifiable {
     }
 
     #if targetEnvironment(simulator)
-    static func generatedByStability(prompt: String) async throws -> Self {
+    enum AudioProvider: String, Decodable {
+        case local = "stable-audio-local"
+        case cloud = "stable-audio-cloud"
+
+        static func available() async -> Self? {
+            struct Status: Decodable { let provider: AudioProvider }
+            let request = URLRequest(url: URL(string: "http://127.0.0.1:54339/status")!, timeoutInterval: 3)
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            return try? JSONDecoder().decode(Status.self, from: data).provider
+        }
+    }
+
+    static func generatedByStability(prompt: String, provider: AudioProvider) async throws -> Self {
+        do { return try await requestGeneratedSample(prompt: prompt, provider: provider) }
+        catch SampleError.pitch where provider == .local {
+            // The model sometimes returns an unpitched or drifting sound.
+            try Task.checkCancellation()
+            return try await requestGeneratedSample(prompt: prompt, provider: provider)
+        }
+    }
+
+    private static func requestGeneratedSample(prompt: String, provider: AudioProvider) async throws -> Self {
         let url = URL(string: "http://127.0.0.1:54339/generate")!
         var request = URLRequest(url: url, timeoutInterval: 95)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(provider.rawValue, forHTTPHeaderField: "X-HandStrudel-Audio-Provider")
         request.httpBody = try JSONEncoder().encode(["prompt": prompt])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
