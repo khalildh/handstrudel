@@ -41,10 +41,15 @@ struct PostComposerView: View {
                     if let instrument {
                         Label(instrument, systemImage: "music.note").font(.footnote).foregroundStyle(.secondary)
                     }
-                    if soundSetup?.isValid == true {
-                        Toggle("Let others try this sound", isOn: $shareSound)
-                            .font(.subheadline)
-                            .disabled(isBusy)
+                    if let soundSetup, soundSetup.isValid {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("Share playable preset", isOn: $shareSound)
+                                .font(.subheadline)
+                                .disabled(isBusy)
+                            Text(shareSound ? soundSetup.presetDetails : "Let viewers play or privately save your instrument settings. This doesn't share backing audio.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     Toggle("Allow comments", isOn: $commentsEnabled)
                         .font(.subheadline)

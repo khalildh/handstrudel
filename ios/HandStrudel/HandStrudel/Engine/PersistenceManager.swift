@@ -3,10 +3,14 @@ import Foundation
 final class PersistenceManager {
     static let shared = PersistenceManager()
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     private let loopsKey = "savedLoops"
     private let snippetsKey = "savedSnippets"
     private let setupsKey = "savedSoundSetups"
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
 
     func loadSetups() -> [NamedSoundSetup] {
         guard let data = defaults.data(forKey: setupsKey) else { return [] }
@@ -15,6 +19,17 @@ final class PersistenceManager {
 
     func saveSetups(_ setups: [NamedSoundSetup]) {
         if let data = try? JSONEncoder().encode(setups) { defaults.set(data, forKey: setupsKey) }
+    }
+
+    @discardableResult
+    func addPreset(_ sound: SoundSetup, named name: String) -> Bool {
+        let name = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
+        guard sound.isValid, !name.isEmpty else { return false }
+        var setups = loadSetups()
+        guard !setups.contains(where: { $0.sound == sound && $0.name == name }) else { return false }
+        setups.insert(NamedSoundSetup(id: UUID(), name: name, sound: sound), at: 0)
+        saveSetups(setups)
+        return true
     }
 
     // MARK: - Settings
@@ -163,6 +178,15 @@ struct SoundSetup: Codable, Equatable {
     var resolvedInstrument: SoundFontInstrument? { SOUNDFONT_INSTRUMENTS.first { $0.id == instrument } }
     var resolvedWaveform: Waveform? { WAVEFORMS.first { $0.id == waveform } }
     var instrumentName: String? { useSoundFont ? resolvedInstrument?.name : resolvedWaveform?.name }
+    var keyAndScale: String { "\(key.rawValue) \(scale.rawValue)" }
+    var presetDetails: String {
+        var parts = [keyAndScale]
+        if (20...400).contains(bpm) { parts.append("\(Int(bpm.rounded())) BPM") }
+        if let progression = resolvedProgression, progression.id != "free" {
+            parts.append(progression.isCustom ? progression.degrees.map { String($0 + 1) }.joined(separator: "-") : progression.name)
+        }
+        return parts.joined(separator: " · ")
+    }
 
     var resolvedProgression: ChordProgression? {
         if progression == "custom" {

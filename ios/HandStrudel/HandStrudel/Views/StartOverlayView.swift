@@ -52,9 +52,10 @@ struct StartOverlayView: View {
                         }
                         .accessibilityIdentifier("private-drafts-button")
                         Button(action: onSetups) {
-                            Label("Saved setups", systemImage: "bookmark")
+                            Label("Presets", systemImage: "square.stack")
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
+                        .accessibilityIdentifier("music-presets-button")
                     }
                     .font(.subheadline.weight(.semibold))
                     .buttonStyle(.plain)

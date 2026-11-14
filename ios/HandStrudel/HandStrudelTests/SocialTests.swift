@@ -269,6 +269,62 @@ final class SocialTests: XCTestCase {
         XCTAssertFalse(unsupported.isValid)
     }
 
+    func testPrivatePresetPersistsAndDoesNotDuplicateTheSameSave() throws {
+        let suite = "preset-test-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PersistenceManager(defaults: defaults)
+        let sound = SoundSetup(instrument: "violin", waveform: "sine", key: .D, scale: .minor,
+                               progression: "custom", customDegrees: [0, 3, 4], mode: .scalechordmelody,
+                               bpm: 100, useSoundFont: false, autoStrum: true, padVolume: 0.3, gridOctave: 3, gridRange: 2)
+        XCTAssertFalse(store.addPreset(sound, named: "  "))
+        XCTAssertTrue(store.addPreset(sound, named: "  Evening jam  "))
+        XCTAssertFalse(store.addPreset(sound, named: "Evening jam"))
+        var invalid = sound
+        invalid.version = 99
+        XCTAssertFalse(store.addPreset(invalid, named: "Unknown version"))
+        let setups = PersistenceManager(defaults: defaults).loadSetups()
+        XCTAssertEqual(setups.map(\.name), ["Evening jam"])
+        XCTAssertEqual(setups.first?.sound, sound)
+        XCTAssertEqual(setups.first?.sound.presetDetails, "D Minor · 100 BPM · 1-4-5")
+    }
+
+    func testPlayAlongCountInUsesFourBeatsAndScalesForHalfSpeed() throws {
+        let regular = RecordingCountIn(sourceBPM: 120, halfSpeed: false)
+        let halfSpeed = RecordingCountIn(sourceBPM: 120, halfSpeed: true)
+        XCTAssertTrue(regular.usesBeats)
+        XCTAssertEqual(regular.steps, 4)
+        XCTAssertEqual(regular.secondsPerStep, 0.5)
+        XCTAssertEqual(halfSpeed.secondsPerStep, 1)
+        for plan in [regular, halfSpeed, RecordingCountIn(sourceBPM: 400, halfSpeed: false)] {
+            let wav = try XCTUnwrap(plan.clickTrack())
+            let player = try AVAudioPlayer(data: wav)
+            XCTAssertEqual(player.duration, Double(plan.steps) * plan.secondsPerStep, accuracy: 0.001)
+            for beat in 0..<plan.steps {
+                let start = 44 + 2 * Int((Double(beat) * plan.secondsPerStep * 22_050).rounded())
+                XCTAssertTrue(wav[start..<(start + 64)].contains { $0 != 0 })
+            }
+            XCTAssertTrue(wav.suffix(2_000).allSatisfy { $0 == 0 })
+        }
+    }
+
+    func testMissingOrInvalidTempoFallsBackToThreeSilentSeconds() {
+        for bpm: Double? in [nil, 0, 401, .nan, .infinity] {
+            let countIn = RecordingCountIn(sourceBPM: bpm, halfSpeed: true)
+            XCTAssertFalse(countIn.usesBeats)
+            XCTAssertEqual(countIn.steps, 3)
+            XCTAssertEqual(countIn.secondsPerStep, 1)
+            XCTAssertNil(countIn.clickTrack())
+        }
+    }
+
+    func testBackingVolumeClampsInvalidPreferences() {
+        XCTAssertEqual(BackingTrackVolume.clamped(-0.1), 0)
+        XCTAssertEqual(BackingTrackVolume.clamped(0.3), 0.3)
+        XCTAssertEqual(BackingTrackVolume.clamped(1.1), 1)
+        XCTAssertEqual(BackingTrackVolume.clamped(.nan), 0.55)
+    }
+
     /// Runs the real transcode on a generated 2 s portrait clip at iPhone screen size.
     @MainActor
     func testPrepareTranscodesTo720WideWithThumbnail() async throws {

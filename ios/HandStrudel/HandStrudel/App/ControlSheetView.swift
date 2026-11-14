@@ -47,7 +47,7 @@ struct ControlSheet: View {
                     sectionDivider
                 }
                 harmonySection
-                Button { showSetups = true } label: { Label("Saved setups", systemImage: "bookmark") }
+                Button { showSetups = true } label: { Label("Presets", systemImage: "square.stack") }
                     .buttonStyle(.bordered)
 
                 // The Strudel waveform / sampled-instrument picker only has
@@ -1489,18 +1489,20 @@ struct SoundSetupsView: View {
             List {
                 if engine.isRunning, let sound = engine.currentSoundSetup, sound.isValid {
                     Section("Current sound") {
-                        TextField("Setup name", text: $name)
-                        Button("Save current setup") {
-                            setups.insert(NamedSoundSetup(id: UUID(), name: cleanName, sound: sound), at: 0)
-                            PersistenceManager.shared.saveSetups(setups)
-                            name = ""
+                        TextField("Preset name", text: $name)
+                            .accessibilityIdentifier("preset-name")
+                        Button("Save current preset") {
+                            if PersistenceManager.shared.addPreset(sound, named: cleanName) {
+                                setups = PersistenceManager.shared.loadSetups()
+                                name = ""
+                            }
                         }
-                        .disabled(cleanName.isEmpty)
+                        .disabled(cleanName.isEmpty || setups.contains { $0.name == cleanName && $0.sound == sound })
                     }
                 }
                 Section("Saved on this device") {
                     if setups.isEmpty {
-                        Text("Open Music and use Settings to save an instrument setup.")
+                        Text("Save a sound from the studio or from a performance in the feed.")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(setups) { setup in
@@ -1509,7 +1511,7 @@ struct SoundSetupsView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(setup.name)
-                                    Text([setup.sound.instrumentName, setup.sound.key.rawValue, setup.sound.scale.rawValue]
+                                    Text([setup.sound.instrumentName, setup.sound.presetDetails]
                                         .compactMap { $0 }.joined(separator: " / "))
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
@@ -1525,7 +1527,7 @@ struct SoundSetupsView: View {
                     }
                 }
             }
-            .navigationTitle("Saved setups")
+            .navigationTitle("Presets")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }

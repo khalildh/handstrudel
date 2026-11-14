@@ -99,6 +99,31 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Done"].exists)
     }
 
+    func testStudioPresetSavesAndStartsFromMusicAfterRelaunch() {
+        launchToSession()
+        let name = "Test preset \(UUID().uuidString.prefix(8))"
+        let studioPresets = element("studio-presets-button")
+        XCTAssertTrue(studioPresets.waitForExistence(timeout: 5))
+        studioPresets.tap()
+        let field = app.textFields["preset-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(name)
+        app.buttons["Save current preset"].tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
+
+        app.terminate()
+        app.launch()
+        let musicPresets = element("music-presets-button")
+        XCTAssertTrue(musicPresets.waitForExistence(timeout: 5))
+        if !musicPresets.isHittable { app.swipeUp() }
+        musicPresets.tap()
+        let preset = app.staticTexts[name]
+        XCTAssertTrue(preset.waitForExistence(timeout: 5))
+        preset.tap()
+        XCTAssertTrue(studioPresets.waitForExistence(timeout: 5))
+    }
+
     func testFeed_commentsSheetOpensWithoutAccount() throws {
         guard let key = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_COMMENTS_KEY"] else {
             throw XCTSkip("Requires the local Supabase comments fixture.")

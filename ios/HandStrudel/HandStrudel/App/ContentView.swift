@@ -43,6 +43,8 @@ struct ContentView: View {
     @State private var backing: BackingTrack?
     @State private var backingLoad: Task<Void, Never>?
     @State private var backingPlaying = false
+    @State private var showBackingMixer = false
+    @AppStorage("playAlongBackingVolume") private var backingVolume = BackingTrackVolume.defaultValue
     @State private var reviewingDraft: RecordingDraft?
     @State private var retakeRequested = false
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
@@ -56,6 +58,8 @@ struct ContentView: View {
     @State private var loopCaptureTask: Task<Void, Never>?
     @State private var recordingError: String?
     @State private var recordCountdown = 0
+    @State private var countInClick: AVAudioPlayer?
+    @State private var countingBeats = false
     @AppStorage("hideSkeletonWhenRecording") private var hideSkeletonWhenRecording = true
     @AppStorage("recordPerformanceMicrophone") private var recordPerformanceMicrophone = false
     @AppStorage("recordAtHalfSpeed") private var recordAtHalfSpeed = false
@@ -144,10 +148,22 @@ struct ContentView: View {
         .sheet(isPresented: $showDrafts) {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil)
         }
-        .sheet(isPresented: $showSetups) {
+        .sheet(isPresented: $showSetups, onDismiss: {
+            if engine.isRunning { engine.resume() }
+        }) {
             SoundSetupsView(engine: engine, store: storeManager) { setup in
                 showSetups = false
-                startSession(setup: setup)
+                if engine.isRunning {
+                    engine.applySoundSetup(setup, store: storeManager)
+                } else {
+                    trySharedSound(setup)
+                }
+            }
+            .onAppear {
+                guard engine.isRunning else { return }
+                engine.pause()
+                backing?.player.pause()
+                backingPlaying = false
             }
         }
         .onOpenURL(perform: openSocialLink)
@@ -216,7 +232,10 @@ struct ContentView: View {
         .statusBarHidden(engine.isRunning)
         .onChange(of: engine.isRunning) { running in
             if running { startingSession = false }
-            else { stopBacking() }
+            else { cancelCountdown(); stopBacking() }
+        }
+        .onChange(of: backingVolume) { volume in
+            backing?.player.volume = Float(BackingTrackVolume.clamped(volume))
         }
         .onChange(of: scenePhase) { phase in
             if phase == .background {
@@ -385,6 +404,7 @@ struct ContentView: View {
                 let track = try await BackingTrack.load(video: source, username: username)
                 guard !Task.isCancelled, !engine.isRunning, !startingSession else { track.remove(); return }
                 stopBacking()
+                track.player.volume = Float(BackingTrackVolume.clamped(backingVolume))
                 backing = track
                 let setup = source.soundSetup.flatMap { sound in
                     sound.requiredPacks.allSatisfy { storeManager.isUnlocked($0) } ? sound : nil
@@ -402,6 +422,7 @@ struct ContentView: View {
         backing?.remove()
         backing = nil
         backingPlaying = false
+        showBackingMixer = false
     }
 
     private func openSocialLink(_ url: URL) {
@@ -902,18 +923,9 @@ struct ContentView: View {
 
                 // Jam session indicator
                 JamStatus(jam: engine.jamSession)
-                if let backing {
-                    Button {
-                        if backingPlaying { backing.player.pause(); backingPlaying = false }
-                        else { backingPlaying = backing.player.play() }
-                    } label: {
-                        Label("Play along with @\(backing.credit.username)", systemImage: backingPlaying ? "pause.fill" : "play.fill")
-                            .font(.caption.weight(.semibold))
-                            .padding(10)
-                            .background(.black.opacity(0.65), in: Capsule())
-                    }
-                    .foregroundStyle(StudioStyle.accent)
-                    .disabled(isRecording || recorderBusy)
+                if let backing, !isRecording, !recorderBusy, recordCountdown == 0 {
+                    backingControls(backing)
+                        .padding(.horizontal, 16)
                 }
                 if hasSeenOnboarding || !engine.scaleChordMelodyModeEnabled {
                     CameraRecoveryBanner(tracker: engine.handTracker)
@@ -983,7 +995,7 @@ struct ContentView: View {
                 DragGesture(minimumDistance: 50)
                     .onEnded { value in
                         // Don't swipe filters while using drum XY pad or grid
-                        guard !engine.drumModeEnabled && !engine.gridModeEnabled else { return }
+                        guard !engine.drumModeEnabled && !engine.gridModeEnabled && !showBackingMixer else { return }
                         guard abs(value.translation.width) > abs(value.translation.height) else { return }
                         let filters = CAMERA_FILTERS.filter { !$0.isPremium || storeManager.isUnlocked($0.packId ?? "") }
                         guard let currentIdx = filters.firstIndex(where: { $0.id == engine.selectedFilter.id }) else { return }
@@ -1051,10 +1063,34 @@ struct ContentView: View {
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 8)
+
+            HStack(spacing: 6) {
+                Image(systemName: "waveform").foregroundStyle(StudioStyle.accent)
+                Text("handstrudel").foregroundStyle(StudioStyle.ink)
+                    .lineLimit(1)
+            }
+            .font(.caption.monospaced().weight(.semibold))
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(.black.opacity(0.55), in: Capsule())
+            .accessibilityHidden(true)
+
+            Spacer(minLength: 8)
+
+            Button { showSetups = true } label: {
+                Image(systemName: "square.stack")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.black.opacity(0.4), in: Circle())
+            }
+            .accessibilityLabel("Presets")
+            .accessibilityIdentifier("studio-presets-button")
+            .disabled(isRecording || recorderBusy || recordCountdown > 0 || activeAudioLoop != nil)
 
             JamButton(jam: engine.jamSession, action: toggleJam)
-                .disabled(activeDraft?.recordedAtHalfSpeed == true)
+                .disabled(activeDraft?.recordedAtHalfSpeed == true || recordCountdown > 0)
 
             // Close button
             Button(action: { cancelCountdown(); stopBacking(); engine.stop() }) {
@@ -1068,18 +1104,6 @@ struct ContentView: View {
             .accessibilityLabel("End session")
             .disabled(isRecording || recorderBusy || activeAudioLoop != nil)
             .accessibilityIdentifier("close-button")
-        }
-        .overlay {
-            HStack(spacing: 6) {
-                Image(systemName: "waveform").foregroundStyle(StudioStyle.accent)
-                Text("handstrudel").foregroundStyle(StudioStyle.ink)
-            }
-            .font(.caption.monospaced().weight(.semibold))
-            .padding(.horizontal, 11)
-            .padding(.vertical, 7)
-            .background(.black.opacity(0.55), in: Capsule())
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
         }
     }
 
@@ -1612,7 +1636,7 @@ struct ContentView: View {
             }
             .accessibilityLabel("Music settings")
             .accessibilityIdentifier("settings-button")
-            .disabled(activeAudioLoop != nil || isRecording || recorderBusy)
+            .disabled(activeAudioLoop != nil || isRecording || recorderBusy || recordCountdown > 0)
         }
     }
 
@@ -1681,6 +1705,58 @@ struct ContentView: View {
         }
     }
 
+    private func backingControls(_ track: BackingTrack) -> some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 0) {
+                Button {
+                    if track.player.isPlaying { track.player.pause(); backingPlaying = false }
+                    else { backingPlaying = track.player.play() }
+                } label: {
+                    Label("Play along with @\(track.credit.username)", systemImage: backingPlaying ? "pause.fill" : "play.fill")
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                }
+                .accessibilityLabel(backingPlaying ? "Pause backing track" : "Play backing track")
+                .accessibilityHint("Performance by @\(track.credit.username)")
+
+                Button {
+                    showBackingMixer.toggle()
+                } label: {
+                    Image(systemName: backingVolume == 0 ? "speaker.slash.fill" : "slider.horizontal.3")
+                        .frame(width: 44, height: 44)
+                        .background(.white.opacity(showBackingMixer ? 0.12 : 0), in: Circle())
+                }
+                .accessibilityLabel(showBackingMixer ? "Hide backing mixer" : "Show backing mixer")
+            }
+
+            if showBackingMixer {
+                VStack(spacing: 0) {
+                    HStack {
+                        Text("Backing volume")
+                        Spacer()
+                        Text(BackingTrackVolume.clamped(backingVolume), format: .percent.precision(.fractionLength(0)))
+                            .monospacedDigit()
+                    }
+                    .foregroundStyle(.white)
+                    .accessibilityHidden(true)
+                    Slider(value: $backingVolume, in: 0...1, step: 0.05) {
+                        Text("Backing volume")
+                    }
+                    .tint(StudioStyle.accent)
+                    .frame(minHeight: 44)
+                }
+                .frame(maxWidth: 228)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 4)
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .buttonStyle(.plain)
+        .foregroundStyle(StudioStyle.accent)
+        .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 22))
+    }
+
     private var recordButton: some View {
         Button {
             if isRecording { stopRecording() }
@@ -1695,9 +1771,15 @@ struct ContentView: View {
                 } else if isRecording {
                     RoundedRectangle(cornerRadius: 6).fill(StudioStyle.recording).frame(width: 27, height: 27)
                 } else if recordCountdown > 0 {
-                    Text("\(recordCountdown)")
-                        .font(.title3.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(.white)
+                    VStack(spacing: 0) {
+                        Text("\(recordCountdown)")
+                            .font(.title3.monospacedDigit().weight(.semibold))
+                        if countingBeats {
+                            Text("\(recordCountdown == 1 ? "Beat" : "Beats")")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                    }
+                    .foregroundStyle(.white)
                 } else {
                     Circle().fill(StudioStyle.recording).padding(7)
                 }
@@ -1707,6 +1789,7 @@ struct ContentView: View {
         .buttonStyle(.plain)
         .disabled(recorderBusy || activeAudioLoop != nil)
         .accessibilityLabel(isRecording ? "Stop recording" : recordCountdown > 0 ? "Cancel countdown" : "Record video")
+        .accessibilityValue(recordCountdown == 0 ? "" : countingBeats ? "\(recordCountdown) beats remaining" : "\(recordCountdown) seconds remaining")
         .accessibilityIdentifier("record-button")
     }
 
@@ -1809,22 +1892,41 @@ struct ContentView: View {
             recordingError = "Screen recording isn’t available right now."
             return
         }
-        recordCountdown = 3
+        let countIn = RecordingCountIn(sourceBPM: backing?.savedBPM, halfSpeed: recordAtHalfSpeed)
+        backing?.player.pause()
+        backingPlaying = false
+        showBackingMixer = false
+        countingBeats = countIn.usesBeats
+        recordCountdown = countIn.steps
+        countInClick = countIn.clickTrack().flatMap { try? AVAudioPlayer(data: $0) }
+        countInClick?.prepareToPlay()
         captureTask = Task {
-            for remaining in (0..<3).reversed() {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            let clock = ContinuousClock()
+            let start = clock.now
+            countInClick?.play()
+            for elapsedSteps in 1...countIn.steps {
+                try? await clock.sleep(until: start.advanced(by: .seconds(Double(elapsedSteps) * countIn.secondsPerStep)))
                 guard !Task.isCancelled else { return }
-                recordCountdown = remaining
+                recordCountdown = countIn.steps - elapsedSteps
             }
-            startRecording()
+            clearCountdown()
+            if engine.isRunning, scenePhase != .background { startRecording() }
         }
     }
 
     private func cancelCountdown() {
         guard recordCountdown > 0 else { return }
         captureTask?.cancel()
+        clearCountdown()
+    }
+
+    private func clearCountdown() {
+        countInClick?.stop()
+        countInClick = nil
         captureTask = nil
         recordCountdown = 0
+        countingBeats = false
     }
 
     private func startRecording() {
@@ -1968,19 +2070,83 @@ struct ContentView: View {
     #endif
 }
 
+enum BackingTrackVolume {
+    static let defaultValue = 0.55
+
+    static func clamped(_ value: Double) -> Double {
+        value.isFinite ? min(1, max(0, value)) : defaultValue
+    }
+}
+
+struct RecordingCountIn {
+    let steps: Int
+    let secondsPerStep: Double
+    var usesBeats: Bool { steps == 4 }
+
+    init(sourceBPM: Double?, halfSpeed: Bool) {
+        if let sourceBPM, (20...400).contains(sourceBPM) {
+            steps = 4
+            secondsPerStep = 60 / sourceBPM * (halfSpeed ? 2 : 1)
+        } else {
+            steps = 3
+            secondsPerStep = 1
+        }
+    }
+
+    func clickTrack() -> Data? {
+        guard usesBeats else { return nil }
+        let sampleRate = 22_050
+        let sampleCount = Int((Double(steps) * secondsPerStep * Double(sampleRate)).rounded())
+        let clickLength = sampleRate / 25
+        var samples = [Int16](repeating: 0, count: sampleCount)
+        // One PCM buffer puts all four clicks on the same audio clock.
+        for beat in 0..<steps {
+            let onset = Int((Double(beat) * secondsPerStep * Double(sampleRate)).rounded())
+            let frequency = beat == 0 ? 1_480.0 : 990.0
+            for sample in 0..<clickLength {
+                let phase = Double(sample) / Double(clickLength)
+                let envelope = min(1, phase * 25) * (1 - phase) * (1 - phase)
+                let wave = sin(2 * .pi * frequency * Double(sample) / Double(sampleRate))
+                samples[onset + sample] = Int16(wave * envelope * 13_000).littleEndian
+            }
+        }
+
+        let dataSize = sampleCount * MemoryLayout<Int16>.size
+        var wav = Data(capacity: 44 + dataSize)
+        func append<T: FixedWidthInteger>(_ value: T) {
+            withUnsafeBytes(of: value.littleEndian) { wav.append(contentsOf: $0) }
+        }
+        wav.append(contentsOf: "RIFF".utf8)
+        append(UInt32(36 + dataSize))
+        wav.append(contentsOf: "WAVEfmt ".utf8)
+        append(UInt32(16))
+        append(UInt16(1)) // Mono, signed 16-bit PCM.
+        append(UInt16(1))
+        append(UInt32(sampleRate))
+        append(UInt32(sampleRate * 2))
+        append(UInt16(2))
+        append(UInt16(16))
+        wav.append(contentsOf: "data".utf8)
+        append(UInt32(dataSize))
+        samples.withUnsafeBytes { wav.append(contentsOf: $0) }
+        return wav
+    }
+}
+
 @MainActor
 private final class BackingTrack {
     let credit: BackingCredit
+    let savedBPM: Double?
     let player: AVAudioPlayer
     private let url: URL
 
-    private init(credit: BackingCredit, url: URL) throws {
+    private init(credit: BackingCredit, savedBPM: Double?, url: URL) throws {
         self.credit = credit
+        self.savedBPM = savedBPM
         self.url = url
         player = try AVAudioPlayer(contentsOf: url)
         player.numberOfLoops = -1
         player.enableRate = true
-        player.volume = 0.55
         guard player.prepareToPlay() else { throw SocialError.message("The backing audio couldn't be prepared.") }
     }
 
@@ -1998,7 +2164,8 @@ private final class BackingTrack {
             await exporter.export()
             try Task.checkCancellation()
             guard exporter.status == .completed else { throw exporter.error ?? SocialError.message("Backing audio couldn't be downloaded.") }
-            return try BackingTrack(credit: BackingCredit(videoId: video.id, username: username), url: url)
+            return try BackingTrack(credit: BackingCredit(videoId: video.id, username: username),
+                                    savedBPM: video.soundSetup?.bpm, url: url)
         } catch {
             try? FileManager.default.removeItem(at: url)
             throw error

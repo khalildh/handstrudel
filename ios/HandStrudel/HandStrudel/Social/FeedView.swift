@@ -3,6 +3,11 @@ import AVKit
 import SwiftUI
 import UIKit
 
+private enum PerformanceStart {
+    case backing(Video)
+    case preset(SoundSetup)
+}
+
 /// Full-screen, vertically paged feed of public posts (newest first).
 /// Browsable signed out; liking, following, reporting and blocking need an account.
 struct FeedView: View {
@@ -26,7 +31,7 @@ struct FeedView: View {
     @State private var showSaved = false
     @State private var challenge: WeeklyChallenge?
     @State private var openChallenge: WeeklyChallenge?
-    @State private var pendingPlayAlong: Video?
+    @State private var pendingStart: PerformanceStart?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -125,16 +130,16 @@ struct FeedView: View {
             if uid == nil { model.followingOnly = false }
         }
         .sheet(isPresented: $showSignIn) { SignInView(auth: auth, reason: "Sign in to save performances and join the community.") }
-        .sheet(isPresented: $showSaved, onDismiss: { resumePlayAlong() }) {
+        .sheet(isPresented: $showSaved, onDismiss: resumePerformance) {
             PerformanceLibraryView(kind: .saved, auth: auth,
-                                   onRemove: { id in model.removedBookmark(id) }) { video in
-                pendingPlayAlong = video
+                                   onRemove: { id in model.removedBookmark(id) }) { start in
+                pendingStart = start
                 showSaved = false
             }
         }
-        .sheet(item: $openChallenge, onDismiss: { resumePlayAlong() }) { challenge in
-            PerformanceLibraryView(kind: .challenge(challenge), auth: auth) { video in
-                pendingPlayAlong = video
+        .sheet(item: $openChallenge, onDismiss: resumePerformance) { challenge in
+            PerformanceLibraryView(kind: .challenge(challenge), auth: auth) { start in
+                pendingStart = start
                 openChallenge = nil
             }
         }
@@ -149,13 +154,22 @@ struct FeedView: View {
         .sheet(isPresented: $showActivity, onDismiss: { Task { await refreshBadge() } }) {
             ActivityInboxView(auth: auth)
         }
-        .sheet(item: $creatorVideo) { video in
-            PublicCreatorView(creatorId: video.userId, auth: auth) {
+        .sheet(item: $creatorVideo, onDismiss: resumePerformance) { video in
+            PublicCreatorView(creatorId: video.userId, auth: auth, onFollowChange: {
                 Task { await model.refresh(user: auth.userId) }
+            }) { start in
+                pendingStart = start
+                creatorVideo = nil
             }
         }
-        .sheet(item: $sourceVideo) { video in
-            CreatorVideoView(video: video, auth: auth)
+        .sheet(item: $sourceVideo, onDismiss: resumePerformance) { video in
+            CreatorVideoView(video: video, auth: auth, onPlayAlong: { source in
+                pendingStart = .backing(source)
+                sourceVideo = nil
+            }, onTrySound: { sound in
+                pendingStart = .preset(sound)
+                sourceVideo = nil
+            })
         }
         .confirmationDialog("Report this post", isPresented: Binding(
             get: { reporting != nil }, set: { if !$0 { reporting = nil } }), titleVisibility: .visible) {
@@ -168,10 +182,12 @@ struct FeedView: View {
         } message: { Text("Reports are anonymous. Posts with several reports are hidden while we review them.") }
     }
 
-    private func resumePlayAlong() {
-        if let video = pendingPlayAlong {
-            pendingPlayAlong = nil
-            onPlayAlong(video)
+    private func resumePerformance() {
+        guard let start = pendingStart else { return }
+        pendingStart = nil
+        switch start {
+        case .backing(let video): onPlayAlong(video)
+        case .preset(let sound): onTrySound(sound)
         }
     }
 
@@ -574,10 +590,12 @@ private struct PublicCreatorView: View {
     let creatorId: UUID
     @ObservedObject var auth: AuthManager
     let onFollowChange: () -> Void
+    let onStart: (PerformanceStart) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var creator: PublicCreator?
     @State private var videos: [Video] = []
     @State private var opened: Video?
+    @State private var afterDismiss: PerformanceStart?
     @State private var following = false
     @State private var loading = true
     @State private var busy = false
@@ -636,7 +654,17 @@ private struct PublicCreatorView: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .refreshable { await load() }
             .task(id: auth.userId) { await load() }
-            .sheet(item: $opened) { CreatorVideoView(video: $0, auth: auth) }
+            .sheet(item: $opened, onDismiss: {
+                if let start = afterDismiss { afterDismiss = nil; onStart(start) }
+            }) { video in
+                CreatorVideoView(video: video, auth: auth, onPlayAlong: { source in
+                    afterDismiss = .backing(source)
+                    opened = nil
+                }, onTrySound: { sound in
+                    afterDismiss = .preset(sound)
+                    opened = nil
+                })
+            }
             .sheet(isPresented: $signIn) { SignInView(auth: auth, reason: "Sign in to follow this creator.") }
         }
         .tint(StudioStyle.accent)
@@ -681,6 +709,60 @@ private struct PublicCreatorView: View {
     }
 }
 
+private struct ClipPresetCard: View {
+    let setup: SoundSetup
+    let username: String?
+    let onPlay: ((SoundSetup) -> Void)?
+    @State private var saved = false
+
+    private var title: String { setup.instrumentName ?? "Performance preset" }
+    private var savedName: String { username.map { "\(title) by @\($0)" } ?? title }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(title, systemImage: "waveform")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(StudioStyle.accent)
+                .lineLimit(1)
+            Text(setup.presetDetails)
+                .font(.caption)
+                .lineLimit(2)
+            HStack(spacing: 8) {
+                if let onPlay {
+                    Button { onPlay(setup) } label: {
+                        Label("Play sound", systemImage: "play.fill")
+                            .padding(.horizontal, 9)
+                            .frame(minHeight: 44)
+                            .background(StudioStyle.accent.opacity(0.17), in: RoundedRectangle(cornerRadius: 9))
+                    }
+                    .accessibilityIdentifier("play-clip-preset")
+                }
+                Button {
+                    PersistenceManager.shared.addPreset(setup, named: savedName)
+                    saved = true
+                } label: {
+                    Image(systemName: saved ? "checkmark" : "bookmark")
+                        .frame(width: 44, height: 44)
+                        .background(.white.opacity(0.11), in: RoundedRectangle(cornerRadius: 9))
+                }
+                .disabled(saved)
+                .accessibilityLabel(saved ? "Preset saved" : "Save preset privately")
+                .accessibilityIdentifier("save-clip-preset")
+            }
+            .font(.caption.weight(.semibold))
+            .buttonStyle(.plain)
+        }
+        .padding(8)
+        .foregroundStyle(StudioStyle.ink)
+        .background(.black.opacity(0.70), in: RoundedRectangle(cornerRadius: 12))
+        .onAppear {
+            saved = PersistenceManager.shared.loadSetups().contains {
+                $0.sound == setup && $0.name == String(savedName.prefix(40))
+            }
+        }
+    }
+}
+
 struct CreatorVideoView: View {
     let video: Video
     @ObservedObject var auth: AuthManager
@@ -696,11 +778,13 @@ struct CreatorVideoView: View {
             VStack(alignment: .leading, spacing: 10) {
                 VideoPlayer(player: player)
                 if !video.caption.isEmpty { Text(verbatim: video.caption) }
+                if let setup = video.soundSetup {
+                    ClipPresetCard(setup: setup, username: video.username, onPlay: onTrySound)
+                } else if let instrument = video.instrument {
+                    Label(instrument, systemImage: "waveform").font(.caption).foregroundStyle(.secondary)
+                }
                 if video.backingEnabled == true, let onPlayAlong {
                     Button("Play along", systemImage: "waveform.badge.plus") { onPlayAlong(video) }
-                        .buttonStyle(StudioActionStyle())
-                } else if let setup = video.soundSetup, let onTrySound {
-                    Button("Try this sound", systemImage: "waveform") { onTrySound(setup) }
                         .buttonStyle(StudioActionStyle())
                 }
                 if video.commentsEnabled == true {
@@ -739,12 +823,12 @@ private struct PerformanceLibraryView: View {
     let kind: Kind
     @ObservedObject var auth: AuthManager
     var onRemove: (UUID) -> Void = { _ in }
-    let onPlay: (Video) -> Void
+    let onPlay: (PerformanceStart) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var items: [Video] = []
     @State private var source: Video?
     @State private var selected: Video?
-    @State private var playAfterDismiss: Video?
+    @State private var playAfterDismiss: PerformanceStart?
     @State private var more = false
     @State private var loading = false
     @State private var removing: UUID?
@@ -761,7 +845,7 @@ private struct PerformanceLibraryView: View {
                             .font(.caption).foregroundStyle(.secondary)
                         if let source {
                             Button("Watch the backing clip", systemImage: "play.rectangle") { selected = source }
-                            Button("Play along", systemImage: "waveform") { onPlay(source) }
+                            Button("Play along", systemImage: "waveform") { onPlay(.backing(source)) }
                                 .fontWeight(.semibold)
                         } else if !loading && error == nil {
                             Text("This challenge is no longer available.").foregroundStyle(.secondary)
@@ -818,7 +902,10 @@ private struct PerformanceLibraryView: View {
                 if let video = playAfterDismiss { playAfterDismiss = nil; onPlay(video) }
             }) { video in
                 CreatorVideoView(video: video, auth: auth, onPlayAlong: { video in
-                    playAfterDismiss = video
+                    playAfterDismiss = .backing(video)
+                    selected = nil
+                }, onTrySound: { sound in
+                    playAfterDismiss = .preset(sound)
                     selected = nil
                 })
             }
@@ -918,18 +1005,13 @@ private struct FeedCell: View {
                         VStack(alignment: .leading, spacing: 4) { author; followButton }
                     }
                     if !video.caption.isEmpty { Text(video.caption).font(.subheadline).lineLimit(3) }
-                    if let instrument = video.instrument {
+                    if let setup = video.soundSetup {
+                        ClipPresetCard(setup: setup, username: video.username, onPlay: onTrySound)
+                            .id(video.id)
+                    } else if let instrument = video.instrument {
                         Label(instrument, systemImage: "waveform")
                             .font(.caption.monospaced())
                             .foregroundStyle(StudioStyle.accent)
-                    }
-                    if let setup = video.soundSetup {
-                        Button { onTrySound(setup) } label: {
-                            Label("Try this sound", systemImage: "waveform.badge.plus")
-                                .font(.caption.weight(.semibold))
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(StudioStyle.accent)
                     }
                     if video.backingEnabled == true {
                         Button(action: playAlong) { Label("Play along", systemImage: "waveform.badge.plus") }

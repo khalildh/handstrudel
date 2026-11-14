@@ -15,7 +15,7 @@ export interface PublicVideo {
   width: number | null;
   height: number | null;
   created_at: string;
-  sound_setup?: { version?: number } | null;
+  sound_setup?: { version?: number; key?: string; scale?: string; bpm?: number } | null;
   comments_enabled?: boolean;
   comment_count?: number;
   backing_enabled?: boolean;

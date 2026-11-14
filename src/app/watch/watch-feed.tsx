@@ -22,6 +22,12 @@ export default function WatchFeed() {
   const listed = videos.find((video) => video.id === id);
   const selected = id ? listed ?? (shared?.id === id ? shared.video : undefined) : videos[0];
   const resolving = id && isVideoID(id) && !listed && shared?.id !== id;
+  const setup = selected?.sound_setup?.version === 1 ? selected.sound_setup : null;
+  const presetDetails = [
+    selected?.instrument,
+    typeof setup?.key === "string" && typeof setup.scale === "string" ? `${setup.key} ${setup.scale}` : null,
+    typeof setup?.bpm === "number" && setup.bpm >= 20 && setup.bpm <= 400 ? `${Math.round(setup.bpm)} BPM` : null,
+  ].filter(Boolean).join(" · ");
 
   useEffect(() => {
     const request = new AbortController();
@@ -114,19 +120,14 @@ export default function WatchFeed() {
                 {selected.source_video_id && selected.source_username && isVideoID(selected.source_video_id) && (
                   <Link href={`/watch?v=${selected.source_video_id}`}>Inspired by @{selected.source_username}</Link>
                 )}
-                {selected.backing_enabled && isVideoID(selected.id) && (
+                {presetDetails && <span>{presetDetails}</span>}
+                {isVideoID(selected.id) && (selected.backing_enabled || setup) && (
                   <div className="watch-sound-actions">
-                    <a className="watch-action" href={`handstrudel://play/${selected.id}`}>Play along in the app</a>
+                    {setup && <a className="watch-action" href={`handstrudel://sound/${selected.id}`}>Play this sound in the app</a>}
+                    {selected.backing_enabled && <a className="watch-action" href={`handstrudel://play/${selected.id}`}>Play along</a>}
                     <a href="https://apps.apple.com/app/id6764415289">Get the iOS app</a>
                   </div>
                 )}
-                {selected.sound_setup?.version === 1 && isVideoID(selected.id) && (
-                  <div className="watch-sound-actions">
-                    <a className="watch-action" href={`handstrudel://sound/${selected.id}`}>Try this sound</a>
-                    <a href="https://apps.apple.com/app/id6764415289">Get the iOS app</a>
-                  </div>
-                )}
-                {selected.instrument && <span>{selected.instrument}</span>}
               </div>
               <WatchComments key={selected.id} video={selected} />
             </>
