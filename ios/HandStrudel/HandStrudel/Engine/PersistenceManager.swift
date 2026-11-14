@@ -182,8 +182,9 @@ struct SoundSetup: Codable, Equatable {
     var presetDetails: String {
         var parts = [keyAndScale]
         if (20...400).contains(bpm) { parts.append("\(Int(bpm.rounded())) BPM") }
-        if let progression = resolvedProgression, progression.id != "free" {
-            parts.append(progression.isCustom ? progression.degrees.map { String($0 + 1) }.joined(separator: "-") : progression.name)
+        if let progression = resolvedProgression {
+            if progression.id == "free" { parts.append("Free layout") }
+            else { parts.append(progression.isCustom ? progression.degrees.map { String($0 + 1) }.joined(separator: "-") : progression.name) }
         }
         return parts.joined(separator: " · ")
     }

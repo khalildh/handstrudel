@@ -471,6 +471,7 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(decoded, sound)
         XCTAssertTrue(decoded.isValid)
         XCTAssertEqual(decoded.resolvedProgression?.degrees, [0, 3, 4])
+        XCTAssertEqual(decoded.presetDetails, "C Major · 100 BPM · 1-4-5")
         var unsupported = decoded
         unsupported.version = 99
         XCTAssertFalse(unsupported.isValid)

@@ -102,10 +102,13 @@
 }
 .watch-author, .watch-app-link, .creator-back { display: inline-flex; align-items: center; gap: 5px; }
 .watch-app-link, .watch-source, .watch-preset, .watch-inline-status { font-size: 13px; }
+.watch-preset-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
 .watch-preset {
   display: flex; align-items: center; gap: 7px; justify-self: start;
   padding: 5px 10px; border-radius: 8px; background: var(--watch-blue-soft); color: var(--watch-blue); font-weight: 750;
 }
+.watch-preset-chords { flex-wrap: wrap; max-width: 100%; column-gap: 5px; }
+.watch-preset-label { font-weight: 600; }
 .watch-sound-actions { column-gap: 12px; }
 .watch-share-actions { gap: 6px; }
 .watch-embed-panel {

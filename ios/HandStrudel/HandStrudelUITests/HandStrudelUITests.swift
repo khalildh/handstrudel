@@ -361,12 +361,26 @@ final class HandStrudelUITests: XCTestCase {
         captureIfRequested("Artist-Profile")
         spotlight.tap()
         XCTAssertTrue(app.staticTexts["Evening loop"].waitForExistence(timeout: 5))
+        let preset = app.buttons.matching(identifier: "play-clip-preset").firstMatch
+        XCTAssertTrue(preset.waitForExistence(timeout: 5))
+        XCTAssertEqual(preset.label, "Play this sound")
         app.navigationBars["@loopmaker"].buttons["Done"].tap()
         app.buttons["profile-sounds"].tap()
         let sound = app.buttons["profile-play-sound"].firstMatch
         XCTAssertTrue(sound.waitForExistence(timeout: 5))
         captureIfRequested("Artist-Sounds")
         sound.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
+    }
+
+    func testPlayThisSoundFromFeedOpensMusicSession() throws {
+        try launchWithProfileFixture()
+        element("tab-feed").tap()
+        let preset = app.buttons.matching(identifier: "play-clip-preset").firstMatch
+        XCTAssertTrue(preset.waitForExistence(timeout: 8))
+        XCTAssertTrue(preset.isHittable)
+        XCTAssertEqual(preset.label, "Play this sound")
+        preset.tap()
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
     }
 

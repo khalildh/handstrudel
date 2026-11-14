@@ -161,8 +161,14 @@ struct FeedView: View {
                 if author == video.userId { commenting = nil }
             }
         }
-        .sheet(isPresented: $showActivity, onDismiss: { Task { await refreshBadge() } }) {
-            ActivityInboxView(auth: auth)
+        .sheet(isPresented: $showActivity, onDismiss: {
+            resumePerformance()
+            Task { await refreshBadge() }
+        }) {
+            ActivityInboxView(auth: auth) { sound in
+                pendingStart = .preset(sound)
+                showActivity = false
+            }
         }
         .sheet(item: $creatorVideo, onDismiss: resumePerformance) { video in
             PublicCreatorView(creatorId: video.userId, auth: auth, onFollowChange: {
@@ -587,6 +593,7 @@ final class FeedModel: ObservableObject {
 private struct ActivityInboxView: View {
     @Environment(\.studioPalette) private var palette
     @ObservedObject var auth: AuthManager
+    let onTrySound: (SoundSetup) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var items: [CreatorActivity] = []
     @State private var cursor: CreatorActivity?
@@ -607,7 +614,7 @@ private struct ActivityInboxView: View {
                 }
                 ForEach(items) { item in
                     NavigationLink {
-                        NotificationPerformanceView(item: item, auth: auth) {
+                        NotificationPerformanceView(item: item, auth: auth, onTrySound: onTrySound) {
                             if let index = items.firstIndex(where: { $0.id == item.id && $0.timestamp == item.timestamp }) {
                                 items[index].readAt = Date()
                             }
@@ -670,6 +677,7 @@ private struct ActivityInboxView: View {
 private struct NotificationPerformanceView: View {
     let item: CreatorActivity
     @ObservedObject var auth: AuthManager
+    let onTrySound: (SoundSetup) -> Void
     let onRead: () -> Void
     @State private var video: Video?
     @State private var failed = false
@@ -678,7 +686,7 @@ private struct NotificationPerformanceView: View {
 
     var body: some View {
         if let video {
-            PerformanceDetail(video: video, auth: auth, notification: item)
+            PerformanceDetail(video: video, auth: auth, notification: item, onTrySound: onTrySound)
                 .task { await markRead() }
         } else {
             VStack(spacing: 14) {
@@ -999,12 +1007,16 @@ private struct ClipPresetCard: View {
             HStack(spacing: 8) {
                 if let onPlay {
                     Button { onPlay(setup) } label: {
-                        Label("Play sound", systemImage: "play.fill")
-                            .padding(.horizontal, 9)
+                        Label("Play this sound", systemImage: "play.fill")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.horizontal, 11)
                             .frame(minHeight: 44)
-                            .background(palette.mediaAccent.opacity(0.17), in: RoundedRectangle(cornerRadius: 9))
+                            .foregroundStyle(palette.mediaOnAccent)
+                            .background(palette.mediaAccent, in: RoundedRectangle(cornerRadius: 9))
                     }
                     .accessibilityIdentifier("play-clip-preset")
+                    .accessibilityHint("Opens this setup in the Music tab")
                 }
                 Button {
                     PersistenceManager.shared.addPreset(setup, named: savedName)
@@ -1073,13 +1085,18 @@ private struct PerformanceDetail: View {
                     .background(.black, in: RoundedRectangle(cornerRadius: 16))
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .accessibilityIdentifier("performance-video")
-                if !video.caption.isEmpty { Text(verbatim: video.caption) }
-                if let notification { notificationCard(notification) }
                 if let setup = video.soundSetup {
-                    ClipPresetCard(setup: setup, username: video.username ?? auth.profile?.username, onPlay: onTrySound)
+                    ClipPresetCard(setup: setup, username: video.username ?? auth.profile?.username, onPlay: onTrySound.map { play in
+                        { sound in
+                            player?.pause()
+                            play(sound)
+                        }
+                    })
                 } else if let instrument = video.instrument {
                     Label(instrument, systemImage: "waveform").font(.caption).foregroundStyle(.secondary)
                 }
+                if !video.caption.isEmpty { Text(verbatim: video.caption) }
+                if let notification { notificationCard(notification) }
                 if video.backingEnabled == true, let onPlayAlong {
                     Button("Play along", systemImage: "waveform.badge.plus") { onPlayAlong(video) }
                         .buttonStyle(StudioActionStyle())
