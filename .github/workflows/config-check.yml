@@ -12,12 +12,14 @@ on:
       - "scripts/gen-music-config.mjs"
       - "src/lib/music-data.generated.ts"
       - "ios/HandStrudel/HandStrudel/Models/MusicConfig.generated.swift"
+      - "ios/HandStrudel/HandStrudel/Models/ChordProgression.swift"
   pull_request:
     paths:
       - "shared/**"
       - "scripts/gen-music-config.mjs"
       - "src/lib/music-data.generated.ts"
       - "ios/HandStrudel/HandStrudel/Models/MusicConfig.generated.swift"
+      - "ios/HandStrudel/HandStrudel/Models/ChordProgression.swift"
 
 jobs:
   verify:

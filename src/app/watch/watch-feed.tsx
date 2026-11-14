@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { creatorHref, isVideoID, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicVideo } from "../../lib/public-feed";
+import { creatorHref, describeClipChords, isVideoID, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicVideo } from "../../lib/public-feed";
 import WatchComments from "./watch-comments";
 import { clipDuration, clipTitle, WatchArtwork, WatchFooter, WatchHeader, WatchIcon, WatchThumbnail } from "./watch-design";
 
@@ -31,6 +31,7 @@ export default function WatchFeed() {
   const selected = id ? listed ?? (shared?.id === id ? shared.video : undefined) : videos[0];
   const resolving = id && isVideoID(id) && !listed && shared?.id !== id;
   const setup = selected?.sound_setup?.version === 1 ? selected.sound_setup : null;
+  const chords = describeClipChords(setup);
   const author = selected ? creatorHref(selected.username) : null;
   const currentIndex = videos.findIndex((video) => video.id === selected?.id);
   const nextVideo = videos[currentIndex + 1];
@@ -217,11 +218,21 @@ export default function WatchFeed() {
                 {selected.source_video_id && selected.source_username && isVideoID(selected.source_video_id) && (
                   <Link className="watch-source" href={`/watch?v=${selected.source_video_id}`}>Inspired by @{selected.source_username}</Link>
                 )}
-                {presetDetails && <p className="watch-preset"><WatchIcon name="wave" /> {presetDetails}</p>}
+                {(presetDetails || chords) && (
+                  <div className="watch-preset-row" aria-label="Sound settings">
+                    {presetDetails && <p className="watch-preset"><WatchIcon name="wave" /> {presetDetails}</p>}
+                    {chords && (
+                      <p className="watch-preset watch-preset-chords">
+                        <span className="watch-preset-label">{chords.label}:</span>
+                        <span>{chords.name}{chords.degrees && ` (${chords.degrees.join("–")})`}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
                 {isVideoID(selected.id) && (
                   <div className="watch-sound-actions">
                     <a className="watch-action watch-primary watch-open-ios" href={`handstrudel://watch/${selected.id}`}>Open in HandStrudel <WatchIcon name="arrow" /></a>
-                    {setup && <a className="watch-action" href={`handstrudel://sound/${selected.id}`}>Play this sound in the app</a>}
+                    {setup && <a className="watch-action watch-primary" href={`handstrudel://sound/${selected.id}`}><WatchIcon name="play" /> Play this sound in the app</a>}
                     {selected.backing_enabled && <a className="watch-action" href={`handstrudel://play/${selected.id}`}>Play along</a>}
                     <a className="watch-app-link" href="https://apps.apple.com/app/id6764415289">Get the iOS app</a>
                   </div>

@@ -1,3 +1,5 @@
+import { CHORD_PROGRESSIONS } from "./music-data.generated";
+
 const feedBase = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://eygrtqbtbhktptphqdnn.supabase.co";
 const publicKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_V6B0E_NNyf0ClZ13WpHegQ_W-wXH_im";
 const mediaBase = process.env.NEXT_PUBLIC_MEDIA_BASE_URL || "https://media.handstrudel.com";
@@ -15,12 +17,25 @@ export interface PublicVideo {
   width: number | null;
   height: number | null;
   created_at: string;
-  sound_setup?: { version?: number; key?: string; scale?: string; bpm?: number } | null;
+  sound_setup?: { version?: number; key?: string; scale?: string; bpm?: number; progression?: string; customDegrees?: number[] } | null;
   comments_enabled?: boolean;
   comment_count?: number;
   backing_enabled?: boolean;
   source_video_id?: string | null;
   source_username?: string | null;
+}
+
+export function describeClipChords(setup: PublicVideo["sound_setup"]) {
+  if (setup?.version !== 1 || typeof setup.progression !== "string") return null;
+  if (setup.progression === "free") return { label: "Chord layout", name: "Free layout", degrees: null };
+  if (setup.progression === "custom") {
+    const degrees = setup.customDegrees;
+    if (!Array.isArray(degrees) || !degrees.length || degrees.length > 64 ||
+        !degrees.every(d => Number.isInteger(d) && d >= 0 && d <= 6)) return null;
+    return { label: "Chord progression", name: "Custom", degrees: degrees.map(d => d + 1) };
+  }
+  const preset = CHORD_PROGRESSIONS.get(setup.progression);
+  return preset ? { label: "Chord progression", name: preset.name, degrees: preset.degrees.map(d => d + 1) } : null;
 }
 
 export interface PublicComment {
