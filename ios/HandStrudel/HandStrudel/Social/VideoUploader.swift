@@ -24,6 +24,7 @@ final class VideoUploader: ObservableObject {
         do {
             phase = .preparing
             let prepared = try await Self.prepare(clip)
+            defer { try? FileManager.default.removeItem(at: prepared.videoURL) }
             phase = .uploading(0)
             let signed: SignUploadResponse = try await supabase.functions.invoke(
                 "sign-upload",
@@ -37,7 +38,6 @@ final class VideoUploader: ObservableObject {
                 id: signed.id, userId: userId, videoKey: signed.videoKey, thumbKey: signed.thumbKey,
                 caption: String(caption.prefix(150)), instrument: instrument, mode: mode,
                 durationS: prepared.duration, width: prepared.width, height: prepared.height)).execute()
-            try? FileManager.default.removeItem(at: prepared.videoURL)
             phase = .done
             return true
         } catch {
@@ -63,13 +63,23 @@ final class VideoUploader: ObservableObject {
         let upright = natural.applying(transform)
         let source = CGSize(width: abs(upright.width), height: abs(upright.height))
         let size = renderSize(for: source)
-        let duration = try await asset.load(.duration).seconds
+        let sourceDuration = try await asset.load(.duration)
+        guard sourceDuration.seconds.isFinite, sourceDuration.seconds > 0, source.width >= 1, size.height >= 2 else {
+            throw SocialError.message("The recording could not be read.")
+        }
+        guard sourceDuration.seconds <= Double(RecordingDrafts.recordingLimit) + 1 else {
+            throw SocialError.message("Trim the recording to 60 seconds or less to post it.")
+        }
+        let capped = CMTime(seconds: Double(RecordingDrafts.recordingLimit), preferredTimescale: 600)
+        let assetDuration = CMTimeMinimum(sourceDuration, capped)
+        let duration = assetDuration.seconds
+        let range = CMTimeRange(start: .zero, duration: assetDuration)
 
         let composition = AVMutableVideoComposition()
         composition.renderSize = size
         composition.frameDuration = CMTime(value: 1, timescale: 30)
         let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRange(start: .zero, duration: try await asset.load(.duration))
+        instruction.timeRange = range
         let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
         let scale = size.width / source.width
         layer.setTransform(transform.concatenating(CGAffineTransform(scaleX: scale, y: scale)), at: .zero)
@@ -77,7 +87,13 @@ final class VideoUploader: ObservableObject {
         composition.instructions = [instruction]
 
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("post_\(UUID().uuidString).mp4")
-        try await encode(asset: asset, composition: composition, size: size, to: out)
+        var prepared = false
+        defer { if !prepared { try? FileManager.default.removeItem(at: out) } }
+        try await encode(asset: asset, composition: composition, size: size, range: range,
+                         videoBitrate: targetVideoBitrate(duration: duration), to: out)
+        guard try fileSize(out) <= 15 * 1024 * 1024 else {
+            throw SocialError.message("This clip is too large to post. Trim it and try again.")
+        }
 
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: out))
         generator.appliesPreferredTrackTransform = true
@@ -87,6 +103,7 @@ final class VideoUploader: ObservableObject {
         guard let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.75) else {
             throw SocialError.message("Couldn't make a thumbnail.")
         }
+        prepared = true
         return Prepared(videoURL: out, thumb: jpeg, width: Int(size.width), height: Int(size.height),
                         duration: duration)
     }
@@ -96,13 +113,19 @@ final class VideoUploader: ObservableObject {
     static let videoBitrate = 2_500_000
     static let audioBitrate = 128_000
 
-    /// Reader (through the scaling composition) → writer at a fixed bitrate.
+    static func targetVideoBitrate(duration: Double) -> Int {
+        // Reserve space below the 15 MiB upload limit for AAC, the container and encoder overshoot.
+        let available = Double(12 * 1024 * 1024 * 8) / max(duration, 1) - Double(audioBitrate)
+        return Int(min(Double(videoBitrate), available))
+    }
+
     private static func encode(asset: AVAsset, composition: AVVideoComposition, size: CGSize,
-                               to out: URL) async throws {
+                               range: CMTimeRange, videoBitrate: Int, to out: URL) async throws {
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
 
         let reader = try AVAssetReader(asset: asset)
+        reader.timeRange = range
         let videoOut = AVAssetReaderVideoCompositionOutput(videoTracks: videoTracks, videoSettings: [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange])
         videoOut.videoComposition = composition

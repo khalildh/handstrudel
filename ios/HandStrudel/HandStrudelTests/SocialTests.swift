@@ -3,6 +3,48 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    @MainActor
+    func testHalfSpeedDraftExportsAtNormalTempoWithoutChangingRawTake() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let drafts = RecordingDrafts(directory: directory)
+        var draft = try drafts.begin(instrument: "Violin", mode: "Scale", halfSpeed: true)
+        let fixture = try await Self.makeClip(width: 180, height: 320, seconds: 4)
+        let raw = drafts.videoURL(for: draft.id)
+        try FileManager.default.moveItem(at: fixture, to: raw)
+        try drafts.complete(draft)
+        XCTAssertEqual(RecordingDrafts(directory: directory).drafts.first?.recordedAtHalfSpeed, true)
+        let full = try await drafts.makeExport(for: draft)
+        defer { try? FileManager.default.removeItem(at: full) }
+        let fullDuration = try await AVURLAsset(url: full).load(.duration).seconds
+        XCTAssertEqual(fullDuration, 2, accuracy: 0.08)
+        draft.trimStart = 1
+        draft.trimEnd = 3
+        try drafts.saveTrim(draft)
+        let trimmed = try await drafts.makeExport(for: draft)
+        defer { try? FileManager.default.removeItem(at: trimmed) }
+        let trimmedDuration = try await AVURLAsset(url: trimmed).load(.duration).seconds
+        let originalDuration = try await AVURLAsset(url: raw).load(.duration).seconds
+        XCTAssertEqual(trimmedDuration, 1, accuracy: 0.08)
+        XCTAssertEqual(originalDuration, 4, accuracy: 0.08)
+    }
+
+    @MainActor
+    func testHalfSpeedTempoUpdatesDrumTracksAndRestoresNormalTempo() {
+        let engine = EngineController()
+        engine.selectedDrumLoop = DRUM_LOOPS[1]
+        engine.selectedDrumLoop2 = DRUM_LOOPS[1]
+        let normal = engine.buildDrumCodeParts()
+        XCTAssertTrue(normal.allSatisfy { $0.hasSuffix(".cpm(60.0)") })
+        XCTAssertEqual(normal.count, 2)
+        engine.setRecordingTempo(halfSpeed: true)
+        XCTAssertEqual(engine.strudelBridge.tempoScale, 0.5)
+        XCTAssertTrue(engine.buildDrumCodeParts().allSatisfy { $0.hasSuffix(".cpm(30.0)") })
+        engine.setRecordingTempo(halfSpeed: false)
+        XCTAssertEqual(engine.strudelBridge.tempoScale, 1)
+        XCTAssertEqual(engine.buildDrumCodeParts(), normal)
+    }
+
     func testUsernameValidation() {
         XCTAssertTrue(Profile.isValidUsername("hand_strudel1"))
         XCTAssertFalse(Profile.isValidUsername("ab"))                 // too short

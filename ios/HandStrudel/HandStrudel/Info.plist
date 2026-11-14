@@ -35,6 +35,8 @@
 	<string>HandStrudel uses the camera to track your hand gestures and convert them into music.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>HandStrudel records your voice along with the app's sound when you save and share a video recording of your performance.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>HandStrudel adds performance clips to your photo library when you choose Save to Photos.</string>
 	<key>UIDesignRequiresCompatibility</key>
 	<true/>
 	<key>UILaunchScreen</key>

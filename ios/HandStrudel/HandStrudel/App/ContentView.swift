@@ -9,17 +9,23 @@ struct ContentView: View {
     @StateObject private var engine = EngineController()
     @StateObject private var storeManager = StoreManager()
     @StateObject private var auth = AuthManager()
-    @State private var showSignIn = false
     @State private var showProfile = false
     @State private var showFeed = false
-    @State private var composingPost: URL?
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var showSheet = false
     @State private var isRecording = false
     @State private var recordCountdown = 0
-    @State private var showShareSheet = false
-    @State private var showSharePicker = false
-    @State private var recordedVideoURL: URL?
+    @StateObject private var drafts = RecordingDrafts()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showDrafts = false
+    @State private var reviewingDraft: RecordingDraft?
+    @State private var retakeRequested = false
+    @State private var recorderBusy = false
+    @State private var recorderEvents = RecordingInterruptionObserver()
+    @State private var captureTask: Task<Void, Never>?
+    @State private var activeDraft: RecordingDraft?
+    @State private var recordingError: String?
+    @AppStorage("recordAtHalfSpeed") private var recordAtHalfSpeed = false
     @AppStorage("hideSkeletonWhenRecording") private var hideSkeletonWhenRecording = true
     @State private var filterName: String = ""
     @State private var showFilterName = false
@@ -68,6 +74,10 @@ struct ContentView: View {
                                           scaleChordMelody: true)
                     }
                 )
+                .safeAreaInset(edge: .bottom) {
+                    Button("Private drafts", systemImage: "film.stack") { showDrafts = true }
+                        .padding(.bottom, 8)
+                }
                 .overlay(alignment: .top) {
                     if SocialConfig.isConfigured {
                         HStack {
@@ -104,6 +114,17 @@ struct ContentView: View {
                 .allowsHitTesting(false)
         }
         .onAppear {
+            recorderEvents.onStop = { error in
+                guard isRecording, !recorderBusy, let draft = activeDraft else { return }
+                finishRecordingUI()
+                if (try? drafts.complete(draft)) != nil {
+                    recordingError = "Recording interrupted. Check Private drafts for the saved take."
+                } else {
+                    drafts.discardUnfinished(draft)
+                    recordingError = "Recording interrupted: \(error.localizedDescription)"
+                }
+            }
+            RPScreenRecorder.shared().delegate = recorderEvents
             if ProcessInfo.processInfo.arguments.contains("--reset-onboarding") {
                 hasSeenOnboarding = false
             }
@@ -111,23 +132,39 @@ struct ContentView: View {
             // Simulator testing of the posting flow (it can't record the camera):
             // HANDSTRUDEL_TEST_CLIP=/path/to/clip.mp4 starts "Post to HandStrudel" with that clip.
             if let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
-                recordedVideoURL = URL(fileURLWithPath: path)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { postToHandStrudel() }
+                DispatchQueue.main.async { openSampleDraft(at: URL(fileURLWithPath: path)) }
             }
             #endif
         }
-        // Posting sheets live at the root so they work from any screen.
-        .sheet(isPresented: $showSignIn, onDismiss: {
-            // Finished signing in from the share dialog → continue to the composer.
-            if auth.isSignedIn && !auth.needsProfileSetup, let url = recordedVideoURL { composingPost = url }
-        }) {
-            SignInView(auth: auth)
+        .sheet(isPresented: $showDrafts) {
+            RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil)
         }
-        .sheet(item: $composingPost) { url in
-            PostComposerView(clip: url, instrument: engine.selectedSoundFontInstrument.name,
-                             mode: currentModeName, auth: auth)
-                .onAppear { engine.pause() }
-                .onDisappear { engine.resume() }
+        .sheet(item: $reviewingDraft, onDismiss: {
+            if engine.isRunning { engine.resume() }
+            if retakeRequested {
+                retakeRequested = false
+                startRecordingCountdown()
+            }
+        }) { draft in
+            RecordingDraftsView(store: drafts, auth: auth, openedDraft: draft, onRetake: engine.isRunning ? {
+                retakeRequested = true
+                reviewingDraft = nil
+            } : nil)
+            .onAppear { engine.pause() }
+        }
+        .alert("Recording", isPresented: Binding(
+            get: { recordingError != nil }, set: { if !$0 { recordingError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(recordingError ?? "") }
+        .onChange(of: scenePhase) { phase in
+            if phase == .background {
+                if isRecording { stopRecording() }
+                else if !recorderBusy { cancelCountdown() }
+            }
+        }
+        .onReceive(engine.jamSession.$isActive.removeDuplicates()) { active in
+            if active, activeDraft?.recordedAtHalfSpeed == true { stopRecording() }
         }
         .statusBarHidden(engine.isRunning)
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
@@ -151,7 +188,7 @@ struct ContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleLoopRecording)) { _ in
-            guard engine.isRunning else { return }
+            guard engine.isRunning, activeDraft?.recordedAtHalfSpeed != true else { return }
             if engine.isLoopRecording {
                 engine.stopLoopRecording()
             } else {
@@ -694,37 +731,10 @@ struct ContentView: View {
         } message: {
             Text("Start a FaceTime call, then tap the people icon again. Everyone on the call who has HandStrudel can join the jam!")
         }
-        .sheet(isPresented: $showShareSheet) {
-            if let url = recordedVideoURL {
-                ShareSheet(activityItems: [url])
-            }
-        }
         .sheet(isPresented: $showLearnPicker) {
             LearnSongPicker { song in
                 engine.loadLearnSong(song)
                 showLearnPicker = false
-            }
-        }
-        .confirmationDialog("Share to", isPresented: $showSharePicker, titleVisibility: .visible) {
-            if SocialConfig.isConfigured {
-                Button(action: postToHandStrudel) {
-                    Label("Post to HandStrudel", systemImage: "hand.raised.fingers.spread")
-                }
-            }
-            Button(action: shareToInstagramStories) {
-                Label("Instagram Story", systemImage: "camera.circle")
-            }
-            Button(action: shareToInstagramReels) {
-                Label("Instagram Reels", systemImage: "film")
-            }
-            Button(action: {
-                showSharePicker = false
-                showShareSheet = true
-            }) {
-                Label("Other...", systemImage: "square.and.arrow.up")
-            }
-            Button("Cancel", role: .cancel) {
-                showSharePicker = false
             }
         }
         .sheet(isPresented: $showSheet) {
@@ -733,18 +743,6 @@ struct ContentView: View {
                 .presentationDragIndicator(.visible)
                 .onAppear { engine.pause() }
                 .onDisappear { engine.resume() }
-        }
-    }
-
-    // MARK: - Posting
-
-    private func postToHandStrudel() {
-        showSharePicker = false
-        guard let url = recordedVideoURL else { return }
-        if auth.isSignedIn && !auth.needsProfileSetup {
-            composingPost = url
-        } else {
-            showSignIn = true
         }
     }
 
@@ -805,8 +803,10 @@ struct ContentView: View {
                 )
             }
 
+            .disabled(activeDraft?.recordedAtHalfSpeed == true)
+
             // Close button
-            Button(action: { engine.stop() }) {
+            Button(action: { cancelCountdown(); engine.stop() }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white.opacity(0.85))
@@ -815,6 +815,7 @@ struct ContentView: View {
                     .clipShape(Circle())
             }
             .accessibilityIdentifier("close-button")
+            .disabled(isRecording || recorderBusy)
         }
     }
 
@@ -1316,7 +1317,25 @@ struct ContentView: View {
             Spacer()
 
             // Video record button
-            recordButton
+            VStack(spacing: 4) {
+                if !isRecording, !recorderBusy, recordCountdown == 0 {
+                    Button {
+                        recordAtHalfSpeed.toggle()
+                    } label: {
+                        Label("½×", systemImage: "tortoise")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(recordAtHalfSpeed ? Color.black : .white)
+                            .padding(.horizontal, 10)
+                            .frame(minHeight: 32)
+                            .background(recordAtHalfSpeed ? Color.green : .black.opacity(0.55), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Half-speed recording")
+                    .accessibilityValue(recordAtHalfSpeed ? "On" : "Off")
+                    .accessibilityIdentifier("half-speed-recording")
+                }
+                recordButton
+            }
 
             Spacer()
 
@@ -1329,6 +1348,7 @@ struct ContentView: View {
                     .background(Circle().fill(Color.black.opacity(0.3)))
             }
             .accessibilityIdentifier("settings-button")
+            .disabled(isRecording || recorderBusy)
         }
     }
 
@@ -1389,6 +1409,7 @@ struct ContentView: View {
                 }
             }
         }
+        .disabled(activeDraft?.recordedAtHalfSpeed == true)
         .overlay(alignment: .top) {
             if showLoopSaved {
                 HStack(spacing: 6) {
@@ -1417,68 +1438,84 @@ struct ContentView: View {
     }
 
     private var recordButton: some View {
-        // Instagram share button
-            Button(action: startRecording) {
-                ZStack {
-                    if isRecording {
-                        // Recording indicator with countdown
-                        ZStack {
-                            Circle()
-                                .stroke(Color.red.opacity(0.3), lineWidth: 3)
-                                .frame(width: 62, height: 62)
-                            Circle()
-                                .trim(from: 0, to: CGFloat(7 - recordCountdown) / 7.0)
-                                .stroke(Color.red, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                                .frame(width: 62, height: 62)
-                                .rotationEffect(.degrees(-90))
-                                .animation(.linear(duration: 1), value: recordCountdown)
-                            Text("\(recordCountdown)")
-                                .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
-                        }
-                    } else {
-                        // Instagram-style share button
-                        VStack(spacing: 3) {
-                            ZStack {
-                                // Instagram gradient ring
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [.purple, .pink, .orange, .yellow],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 3
-                                    )
-                                    .frame(width: 56, height: 56)
-                                Image(systemName: "video.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.white)
-                            }
-                            Text("7s")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(.white.opacity(0.5))
-                        }
-                    }
+        Button {
+            if isRecording { stopRecording() }
+            else if recordCountdown > 0 { cancelCountdown() }
+            else { startRecordingCountdown() }
+        } label: {
+            ZStack {
+                Circle().fill(.black.opacity(0.55))
+                Circle().strokeBorder(.white.opacity(0.8), lineWidth: 1.5)
+                if recorderBusy {
+                    ProgressView().tint(.white)
+                } else if isRecording {
+                    RoundedRectangle(cornerRadius: 6).fill(Color.red).frame(width: 27, height: 27)
+                } else if recordCountdown > 0 {
+                    Text("\(recordCountdown)")
+                        .font(.title3.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.white)
+                } else {
+                    Circle().fill(Color.red).padding(7)
                 }
             }
-            .disabled(isRecording)
-            .accessibilityIdentifier("record-button")
+            .frame(width: 62, height: 62)
+        }
+        .buttonStyle(.plain)
+        .disabled(recorderBusy)
+        .accessibilityLabel(isRecording ? "Stop recording" : recordCountdown > 0 ? "Cancel countdown" : "Record video")
+        .accessibilityIdentifier("record-button")
     }
 
     // MARK: - Recording
 
+    private func startRecordingCountdown() {
+        let recorder = RPScreenRecorder.shared()
+        guard engine.isRunning, !isRecording, !recorderBusy, recordCountdown == 0 else { return }
+        guard !recordAtHalfSpeed || engine.supportsHalfSpeedRecording else {
+            recordingError = "Half speed is available in solo play. End the jam, guided lesson, or saved sequence first."
+            return
+        }
+        guard recorder.isAvailable else {
+            recordingError = "Screen recording isn’t available right now."
+            return
+        }
+        recordCountdown = 3
+        captureTask = Task {
+            for remaining in (0..<3).reversed() {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                recordCountdown = remaining
+            }
+            startRecording()
+        }
+    }
+
+    private func cancelCountdown() {
+        guard recordCountdown > 0 else { return }
+        captureTask?.cancel()
+        captureTask = nil
+        recordCountdown = 0
+    }
+
     private func startRecording() {
         let recorder = RPScreenRecorder.shared()
-        guard recorder.isAvailable && !isRecording else { return }
+        guard !recordAtHalfSpeed || engine.supportsHalfSpeedRecording else {
+            recordingError = "Half-speed recording is unavailable in this session."
+            return
+        }
+        let draft: RecordingDraft
+        do {
+            draft = try drafts.begin(instrument: engine.selectedSoundFontInstrument.name, mode: currentModeName,
+                                     halfSpeed: recordAtHalfSpeed)
+        } catch {
+            recordingError = "Couldn’t create a private draft. \(error.localizedDescription)"
+            return
+        }
+        activeDraft = draft
+        recorderBusy = true
+        engine.setRecordingTempo(halfSpeed: draft.recordedAtHalfSpeed == true)
 
-        isRecording = true
-        recordCountdown = 7
-
-        // Enable microphone to capture Strudel audio from speaker
-        // (WebView audio runs in a separate process so ReplayKit can't capture it directly)
-        // Audio session is already .playAndRecord so this shouldn't kill playback
-        recorder.isMicrophoneEnabled = true
+        recorder.isMicrophoneEnabled = !engine.jamSession.isActive
 
         // Add watermark overlay for branding in recording
         if let window = UIApplication.shared.connectedScenes
@@ -1489,23 +1526,23 @@ struct ContentView: View {
         }
 
         recorder.startRecording { error in
-            if let error {
-                debugPrint("Recording failed:", error)
-                DispatchQueue.main.async {
-                    isRecording = false
-                    watermarkView?.removeFromSuperview()
-                    watermarkView = nil
-                }
-                return
-            }
-
-            // Countdown timer
-            Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-                DispatchQueue.main.async {
-                    recordCountdown -= 1
-                    if recordCountdown <= 0 {
-                        timer.invalidate()
+            DispatchQueue.main.async {
+                if let error {
+                    drafts.discardUnfinished(draft)
+                    finishRecordingUI()
+                    recordingError = "Couldn’t start recording. \(error.localizedDescription)"
+                } else {
+                    recorderBusy = false
+                    isRecording = true
+                    if scenePhase == .background { stopRecording(); return }
+                    if draft.recordedAtHalfSpeed == true && !engine.supportsHalfSpeedRecording {
                         stopRecording()
+                        return
+                    }
+                    captureTask = Task {
+                        let captureLimit = Double(RecordingDrafts.recordingLimit) / draft.outputScale
+                        try? await Task.sleep(nanoseconds: UInt64(captureLimit * 1_000_000_000))
+                        if !Task.isCancelled { stopRecording() }
                     }
                 }
             }
@@ -1513,53 +1550,68 @@ struct ContentView: View {
     }
 
     private func stopRecording() {
+        guard isRecording, !recorderBusy, let draft = activeDraft else { return }
+        recorderBusy = true
+        captureTask?.cancel()
+        engine.setRecordingTempo(halfSpeed: false)
         let recorder = RPScreenRecorder.shared()
-        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("handstrudel_\(Int(Date().timeIntervalSince1970)).mp4")
+        let outputURL = drafts.videoURL(for: draft.id)
 
         recorder.stopRecording(withOutput: outputURL) { error in
             DispatchQueue.main.async {
-                isRecording = false
-                // Remove watermark
-                watermarkView?.removeFromSuperview()
-                watermarkView = nil
-                if let error {
-                    debugPrint("Stop recording failed:", error)
-                    return
+                finishRecordingUI()
+                do {
+                    if let error { throw error }
+                    try drafts.complete(draft)
+                    if scenePhase != .background { reviewingDraft = draft }
+                } catch {
+                    if (try? drafts.complete(draft)) != nil {
+                        recordingError = "Recording was interrupted. Check Private drafts for the saved take."
+                    } else {
+                        drafts.discardUnfinished(draft)
+                        recordingError = "Couldn’t save this take. \(error.localizedDescription)"
+                    }
                 }
-                recordedVideoURL = outputURL
-                showSharePicker = true
             }
         }
     }
 
-    private func shareToInstagramStories() {
-        guard let url = recordedVideoURL,
-              let videoData = try? Data(contentsOf: url) else { return }
-
-        if let storiesURL = URL(string: "instagram-stories://share?source_application=com.handstrudel.app"),
-           UIApplication.shared.canOpenURL(storiesURL) {
-            UIPasteboard.general.setItems([[
-                "com.instagram.sharedSticker.backgroundVideo": videoData,
-                "com.instagram.sharedSticker.appID": "com.handstrudel.app"
-            ]], options: [.expirationDate: Date().addingTimeInterval(300)])
-            UIApplication.shared.open(storiesURL)
-        } else {
-            showShareSheet = true
-        }
-        showSharePicker = false
+    private func finishRecordingUI() {
+        captureTask?.cancel()
+        engine.setRecordingTempo(halfSpeed: false)
+        RPScreenRecorder.shared().isMicrophoneEnabled = false
+        isRecording = false
+        recorderBusy = false
+        captureTask = nil
+        activeDraft = nil
+        watermarkView?.removeFromSuperview()
+        watermarkView = nil
     }
 
-    private func shareToInstagramReels() {
-        guard let url = recordedVideoURL else { return }
-
-        // Share to Reels via document interaction (video file to Instagram)
-        let instagramURL = URL(string: "instagram://library?AssetPath=\(url.absoluteString)")
-        if let instagramURL, UIApplication.shared.canOpenURL(instagramURL) {
-            UIApplication.shared.open(instagramURL)
-        } else {
-            // Fallback: open share sheet which shows Instagram as option
-            showShareSheet = true
+    #if DEBUG
+    private func openSampleDraft(at url: URL) {
+        do {
+            let draft = try drafts.begin(instrument: engine.selectedSoundFontInstrument.name, mode: currentModeName)
+            do {
+                try FileManager.default.copyItem(at: url, to: drafts.videoURL(for: draft.id))
+                try drafts.complete(draft)
+                reviewingDraft = draft
+            } catch {
+                drafts.discardUnfinished(draft)
+                throw error
+            }
+        } catch {
+            recordingError = error.localizedDescription
         }
-        showSharePicker = false
+    }
+    #endif
+}
+
+private final class RecordingInterruptionObserver: NSObject, RPScreenRecorderDelegate {
+    var onStop: ((Error) -> Void)?
+
+    func screenRecorder(_ screenRecorder: RPScreenRecorder, didStopRecordingWith previewViewController: RPPreviewViewController?, error: Error?) {
+        guard let error else { return }
+        DispatchQueue.main.async { [weak self] in self?.onStop?(error) }
     }
 }
