@@ -60,6 +60,7 @@ targets:
         UIRequiresFullScreen: true
         NSCameraUsageDescription: "HandStrudel uses the camera to track your hand gestures and convert them into music."
         NSMicrophoneUsageDescription: "HandStrudel records your voice along with the app's sound when you save and share a video recording of your performance."
+        NSPhotoLibraryAddUsageDescription: "HandStrudel adds performance clips to your photo library when you choose Save to Photos."
         NSLocalNetworkUsageDescription: "HandStrudel uses the local network to discover nearby devices for SharePlay jam sessions, letting you play music together in real time."
         NSBonjourServices:
           - "_groupactivities._tcp"

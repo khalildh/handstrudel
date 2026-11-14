@@ -97,6 +97,24 @@ final class EngineController: ObservableObject {
     @Published var noteDisplay = ""
     @Published var bpm: Double = 120
     @Published var currentBeat = 0
+    private(set) var recordingTempoScale: Double = 1
+    private var lastReportedTempo = 0.0
+
+    func setRecordingTempo(halfSpeed: Bool) {
+        let scale = halfSpeed ? 0.5 : 1
+        guard scale != recordingTempoScale else { return }
+        let bpm = smoothed["bpm"] ?? manualBPM
+        recordingTempoScale = scale
+        strudelBridge.setTempoScale(scale, bpm: bpm)
+        quantizeQuarterPeriod = 60 / max(1, bpm * scale)
+        quantizeBeatWallTime = 0
+        lastStructKey = ""
+    }
+
+    var supportsHalfSpeedRecording: Bool {
+        !learnModeEnabled && !jamSession.isActive && playingSet.isEmpty && !trackPlaying
+        && playingLoopIds.isEmpty && !isLoopRecording
+    }
 
     // Saved snippets
     @Published var savedSnippets = [SavedSnippet]()
@@ -427,7 +445,9 @@ final class EngineController: ObservableObject {
                             let now = CACurrentMediaTime()
                             if self.quantizeBeatWallTime > 0 {
                                 let delta = now - self.quantizeBeatWallTime
-                                if delta > 0.05 && delta < 2.0 { self.quantizeQuarterPeriod = delta }
+                                if delta > 0.05 && delta < 2.0 / self.recordingTempoScale {
+                                    self.quantizeQuarterPeriod = delta
+                                }
                             }
                             self.quantizeBeatWallTime = now
                             self.quantizeBeatIndex += 1
@@ -507,6 +527,10 @@ final class EngineController: ObservableObject {
         let isLive = playingSet.isEmpty && !trackPlaying
         guard isLive, !isPaused else { return }
 
+        if recordingTempoScale != 1 {
+            let bpm = smoothed["bpm"] ?? manualBPM
+            if bpm != lastReportedTempo { strudelBridge.updateTempo(bpm); lastReportedTempo = bpm }
+        }
         activeMode.tick(self)
 
         tickLoopPlayback()
@@ -822,7 +846,7 @@ final class EngineController: ObservableObject {
             let vol = drumVolume * intensityGain
             code1 = "(\(code1)).gain(\(String(format: "%.2f", vol)))"
             // BPM via cpm (cycles per minute = BPM / 4)
-            let cpm1 = drumBPM / 4.0 * complexitySpeed
+            let cpm1 = drumBPM / 4.0 * complexitySpeed * recordingTempoScale
             code1 = "(\(code1)).cpm(\(String(format: "%.1f", cpm1)))"
             parts.append(code1)
         }
@@ -830,7 +854,7 @@ final class EngineController: ObservableObject {
         if !code2.isEmpty {
             let vol = drumVolume2 * intensityGain
             code2 = "(\(code2)).gain(\(String(format: "%.2f", vol)))"
-            let cpm2 = drumBPM2 / 4.0 * complexitySpeed
+            let cpm2 = drumBPM2 / 4.0 * complexitySpeed * recordingTempoScale
             code2 = "(\(code2)).cpm(\(String(format: "%.1f", cpm2)))"
             parts.append(code2)
         }
@@ -1069,6 +1093,7 @@ final class EngineController: ObservableObject {
     }
 
     func stop() {
+        setRecordingTempo(halfSpeed: false)
         // Persist state before teardown
         let mode = currentModeString
         PersistenceManager.shared.lastSoundFont = selectedSoundFontInstrument.id

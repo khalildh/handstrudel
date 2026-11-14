@@ -174,10 +174,21 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         }
     }
 
+    private(set) var tempoScale: Double = 1
+
+    func setTempoScale(_ scale: Double, bpm: Double) {
+        tempoScale = scale
+        updateTempo(bpm)
+    }
+
+    func updateTempo(_ bpm: Double) {
+        webView.evaluateJavaScript("__hp._cpm=\(String(format: "%.2f", bpm / 4 * tempoScale))", completionHandler: nil)
+    }
+
     func updateParams(_ params: MusicParams, config: MappingConfig) {
         let ni = max(0, min(NOTES.count - 1, Int((params["noteIdx"] ?? 10).rounded())))
         let midi = MIDI_NOTES[ni]
-        let cpm = (params["bpm"] ?? 120) / 4
+        let cpm = (params["bpm"] ?? 120) / 4 * tempoScale
 
         var parts = ["__hp._midi=\(midi)", "__hp._cpm=\(String(format: "%.2f", cpm))"]
         for id in extraParamIds(config) {
@@ -189,7 +200,7 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     func updateScaleParams(_ params: MusicParams, config: MappingConfig, midi: Int) {
-        let cpm = (params["bpm"] ?? 120) / 4
+        let cpm = (params["bpm"] ?? 120) / 4 * tempoScale
         var parts = ["__hp._midi=\(midi)", "__hp._cpm=\(String(format: "%.2f", cpm))"]
         for id in extraParamIds(config) {
             guard let def = PARAM_MAP[id] else { continue }
@@ -199,7 +210,7 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     func updateChordParams(_ params: MusicParams, config: MappingConfig, chordMidi: [Int]) {
-        let cpm = (params["bpm"] ?? 120) / 4
+        let cpm = (params["bpm"] ?? 120) / 4 * tempoScale
         var parts = ["__hp._cpm=\(String(format: "%.2f", cpm))", "__hp._midi=\(chordMidi.first ?? 60)"]
         for i in 0..<3 {
             let midi = i < chordMidi.count ? chordMidi[i] : (chordMidi.first ?? 60)

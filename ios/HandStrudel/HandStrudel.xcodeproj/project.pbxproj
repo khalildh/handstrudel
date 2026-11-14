@@ -23,6 +23,7 @@
 		31732217DB10380B3787DE51 /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */; };
 		372DDDFE5ECB97237C94192A /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 060174F53A17DCA947630D4A /* ProfileView.swift */; };
 		375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D986625C7BF30952FBAED619 /* OnboardingView.swift */; };
+		4E3F10DA602E4A40A107F24B /* RecordingDraftsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */; };
 		380966C71A0162507C985C6C /* StartOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74287CD261130ADF57405FF3 /* StartOverlayView.swift */; };
 		39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */; };
 		3A9EDA3981D97A38C0BD9C52 /* MotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60006BC6A28FE1029F6097F /* MotionManager.swift */; };
@@ -210,6 +211,7 @@
 		CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordProgression.swift; sourceTree = "<group>"; };
 		D1FD63E1E2EC2BFA39147EDD /* SocialTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialTests.swift; sourceTree = "<group>"; };
 		D986625C7BF30952FBAED619 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDraftsView.swift; sourceTree = "<group>"; };
 		E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeManagerTests.swift; sourceTree = "<group>"; };
 		F15B500CE35D9D44107CDAC4 /* StoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreView.swift; sourceTree = "<group>"; };
 		F2C015029D54DF587EDD09DC /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
@@ -273,6 +275,7 @@
 				SPLITTOUCHOVL000000002 /* SplitTouchOverlay.swift */,
 				1C85B4858D833EF68AAD427C /* LearnSongPicker.swift */,
 				D986625C7BF30952FBAED619 /* OnboardingView.swift */,
+				5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */,
 				A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */,
 				74287CD261130ADF57405FF3 /* StartOverlayView.swift */,
 				F15B500CE35D9D44107CDAC4 /* StoreView.swift */,
@@ -598,6 +601,7 @@
 				3A9EDA3981D97A38C0BD9C52 /* MotionManager.swift in Sources */,
 				F4DD8246A5A0539BE5F7D78C /* MusicTheory.swift in Sources */,
 				375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */,
+				4E3F10DA602E4A40A107F24B /* RecordingDraftsView.swift in Sources */,
 				9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */,
 				A1B2C3D4E5F600000000FF11 /* MusicConfig.generated.swift in Sources */,
 				2FC5D55810AF0B87923E355B /* ParamSmoother.swift in Sources */,

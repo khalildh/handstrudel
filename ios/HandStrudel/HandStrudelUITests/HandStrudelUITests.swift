@@ -160,6 +160,25 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("settings-button").waitForExistence(timeout: 2))
     }
 
+    func testSession_halfSpeedRecordingToggle() {
+        app.launchArguments.append("--uitesting")
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        let onboarding = element("onboarding-got-it")
+        if onboarding.waitForExistence(timeout: 2) { onboarding.tap() }
+        let toggle = element("half-speed-recording")
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        let previous = toggle.value as? String
+        XCTAssertTrue(previous == "On" || previous == "Off")
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, previous == "On" ? "Off" : "On")
+        XCTAssertTrue(element("record-button").exists)
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, previous)
+    }
+
     func testSession_showsRecordButton() {
         launchToSession()
         XCTAssertTrue(element("record-button").waitForExistence(timeout: 2))
