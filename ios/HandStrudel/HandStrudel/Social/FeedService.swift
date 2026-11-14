@@ -277,6 +277,26 @@ enum FeedService {
         return !rows.isEmpty
     }
 
+    struct ProfileCounts {
+        let posts: Int?
+        let followers: Int?
+        let following: Int?
+    }
+
+    static func profileCounts(for id: UUID, owner: Bool = false) async -> ProfileCounts {
+        async let posts = try? supabase.from(owner ? "videos" : "feed_videos")
+            .select("id", head: true, count: .exact).eq("user_id", value: id).execute().count
+        async let followers = try? supabase.from("follows")
+            .select("follower_id", head: true, count: .exact).eq("followee_id", value: id).execute().count
+        async let following = try? supabase.from("follows")
+            .select("followee_id", head: true, count: .exact).eq("follower_id", value: id).execute().count
+        return await ProfileCounts(posts: posts, followers: followers, following: following)
+    }
+
+    static func ownerPage(user: UUID, after last: Video? = nil) async throws -> [Video] {
+        try await orderedPage(supabase.from("videos").select(), after: last, creator: user)
+    }
+
     static func followedAuthors(_ authors: Set<UUID>, user: UUID) async throws -> Set<UUID> {
         guard !authors.isEmpty else { return [] }
         struct Follow: Decodable { let followee_id: UUID }

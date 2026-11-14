@@ -726,64 +726,58 @@ private struct PublicCreatorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var creator: PublicCreator?
     @State private var videos: [Video] = []
+    @State private var counts: FeedService.ProfileCounts?
     @State private var opened: Video?
     @State private var afterDismiss: PerformanceStart?
     @State private var following = false
     @State private var loading = true
     @State private var busy = false
+    @State private var changingFollow = false
     @State private var more = false
     @State private var signIn = false
     @State private var error: String?
+    @State private var postsFailed = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 20) {
                     if let creator {
-                        HStack(spacing: 12) {
-                            Text(String(creator.username.prefix(1)).uppercased())
-                                .font(.title2.bold()).frame(width: 56, height: 56)
-                                .background(palette.surface, in: Circle())
-                            VStack(alignment: .leading) {
-                                Text(creator.displayName ?? "@\(creator.username)").font(.title2.bold())
-                                if creator.displayName != nil { Text("@\(creator.username)").foregroundStyle(.secondary) }
-                            }
-                            Spacer()
+                        CreatorProfileHeader(username: creator.username, displayName: creator.displayName,
+                                             avatarKey: videos.first?.avatarKey, counts: counts,
+                                             isOwner: auth.userId == creatorId) {
                             if auth.userId != creatorId {
-                                Button(following ? "Following" : "Follow", action: changeFollow)
-                                    .buttonStyle(.bordered).disabled(busy)
-                            }
-                        }
-                        Text("Performances").font(.headline)
-                        if videos.isEmpty && !loading { Text("No public performances yet.").foregroundStyle(.secondary) }
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
-                            ForEach(videos) { video in
-                                Button { opened = video } label: {
-                                    Rectangle().fill(palette.surface).aspectRatio(9 / 16, contentMode: .fit)
-                                        .overlay {
-                                            AsyncImage(url: video.thumbURL) { image in image.resizable().scaledToFill() }
-                                                placeholder: { Image(systemName: "play.rectangle") }
-                                        }
-                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                Button(action: changeFollow) {
+                                    Label(following ? "Following" : "Follow",
+                                          systemImage: following ? "checkmark" : "plus")
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(video.caption.isEmpty ? "Play performance" : video.caption)
+                                .buttonStyle(ProfileActionStyle(primary: !following))
+                                .disabled(changingFollow || loading)
+                                .accessibilityIdentifier("profile-follow")
                             }
                         }
-                        if more { Button("More performances") { Task { await loadVideos(append: true) } }.disabled(busy) }
+                        CreatorPortfolio(videos: videos, loading: loading || busy, failed: postsFailed, more: more,
+                                         isOwner: false, open: { opened = $0 }, trySound: { onStart(.preset($0)) },
+                                         retry: { Task { await loadVideos(append: more) } },
+                                         loadMore: { Task { await loadVideos(append: true) } })
                     } else if loading {
-                        ProgressView("Loading creator")
+                        ProgressView("Loading creator").frame(maxWidth: .infinity).padding(.vertical, 40)
                     } else if error == nil {
-                        Text("This profile is unavailable.")
+                        Text("This profile is unavailable.").foregroundStyle(palette.muted)
                     }
                     if let error {
-                        Text(error).font(.footnote).foregroundStyle(.secondary)
-                        Button("Try again") { Task { await load() } }.disabled(loading || busy)
+                        Text(error).font(.footnote).foregroundStyle(palette.muted)
+                        Button("Try again") { Task { await load() } }
+                            .buttonStyle(ProfileActionStyle()).disabled(loading || changingFollow)
                     }
                 }
-                .padding(18)
+                .padding(.horizontal, 21)
+                .padding(.vertical, 12)
+                .frame(maxWidth: 650)
+                .frame(maxWidth: .infinity, alignment: .top)
             }
-            .background(palette.background)
+            .background(palette.background.ignoresSafeArea())
+            .foregroundStyle(palette.ink)
             .navigationTitle("Creator")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
@@ -808,20 +802,29 @@ private struct PublicCreatorView: View {
     private func load() async {
         loading = true
         error = nil
-        defer { loading = false }
+        defer { if !Task.isCancelled { loading = false } }
+        let viewer = auth.userId
         do {
-            creator = try await FeedService.creator(id: creatorId)
-            guard creator != nil else { return }
-            if let user = auth.userId { following = await FeedService.isFollowing(creatorId, user: user) }
-            else { following = false }
+            let profile = try await FeedService.creator(id: creatorId)
+            guard !Task.isCancelled, viewer == auth.userId else { return }
+            creator = profile
+            guard profile != nil else { videos = []; counts = nil; return }
+            async let metrics = FeedService.profileCounts(for: creatorId)
+            if let viewer {
+                let result = await FeedService.isFollowing(creatorId, user: viewer)
+                guard !Task.isCancelled, viewer == auth.userId else { return }
+                if !changingFollow { following = result }
+            } else { following = false }
             await loadVideos()
+            let result = await metrics
+            if !Task.isCancelled, viewer == auth.userId { counts = result }
         } catch { if !Task.isCancelled { self.error = "Couldn't load this profile. Pull down to refresh." } }
     }
 
     private func loadVideos(append: Bool = false) async {
         guard !busy else { return }
         busy = true
-        error = nil
+        postsFailed = false
         defer { busy = false }
         do {
             let page = try await FeedService.page(after: append ? videos.last : nil, creator: creatorId)
@@ -831,18 +834,21 @@ private struct PublicCreatorView: View {
                 videos += page.filter { !loaded.contains($0.id) }
             } else { videos = page }
             more = page.count == FeedService.pageSize
-        } catch { if !Task.isCancelled { self.error = "Couldn't load performances." } }
+        } catch { if !Task.isCancelled { postsFailed = true } }
     }
 
     private func changeFollow() {
         guard let user = auth.userId, !auth.needsProfileSetup else { signIn = true; return }
-        busy = true
+        changingFollow = true
+        error = nil
         Task {
-            defer { busy = false }
+            defer { changingFollow = false }
             do {
                 try await FeedService.setFollowing(!following, target: creatorId, user: user)
+                guard auth.userId == user else { return }
                 following.toggle()
                 onFollowChange()
+                counts = await FeedService.profileCounts(for: creatorId)
             } catch { self.error = "Couldn't update your follows." }
         }
     }
@@ -1031,11 +1037,13 @@ struct CreatorVideoView: View {
     @ObservedObject var auth: AuthManager
     var onPlayAlong: ((Video) -> Void)? = nil
     var onTrySound: ((SoundSetup) -> Void)? = nil
+    var allowsSharing = true
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            PerformanceDetail(video: video, auth: auth, onPlayAlong: onPlayAlong, onTrySound: onTrySound)
+            PerformanceDetail(video: video, auth: auth, onPlayAlong: onPlayAlong, onTrySound: onTrySound,
+                              allowsSharing: allowsSharing)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
                 }
@@ -1051,6 +1059,7 @@ private struct PerformanceDetail: View {
     var notification: CreatorActivity? = nil
     var onPlayAlong: ((Video) -> Void)? = nil
     var onTrySound: ((SoundSetup) -> Void)? = nil
+    var allowsSharing = true
     @State private var player: AVPlayer?
     @State private var showComments = false
 
@@ -1067,7 +1076,7 @@ private struct PerformanceDetail: View {
                 if !video.caption.isEmpty { Text(verbatim: video.caption) }
                 if let notification { notificationCard(notification) }
                 if let setup = video.soundSetup {
-                    ClipPresetCard(setup: setup, username: video.username, onPlay: onTrySound)
+                    ClipPresetCard(setup: setup, username: video.username ?? auth.profile?.username, onPlay: onTrySound)
                 } else if let instrument = video.instrument {
                     Label(instrument, systemImage: "waveform").font(.caption).foregroundStyle(.secondary)
                 }
@@ -1086,9 +1095,11 @@ private struct PerformanceDetail: View {
         }
         .background(palette.background.ignoresSafeArea())
         .foregroundStyle(palette.ink)
-        .navigationTitle("@\(video.username ?? "creator")")
+        .navigationTitle("@\(video.username ?? auth.profile?.username ?? "creator")")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .primaryAction) { ShareLink(item: video.watchURL) } }
+        .toolbar {
+            if allowsSharing { ToolbarItem(placement: .primaryAction) { ShareLink(item: video.watchURL) } }
+        }
         .sheet(isPresented: $showComments) {
             CommentsView(video: video, auth: auth, targetComment: notification?.commentId)
         }

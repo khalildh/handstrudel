@@ -38,6 +38,17 @@ enum SocialConfig {
     static let termsURL = URL(string: "https://handstrudel.com/terms")!
     static let guidelinesURL = URL(string: "https://handstrudel.com/community")!
     static let watchURL = URL(string: "https://handstrudel.com/watch")!
+    static let reviewURL = URL(string: "https://apps.apple.com/app/id6764415289?action=write-review")!
+    static let supportURL = URL(string: "https://handstrudel.com/support")!
 
     static func mediaURL(_ key: String) -> URL { mediaBaseURL.appendingPathComponent(key) }
+
+    static func creatorURL(_ username: String) -> URL {
+        var url = URLComponents()
+        url.scheme = "https"
+        url.host = "handstrudel.com"
+        url.path = "/creator"
+        url.queryItems = [URLQueryItem(name: "u", value: username)]
+        return url.url!
+    }
 }

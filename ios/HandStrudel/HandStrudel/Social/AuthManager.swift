@@ -12,6 +12,7 @@ let supabase = SupabaseClient(supabaseURL: SocialConfig.supabaseURL,
 /// Owns the signed-in user and their profile.
 @MainActor
 final class AuthManager: NSObject, ObservableObject {
+    static let displayNameLimit = 40
     @Published private(set) var userId: UUID?
     @Published private(set) var email: String?
     @Published private(set) var profile: Profile?
@@ -131,6 +132,31 @@ final class AuthManager: NSObject, ObservableObject {
                 ? "That username is taken." : error.localizedDescription
             return false
         }
+    }
+
+    func updateDisplayName(_ displayName: String) async throws {
+        guard let userId, var updated = profile, updated.id == userId else {
+            throw SocialError.message("Sign in again to edit your profile.")
+        }
+        let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard name.unicodeScalars.count <= Self.displayNameLimit else {
+            throw SocialError.message("Use 40 characters or fewer.")
+        }
+        let displayName = name.isEmpty ? nil : name
+        struct Update: Encodable {
+            let display_name: String?
+
+            func encode(to encoder: Encoder) throws {
+                enum Key: String, CodingKey { case display_name }
+                var container = encoder.container(keyedBy: Key.self)
+                try container.encode(display_name, forKey: .display_name)
+            }
+        }
+        try await supabase.from("profiles").update(Update(display_name: displayName))
+            .eq("id", value: userId).execute()
+        guard self.userId == userId else { return }
+        updated.displayName = displayName
+        profile = updated
     }
 
     func signOut() async {

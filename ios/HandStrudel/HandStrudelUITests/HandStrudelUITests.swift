@@ -336,6 +336,73 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Sign in to follow creators"].waitForExistence(timeout: 5))
     }
 
+    func testArtistProfileOpensLatestClipAndPlaysSharedSound() throws {
+        try launchWithProfileFixture()
+        element("tab-feed").tap()
+        let author = app.buttons["@loopmaker"].firstMatch
+        XCTAssertTrue(author.waitForExistence(timeout: 8))
+        author.tap()
+        XCTAssertTrue(app.staticTexts["Loop Maker"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Share profile"].exists)
+        let spotlight = app.buttons["profile-latest-performance"]
+        XCTAssertTrue(spotlight.waitForExistence(timeout: 5))
+        captureIfRequested("Artist-Profile")
+        spotlight.tap()
+        XCTAssertTrue(app.staticTexts["Evening loop"].waitForExistence(timeout: 5))
+        app.navigationBars["@loopmaker"].buttons["Done"].tap()
+        app.buttons["profile-sounds"].tap()
+        let sound = app.buttons["profile-play-sound"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 5))
+        captureIfRequested("Artist-Sounds")
+        sound.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
+    }
+
+    func testAccountProfileEditsDisplayNameAndKeepsEmptyState() throws {
+        try launchWithProfileFixture()
+        element("tab-account").tap()
+        let emailPrompt = app.buttons["Sign in"]
+        if emailPrompt.waitForExistence(timeout: 2) {
+            captureIfRequested("Account-Guest")
+            emailPrompt.tap()
+            let email = app.textFields["you@example.com"]
+            XCTAssertTrue(email.waitForExistence(timeout: 5))
+            email.tap()
+            email.typeText("profile@example.test")
+            app.buttons["Email me a code"].tap()
+            let code = app.textFields["6-digit code"]
+            XCTAssertTrue(code.waitForExistence(timeout: 5))
+            code.tap()
+            code.typeText("123456")
+            app.buttons["verify-sign-in-code"].tap()
+        }
+        let edit = app.buttons["Edit profile"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 12))
+        edit.tap()
+        let name = app.textFields["Display name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        let previous = (name.value as? String) ?? ""
+        let edited = previous == "Night Studio" ? "Dawn Studio" : "Night Studio"
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count) + edited)
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts[edited].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No performances yet"].waitForExistence(timeout: 5))
+        captureIfRequested("Account-Artist")
+        app.buttons["Make music"].tap()
+        XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
+    }
+
+    private func launchWithProfileFixture() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the profile API fixture.")
+        }
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launch()
+    }
+
     func testFeed_challengeAndPrivateBookmarkEntryPoints() throws {
         guard let key = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_DISCOVERY_KEY"] else {
             throw XCTSkip("Requires the local weekly challenge fixture.")

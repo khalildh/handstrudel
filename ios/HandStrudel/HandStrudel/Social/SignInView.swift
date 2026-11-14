@@ -81,6 +81,7 @@ struct SignInView: View {
                     Button("Sign in") {
                         Task { busy = true; await auth.verifyEmailCode(code, email: email); busy = false }
                     }
+                    .accessibilityIdentifier("verify-sign-in-code")
                     .disabled(code.count < 6 || busy)
                     .listRowBackground(palette.surface)
                 } else {
