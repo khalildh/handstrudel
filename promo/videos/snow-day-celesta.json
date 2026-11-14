@@ -1,0 +1,27 @@
+{
+  "song": "snow-day-celesta",
+  "voice": "af_kore",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 7.54,
+      "text": "Snow day<br><em>soundtrack</em>",
+      "emoji": "❄️",
+      "say": "Snow day soundtrack."
+    },
+    {
+      "start": 7.84,
+      "end": 14.78,
+      "text": "The celesta,<br><em>from every winter movie</em>",
+      "emoji": "☃️",
+      "say": "The celesta. The sound of every winter movie."
+    },
+    {
+      "start": 15.08,
+      "end": 22.02,
+      "text": "Played by waving<br><em>at your phone</em>",
+      "emoji": "✨",
+      "say": "Played by waving at your phone."
+    }
+  ]
+}

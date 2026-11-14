@@ -1,0 +1,26 @@
+{
+  "appName": "HandStrudel",
+  "tagline": "your hands are the instrument",
+  "bundleId": "com.handstrudel.app",
+  "appStoreUrl": "https://apps.apple.com/app/id6764415289",
+  "campaignLinks": {
+    "tiktok": "https://apps.apple.com/app/apple-store/id6764415289?pt=127873492&ct=tiktok&mt=8",
+    "instagram": "https://apps.apple.com/app/apple-store/id6764415289?pt=127873492&ct=instagram&mt=8",
+    "youtube": "https://apps.apple.com/app/apple-store/id6764415289?pt=127873492&ct=youtube&mt=8",
+    "x": "https://apps.apple.com/app/apple-store/id6764415289?pt=127873492&ct=x&mt=8",
+    "reddit": "https://apps.apple.com/app/apple-store/id6764415289?pt=127873492&ct=reddit&mt=8",
+    "website": "https://apps.apple.com/app/apple-store/id6764415289?pt=127873492&ct=website&mt=8"
+  },
+  "ctaText": "Download on the App Store",
+  "searchHint": "Search “HandStrudel” on the App Store",
+  "device": "iPhone 16e",
+  "endCardSeconds": 3.5,
+  "styles": [
+    "clean",
+    "hype",
+    "short"
+  ],
+  "voice": "af_heart",
+  "voiceSpeed": 1.08,
+  "endSay": "HandStrudel. Free on the App Store."
+}

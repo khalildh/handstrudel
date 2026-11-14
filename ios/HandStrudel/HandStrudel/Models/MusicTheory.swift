@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Keys
 
-enum MusicKey: String, CaseIterable, Identifiable {
+enum MusicKey: String, CaseIterable, Identifiable, Codable {
     case C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B
     var id: String { rawValue }
     var semitone: Int {
@@ -25,7 +25,7 @@ enum MusicKey: String, CaseIterable, Identifiable {
 
 // MARK: - Scales
 
-enum Scale: String, CaseIterable, Identifiable {
+enum Scale: String, CaseIterable, Identifiable, Codable {
     case major = "Major"
     case minor = "Minor"
     case dorian = "Dorian"

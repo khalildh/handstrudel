@@ -1,6 +1,6 @@
 -- RLS + trigger tests for the accounts/feed schema.  Run: supabase test db
 begin;
-select plan(15);
+select plan(18);
 
 -- Two users (the auth trigger creates their profile rows).
 insert into auth.users (id, email) values
@@ -26,6 +26,11 @@ values ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-0000000
         'thumbs/00000000-0000-0000-0000-00000000000a/v1.jpg', 'hello', 999);
 select is((select like_count from public.videos where id = '11111111-1111-1111-1111-111111111111'), 0,
           'clients cannot seed counters');
+select is((select sound_setup from public.feed_videos where id = '11111111-1111-1111-1111-111111111111'),
+          null::jsonb, 'setups are not shared by default');
+select throws_ok($$ update public.videos set sound_setup = '[1]' $$,
+                 '23514', null, 'setups must be JSON objects');
+update public.videos set sound_setup = '{"version":1,"instrument":"violin"}';
 
 select throws_ok($$ insert into public.videos (user_id, video_key, thumb_key)
                     values ('00000000-0000-0000-0000-00000000000b',
@@ -52,6 +57,7 @@ select is((select count(*)::int from public.videos), 1, 'other users cannot dele
 set local role anon;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 select is((select count(*)::int from public.feed_videos), 1, 'anon can read feed');
+select is((select sound_setup->>'instrument' from public.feed_videos), 'violin', 'opted-in sound is public');
 select throws_ok($$ select count(*) from public.reports $$, '42501', null, 'anon cannot read reports');
 reset role;
 

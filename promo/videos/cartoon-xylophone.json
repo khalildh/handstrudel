@@ -1,0 +1,27 @@
+{
+  "song": "cartoon-xylophone",
+  "voice": "am_eric",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 6.33,
+      "text": "Cartoon chase<br><em>scene energy</em>",
+      "emoji": "🏃",
+      "say": "Cartoon chase scene energy."
+    },
+    {
+      "start": 6.63,
+      "end": 12.35,
+      "text": "Xylophone<br><em>at full speed</em>",
+      "emoji": "💨",
+      "say": "Xylophone, at full speed."
+    },
+    {
+      "start": 12.65,
+      "end": 18.38,
+      "text": "Your hands are faster<br><em>than you think</em>",
+      "emoji": "⚡",
+      "say": "Your hands are faster than you think."
+    }
+  ]
+}

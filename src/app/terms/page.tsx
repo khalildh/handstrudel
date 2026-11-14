@@ -17,17 +17,18 @@ export default function Terms() {
       <p>You must be at least 13 years old to create an account. If you are under the age of majority where you live, a parent or guardian must agree to these terms on your behalf.</p>
 
       <h2>Your account</h2>
-      <p>You can sign in with Apple or with a one-time code sent to your email. Keep access to your account secure and don&apos;t impersonate anyone. You can delete your account at any time from your profile; this permanently removes your profile and every video you&apos;ve posted.</p>
+      <p>You can sign in with Apple or with a one-time code sent to your email. Keep access to your account secure and don&apos;t impersonate anyone. You can delete your account at any time from your profile; this permanently removes your profile, videos, and comments.</p>
 
       <h2>Your content</h2>
-      <p>You own the videos and captions you post. By posting, you give HandStrudel a worldwide, non-exclusive, royalty-free license to host, store, display, and distribute that content inside HandStrudel and in promotion of HandStrudel, for as long as it stays posted. You confirm you have the rights to everything in your post, including any people, audio, or music it contains.</p>
-      <p>Posts are public. Anyone can watch them in the app, including people who aren&apos;t signed in.</p>
+      <p>You own the videos, captions, and comments you post. By posting, you give HandStrudel a worldwide, non-exclusive, royalty-free license to host, store, display, and distribute that content inside HandStrudel and in promotion of HandStrudel, for as long as it stays posted. You confirm you have the rights to everything in your post, including any people, audio, or music it contains.</p>
+      <p>Posts and comments are public. Anyone can watch posts and read comments in the app or on the HandStrudel website, including people who aren&apos;t signed in.</p>
+      <p>If you enable play-along on a video, you give other HandStrudel users permission to use its audio as backing in credited videos they make with HandStrudel. Only enable this if you have permission to share all of the audio for that use. You can turn off new play-along posts later; it does not remove takes that were already published.</p>
 
       <h2>No objectionable content or abusive behavior</h2>
       <p>There is <strong>zero tolerance</strong> for objectionable content or abusive users. Don&apos;t post anything that breaks the <a href="/community" style={link}>Community Guidelines</a>: no nudity or sexual content, no hate, harassment, threats, or bullying, no violence or self-harm, no illegal activity, no spam, and nothing that infringes someone else&apos;s rights.</p>
 
       <h2>Reporting, blocking, and moderation</h2>
-      <p>Every post can be reported and every user can be blocked from inside the app. Reported posts are hidden automatically once several people report them, and we review reports within 24 hours. We may remove any content and suspend or terminate any account that breaks these terms, without notice.</p>
+      <p>Posts and comments can be reported and users can be blocked from inside the app. Posts and comments are hidden automatically once several people report them, and we review reports within 24 hours. We may remove any content and suspend or terminate any account that breaks these terms, without notice.</p>
 
       <h2>The app</h2>
       <p>HandStrudel is provided &ldquo;as is&rdquo;. We work hard to keep it running, but we don&apos;t guarantee it will always be available or error-free, and we may change or discontinue features. Purchases are handled by Apple and are subject to Apple&apos;s terms.</p>

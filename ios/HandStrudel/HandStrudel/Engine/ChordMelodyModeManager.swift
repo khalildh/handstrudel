@@ -97,7 +97,22 @@ final class ChordMelodyModeManager {
 
     // MARK: - State (mutated each tick)
 
-    private var chordPinch = PinchDetector(on: 0.8, off: 0.5)
+    // Wider hysteresis than melody (0.8/0.5) because the chord hand tends to
+    // be held still while the melody hand is actively moving. A still hand's
+    // fingers naturally drift apart over a second or two — if `off` sits at
+    // 0.5 the pad falsely releases mid-chord. `off: 0.25` covers finger drift
+    // of up to ~15% of the frame while `on: 0.7` still requires an
+    // intentional pinch to start the chord.
+    private var chordPinch = PinchDetector(on: 0.7, off: 0.25)
+
+    /// How many consecutive frames the chord hand has been reported absent.
+    /// Vision routinely drops the hand for 1-2 frames during a stable held
+    /// pose, and treating those blips as "released" makes the pad cut out
+    /// mid-hold. We only fire padOff once this crosses a threshold — long
+    /// enough to survive tracker glitches, short enough that a real release
+    /// still feels immediate.
+    private var chordHandAbsentFrames: Int = 0
+    private static let chordAbsentGraceFrames = 12  // ~200ms at 60fps
     private var melodyPinch = PinchDetector(on: 0.8, off: 0.5)
     private var heldMelodyMidi: Int? = nil
 
@@ -224,7 +239,10 @@ final class ChordMelodyModeManager {
     /// shared wheel). Distances are taken in units of screen height so x and y
     /// share one pixel scale — the wheel is a true circle, not an
     /// aspect-stretched ellipse. `angle` is degrees clockwise from 12 o'clock;
-    /// `radius` is 0 at the center and 1 at the wheel's rim.
+    /// `radius` is 0 at the center and 1 at the wheel's rim. Values above 1
+    /// are meaningful — they mean the hand is past the wheel's edge, which
+    /// the chord-hand reader treats as "outside" so the pad can release
+    /// instead of holding on the nearest rim wedge forever.
     private func radialVector(x: Double, y: Double) -> (angle: Double, radius: Double) {
         guard screenAspect > 0 else { return (0, 0) }
         let sx = visibleX(x) * screenAspect
@@ -234,7 +252,7 @@ final class ChordMelodyModeManager {
         // Fit inside the shorter half-dimension so the wheel stays on screen.
         let wheelRadius = min(0.5 * screenAspect, 0.5) * Self.radialRadiusFraction
         guard wheelRadius > 0 else { return (0, 0) }
-        let radius = min(1.0, (dx * dx + dyUp * dyUp).squareRoot() / wheelRadius)
+        let radius = (dx * dx + dyUp * dyUp).squareRoot() / wheelRadius
         var deg = 90 - atan2(dyUp, dx) * 180 / .pi   // clockwise from top
         deg = deg.truncatingRemainder(dividingBy: 360)
         if deg < 0 { deg += 360 }
@@ -333,15 +351,9 @@ final class ChordMelodyModeManager {
             let zone = radialWedgeIndex(angle: v.angle, count: zoneCount)
             return (degreeForZone(zone), 0, false)
         case .split, .scale:
-            // Same chord-side math for both — what differs between Split and
-            // Scale lives on the melody half (full diatonic vs chord tones)
-            // and in the chord *voicing* (triad vs 7th), handled by the
-            // controller — not in the wedge selection here.
             let v = radialVector(x: h.pinchX, y: h.pinchY)
             let holdValue = (padDegree ?? currentChordDegree ?? 0, padOctaveShift, true)
             guard v.radius >= Self.splitDeadzone else { return holdValue }
-            // Hand strayed onto the melody half → treat as resting so we
-            // don't accidentally re-pick the chord when reaching for melody.
             guard let zone = splitWedgeIndex(side: chordSide, angle: v.angle, count: zoneCount) else {
                 return holdValue
             }
@@ -415,7 +427,13 @@ final class ChordMelodyModeManager {
         var actions: [Action] = []
 
         // -------------------- Chord hand (pad + accent) --------------------
+        // Pinch-gated, matching the melody hand: pinch to hold the chord, move
+        // to change it, release to end it. Presence alone doesn't sound the
+        // pad — that's what made the pad feel "stuck on" when the hand strayed
+        // off the wedge. The chord-accent hit (below) is what strikes on the
+        // pinch-began transition; the pad tracks the same held-pinch window.
         if let h = chordHand(hands) {
+            chordHandAbsentFrames = 0
             let reading = readChordHand(h)
             let degree = reading.degree
             let octave = reading.octave
@@ -424,25 +442,19 @@ final class ChordMelodyModeManager {
             let baseTones = chordTones(degree)
             currentChordMidi = baseTones.map { $0 + octave * 12 }
 
-            if !padOn {
-                // First frame of presence — bring the pad up immediately.
+            let pinchState = chordPinch.update(pinch: h.pinch)
+            #if DEBUG
+            print("[chord] hand=present pinch=\(String(format: "%.2f", h.pinch)) state=\(pinchState) padOn=\(padOn)")
+            #endif
+
+            switch pinchState {
+            case .began:
+                // Bring the pad up immediately on pinch onset.
                 padOn = true
                 padDegree = degree
                 padOctaveShift = octave
                 actions.append(.padOn(midiNotes: currentChordMidi, degree: degree))
-            } else if (degree != padDegree || octave != padOctaveShift) && !reading.resting && (!quantize || gridBoundaryCrossed) {
-                // Hand moved to a new zone or octave — glide the pad. Resting
-                // (radial center) holds the chord. Quantized: hold the change
-                // until the next grid boundary.
-                padDegree = degree
-                padOctaveShift = octave
-                actions.append(.padSlide(midiNotes: currentChordMidi, degree: degree))
-            }
-
-            // Pinch crossings trigger an additive accent on top of the pad.
-            // Free: strike immediately. Quantized: latch and strike the
-            // sounding chord on the next grid boundary.
-            if case .began = chordPinch.update(pinch: h.pinch) {
+                // Also fire the accent hit that used to live on chordPinch.began.
                 if quantize {
                     pendingChordAccent = true
                     pendingChordAccentVel = min(1, h.pinch)
@@ -453,6 +465,31 @@ final class ChordMelodyModeManager {
                         velocity: min(1, h.pinch)
                     ))
                 }
+            case .held:
+                // While the pinch is held, glide the pad if the hand moved to
+                // a new zone or octave. Resting (deadzone) holds the chord.
+                if !padOn {
+                    padOn = true
+                    padDegree = degree
+                    padOctaveShift = octave
+                    actions.append(.padOn(midiNotes: currentChordMidi, degree: degree))
+                } else if (degree != padDegree || octave != padOctaveShift) && !reading.resting && (!quantize || gridBoundaryCrossed) {
+                    padDegree = degree
+                    padOctaveShift = octave
+                    actions.append(.padSlide(midiNotes: currentChordMidi, degree: degree))
+                }
+            case .ended:
+                // Pinch released — release the pad immediately.
+                if padOn {
+                    padOn = false
+                    padDegree = nil
+                    actions.append(.padOff)
+                }
+                pendingChordAccent = false
+            case .idle:
+                // Hand present but not pinching — hold whatever we've already
+                // released. Don't re-arm anything.
+                break
             }
 
             if quantize && pendingChordAccent && gridBoundaryCrossed {
@@ -468,14 +505,24 @@ final class ChordMelodyModeManager {
                 ))
             }
         } else {
-            // Hand left the frame — fade the pad out and clear pinch latches.
-            if padOn {
-                padOn = false
-                padDegree = nil
-                actions.append(.padOff)
+            // Hand missing this frame. Vision routinely blips out for 1-2
+            // frames during a steady held pose, so we ride out short gaps
+            // instead of immediately dropping the pad. Only after the tracker
+            // has been silent for the grace window do we treat it as a real
+            // release.
+            chordHandAbsentFrames += 1
+            #if DEBUG
+            print("[chord] hand=absent frames=\(chordHandAbsentFrames) padOn=\(padOn)")
+            #endif
+            if chordHandAbsentFrames >= Self.chordAbsentGraceFrames {
+                if padOn {
+                    padOn = false
+                    padDegree = nil
+                    actions.append(.padOff)
+                }
+                chordPinch.reset()
+                pendingChordAccent = false
             }
-            chordPinch.reset()
-            pendingChordAccent = false
         }
 
         // Touch override (Split mode): if a finger is held on a chord wedge,

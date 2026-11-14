@@ -1,0 +1,27 @@
+{
+  "song": "saloon-piano",
+  "voice": "am_michael",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 5.6,
+      "text": "Saloon piano,<br><em>cowboy hat optional</em>",
+      "emoji": "🤠",
+      "say": "Saloon piano. Cowboy hat optional."
+    },
+    {
+      "start": 5.9,
+      "end": 10.9,
+      "text": "Honky-tonk keys<br><em>at full gallop</em>",
+      "emoji": "🐎",
+      "say": "Honky tonk keys, at full gallop."
+    },
+    {
+      "start": 11.2,
+      "end": 16.2,
+      "text": "Yeehaw,<br><em>by hand</em>",
+      "emoji": "🌵",
+      "say": "Yee haw, by hand."
+    }
+  ]
+}

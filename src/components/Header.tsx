@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AspectRatio } from "../lib/recorder";
 
 interface HeaderProps {
@@ -42,6 +43,7 @@ export default function Header({
       <span className="logo">HANDSTRUDEL</span>
       <span className="sep">|</span>
       <span id="status">{status}</span>
+      <Link className="watch-site-link" href="/watch">Watch videos</Link>
 
       {canRecord && (
         <div id="rec-controls">

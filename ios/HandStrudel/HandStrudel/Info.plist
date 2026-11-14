@@ -20,6 +20,17 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.handstrudel.app.sound</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>handstrudel</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>instagram-stories</string>
@@ -34,7 +45,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>HandStrudel uses the camera to track your hand gestures and convert them into music.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>HandStrudel records your voice along with the app's sound when you save and share a video recording of your performance.</string>
+	<string>HandStrudel includes microphone audio in solo performances only when you turn it on in recording settings.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>HandStrudel adds performance clips to your photo library when you choose Save to Photos.</string>
 	<key>UIDesignRequiresCompatibility</key>
 	<true/>
 	<key>UILaunchScreen</key>

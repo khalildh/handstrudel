@@ -151,8 +151,6 @@ struct StoreView: View {
                 featureItem("120+ instruments")
                 featureItem("Every scale — modes, harmonic minor, exotic")
                 featureItem("Every chord progression")
-                featureItem("All drum kits")
-                featureItem("Premium camera filters + hand themes")
                 featureItem("One-time purchase")
             }
 
@@ -195,8 +193,9 @@ struct StoreView: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 featureItem("Everything in Pro")
+                featureItem("Premium camera filters")
+                featureItem("Premium hand themes")
                 featureItem("Early access to new content")
-                featureItem("Exclusive presets & sounds")
             }
 
             if storeManager.hasSubscription {

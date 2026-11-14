@@ -37,6 +37,7 @@ enum SocialConfig {
 
     static let termsURL = URL(string: "https://handstrudel.com/terms")!
     static let guidelinesURL = URL(string: "https://handstrudel.com/community")!
+    static let watchURL = URL(string: "https://handstrudel.com/watch")!
 
     static func mediaURL(_ key: String) -> URL { mediaBaseURL.appendingPathComponent(key) }
 }

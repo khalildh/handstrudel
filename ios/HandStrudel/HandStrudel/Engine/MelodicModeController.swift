@@ -127,15 +127,18 @@ final class MelodicModeController: ModeController {
         guard hasHands, let midi = melodicMidi(engine) else {
             if engine.leadVoiceMidi != nil {
                 engine.strudelBridge.noteOff(hand: "lead")
+                engine.releaseJamVoice("lead")
                 engine.leadVoiceMidi = nil
             }
             return
         }
         if engine.leadVoiceMidi == nil {
             engine.strudelBridge.noteOn(hand: "lead", midi: midi, waveform: engine.selectedWaveform, velocity: velocity)
+            engine.holdJamVoice("lead", pitches: [midi], velocity: velocity)
             engine.leadVoiceMidi = midi
         } else if engine.leadVoiceMidi != midi {
             engine.strudelBridge.noteSlide(hand: "lead", midi: midi)
+            engine.slideJamVoice("lead", pitches: [midi])
             engine.leadVoiceMidi = midi
         }
     }

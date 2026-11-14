@@ -1,102 +1,73 @@
 import SwiftUI
 
-/// First-run overlay shown on top of the performance screen. Mirrors how the
-/// default mode (Split chord+melody) actually plays: the wheel cuts left and
-/// right at the screen divider, hands fall in their own half, and either a
-/// pinch or a touch makes sound. Goal is to get a brand-new user from "I
-/// opened this" to a sustained chord in under twenty seconds.
 struct OnboardingView: View {
     @Binding var hasSeenOnboarding: Bool
+    let noteName: String
+    let melodyLaneCount: Int
+    let swapHands: Bool
+    let playFirstNote: () -> Void
+    @State private var played = false
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.78)
-                .ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                // This layer keeps the first touch on the highlighted note.
+                Color.black.opacity(0.16)
+                    .contentShape(Rectangle())
+                    .onTapGesture {}
+                    .allowsHitTesting(!played)
 
-            VStack(spacing: 28) {
-                Spacer()
-
-                // Title
-                VStack(spacing: 6) {
-                    Text("welcome to")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.4))
-
-                    HStack(spacing: 0) {
-                        Text("hand")
-                            .font(.system(size: 28, weight: .thin, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.8))
-                        Text("strudel")
-                            .font(.system(size: 28, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green)
+                if !played {
+                    Button {
+                        playFirstNote()
+                        withAnimation(.easeOut(duration: 0.2)) { played = true }
+                    } label: {
+                        Text(noteName)
+                            .font(.title3.bold())
+                            .foregroundStyle(StudioStyle.background)
+                            .frame(width: 53, height: 53)
+                            .background(StudioStyle.accent, in: Circle())
+                            .overlay { Circle().strokeBorder(.white.opacity(0.6)) }
                     }
+                    .buttonStyle(.plain)
+                    .position(target(in: geometry.size))
+                    .accessibilityLabel("Play your first note")
+                    .accessibilityIdentifier("onboarding-first-note")
                 }
 
-                // Tips — each one corresponds directly to a physical thing the
-                // player can do as soon as they dismiss this overlay.
-                VStack(spacing: 18) {
-                    tipRow(
-                        icon: "hand.point.left.fill",
-                        title: "Left half = chords",
-                        subtitle: "Reach toward a wedge to pick a chord"
-                    )
-                    tipRow(
-                        icon: "hand.point.right.fill",
-                        title: "Right half = melody",
-                        subtitle: "Reach high for high notes, low for low"
-                    )
-                    tipRow(
-                        icon: "hand.tap.fill",
-                        title: "Pinch — or just tap",
-                        subtitle: "Hold to sustain, drag to slide between zones"
-                    )
-                }
-                .padding(.horizontal, 32)
-
-                Spacer()
-
-                // Dismiss button
-                Button(action: {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        hasSeenOnboarding = true
+                VStack {
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text(played ? "Now try a pinch" : "Play your first note")
+                            .font(.system(.title2, design: .serif))
+                            .accessibilityAddTraits(.isHeader)
+                        Text(played
+                             ? "Hold your hand over a note and pinch your thumb and index finger. You can also tap or drag on the wheel."
+                             : "Tap the highlighted note on the wheel.")
+                            .font(.subheadline)
+                            .foregroundStyle(StudioStyle.muted)
+                        Button(played ? "Keep playing" : "Skip") { hasSeenOnboarding = true }
+                            .buttonStyle(.bordered)
+                            .tint(StudioStyle.accent)
+                            .accessibilityIdentifier("onboarding-got-it")
                     }
-                }) {
-                    Text("LET'S PLAY")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(Color.green)
-                        .cornerRadius(16)
+                    .frame(maxWidth: 430, alignment: .leading)
+                    .padding(17)
+                    .background(StudioStyle.surface, in: RoundedRectangle(cornerRadius: 20))
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 18)
                 }
-                .accessibilityIdentifier("onboarding-got-it")
-                .padding(.horizontal, 24)
-                .padding(.bottom, 50)
             }
         }
+        .ignoresSafeArea(edges: .top)
     }
 
-    private func tipRow(icon: String, title: String, subtitle: String) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 24))
-                .foregroundColor(.green)
-                .frame(width: 44, height: 44)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.green.opacity(0.12))
-                )
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
-            }
-
-            Spacer()
-        }
+    private func target(in size: CGSize) -> CGPoint {
+        let count = max(1, melodyLaneCount)
+        let lane = count / 2
+        let theta = (Double(count - 1 - lane) + 0.5) * .pi / Double(count)
+        let radius = min(size.width, size.height) * 0.31
+        return CGPoint(x: size.width / 2 + sin(theta) * radius * (swapHands ? -1 : 1),
+                       y: size.height / 2 - cos(theta) * radius)
     }
 }

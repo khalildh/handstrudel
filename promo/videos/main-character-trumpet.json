@@ -1,0 +1,27 @@
+{
+  "song": "main-character-trumpet",
+  "voice": "am_fenrir",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 5.98,
+      "text": "Main character<br><em>entrance music</em>",
+      "emoji": "👑",
+      "say": "Main character entrance music."
+    },
+    {
+      "start": 6.28,
+      "end": 11.66,
+      "text": "Two hands.<br><em>Zero lungs.</em>",
+      "emoji": "🎺",
+      "say": "Two hands. Zero lungs."
+    },
+    {
+      "start": 11.96,
+      "end": 17.34,
+      "text": "Cue the<br><em>trumpets</em>",
+      "emoji": "🎬",
+      "say": "Cue the trumpets."
+    }
+  ]
+}

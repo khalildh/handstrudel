@@ -70,6 +70,7 @@ final class ChordMelodyModeController: ModeController {
                 for (i, midi) in notes.enumerated() {
                     strudelBridge.noteOn(hand: "pad\(i)", midi: midi, waveform: "triangle", velocity: engine.chordMelodyPadVolume)
                 }
+                engine.holdJamVoice("pad", pitches: notes, velocity: engine.chordMelodyPadVolume, waveform: "triangle")
             case .padSlide(let notes, let degree):
                 let name = chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
                 engine.chordMelodyCurrentChordName = name
@@ -78,26 +79,32 @@ final class ChordMelodyModeController: ModeController {
                 for (i, midi) in notes.enumerated() {
                     strudelBridge.noteSlide(hand: "pad\(i)", midi: midi)
                 }
+                engine.slideJamVoice("pad", pitches: notes)
             case .padOff:
-                for i in 0..<3 {
+                for i in 0..<4 {
                     strudelBridge.noteOff(hand: "pad\(i)")
                 }
+                engine.releaseJamVoice("pad")
             case .chordAccent(let notes, _, let vel):
                 for midi in notes {
                     strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: vel * 0.5, duration: 0.5)
                     loopRecorder.recordEvent(.noteOn(midi: midi, waveform: engine.selectedWaveform, velocity: vel * 0.5), currentTime: elapsed)
                 }
+                engine.shareJamNotes(notes, velocity: vel * 0.5, duration: 0.5)
                 haptics.noteTrigger()
             case .melodyOn(let hand, let midi, let name, let vel):
                 strudelBridge.noteOn(hand: hand, midi: midi, waveform: engine.selectedWaveform, velocity: vel)
+                engine.holdJamVoice(hand, pitches: [midi], velocity: vel)
                 haptics.noteTrigger()
                 engine.lastGridNote = name
                 loopRecorder.recordEvent(.noteOn(midi: midi, waveform: engine.selectedWaveform, velocity: vel), currentTime: elapsed)
             case .melodyOff(let hand):
                 strudelBridge.noteOff(hand: hand)
+                engine.releaseJamVoice(hand)
                 loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
             case .melodySlide(let hand, let midi, let name):
                 strudelBridge.noteSlide(hand: hand, midi: midi)
+                engine.slideJamVoice(hand, pitches: [midi])
                 engine.lastGridNote = name
             }
         }
@@ -137,6 +144,7 @@ final class ChordMelodyModeController: ModeController {
             for midi in chordMelodyModeManager.currentChordMidi {
                 strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.25, duration: 0.4)
             }
+            engine.shareJamNotes(chordMelodyModeManager.currentChordMidi, velocity: 0.25, duration: 0.4)
         }
 
         engine.evaluateDrumLoopsIfChanged(modePrefix: "chordmelody")

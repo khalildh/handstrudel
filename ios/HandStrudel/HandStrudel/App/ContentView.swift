@@ -1,29 +1,68 @@
 import SwiftUI
 import ReplayKit
+import GroupActivities
+import Combine
+import UIKit
+import AVFAudio
+import AVFoundation
 
 extension String: @retroactive Identifiable {
     public var id: String { self }
 }
 
 struct ContentView: View {
+    private enum Destination: String, CaseIterable {
+        case feed = "Feed"
+        case music = "Music"
+        case account = "Account"
+
+        var icon: String {
+            switch self {
+            case .feed: return "play.rectangle"
+            case .music: return "waveform"
+            case .account: return "person"
+            }
+        }
+    }
+
     @StateObject private var engine = EngineController()
     @StateObject private var storeManager = StoreManager()
     @StateObject private var auth = AuthManager()
-    @State private var showSignIn = false
-    @State private var showProfile = false
-    @State private var showFeed = false
-    @State private var composingPost: URL?
+    @StateObject private var drafts = RecordingDrafts()
+    @State private var recorderEvents = RecorderEvents()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var destination: Destination = .music
+    @State private var hasOpenedFeed = false
+    @State private var startingSession = false
+    @State private var showDrafts = false
+    @State private var showSetups = false
+    @State private var soundError: String?
+    @State private var sharedSoundLoad: Task<Void, Never>?
+    @State private var linkedComments: Video?
+    @State private var linkedPerformance: Video?
+    @State private var backing: BackingTrack?
+    @State private var backingLoad: Task<Void, Never>?
+    @State private var backingPlaying = false
+    @State private var reviewingDraft: RecordingDraft?
+    @State private var retakeRequested = false
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var showSheet = false
     @State private var isRecording = false
+    @State private var recordingUsesMicrophone = false
+    @State private var recorderBusy = false
+    @State private var captureTask: Task<Void, Never>?
+    @State private var activeDraft: RecordingDraft?
+    @State private var activeAudioLoop: CapturedLoopFile?
+    @State private var loopCaptureTask: Task<Void, Never>?
+    @State private var recordingError: String?
     @State private var recordCountdown = 0
-    @State private var showShareSheet = false
-    @State private var showSharePicker = false
-    @State private var recordedVideoURL: URL?
     @AppStorage("hideSkeletonWhenRecording") private var hideSkeletonWhenRecording = true
+    @AppStorage("recordPerformanceMicrophone") private var recordPerformanceMicrophone = false
+    @AppStorage("recordAtHalfSpeed") private var recordAtHalfSpeed = false
     @State private var filterName: String = ""
     @State private var showFilterName = false
-    @State private var showJamAlert = false
+    @State private var jamInvitation: JamInvitation?
+    @State private var jamError: String?
     @State private var showLearnPicker = false
     @State private var watermarkView: UIView?
     @State private var showRandomizedToast = false
@@ -43,58 +82,29 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            (engine.isRunning ? Color.black : StudioStyle.background).ignoresSafeArea()
+
+            if !engine.isRunning || hasOpenedFeed {
+                destinations
+                    .opacity(engine.isRunning ? 0 : 1)
+                    .allowsHitTesting(!engine.isRunning)
+                    .accessibilityHidden(engine.isRunning)
+            }
 
             if engine.isRunning {
                 performanceView
                     .overlay {
-                        if !hasSeenOnboarding {
-                            OnboardingView(hasSeenOnboarding: $hasSeenOnboarding)
+                        if !hasSeenOnboarding && engine.scaleChordMelodyModeEnabled {
+                            let notes = scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
+                            let midi = notes.isEmpty ? 60 : notes[notes.count / 2]
+                            OnboardingView(hasSeenOnboarding: $hasSeenOnboarding,
+                                           noteName: pitchClassName(midi), melodyLaneCount: notes.count,
+                                           swapHands: engine.chordMelodySwapHands) {
+                                playFirstNote(midi)
+                            }
                                 .transition(.opacity)
                         }
                     }
-            } else {
-                StartOverlayView(
-                    status: engine.status,
-                    engine: engine,
-                    storeManager: storeManager,
-                    onStart: {
-                        // Boot straight into Scale mode — the SoundFont-backed
-                        // two-hand chord+melody wheel. The instrument, key,
-                        // scale, and progression selected on the start screen
-                        // are already live on the engine via @Published bindings.
-                        engine.start(config: DEFAULT_MAPPING, advanced: false)
-                        engine.switchMode(grid: false, drums: false, learn: false,
-                                          scaleChordMelody: true)
-                    }
-                )
-                .overlay(alignment: .top) {
-                    if SocialConfig.isConfigured {
-                        HStack {
-                            Button { showFeed = true } label: {
-                                Image(systemName: "play.rectangle.on.rectangle")
-                                    .font(.title2)
-                                    .foregroundStyle(.white.opacity(0.85))
-                                    .padding(16)
-                            }
-                            .accessibilityLabel("Feed")
-                            Spacer()
-                            Button { showProfile = true } label: {
-                                Image(systemName: auth.isSignedIn ? "person.crop.circle.fill" : "person.crop.circle")
-                                    .font(.title2)
-                                    .foregroundStyle(.white.opacity(0.85))
-                                    .padding(16)
-                            }
-                            .accessibilityLabel("Profile")
-                        }
-                    }
-                }
-                .sheet(isPresented: $showProfile) {
-                    ProfileView(auth: auth)
-                }
-                .fullScreenCover(isPresented: $showFeed) {
-                    FeedView(auth: auth)
-                }
             }
 
             // Hidden WebView for audio (must be in view hierarchy)
@@ -104,32 +114,128 @@ struct ContentView: View {
                 .allowsHitTesting(false)
         }
         .onAppear {
+            recorderEvents.onInterruption = { error in
+                if let activeAudioLoop {
+                    if engine.isLoopRecording { resolveAudioLoop(activeAudioLoop, interruption: error) }
+                    else { activeAudioLoop.fail(error) }
+                    return
+                }
+                guard isRecording, !recorderBusy, let draft = activeDraft else { return }
+                finishRecordingUI()
+                if (try? drafts.complete(draft)) != nil {
+                    recordingError = "Recording interrupted. Check Private drafts for the saved take."
+                } else {
+                    drafts.discardUnfinished(draft)
+                    recordingError = "Recording stopped before the take could be saved. \(error.localizedDescription)"
+                }
+            }
+            RPScreenRecorder.shared().delegate = recorderEvents
             if ProcessInfo.processInfo.arguments.contains("--reset-onboarding") {
                 hasSeenOnboarding = false
             }
             #if DEBUG
-            // Simulator testing of the posting flow (it can't record the camera):
-            // HANDSTRUDEL_TEST_CLIP=/path/to/clip.mp4 starts "Post to HandStrudel" with that clip.
+            startDemoIfRequested()
+            // Open a sample take in the simulator, which cannot record with ReplayKit.
             if let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
-                recordedVideoURL = URL(fileURLWithPath: path)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { postToHandStrudel() }
+                DispatchQueue.main.async { openSampleDraft(at: URL(fileURLWithPath: path)) }
             }
             #endif
         }
-        // Posting sheets live at the root so they work from any screen.
-        .sheet(isPresented: $showSignIn, onDismiss: {
-            // Finished signing in from the share dialog → continue to the composer.
-            if auth.isSignedIn && !auth.needsProfileSetup, let url = recordedVideoURL { composingPost = url }
-        }) {
-            SignInView(auth: auth)
+        .sheet(isPresented: $showDrafts) {
+            RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil)
         }
-        .sheet(item: $composingPost) { url in
-            PostComposerView(clip: url, instrument: engine.selectedSoundFontInstrument.name,
-                             mode: currentModeName, auth: auth)
+        .sheet(isPresented: $showSetups) {
+            SoundSetupsView(engine: engine, store: storeManager) { setup in
+                showSetups = false
+                startSession(setup: setup)
+            }
+        }
+        .onOpenURL(perform: openSocialLink)
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            if let url = activity.webpageURL { openSocialLink(url) }
+        }
+        .sheet(item: $linkedPerformance) { video in
+            CreatorVideoView(video: video, auth: auth, onPlayAlong: { source in
+                linkedPerformance = nil
+                prepareBacking(source)
+            }, onTrySound: { sound in
+                linkedPerformance = nil
+                trySharedSound(sound)
+            })
+        }
+        .sheet(item: $linkedComments) { video in
+            CommentsView(video: video, auth: auth) { author in
+                if author == video.userId { linkedComments = nil }
+            }
+        }
+        .alert("HandStrudel", isPresented: Binding(
+            get: { soundError != nil }, set: { if !$0 { soundError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(soundError ?? "") }
+        .sheet(item: $reviewingDraft, onDismiss: {
+            if engine.isRunning { engine.resume() }
+            if retakeRequested {
+                retakeRequested = false
+                startRecordingCountdown()
+            }
+        }) { draft in
+            RecordingDraftsView(store: drafts, auth: auth, openedDraft: draft, onRetake: engine.isRunning ? {
+                retakeRequested = true
+                reviewingDraft = nil
+            } : nil)
                 .onAppear { engine.pause() }
-                .onDisappear { engine.resume() }
+        }
+        .alert("Recording", isPresented: Binding(
+            get: { recordingError != nil }, set: { if !$0 { recordingError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(recordingError ?? "") }
+        .sheet(item: $jamInvitation) { invitation in
+            invitation
+        }
+        .alert("SharePlay", isPresented: Binding(
+            get: { jamError != nil }, set: { if !$0 { jamError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(jamError ?? "")
+        }
+        .task { await engine.jamSession.listenForSessions() }
+        .onReceive(engine.jamSession.$isActive.removeDuplicates()) { active in
+            guard active else { return }
+            if activeDraft?.recordedAtHalfSpeed == true { stopRecording() }
+            jamInvitation = nil
+            if !isRecording { restoreInstrumentAudio() }
+            if !engine.isRunning { startSession() }
+        }
+        .onReceive(engine.jamSession.$errorMessage.compactMap { $0 }) { message in
+            jamError = message
+            engine.jamSession.errorMessage = nil
         }
         .statusBarHidden(engine.isRunning)
+        .onChange(of: engine.isRunning) { running in
+            if running { startingSession = false }
+            else { stopBacking() }
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .background {
+                backing?.player.pause()
+                backingPlaying = false
+                if isRecording { stopRecording() }
+                else if engine.isLoopRecording, activeAudioLoop != nil { finishAudioLoop() }
+                else if !recorderBusy { cancelCountdown() }
+            }
+            if phase == .active, engine.isRunning, engine.handTracker.cameraIssue != nil {
+                engine.handTracker.startSession()
+            }
+        }
+        .onChange(of: engine.status) { status in
+            if status.hasPrefix("error:") { startingSession = false; stopBacking() }
+        }
+        .onChange(of: destination) { tab in
+            if tab == .feed { hasOpenedFeed = true }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
             guard !engine.isRunning, let presetId = notification.object as? String else { return }
             if let preset = PRESETS.first(where: { $0.id == presetId }) {
@@ -152,13 +258,216 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleLoopRecording)) { _ in
             guard engine.isRunning else { return }
-            if engine.isLoopRecording {
-                engine.stopLoopRecording()
-            } else {
-                engine.startLoopRecording()
+            toggleAudioLoop()
+        }
+    }
+
+    private var destinations: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                if hasOpenedFeed && SocialConfig.isConfigured {
+                    FeedView(auth: auth, isActive: destination == .feed && !engine.isRunning,
+                             onMakeMusic: { destination = .music }, onTrySound: trySharedSound,
+                             onPlayAlong: prepareBacking)
+                        .opacity(destination == .feed ? 1 : 0)
+                        .allowsHitTesting(destination == .feed)
+                        .accessibilityHidden(destination != .feed)
+                }
+
+                switch destination {
+                case .feed:
+                    if !SocialConfig.isConfigured {
+                        socialUnavailable("Feed", icon: "play.rectangle")
+                    }
+                case .music:
+                    StartOverlayView(
+                        status: engine.status,
+                        engine: engine,
+                        storeManager: storeManager,
+                        starting: startingSession,
+                        onStart: { startSession() },
+                        onDrafts: { showDrafts = true },
+                        onSetups: { showSetups = true }
+                    )
+                case .account:
+                    if SocialConfig.isConfigured {
+                        ProfileView(auth: auth)
+                    } else {
+                        socialUnavailable("Account", icon: "person.crop.circle")
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+
+            HStack(spacing: 0) {
+                ForEach(Destination.allCases, id: \.self) { tab in
+                    let selected = destination == tab
+                    Button {
+                        destination = tab
+                    } label: {
+                        VStack(spacing: 5) {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 19, weight: .semibold))
+                                .frame(width: 56, height: 31)
+                                .background {
+                                    if tab == .music {
+                                        Capsule().fill(selected ? StudioStyle.accent : StudioStyle.accent.opacity(0.12))
+                                    }
+                                }
+                                .foregroundStyle(tab == .music && selected ? StudioStyle.background
+                                                 : selected || tab == .music ? StudioStyle.accent : StudioStyle.muted)
+                            Text(tab.rawValue)
+                                .font(.caption2.weight(selected ? .semibold : .medium))
+                                .foregroundStyle(selected ? StudioStyle.ink : StudioStyle.muted)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 54)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("tab-\(tab.rawValue.lowercased())")
+                }
+            }
+            .frame(maxWidth: 520)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity)
+            .background {
+                StudioStyle.background.ignoresSafeArea(edges: .bottom)
+            }
+            .overlay(alignment: .top) { Rectangle().fill(StudioStyle.border).frame(height: 1) }
+            .disabled(startingSession)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Main navigation")
+        }
+        .tint(StudioStyle.accent)
+    }
+
+    private func socialUnavailable(_ title: String, icon: String) -> some View {
+        VStack(spacing: 12) {
+            Label(title, systemImage: icon).font(.title2.bold())
+            Text("This section is unavailable in this build.").foregroundStyle(.secondary)
+        }
+    }
+
+    private func startSession(setup: SoundSetup? = nil) {
+        guard !engine.isRunning, !startingSession else { return }
+        if let setup, !engine.applySoundSetup(setup, store: storeManager) {
+            soundError = "This setup is unavailable or requires a sound pack you don't own."
+            return
+        }
+        startingSession = true
+        destination = .music
+        engine.start(config: DEFAULT_MAPPING, advanced: false)
+        if setup == nil { engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true) }
+    }
+
+    private func trySharedSound(_ setup: SoundSetup) {
+        guard !engine.isRunning, !startingSession else {
+            soundError = "Close your current session, then open this sound again."
+            return
+        }
+        startSession(setup: setup)
+    }
+
+    private func prepareBacking(_ video: Video) {
+        guard !engine.isRunning, !startingSession else { return }
+        backingLoad?.cancel()
+        backingLoad = Task {
+            do {
+                guard let source = try await FeedService.video(id: video.id),
+                      source.backingEnabled == true, let username = source.username else {
+                    throw SocialError.message("The creator no longer allows play-along on this performance.")
+                }
+                let track = try await BackingTrack.load(video: source, username: username)
+                guard !Task.isCancelled, !engine.isRunning, !startingSession else { track.remove(); return }
+                stopBacking()
+                backing = track
+                let setup = source.soundSetup.flatMap { sound in
+                    sound.requiredPacks.allSatisfy { storeManager.isUnlocked($0) } ? sound : nil
+                }
+                startSession(setup: setup)
+            } catch {
+                if !Task.isCancelled {
+                    soundError = (error as? SocialError)?.localizedDescription ?? "Couldn't load the backing audio. Try again."
+                }
             }
         }
     }
+
+    private func stopBacking() {
+        backing?.remove()
+        backing = nil
+        backingPlaying = false
+    }
+
+    private func openSocialLink(_ url: URL) {
+        guard let link = PerformanceLink(url: url), SocialConfig.isConfigured else { return }
+        sharedSoundLoad?.cancel()
+        sharedSoundLoad = Task {
+            do {
+                let video = try await FeedService.video(id: link.videoID)
+                guard !Task.isCancelled else { return }
+                switch link {
+                case .watch:
+                    if let video { linkedPerformance = video }
+                    else { soundError = "This performance is no longer available." }
+                case .comments:
+                    if let video, video.commentsEnabled != nil { linkedComments = video }
+                    else { soundError = "Comments are not available for this performance." }
+                case .playAlong:
+                    if let video { prepareBacking(video) }
+                    else { soundError = "This backing track is no longer available." }
+                case .sound:
+                    if let sound = video?.soundSetup { trySharedSound(sound) }
+                    else { soundError = "The creator hasn't shared a sound setup for this clip, or it is no longer available." }
+                }
+            } catch {
+                if !Task.isCancelled { soundError = "Couldn't open this link. Check your connection and try again." }
+            }
+        }
+    }
+
+    private func playFirstNote(_ midi: Int) {
+        if ProcessInfo.processInfo.arguments.contains("--uitesting") { return }
+        if engine.scaleUseSoundFont,
+           engine.soundFontEngine.startIfNeeded(program: engine.selectedSoundFontInstrument.program) {
+            engine.soundFontEngine.oneShot(midi: midi, velocity: 0.75, duration: 0.48)
+        } else {
+            engine.strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform,
+                                          velocity: 0.75, duration: 0.48)
+        }
+        engine.haptics.noteTrigger()
+    }
+
+    #if DEBUG
+    // MARK: - Promo demo mode
+
+    /// When launched with a demo script (see `DemoDirector`), skip the start
+    /// screen + onboarding, apply the script's setup, and boot Scale mode with
+    /// scripted hands. Used by `promo/` to produce App Store promo videos.
+    private func startDemoIfRequested() {
+        guard let demo = DemoDirector.shared, !engine.isRunning else { return }
+        hasSeenOnboarding = true
+        let s = demo.script
+        if let id = s.instrument {
+            engine.selectedSoundFontInstrument = soundFontInstrument(id: id)
+        }
+        if let k = s.key, let key = MusicKey(rawValue: k) { engine.selectedKey = key }
+        if let sc = s.scale, let scale = Scale(rawValue: sc) { engine.selectedScale = scale }
+        let progId = s.progression ?? "free"
+        if let prog = CHORD_PROGRESSIONS.first(where: { $0.id == progId }) {
+            engine.chordMelodyProgression = prog
+        }
+        demo.onBeginCapture = { [engine] url in engine.soundFontEngine.startCapture(to: url) }
+        demo.onEndCapture = { [engine] in engine.soundFontEngine.stopCapture() }
+        engine.start(config: DEFAULT_MAPPING, advanced: false)
+        engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true)
+    }
+    #endif
 
     // MARK: - Weave inputs & melodic-active probe
 
@@ -269,7 +578,7 @@ struct ContentView: View {
     /// Start a sustained voice for one MIDI note. Routes to the SoundFont
     /// sampler or the WebView synth depending on `splitUseSoundFont`.
     private func splitNoteOn(voice: String, midi: Int, velocity: Double = 0.7) {
-        if engine.splitUseSoundFont {
+        if splitUsesSoundFont {
             engine.soundFontEngine.noteOn(voice: voice, midi: midi, velocity: velocity)
         } else {
             engine.strudelBridge.noteOn(hand: voice, midi: midi,
@@ -279,17 +588,22 @@ struct ContentView: View {
 
     /// Stop a sustained voice started by `splitNoteOn`.
     private func splitNoteOff(voice: String) {
-        if engine.splitUseSoundFont {
+        if splitUsesSoundFont {
             engine.soundFontEngine.noteOff(voice: voice)
         } else {
             engine.strudelBridge.noteOff(hand: voice)
         }
     }
 
+    private var splitUsesSoundFont: Bool {
+        engine.scaleChordMelodyModeEnabled ? engine.scaleUseSoundFont : engine.splitUseSoundFont
+    }
+
     /// Touch entered a Split-mode zone — spawn sustained voices and remember
     /// them under `parentVoice` so the matching `splitTouchExit` can stop them.
     private func splitTouchEnter(parentVoice: String, zone: SplitTouchZone) {
         let scaleMode = engine.scaleChordMelodyModeEnabled
+        let native = splitUsesSoundFont
         switch zone {
         case .chord(let sub):
             let degree = engine.chordMelodyModeManager.degreeForZone(sub.wedge)
@@ -298,6 +612,7 @@ struct ContentView: View {
                 ? chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
                 : chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
             let absoluteTones = voicing.map { $0 + sub.octave * 12 }
+            engine.holdJamVoice(parentVoice, pitches: absoluteTones, velocity: 0.7, native: native)
             var subs: [String] = []
             for (i, note) in absoluteTones.enumerated() {
                 let sv = "\(parentVoice)-c\(i)"
@@ -331,6 +646,7 @@ struct ContentView: View {
             // band; touch is an explicit-tap experience.
             let sv = "\(parentVoice)-m"
             splitNoteOn(voice: sv, midi: lanes[safe], velocity: 0.75)
+            engine.holdJamVoice(parentVoice, pitches: [lanes[safe]], velocity: 0.75, native: native)
             splitVoiceSubvoices[parentVoice] = [sv]
         }
         engine.haptics.noteTrigger()
@@ -338,6 +654,7 @@ struct ContentView: View {
 
     /// Touch left a Split-mode zone — release all voices spawned for it.
     private func splitTouchExit(parentVoice: String) {
+        engine.releaseJamVoice(parentVoice)
         if let subs = splitVoiceSubvoices[parentVoice] {
             for sv in subs { splitNoteOff(voice: sv) }
             splitVoiceSubvoices.removeValue(forKey: parentVoice)
@@ -583,23 +900,23 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
 
-                // Logo
-                logoMark
-                    .padding(.top, 2)
-
                 // Jam session indicator
-                if engine.jamSession.isActive {
-                    let text = engine.jamSession.lastReceivedEvent.isEmpty
-                        ? engine.jamSession.statusMessage
-                        : engine.jamSession.lastReceivedEvent
-                    if !text.isEmpty {
-                        Text(text)
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundColor(.cyan.opacity(0.8))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(Color.cyan.opacity(0.1)))
+                JamStatus(jam: engine.jamSession)
+                if let backing {
+                    Button {
+                        if backingPlaying { backing.player.pause(); backingPlaying = false }
+                        else { backingPlaying = backing.player.play() }
+                    } label: {
+                        Label("Play along with @\(backing.credit.username)", systemImage: backingPlaying ? "pause.fill" : "play.fill")
+                            .font(.caption.weight(.semibold))
+                            .padding(10)
+                            .background(.black.opacity(0.65), in: Capsule())
                     }
+                    .foregroundStyle(StudioStyle.accent)
+                    .disabled(isRecording || recorderBusy)
+                }
+                if hasSeenOnboarding || !engine.scaleChordMelodyModeEnabled {
+                    CameraRecoveryBanner(tracker: engine.handTracker)
                 }
 
                 // Floating code pill — hide in grid/drum/learn/chord/soundfont mode
@@ -689,62 +1006,19 @@ struct ContentView: View {
                     }
             )
         }
-        .alert("Jam Session", isPresented: $showJamAlert) {
-            Button("Got it") {}
-        } message: {
-            Text("Start a FaceTime call, then tap the people icon again. Everyone on the call who has HandStrudel can join the jam!")
-        }
-        .sheet(isPresented: $showShareSheet) {
-            if let url = recordedVideoURL {
-                ShareSheet(activityItems: [url])
-            }
-        }
         .sheet(isPresented: $showLearnPicker) {
             LearnSongPicker { song in
                 engine.loadLearnSong(song)
                 showLearnPicker = false
             }
         }
-        .confirmationDialog("Share to", isPresented: $showSharePicker, titleVisibility: .visible) {
-            if SocialConfig.isConfigured {
-                Button(action: postToHandStrudel) {
-                    Label("Post to HandStrudel", systemImage: "hand.raised.fingers.spread")
-                }
-            }
-            Button(action: shareToInstagramStories) {
-                Label("Instagram Story", systemImage: "camera.circle")
-            }
-            Button(action: shareToInstagramReels) {
-                Label("Instagram Reels", systemImage: "film")
-            }
-            Button(action: {
-                showSharePicker = false
-                showShareSheet = true
-            }) {
-                Label("Other...", systemImage: "square.and.arrow.up")
-            }
-            Button("Cancel", role: .cancel) {
-                showSharePicker = false
-            }
-        }
         .sheet(isPresented: $showSheet) {
-            ControlSheet(engine: engine, storeManager: storeManager, hideSkeletonWhenRecording: $hideSkeletonWhenRecording)
+            ControlSheet(engine: engine, storeManager: storeManager, hideSkeletonWhenRecording: $hideSkeletonWhenRecording,
+                         recordPerformanceMicrophone: $recordPerformanceMicrophone)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .onAppear { engine.pause() }
                 .onDisappear { engine.resume() }
-        }
-    }
-
-    // MARK: - Posting
-
-    private func postToHandStrudel() {
-        showSharePicker = false
-        guard let url = recordedVideoURL else { return }
-        if auth.isSignedIn && !auth.needsProfileSetup {
-            composingPost = url
-        } else {
-            showSignIn = true
         }
     }
 
@@ -769,7 +1043,7 @@ struct ContentView: View {
                 ForEach(0..<4, id: \.self) { i in
                     Circle()
                         .fill(i == engine.currentBeat
-                              ? (i % 2 == 0 ? Color.green : Color.pink)
+                              ? StudioStyle.accent
                               : Color.white.opacity(0.15))
                         .frame(width: 7, height: 7)
                         .scaleEffect(i == engine.currentBeat ? 1.5 : 1.0)
@@ -779,34 +1053,11 @@ struct ContentView: View {
 
             Spacer()
 
-            // Jam session button
-            Button(action: {
-                if engine.jamSession.isActive {
-                    engine.jamSession.leaveSession()
-                } else {
-                    engine.jamSession.startSession()
-                    showJamAlert = true
-                }
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: engine.jamSession.isActive ? "person.2.fill" : "person.2")
-                        .font(.system(size: 12, weight: .bold))
-                    if engine.jamSession.isActive {
-                        Text("\(engine.jamSession.participants.count)")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                    }
-                }
-                .foregroundColor(engine.jamSession.isActive ? .green : .white.opacity(0.6))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(engine.jamSession.isActive ? Color.green.opacity(0.2) : Color.black.opacity(0.3))
-                )
-            }
+            JamButton(jam: engine.jamSession, action: toggleJam)
+                .disabled(activeDraft?.recordedAtHalfSpeed == true)
 
             // Close button
-            Button(action: { engine.stop() }) {
+            Button(action: { cancelCountdown(); stopBacking(); engine.stop() }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white.opacity(0.85))
@@ -814,11 +1065,40 @@ struct ContentView: View {
                     .background(Color.black.opacity(0.4))
                     .clipShape(Circle())
             }
+            .accessibilityLabel("End session")
+            .disabled(isRecording || recorderBusy || activeAudioLoop != nil)
             .accessibilityIdentifier("close-button")
+        }
+        .overlay {
+            HStack(spacing: 6) {
+                Image(systemName: "waveform").foregroundStyle(StudioStyle.accent)
+                Text("handstrudel").foregroundStyle(StudioStyle.ink)
+            }
+            .font(.caption.monospaced().weight(.semibold))
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(.black.opacity(0.55), in: Capsule())
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 
-    // MARK: - Logo
+    private func toggleJam() {
+        let jam = engine.jamSession
+        if jam.isActive {
+            jam.leaveSession()
+        } else if jam.canActivate {
+            jam.startSession()
+        } else {
+            do {
+                jamInvitation = JamInvitation(controller: try GroupActivitySharingController(HandStrudelActivity()))
+            } catch {
+                jamError = "SharePlay is unavailable. Start a FaceTime call, then try again."
+            }
+        }
+    }
+
+    // MARK: - Music-reactive color
 
     private var strudelHue: Double {
         // Map note index (0-17) to hue (0-1), shift with beat for extra life
@@ -826,27 +1106,6 @@ struct ContentView: View {
         let base = ni / 17.0
         let beatShift = Double(engine.currentBeat) * 0.03
         return (base + beatShift).truncatingRemainder(dividingBy: 1.0)
-    }
-
-    private var logoMark: some View {
-        HStack(spacing: 0) {
-            Text("hand")
-                .font(.system(size: 18, weight: .light, design: .monospaced))
-                .foregroundColor(.white.opacity(0.9))
-            Text("strudel")
-                .font(.system(size: 18, weight: .black, design: .monospaced))
-                .foregroundColor(Color(hue: strudelHue, saturation: 0.8, brightness: 1.0))
-                .animation(.easeInOut(duration: 0.3), value: strudelHue)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(
-            Capsule()
-                .fill(Color.black.opacity(0.3))
-                .background(Capsule().fill(.ultraThinMaterial).opacity(0.3))
-        )
-        .clipShape(Capsule())
-        .shadow(color: Color(hue: strudelHue, saturation: 0.6, brightness: 0.8).opacity(0.5), radius: 10, x: 0, y: 2)
     }
 
     // MARK: - Code Pill
@@ -1162,6 +1421,7 @@ struct ContentView: View {
                 waveform: engine.selectedWaveform,
                 onNoteOn: { voice, midi, name in
                     engine.strudelBridge.noteOn(hand: voice, midi: midi, waveform: engine.selectedWaveform, velocity: 0.7)
+                    engine.holdJamVoice(voice, pitches: [midi], velocity: 0.7)
                     engine.haptics.noteTrigger()
                     engine.lastGridNote = name
                     let elapsed = engine.startTime.map { Date().timeIntervalSince($0) } ?? 0
@@ -1169,9 +1429,11 @@ struct ContentView: View {
                 },
                 onNoteOff: { voice in
                     engine.strudelBridge.noteOff(hand: voice)
+                    engine.releaseJamVoice(voice)
                 },
                 onNoteSlide: { voice, midi, name in
                     engine.strudelBridge.noteSlide(hand: voice, midi: midi)
+                    engine.slideJamVoice(voice, pitches: [midi])
                     engine.lastGridNote = name
                     engine.haptics.lightTap()
                 },
@@ -1247,6 +1509,7 @@ struct ContentView: View {
                                 if !activeDrumLanes.contains(key) {
                                     activeDrumLanes.insert(key)
                                     engine.strudelBridge.playHit(lane.hitType)
+                                    engine.jamSession.sendEvent(.drumHit(hitType: lane.hitType))
                                     engine.haptics.drumHit()
                                 }
                             }
@@ -1283,6 +1546,7 @@ struct ContentView: View {
                                 if !activeDrumLanes.contains(key) {
                                     activeDrumLanes.insert(key)
                                     engine.strudelBridge.playHit(lane.hitType)
+                                    engine.jamSession.sendEvent(.drumHit(hitType: lane.hitType))
                                     engine.haptics.drumHit()
                                 }
                             }
@@ -1316,19 +1580,39 @@ struct ContentView: View {
             Spacer()
 
             // Video record button
-            recordButton
+            VStack(spacing: 4) {
+                if !isRecording, !recorderBusy, recordCountdown == 0 {
+                    Button {
+                        recordAtHalfSpeed.toggle()
+                    } label: {
+                        Label("½×", systemImage: "tortoise")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(recordAtHalfSpeed ? StudioStyle.background : .white)
+                            .padding(.horizontal, 10)
+                            .frame(minHeight: 32)
+                            .background(recordAtHalfSpeed ? StudioStyle.accent : .black.opacity(0.55), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Half-speed recording")
+                    .accessibilityValue(recordAtHalfSpeed ? "On" : "Off")
+                    .accessibilityIdentifier("half-speed-recording")
+                }
+                recordButton
+            }
 
             Spacer()
 
             // Settings button
             Button(action: { showSheet = true }) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.4))
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.black.opacity(0.3)))
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.black.opacity(0.55), in: Circle())
             }
+            .accessibilityLabel("Music settings")
             .accessibilityIdentifier("settings-button")
+            .disabled(activeAudioLoop != nil || isRecording || recorderBusy)
         }
     }
 
@@ -1336,31 +1620,10 @@ struct ContentView: View {
     @State private var loopMessage = ""
 
     private var loopRecordButton: some View {
-        Button(action: {
-            if engine.isLoopRecording {
-                let hadEvents = engine.stopLoopRecording()
-                if hadEvents {
-                    loopMessage = "Loop saved & playing"
-                } else {
-                    loopMessage = "No notes recorded"
-                }
-                withAnimation { showLoopSaved = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation { showLoopSaved = false }
-                }
-            } else {
-                engine.startLoopRecording()
-                let modeHint = engine.gridModeEnabled ? "play notes" : engine.drumModeEnabled ? "play drums" : "move your hands"
-                loopMessage = "Recording loop — \(modeHint), tap again to stop"
-                withAnimation { showLoopSaved = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                    withAnimation { showLoopSaved = false }
-                }
-            }
-        }) {
+        Button(action: toggleAudioLoop) {
             ZStack {
                 Circle()
-                    .stroke(engine.isLoopRecording ? Color.red : Color.white.opacity(0.3), lineWidth: 2)
+                    .fill(.black.opacity(0.55))
                     .frame(width: 44, height: 44)
 
                 if engine.isLoopRecording {
@@ -1369,26 +1632,28 @@ struct ContentView: View {
                         .stroke(Color.red, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .frame(width: 44, height: 44)
                         .rotationEffect(.degrees(-90))
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 14, height: 14)
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(StudioStyle.recording)
                 } else {
-                    Circle()
-                        .fill(Color.red.opacity(0.8))
-                        .frame(width: 18, height: 18)
+                    Image(systemName: "repeat")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
 
                 // Loop count badge
                 if !engine.savedLoops.isEmpty && !engine.isLoopRecording {
                     Text("\(engine.savedLoops.count)")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundStyle(StudioStyle.background)
                         .frame(width: 18, height: 18)
-                        .background(Circle().fill(Color.green))
+                        .background(Circle().fill(StudioStyle.accent))
                         .offset(x: 16, y: -16)
                 }
             }
         }
+        .disabled(engine.loopCaptureBusy || isRecording || recorderBusy || recordCountdown > 0)
+        .accessibilityLabel(engine.isLoopRecording ? "Stop loop recording" : "Record audio loop")
         .overlay(alignment: .top) {
             if showLoopSaved {
                 HStack(spacing: 6) {
@@ -1417,95 +1682,221 @@ struct ContentView: View {
     }
 
     private var recordButton: some View {
-        // Instagram share button
-            Button(action: startRecording) {
-                ZStack {
-                    if isRecording {
-                        // Recording indicator with countdown
-                        ZStack {
-                            Circle()
-                                .stroke(Color.red.opacity(0.3), lineWidth: 3)
-                                .frame(width: 62, height: 62)
-                            Circle()
-                                .trim(from: 0, to: CGFloat(7 - recordCountdown) / 7.0)
-                                .stroke(Color.red, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                                .frame(width: 62, height: 62)
-                                .rotationEffect(.degrees(-90))
-                                .animation(.linear(duration: 1), value: recordCountdown)
-                            Text("\(recordCountdown)")
-                                .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
-                        }
-                    } else {
-                        // Instagram-style share button
-                        VStack(spacing: 3) {
-                            ZStack {
-                                // Instagram gradient ring
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [.purple, .pink, .orange, .yellow],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 3
-                                    )
-                                    .frame(width: 56, height: 56)
-                                Image(systemName: "video.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.white)
-                            }
-                            Text("7s")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(.white.opacity(0.5))
-                        }
-                    }
+        Button {
+            if isRecording { stopRecording() }
+            else if recordCountdown > 0 { cancelCountdown() }
+            else { startRecordingCountdown() }
+        } label: {
+            ZStack {
+                Circle().fill(.black.opacity(0.55))
+                Circle().strokeBorder(.white.opacity(0.8), lineWidth: 1.5)
+                if recorderBusy {
+                    ProgressView().tint(.white)
+                } else if isRecording {
+                    RoundedRectangle(cornerRadius: 6).fill(StudioStyle.recording).frame(width: 27, height: 27)
+                } else if recordCountdown > 0 {
+                    Text("\(recordCountdown)")
+                        .font(.title3.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.white)
+                } else {
+                    Circle().fill(StudioStyle.recording).padding(7)
                 }
             }
-            .disabled(isRecording)
-            .accessibilityIdentifier("record-button")
+            .frame(width: 62, height: 62)
+        }
+        .buttonStyle(.plain)
+        .disabled(recorderBusy || activeAudioLoop != nil)
+        .accessibilityLabel(isRecording ? "Stop recording" : recordCountdown > 0 ? "Cancel countdown" : "Record video")
+        .accessibilityIdentifier("record-button")
     }
 
     // MARK: - Recording
 
+    private func toggleAudioLoop() {
+        if activeAudioLoop != nil { finishAudioLoop(); return }
+        guard engine.isRunning, !isRecording, !recorderBusy, recordCountdown == 0 else { return }
+        guard engine.savedLoops.count < EngineController.maxLoops else {
+            showLoopNotice("Delete a saved loop before recording another.")
+            return
+        }
+        let recorder = RPScreenRecorder.shared()
+        guard recorder.isAvailable else {
+            recordingError = "Audio capture isn't available right now."
+            return
+        }
+        let capture = CapturedLoopFile()
+        activeAudioLoop = capture
+        engine.loopCaptureBusy = true
+        recorder.isMicrophoneEnabled = false
+        let bpm = engine.manualBPM
+        let duration = min(90, max(1, engine.loopRecorder.loopDuration(bpm: bpm)))
+        recorder.startCapture(handler: { sample, type, error in
+            if let error { capture.fail(error) }
+            if type == .audioApp { capture.append(sample) }
+        }, completionHandler: { error in
+            DispatchQueue.main.async {
+                guard activeAudioLoop?.id == capture.id else { return }
+                engine.loopCaptureBusy = false
+                if let error {
+                    capture.discard()
+                    activeAudioLoop = nil
+                    recordingError = "Couldn't start loop recording. \(error.localizedDescription)"
+                    return
+                }
+                engine.isLoopRecording = true
+                if scenePhase == .background { finishAudioLoop(); return }
+                showLoopNotice("Recording app audio. Tap again to stop.")
+                loopCaptureTask = Task {
+                    let start = Date()
+                    while !Task.isCancelled {
+                        let elapsed = Date().timeIntervalSince(start)
+                        engine.loopRecordingProgress = min(1, elapsed / duration)
+                        if elapsed >= duration { finishAudioLoop(); return }
+                        try? await Task.sleep(nanoseconds: 100_000_000)
+                    }
+                }
+            }
+        })
+    }
+
+    private func finishAudioLoop() {
+        guard let capture = activeAudioLoop, !engine.loopCaptureBusy else { return }
+        engine.loopCaptureBusy = true
+        loopCaptureTask?.cancel()
+        loopCaptureTask = nil
+        RPScreenRecorder.shared().stopCapture { error in
+            DispatchQueue.main.async {
+                resolveAudioLoop(capture, interruption: error)
+            }
+        }
+    }
+
+    private func resolveAudioLoop(_ capture: CapturedLoopFile, interruption: Error?) {
+        guard activeAudioLoop?.id == capture.id else { return }
+        loopCaptureTask?.cancel()
+        loopCaptureTask = nil
+        activeAudioLoop = nil
+        engine.loopCaptureBusy = false
+        engine.isLoopRecording = false
+        engine.loopRecordingProgress = 0
+        do {
+            let duration = try capture.finish()
+            engine.saveCapturedLoop(id: capture.id, duration: duration, bpm: engine.manualBPM,
+                                    mode: engine.currentModeString, autoplay: scenePhase == .active && interruption == nil)
+            showLoopNotice(interruption == nil ? "Loop saved as WAV." : "Recording interrupted. Partial loop saved as WAV.")
+        } catch {
+            capture.discard()
+            recordingError = "Couldn't save the loop. \((interruption ?? error).localizedDescription)"
+        }
+    }
+
+    private func showLoopNotice(_ message: String) {
+        loopMessage = message
+        withAnimation { showLoopSaved = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            if loopMessage == message { withAnimation { showLoopSaved = false } }
+        }
+    }
+
+    private func startRecordingCountdown() {
+        let recorder = RPScreenRecorder.shared()
+        guard engine.isRunning, !isRecording, !recorderBusy, activeAudioLoop == nil, recordCountdown == 0 else { return }
+        guard !recordAtHalfSpeed || engine.supportsHalfSpeedRecording else {
+            recordingError = "Half speed is available in solo play. End the jam, guided lesson, or saved sequence first."
+            return
+        }
+        guard recorder.isAvailable else {
+            recordingError = "Screen recording isn’t available right now."
+            return
+        }
+        recordCountdown = 3
+        captureTask = Task {
+            for remaining in (0..<3).reversed() {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                recordCountdown = remaining
+            }
+            startRecording()
+        }
+    }
+
+    private func cancelCountdown() {
+        guard recordCountdown > 0 else { return }
+        captureTask?.cancel()
+        captureTask = nil
+        recordCountdown = 0
+    }
+
     private func startRecording() {
         let recorder = RPScreenRecorder.shared()
-        guard recorder.isAvailable && !isRecording else { return }
+        guard !recordAtHalfSpeed || engine.supportsHalfSpeedRecording else {
+            recordingError = "Half-speed recording is unavailable in this session."
+            return
+        }
+        let draft: RecordingDraft
+        do {
+            let sound = engine.currentSoundSetup
+            draft = try drafts.begin(instrument: sound?.instrumentName, mode: currentModeName, soundSetup: sound,
+                                     backingCredit: backing?.credit, halfSpeed: recordAtHalfSpeed)
+        } catch {
+            recordingError = "Couldn’t create a private draft. \(error.localizedDescription)"
+            return
+        }
+        activeDraft = draft
+        recorderBusy = true
+        engine.setRecordingTempo(halfSpeed: draft.recordedAtHalfSpeed == true)
+        backing?.player.rate = Float(engine.recordingTempoScale)
+        backing?.player.pause()
+        backingPlaying = false
 
-        isRecording = true
-        recordCountdown = 7
-
-        // Enable microphone to capture Strudel audio from speaker
-        // (WebView audio runs in a separate process so ReplayKit can't capture it directly)
-        // Audio session is already .playAndRecord so this shouldn't kill playback
-        recorder.isMicrophoneEnabled = true
+        recordingUsesMicrophone = false
+        if recordPerformanceMicrophone, !engine.jamSession.isActive, !engine.jamSession.canActivate {
+            let audio = AVAudioSession.sharedInstance()
+            do {
+                try audio.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+                try audio.setActive(true)
+                recordingUsesMicrophone = true
+            } catch {
+                restoreInstrumentAudio()
+            }
+        }
+        recorder.isMicrophoneEnabled = recordingUsesMicrophone
 
         // Add watermark overlay for branding in recording
         if let window = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene }).first?.windows.first {
-            let wm = WatermarkManager.createWatermarkView(frame: window.bounds)
+            let wm = WatermarkManager.createWatermarkView(frame: window.bounds, credit: draft.backingCredit)
             window.addSubview(wm)
             watermarkView = wm
         }
 
         recorder.startRecording { error in
-            if let error {
-                debugPrint("Recording failed:", error)
-                DispatchQueue.main.async {
-                    isRecording = false
-                    watermarkView?.removeFromSuperview()
-                    watermarkView = nil
-                }
-                return
-            }
-
-            // Countdown timer
-            Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-                DispatchQueue.main.async {
-                    recordCountdown -= 1
-                    if recordCountdown <= 0 {
-                        timer.invalidate()
+            DispatchQueue.main.async {
+                if let error {
+                    drafts.discardUnfinished(draft)
+                    finishRecordingUI()
+                    recordingError = "Couldn’t start recording. \(error.localizedDescription)"
+                } else {
+                    recorderBusy = false
+                    isRecording = true
+                    if scenePhase == .background { stopRecording(); return }
+                    if draft.recordedAtHalfSpeed == true && !engine.supportsHalfSpeedRecording {
                         stopRecording()
+                        return
+                    }
+                    if let backing {
+                        backing.player.currentTime = 0
+                        backingPlaying = backing.player.play()
+                        if !backingPlaying {
+                            recordingError = "The backing track couldn't start. Check the take before sharing."
+                            stopRecording()
+                            return
+                        }
+                    }
+                    captureTask = Task {
+                        let captureLimit = Double(RecordingDrafts.recordingLimit) / draft.outputScale
+                        try? await Task.sleep(nanoseconds: UInt64(captureLimit * 1_000_000_000))
+                        if !Task.isCancelled { stopRecording() }
                     }
                 }
             }
@@ -1513,53 +1904,186 @@ struct ContentView: View {
     }
 
     private func stopRecording() {
+        guard isRecording, !recorderBusy, let draft = activeDraft else { return }
+        recorderBusy = true
+        captureTask?.cancel()
+        engine.setRecordingTempo(halfSpeed: false)
         let recorder = RPScreenRecorder.shared()
-        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("handstrudel_\(Int(Date().timeIntervalSince1970)).mp4")
+        let outputURL = drafts.videoURL(for: draft.id)
 
         recorder.stopRecording(withOutput: outputURL) { error in
             DispatchQueue.main.async {
-                isRecording = false
-                // Remove watermark
-                watermarkView?.removeFromSuperview()
-                watermarkView = nil
-                if let error {
-                    debugPrint("Stop recording failed:", error)
-                    return
+                finishRecordingUI()
+                do {
+                    if let error { throw error }
+                    try drafts.complete(draft)
+                    if scenePhase != .background { reviewingDraft = draft }
+                } catch {
+                    if (try? drafts.complete(draft)) != nil {
+                        recordingError = "Recording was interrupted. Check Private drafts for the saved take."
+                    } else {
+                        drafts.discardUnfinished(draft)
+                        recordingError = "Couldn’t save this take. \(error.localizedDescription)"
+                    }
                 }
-                recordedVideoURL = outputURL
-                showSharePicker = true
             }
         }
     }
 
-    private func shareToInstagramStories() {
-        guard let url = recordedVideoURL,
-              let videoData = try? Data(contentsOf: url) else { return }
-
-        if let storiesURL = URL(string: "instagram-stories://share?source_application=com.handstrudel.app"),
-           UIApplication.shared.canOpenURL(storiesURL) {
-            UIPasteboard.general.setItems([[
-                "com.instagram.sharedSticker.backgroundVideo": videoData,
-                "com.instagram.sharedSticker.appID": "com.handstrudel.app"
-            ]], options: [.expirationDate: Date().addingTimeInterval(300)])
-            UIApplication.shared.open(storiesURL)
-        } else {
-            showShareSheet = true
+    private func finishRecordingUI() {
+        captureTask?.cancel()
+        backing?.player.pause()
+        backing?.player.rate = 1
+        engine.setRecordingTempo(halfSpeed: false)
+        backingPlaying = false
+        if recordingUsesMicrophone {
+            RPScreenRecorder.shared().isMicrophoneEnabled = false
+            restoreInstrumentAudio()
+            recordingUsesMicrophone = false
         }
-        showSharePicker = false
+        isRecording = false
+        recorderBusy = false
+        captureTask = nil
+        activeDraft = nil
+        watermarkView?.removeFromSuperview()
+        watermarkView = nil
     }
 
-    private func shareToInstagramReels() {
-        guard let url = recordedVideoURL else { return }
-
-        // Share to Reels via document interaction (video file to Instagram)
-        let instagramURL = URL(string: "instagram://library?AssetPath=\(url.absoluteString)")
-        if let instagramURL, UIApplication.shared.canOpenURL(instagramURL) {
-            UIApplication.shared.open(instagramURL)
-        } else {
-            // Fallback: open share sheet which shows Instagram as option
-            showShareSheet = true
+    #if DEBUG
+    private func openSampleDraft(at url: URL) {
+        do {
+            let draft = try drafts.begin(instrument: engine.selectedSoundFontInstrument.name, mode: currentModeName)
+            do {
+                try FileManager.default.copyItem(at: url, to: drafts.videoURL(for: draft.id))
+                try drafts.complete(draft)
+                reviewingDraft = draft
+            } catch {
+                drafts.discardUnfinished(draft)
+                throw error
+            }
+        } catch {
+            recordingError = error.localizedDescription
         }
-        showSharePicker = false
+    }
+    #endif
+}
+
+@MainActor
+private final class BackingTrack {
+    let credit: BackingCredit
+    let player: AVAudioPlayer
+    private let url: URL
+
+    private init(credit: BackingCredit, url: URL) throws {
+        self.credit = credit
+        self.url = url
+        player = try AVAudioPlayer(contentsOf: url)
+        player.numberOfLoops = -1
+        player.enableRate = true
+        player.volume = 0.55
+        guard player.prepareToPlay() else { throw SocialError.message("The backing audio couldn't be prepared.") }
+    }
+
+    static func load(video: Video, username: String) async throws -> BackingTrack {
+        let asset = AVURLAsset(url: video.videoURL)
+        let duration = try await asset.load(.duration).seconds
+        guard duration.isFinite, (0.1...61).contains(duration),
+              !(try await asset.loadTracks(withMediaType: .audio)).isEmpty,
+              let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A)
+        else { throw SocialError.message("This performance doesn't have playable backing audio.") }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Backing-\(UUID()).m4a")
+        do {
+            exporter.outputURL = url
+            exporter.outputFileType = .m4a
+            await exporter.export()
+            try Task.checkCancellation()
+            guard exporter.status == .completed else { throw exporter.error ?? SocialError.message("Backing audio couldn't be downloaded.") }
+            return try BackingTrack(credit: BackingCredit(videoId: video.id, username: username), url: url)
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
+    }
+
+    func remove() {
+        player.stop()
+        try? FileManager.default.removeItem(at: url)
+    }
+}
+
+private final class RecorderEvents: NSObject, RPScreenRecorderDelegate {
+    var onInterruption: ((Error) -> Void)?
+
+    func screenRecorder(_ screenRecorder: RPScreenRecorder, didStopRecordingWith previewViewController: RPPreviewViewController?, error: Error?) {
+        guard let error else { return }
+        DispatchQueue.main.async { [weak self] in self?.onInterruption?(error) }
+    }
+}
+
+private struct JamInvitation: UIViewControllerRepresentable, Identifiable {
+    let id = UUID()
+    let controller: GroupActivitySharingController
+
+    func makeUIViewController(context: Context) -> GroupActivitySharingController { controller }
+    func updateUIViewController(_ controller: GroupActivitySharingController, context: Context) {}
+}
+
+private struct CameraRecoveryBanner: View {
+    @ObservedObject var tracker: HandTrackingManager
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        if let issue = tracker.cameraIssue {
+            HStack {
+                Text(issue).font(.caption)
+                Button("Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                }
+                .font(.caption.weight(.semibold))
+                .tint(StudioStyle.accent)
+            }
+            .padding(10)
+            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 20)
+        }
+    }
+}
+
+private struct JamButton: View {
+    @ObservedObject var jam: JamSessionManager
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            if jam.isConnecting {
+                ProgressView().tint(.white)
+                    .frame(width: 44, height: 44)
+            } else {
+                Image(systemName: "shareplay")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(jam.isActive ? StudioStyle.accent : .white)
+                    .frame(width: 44, height: 44)
+                    .background(.black.opacity(0.55), in: Circle())
+            }
+        }
+        .disabled(jam.isConnecting)
+        .accessibilityLabel(jam.isActive ? "Leave SharePlay jam" : "Start SharePlay jam")
+        .accessibilityIdentifier("shareplay-jam-button")
+    }
+}
+
+private struct JamStatus: View {
+    @ObservedObject var jam: JamSessionManager
+
+    var body: some View {
+        if jam.isActive {
+            Text(jam.participantCount > 1 ? "\(jam.participantCount) people jamming" : "Waiting for friends")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(StudioStyle.accent)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.black.opacity(0.65), in: Capsule())
+                .allowsHitTesting(false)
+        }
     }
 }

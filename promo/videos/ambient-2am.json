@@ -1,0 +1,27 @@
+{
+  "song": "ambient-halo",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 6.0,
+      "text": "Ambient music<br><em>for 2am</em>",
+      "emoji": "🌙",
+      "say": "Ambient music, for two A M."
+    },
+    {
+      "start": 6.5,
+      "end": 14.0,
+      "text": "Slow hands =<br><em>slow vibes</em>",
+      "emoji": "🫠",
+      "say": "Slow hands. Slow vibes."
+    },
+    {
+      "start": 14.5,
+      "end": 22.0,
+      "text": "Every note fits<br><em>the key you pick</em>",
+      "emoji": "✨",
+      "say": "Every note fits the key you pick."
+    }
+  ],
+  "voice": "af_sky"
+}

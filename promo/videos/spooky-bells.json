@@ -1,0 +1,27 @@
+{
+  "song": "spooky-bells",
+  "voice": "am_echo",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 9.41,
+      "text": "Spooky season<br><em>starts now</em>",
+      "emoji": "👻",
+      "say": "Spooky season starts now."
+    },
+    {
+      "start": 9.71,
+      "end": 18.52,
+      "text": "Haunted bells,<br><em>summoned by hand</em>",
+      "emoji": "🔔",
+      "say": "Haunted bells, summoned by hand."
+    },
+    {
+      "start": 18.82,
+      "end": 27.63,
+      "text": "Don't play this<br><em>at midnight</em>",
+      "emoji": "🕯️",
+      "say": "Don't play this at midnight."
+    }
+  ]
+}

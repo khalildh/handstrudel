@@ -37,7 +37,7 @@ export default function Community() {
       <p>Record in a space where you&apos;re comfortable with what the camera sees. Your recordings show your screen and your hands; avoid filming other people without their permission.</p>
 
       <h2>Report and block</h2>
-      <p>If you see something that breaks these rules, tap <strong>⋯ → Report</strong> on the post. Posts with several reports are hidden automatically while we review them, and we act on reports within 24 hours. You can also <strong>Block</strong> anyone: you won&apos;t see each other&apos;s posts.</p>
+      <p>If you see something that breaks these rules, use the options menu on the post or comment to report it. Posts and comments with several reports are hidden automatically while we review them, and we act on reports within 24 hours. You can also <strong>Block</strong> anyone so you won&apos;t see each other&apos;s posts or comments. If you&apos;re watching on the web, email <a href="mailto:hello@handstrudel.com" style={link}>hello@handstrudel.com</a> to report a comment.</p>
 
       <h2>What happens if you break the rules</h2>
       <p>We remove content that breaks these guidelines, and accounts that do it repeatedly or seriously are suspended or deleted. Illegal content is reported to the authorities.</p>

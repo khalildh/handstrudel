@@ -1,0 +1,27 @@
+{
+  "song": "slap-bass",
+  "voice": "am_puck",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 6.67,
+      "text": "Slap bass,<br><em>no bass</em>",
+      "emoji": "🎸",
+      "say": "Slap bass. No bass."
+    },
+    {
+      "start": 6.97,
+      "end": 13.03,
+      "text": "Pinch<br><em>= slap</em>",
+      "emoji": "👋",
+      "say": "Pinch equals slap."
+    },
+    {
+      "start": 13.33,
+      "end": 19.4,
+      "text": "Bassists hate<br><em>this one trick</em>",
+      "emoji": "😤",
+      "say": "Bassists hate this one trick."
+    }
+  ]
+}

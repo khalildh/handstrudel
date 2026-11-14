@@ -1,0 +1,27 @@
+{
+  "song": "afternoon-reset-pad",
+  "voice": "bf_lily",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 8.27,
+      "text": "Your 3pm<br><em>reset</em>",
+      "emoji": "☁️",
+      "say": "Your three P M reset."
+    },
+    {
+      "start": 8.57,
+      "end": 16.23,
+      "text": "Close your eyes.<br><em>Move your hands.</em>",
+      "emoji": "🫧",
+      "say": "Close your eyes. Move your hands."
+    },
+    {
+      "start": 16.53,
+      "end": 24.2,
+      "text": "Lydian mode<br><em>floats, trust me</em>",
+      "emoji": "🧠",
+      "say": "Lydian mode floats. Trust me."
+    }
+  ]
+}

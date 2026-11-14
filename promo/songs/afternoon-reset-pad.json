@@ -1,0 +1,17 @@
+{
+  "name": "afternoon reset pad",
+  "instrument": "pad_new_age",
+  "key": "C",
+  "scale": "Lydian",
+  "bpm": 60,
+  "beatsPerChord": 4,
+  "chords": [
+    "I",
+    "II",
+    "vi",
+    "II",
+    "I",
+    "I"
+  ],
+  "melody": "5:2 7:2  6:4  3:2 5:2  4:4  2:2 7,:2  1:4"
+}

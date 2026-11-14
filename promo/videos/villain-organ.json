@@ -1,0 +1,27 @@
+{
+  "song": "villain-organ",
+  "voice": "am_onyx",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 9.16,
+      "text": "Villain arc<br><em>unlocked</em>",
+      "emoji": "😈",
+      "say": "Villain arc, unlocked."
+    },
+    {
+      "start": 9.46,
+      "end": 18.01,
+      "text": "Pipe organ.<br><em>No pipes. No organ.</em>",
+      "emoji": "🦇",
+      "say": "Pipe organ. No pipes. No organ."
+    },
+    {
+      "start": 18.31,
+      "end": 26.87,
+      "text": "Just two hands<br><em>& bad intentions</em>",
+      "emoji": "🕯️",
+      "say": "Just two hands, and bad intentions."
+    }
+  ]
+}

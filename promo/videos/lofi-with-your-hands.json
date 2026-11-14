@@ -1,0 +1,27 @@
+{
+  "song": "lofi-rhodes",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 4.5,
+      "text": "POV: you make lo-fi<br><em>by waving at your phone</em>",
+      "emoji": "🎧",
+      "say": "P O V: you're making lo-fi by waving at your phone."
+    },
+    {
+      "start": 5.0,
+      "end": 11.0,
+      "text": "Your camera tracks<br><em>both hands</em>",
+      "emoji": "✋",
+      "say": "Your camera tracks both hands."
+    },
+    {
+      "start": 11.5,
+      "end": 18.0,
+      "text": "You literally can't<br><em>hit a wrong note</em>",
+      "emoji": "✨",
+      "say": "And you literally can't hit a wrong note."
+    }
+  ],
+  "voice": "af_bella"
+}

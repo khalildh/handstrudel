@@ -207,6 +207,10 @@ final class StoreManager: ObservableObject {
         if ProcessInfo.processInfo.arguments.contains("--force-locked") {
             return false
         }
+        // Promo-video demo runs show every instrument unlocked.
+        if ProcessInfo.processInfo.environment["HANDSTRUDEL_DEMO_SCRIPT"] != nil {
+            return true
+        }
         #endif
         // NOTE: DEBUG bypass disabled for testing purchase flows.
         // Re-enable by wrapping the body below in `#if DEBUG\nreturn true\n#else ... #endif`.
@@ -217,6 +221,9 @@ final class StoreManager: ObservableObject {
 
     /// True when the user owns Pro music content (via Pro one-time or Plus subscription).
     var hasProAccess: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["HANDSTRUDEL_DEMO_SCRIPT"] != nil { return true }
+        #endif
         guard let info = customerInfo else { return false }
         return info.entitlements[Self.entitlementPro]?.isActive == true
     }

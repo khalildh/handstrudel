@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TVAG3T3Y65.com.handstrudel.app"],
+        "components": [
+          { "/": "/watch", "?": { "v": "*" } },
+          { "/": "/watch/", "?": { "v": "*" } }
+        ]
+      }
+    ]
+  }
+}

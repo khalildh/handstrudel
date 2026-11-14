@@ -1,0 +1,27 @@
+{
+  "song": "island-steel-drums",
+  "voice": "af_alloy",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 6.19,
+      "text": "Instant<br><em>beach vacation</em>",
+      "emoji": "🏝️",
+      "say": "Instant beach vacation."
+    },
+    {
+      "start": 6.49,
+      "end": 12.09,
+      "text": "Steel drums,<br><em>from your sofa</em>",
+      "emoji": "🥥",
+      "say": "Steel drums, from your sofa."
+    },
+    {
+      "start": 12.39,
+      "end": 17.98,
+      "text": "Pinch for<br><em>paradise</em>",
+      "emoji": "☀️",
+      "say": "Pinch for paradise."
+    }
+  ]
+}

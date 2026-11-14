@@ -6,6 +6,16 @@ final class PersistenceManager {
     private let defaults = UserDefaults.standard
     private let loopsKey = "savedLoops"
     private let snippetsKey = "savedSnippets"
+    private let setupsKey = "savedSoundSetups"
+
+    func loadSetups() -> [NamedSoundSetup] {
+        guard let data = defaults.data(forKey: setupsKey) else { return [] }
+        return (try? JSONDecoder().decode([NamedSoundSetup].self, from: data)) ?? []
+    }
+
+    func saveSetups(_ setups: [NamedSoundSetup]) {
+        if let data = try? JSONEncoder().encode(setups) { defaults.set(data, forKey: setupsKey) }
+    }
 
     // MARK: - Settings
 
@@ -120,6 +130,103 @@ final class PersistenceManager {
         lastGridOctaveRange = gridOctaveRange
         lastQuantizeEnabled = quantizeEnabled
         lastQuantizeDiv = quantizeDiv
+    }
+}
+
+struct NamedSoundSetup: Identifiable, Codable {
+    let id: UUID
+    let name: String
+    let sound: SoundSetup
+}
+
+struct SoundSetup: Codable, Equatable {
+    var version = 1
+    let instrument: String
+    let waveform: String
+    let key: MusicKey
+    let scale: Scale
+    let progression: String
+    let customDegrees: [Int]?
+    let mode: Mode
+    let bpm: Double
+    let useSoundFont: Bool
+    let autoStrum: Bool
+    let padVolume: Double
+    let gridOctave: Int
+    let gridRange: Int
+
+    enum Mode: String, Codable {
+        case melodic, flow, hybrid, lead, grid, drum, chordmelody, radialchordmelody
+        case splitchordmelody, scalechordmelody, soundfont
+    }
+
+    var resolvedInstrument: SoundFontInstrument? { SOUNDFONT_INSTRUMENTS.first { $0.id == instrument } }
+    var resolvedWaveform: Waveform? { WAVEFORMS.first { $0.id == waveform } }
+    var instrumentName: String? { useSoundFont ? resolvedInstrument?.name : resolvedWaveform?.name }
+
+    var resolvedProgression: ChordProgression? {
+        if progression == "custom" {
+            guard let customDegrees, (1...64).contains(customDegrees.count),
+                  customDegrees.allSatisfy({ (0...6).contains($0) }) else { return nil }
+            return ChordProgression.parse(customDegrees.map { String($0 + 1) }.joined(separator: " "))
+        }
+        return CHORD_PROGRESSIONS.first { $0.id == progression }
+    }
+
+    var isValid: Bool {
+        version == 1 && resolvedInstrument != nil && resolvedWaveform != nil && resolvedProgression != nil
+            && (20...400).contains(bpm) && (0...0.6).contains(padVolume)
+            && (1...6).contains(gridOctave) && (1...3).contains(gridRange)
+            && (mode == .soundfont ? useSoundFont : (!useSoundFont || [.radialchordmelody, .splitchordmelody, .scalechordmelody].contains(mode)))
+    }
+
+    var requiredPacks: [String] {
+        // Ignore the inactive synth's selection, which isn't used when this sound is applied.
+        [useSoundFont ? resolvedInstrument?.packId : resolvedWaveform?.packId,
+         scale.packId, resolvedProgression?.packId].compactMap { $0 }
+    }
+}
+
+extension EngineController {
+    var currentSoundSetup: SoundSetup? {
+        guard !learnModeEnabled, let mode = SoundSetup.Mode(rawValue: currentModeString) else { return nil }
+        return SoundSetup(instrument: selectedSoundFontInstrument.id, waveform: selectedWaveform,
+                          key: selectedKey, scale: selectedScale, progression: chordMelodyProgression.id,
+                          customDegrees: chordMelodyProgression.isCustom ? chordMelodyProgression.degrees : nil,
+                          mode: mode, bpm: manualBPM, useSoundFont: activeSoundFontRouting,
+                          autoStrum: chordMelodyAutoStrum, padVolume: chordMelodyPadVolume,
+                          gridOctave: gridBaseOctave, gridRange: gridOctaveRange)
+    }
+
+    private var activeSoundFontRouting: Bool {
+        soundFontModeEnabled || (radialChordMelodyModeEnabled && radialUseSoundFont)
+            || (splitChordMelodyModeEnabled && splitUseSoundFont) || (scaleChordMelodyModeEnabled && scaleUseSoundFont)
+    }
+
+    @discardableResult
+    func applySoundSetup(_ setup: SoundSetup, store: StoreManager) -> Bool {
+        guard setup.isValid, let progression = setup.resolvedProgression,
+              setup.requiredPacks.allSatisfy({ store.isUnlocked($0) }) else { return false }
+        let mode = setup.mode
+        silenceAll()
+        selectedKey = setup.key
+        selectedScale = setup.scale
+        chordMelodyProgression = progression
+        if setup.useSoundFont, let instrument = setup.resolvedInstrument { selectedSoundFontInstrument = instrument }
+        else { selectedWaveform = setup.waveform }
+        if mode == .radialchordmelody { radialUseSoundFont = setup.useSoundFont }
+        if mode == .splitchordmelody { splitUseSoundFont = setup.useSoundFont }
+        if mode == .scalechordmelody { scaleUseSoundFont = setup.useSoundFont }
+        manualBPM = setup.bpm
+        chordMelodyAutoStrum = setup.autoStrum
+        chordMelodyPadVolume = setup.padVolume
+        gridBaseOctave = setup.gridOctave
+        gridOctaveRange = setup.gridRange
+        switchMode(grid: mode == .grid, drums: mode == .drum, learn: false, chordMelody: mode == .chordmelody,
+                   lead: mode == .lead, hybrid: mode == .hybrid, flow: mode == .flow, soundFont: mode == .soundfont,
+                   radialChordMelody: mode == .radialchordmelody, splitChordMelody: mode == .splitchordmelody,
+                   scaleChordMelody: mode == .scalechordmelody)
+        return true
     }
 }
 

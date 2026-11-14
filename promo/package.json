@@ -1,0 +1,14 @@
+{
+  "name": "handstrudel-promo",
+  "private": true,
+  "type": "module",
+  "description": "Automated promo-video production: drives the real iOS app in the Simulator with scripted hands, records screen + audio, and edits vertical videos with an App Store end card.",
+  "scripts": {
+    "make": "node make.mjs"
+  },
+  "dependencies": {
+    "kokoro-js": "^1.2.1",
+    "playwright-core": "1.49.1",
+    "qrcode": "1.5.4"
+  }
+}

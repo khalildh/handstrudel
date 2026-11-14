@@ -1,0 +1,27 @@
+{
+  "song": "cinematic-strings",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 4.5,
+      "text": "I turned my phone<br><em>into an orchestra</em>",
+      "emoji": "🎻",
+      "say": "I turned my phone into an orchestra."
+    },
+    {
+      "start": 5.0,
+      "end": 11.0,
+      "text": "128 real instruments.<br><em>Zero practice.</em>",
+      "emoji": "🔥",
+      "say": "A hundred and twenty eight real instruments. Zero practice."
+    },
+    {
+      "start": 11.5,
+      "end": 18.0,
+      "text": "Strings, piano, choir,<br><em>synths & more</em>",
+      "emoji": "🎶",
+      "say": "Strings, piano, choir, synths, and more."
+    }
+  ],
+  "voice": "am_puck"
+}

@@ -1,5 +1,6 @@
 import SwiftUI
 import QuartzCore
+import AVFAudio
 
 struct Waveform: Identifiable {
     let id: String
@@ -97,6 +98,24 @@ final class EngineController: ObservableObject {
     @Published var noteDisplay = ""
     @Published var bpm: Double = 120
     @Published var currentBeat = 0
+    private(set) var recordingTempoScale: Double = 1
+
+    func setRecordingTempo(halfSpeed: Bool) {
+        let scale = halfSpeed ? 0.5 : 1
+        guard scale != recordingTempoScale else { return }
+        let bpm = smoothed["bpm"] ?? manualBPM
+        recordingTempoScale = scale
+        strudelBridge.setTempoScale(scale, bpm: bpm)
+        quantizeQuarterPeriod = 60 / max(1, bpm * scale)
+        quantizeBeatWallTime = 0
+        lastStructKey = ""
+        audioLoopPlayers.values.forEach { $0.rate = Float(scale) }
+    }
+
+    var supportsHalfSpeedRecording: Bool {
+        !learnModeEnabled && !jamSession.isActive && playingSet.isEmpty && !trackPlaying
+        && playingLoopIds.allSatisfy { audioLoopPlayers[$0] != nil }
+    }
 
     // Saved snippets
     @Published var savedSnippets = [SavedSnippet]()
@@ -117,13 +136,21 @@ final class EngineController: ObservableObject {
 
     // Jam session (SharePlay)
     let jamSession = JamSessionManager()
+    private var jamSamplers: [UInt8: SoundFontEngine] = [:]
+    private struct RemoteJamVoice {
+        let voice: JamHeldVoice
+        let sampler: SoundFontEngine?
+    }
+    private var remoteJamVoices: [UUID: [String: RemoteJamVoice]] = [:]
 
     // Loop recording & playback
     let loopRecorder = LoopRecorder()
     @Published var isLoopRecording = false
+    @Published var loopCaptureBusy = false
     @Published var loopRecordingProgress: Double = 0
     @Published var savedLoops = [RecordedLoop]()
     @Published var playingLoopIds = Set<UUID>()
+    private var audioLoopPlayers: [UUID: AVAudioPlayer] = [:]
 
     // Learn mode (Guitar Hero-style guided play)
     @Published var learnModeEnabled = false
@@ -263,6 +290,9 @@ final class EngineController: ObservableObject {
 
     init() {
         loadPersistedState()
+        jamSession.onRemoteEvent = { [weak self] event in self?.playJamEvent(event) }
+        jamSession.onRemoteVoices = { [weak self] peer, voices in self?.playJamVoices(voices, peer: peer) }
+        jamSession.onSessionCleared = { [weak self] in self?.silenceJamAudio() }
     }
 
     private func loadPersistedState() {
@@ -399,21 +429,6 @@ final class EngineController: ObservableObject {
                 handTracker.startSession()
                 debugLog("camera started")
 
-                // Jam session: play remote events
-                jamSession.onRemoteEvent = { [weak self] event in
-                    guard let self else { return }
-                    switch event {
-                    case .noteOn(let midi, let waveform, let vel):
-                        self.strudelBridge.playNote(midi: midi, waveform: waveform, velocity: vel * 0.7, duration: 0.2)
-                    case .drumHit(let hitType):
-                        self.strudelBridge.playHit(hitType)
-                    case .noteOff:
-                        break
-                    case .bpmChange:
-                        break
-                    }
-                }
-
                 // Beat callback
                 strudelBridge.onBeat = { [weak self] beat in
                     DispatchQueue.main.async {
@@ -427,7 +442,9 @@ final class EngineController: ObservableObject {
                             let now = CACurrentMediaTime()
                             if self.quantizeBeatWallTime > 0 {
                                 let delta = now - self.quantizeBeatWallTime
-                                if delta > 0.05 && delta < 2.0 { self.quantizeQuarterPeriod = delta }
+                                if delta > 0.05 && delta < 2.0 / self.recordingTempoScale {
+                                    self.quantizeQuarterPeriod = delta
+                                }
                             }
                             self.quantizeBeatWallTime = now
                             self.quantizeBeatIndex += 1
@@ -443,6 +460,7 @@ final class EngineController: ObservableObject {
                 debugLog("all started, setting isRunning=true")
                 status = "running -- wave your hands"
                 isRunning = true
+                jamSession.replayRemoteVoices()
             } catch {
                 debugLog("start error: \(error.localizedDescription)")
                 status = "error: \(error.localizedDescription)"
@@ -507,6 +525,10 @@ final class EngineController: ObservableObject {
         let isLive = playingSet.isEmpty && !trackPlaying
         guard isLive, !isPaused else { return }
 
+        if recordingTempoScale != 1 {
+            let effectiveBPM = smoothed["bpm"] ?? manualBPM
+            if effectiveBPM != lastReportedTempo { strudelBridge.updateTempo(effectiveBPM); lastReportedTempo = effectiveBPM }
+        }
         activeMode.tick(self)
 
         tickLoopPlayback()
@@ -530,11 +552,114 @@ final class EngineController: ObservableObject {
         structIdx = currentStructIdx
     }
 
+    private var lastReportedTempo = 0.0
+
     @Published var fingerOctaveEnabled = false
     @Published var currentFingerCount: Int = 0
 
 
     // MARK: - SoundFont mode
+
+    func shareJamNotes(_ pitches: [Int], velocity: Double, duration: Double = 0.25,
+                       native: Bool = false, waveform: String? = nil) {
+        guard jamSession.isActive, jamSession.participantCount > 1, velocity > 0 else { return }
+        jamSession.sendEvent(.notes(pitches: pitches.map { min(127, max(0, $0)) },
+                                    program: native ? selectedSoundFontInstrument.program : nil,
+                                    waveform: waveform ?? selectedWaveform,
+                                    velocity: velocity, duration: duration))
+    }
+
+    func holdJamVoice(_ id: String, pitches: [Int], velocity: Double,
+                      native: Bool = false, waveform: String? = nil) {
+        guard velocity > 0 else { releaseJamVoice(id); return }
+        let voice = JamHeldVoice(pitches: pitches.map { min(127, max(0, $0)) },
+                                 program: native ? selectedSoundFontInstrument.program : nil,
+                                 waveform: waveform ?? selectedWaveform, velocity: velocity)
+        jamSession.setHeldVoice(id, voice: voice)
+    }
+
+    func slideJamVoice(_ id: String, pitches: [Int]) {
+        jamSession.slideHeldVoice(id, pitches: pitches.map { min(127, max(0, $0)) })
+    }
+
+    func releaseJamVoice(_ id: String) {
+        jamSession.setHeldVoice(id, voice: nil)
+    }
+
+    private func playJamVoices(_ voices: [String: JamHeldVoice], peer: UUID) {
+        let desired = isRunning && !isPaused ? voices : [:]
+        let previous = remoteJamVoices[peer] ?? [:]
+        let prefix = "jam-\(peer.uuidString.lowercased())-"
+        var playing: [String: RemoteJamVoice] = [:]
+
+        for (id, old) in previous {
+            let next = desired[id]
+            let sameSound = next?.attack == old.voice.attack
+                && next?.program == old.voice.program && next?.waveform == old.voice.waveform
+            for index in old.voice.pitches.indices where !sameSound || index >= (next?.pitches.count ?? 0) {
+                let key = "\(prefix)\(id)-\(index)"
+                if let sampler = old.sampler { sampler.releaseTemporaryVoice(key) }
+                else { strudelBridge.noteOff(hand: key) }
+            }
+        }
+
+        for (id, voice) in desired {
+            let old = previous[id]
+            let sameSound = old?.voice.attack == voice.attack
+                && old?.voice.program == voice.program && old?.voice.waveform == voice.waveform
+            let sampler = sameSound ? old?.sampler : voice.program.flatMap { jamSampler(for: $0) }
+            let volume = voice.velocity * (voice.pitches.count > 1 ? 0.45 : 0.7)
+            for (index, pitch) in voice.pitches.enumerated() {
+                let key = "\(prefix)\(id)-\(index)"
+                if sameSound, let old, old.voice.pitches.indices.contains(index) {
+                    if old.voice.pitches[index] != pitch {
+                        if let sampler { sampler.slide(voice: key, midi: pitch) }
+                        else { strudelBridge.noteSlide(hand: key, midi: pitch) }
+                    }
+                } else if let sampler {
+                    sampler.noteOn(voice: key, midi: pitch, velocity: volume)
+                } else {
+                    strudelBridge.noteOn(hand: key, midi: pitch, waveform: voice.waveform, velocity: volume)
+                }
+            }
+            playing[id] = RemoteJamVoice(voice: voice, sampler: sampler)
+        }
+        remoteJamVoices[peer] = playing.isEmpty ? nil : playing
+    }
+
+    private func playJamEvent(_ event: JamEvent) {
+        guard isRunning, !isPaused else { return }
+        switch event {
+        case let .notes(pitches, program, waveform, velocity, duration):
+            let volume = velocity * (pitches.count > 1 ? 0.45 : 0.7)
+            if let program, let sampler = jamSampler(for: program) {
+                for pitch in pitches {
+                    sampler.oneShot(midi: pitch, velocity: volume, duration: duration)
+                }
+            } else {
+                for pitch in pitches {
+                    strudelBridge.playNote(midi: pitch, waveform: waveform, velocity: volume, duration: duration)
+                }
+            }
+        case .drumHit(let hitType):
+            strudelBridge.playHit(hitType)
+        }
+    }
+
+    private func jamSampler(for program: UInt8) -> SoundFontEngine? {
+        if let sampler = jamSamplers[program] { return sampler.isAvailable ? sampler : nil }
+        // Keep remote instruments separate from the player's sampler and cap the audio graphs.
+        guard jamSamplers.count < 4 else { return nil }
+        let sampler = SoundFontEngine()
+        jamSamplers[program] = sampler
+        return sampler.startIfNeeded(program: program) ? sampler : nil
+    }
+
+    private func silenceJamAudio() {
+        for peer in Array(remoteJamVoices.keys) { playJamVoices([:], peer: peer) }
+        jamSamplers.values.forEach { $0.allNotesOff() }
+        jamSamplers.removeAll()
+    }
 
     /// Same two-hand chord+melody interaction as `tickChordMelodyMode`, but the
     /// notes are voiced by the native `AVAudioUnitSampler` (`soundFontEngine`)
@@ -594,6 +719,7 @@ final class EngineController: ObservableObject {
                 for (i, midi) in notes.enumerated() {
                     soundFontEngine.noteOn(voice: "pad\(i)", midi: midi, velocity: chordMelodyPadVolume)
                 }
+                holdJamVoice("pad", pitches: notes, velocity: chordMelodyPadVolume, native: true)
             case .padSlide(let notes, let degree):
                 chordMelodyCurrentChordName = chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree)
                 chordMelodyCurrentDegree = degree
@@ -601,24 +727,34 @@ final class EngineController: ObservableObject {
                 for (i, midi) in notes.enumerated() {
                     soundFontEngine.slide(voice: "pad\(i)", midi: midi)
                 }
+                slideJamVoice("pad", pitches: notes)
             case .padOff:
-                for i in 0..<3 { soundFontEngine.noteOff(voice: "pad\(i)") }
+                // Hard-cut instead of noteOff so pad-y instruments with long
+                // SF2 release tails (Choir, Strings, synth pads) go silent
+                // immediately — release tails read as "still playing" to the
+                // player when the hand is off screen.
+                for i in 0..<4 { soundFontEngine.hardStop(voice: "pad\(i)") }
+                releaseJamVoice("pad")
             case .chordAccent(let notes, _, let vel):
                 for midi in notes {
                     soundFontEngine.oneShot(midi: midi, velocity: vel * 0.6, duration: 0.5)
                     loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel * 0.5), currentTime: elapsed)
                 }
+                shareJamNotes(notes, velocity: vel * 0.6, duration: 0.5, native: true)
                 haptics.noteTrigger()
             case .melodyOn(let hand, let midi, let name, let vel):
                 soundFontEngine.noteOn(voice: hand, midi: midi, velocity: vel)
+                holdJamVoice(hand, pitches: [midi], velocity: vel, native: true)
                 haptics.noteTrigger()
                 lastGridNote = name
                 loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel), currentTime: elapsed)
             case .melodyOff(let hand):
                 soundFontEngine.noteOff(voice: hand)
+                releaseJamVoice(hand)
                 loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
             case .melodySlide(let hand, let midi, let name):
                 soundFontEngine.slide(voice: hand, midi: midi)
+                slideJamVoice(hand, pitches: [midi])
                 lastGridNote = name
             }
         }
@@ -647,6 +783,7 @@ final class EngineController: ObservableObject {
             for midi in chordMelodyModeManager.currentChordMidi {
                 soundFontEngine.oneShot(midi: midi, velocity: 0.3, duration: 0.4)
             }
+            shareJamNotes(chordMelodyModeManager.currentChordMidi, velocity: 0.3, duration: 0.4, native: true)
         }
 
         evaluateDrumLoopsIfChanged(modePrefix: "soundfont")
@@ -696,7 +833,7 @@ final class EngineController: ObservableObject {
     }
 
     private static let maxSnippets = 50
-    private static let maxLoops = 20
+    static let maxLoops = 20
 
     private func tickSaveGesture() {
         guard !gridModeEnabled && !drumModeEnabled else { return }
@@ -745,7 +882,9 @@ final class EngineController: ObservableObject {
             isLoopRecording = false
         }
 
-        loopRecordingProgress = loopRecorder.recordingProgress(currentTime: elapsed, bpm: currentBpm)
+        if loopRecorder.isRecording {
+            loopRecordingProgress = loopRecorder.recordingProgress(currentTime: elapsed, bpm: currentBpm)
+        }
     }
 
     func startLoopRecording() {
@@ -773,9 +912,24 @@ final class EngineController: ObservableObject {
 
     func toggleLoopPlayback(_ loopId: UUID) {
         if playingLoopIds.contains(loopId) {
+            audioLoopPlayers.removeValue(forKey: loopId)?.stop()
             loopRecorder.removeLoop(loopId)
             playingLoopIds.remove(loopId)
         } else if let loop = savedLoops.first(where: { $0.id == loopId }) {
+            if loop.hasCapturedAudio == true {
+                if let player = try? AVAudioPlayer(contentsOf: AudioExporter.capturedURL(loop.id)) {
+                    player.numberOfLoops = -1
+                    player.enableRate = true
+                    player.rate = Float(recordingTempoScale)
+                    audioLoopPlayers[loop.id] = player
+                    if (!isPaused || player.prepareToPlay()) && (isPaused || player.play()) {
+                        playingLoopIds.insert(loop.id)
+                    } else {
+                        audioLoopPlayers[loop.id] = nil
+                    }
+                }
+                return
+            }
             let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
             loopRecorder.addLoop(loop, startTime: elapsed)
             playingLoopIds.insert(loopId)
@@ -783,12 +937,26 @@ final class EngineController: ObservableObject {
     }
 
     func deleteLoop(_ loopId: UUID) {
+        audioLoopPlayers.removeValue(forKey: loopId)?.stop()
         loopRecorder.removeLoop(loopId)
         playingLoopIds.remove(loopId)
         savedLoops.removeAll { $0.id == loopId }
+        try? FileManager.default.removeItem(at: AudioExporter.capturedURL(loopId))
+        PersistenceManager.shared.saveLoops(savedLoops)
+    }
+
+    func saveCapturedLoop(id: UUID, duration: Double, bpm: Double, mode: String, autoplay: Bool = true) {
+        var loop = RecordedLoop(id: id, events: [], duration: duration, bpm: bpm,
+                                name: "Loop \(savedLoops.count + 1)", mode: mode)
+        loop.hasCapturedAudio = true
+        savedLoops.append(loop)
+        PersistenceManager.shared.saveLoops(savedLoops)
+        if autoplay { toggleLoopPlayback(id) }
     }
 
     func stopAllLoops() {
+        audioLoopPlayers.values.forEach { $0.stop() }
+        audioLoopPlayers.removeAll()
         loopRecorder.stopPlayback()
         playingLoopIds.removeAll()
     }
@@ -822,7 +990,7 @@ final class EngineController: ObservableObject {
             let vol = drumVolume * intensityGain
             code1 = "(\(code1)).gain(\(String(format: "%.2f", vol)))"
             // BPM via cpm (cycles per minute = BPM / 4)
-            let cpm1 = drumBPM / 4.0 * complexitySpeed
+            let cpm1 = drumBPM / 4.0 * complexitySpeed * recordingTempoScale
             code1 = "(\(code1)).cpm(\(String(format: "%.1f", cpm1)))"
             parts.append(code1)
         }
@@ -830,7 +998,7 @@ final class EngineController: ObservableObject {
         if !code2.isEmpty {
             let vol = drumVolume2 * intensityGain
             code2 = "(\(code2)).gain(\(String(format: "%.2f", vol)))"
-            let cpm2 = drumBPM2 / 4.0 * complexitySpeed
+            let cpm2 = drumBPM2 / 4.0 * complexitySpeed * recordingTempoScale
             code2 = "(\(code2)).cpm(\(String(format: "%.1f", cpm2)))"
             parts.append(code2)
         }
@@ -1016,18 +1184,24 @@ final class EngineController: ObservableObject {
         leadVoiceMidi = nil
         strudelBridge.stop()
         soundFontEngine.allNotesOff()
+        for peer in Array(remoteJamVoices.keys) { playJamVoices([:], peer: peer) }
+        jamSamplers.values.forEach { $0.allNotesOff() }
+        jamSession.clearHeldVoices()
         lastStructKey = "" // force re-eval when resuming
     }
 
     /// Pause audio (control sheet open)
     func pause() {
         isPaused = true
+        audioLoopPlayers.values.forEach { $0.pause() }
         silenceAll()
     }
 
     /// Resume audio (control sheet closed)
     func resume() {
         isPaused = false
+        audioLoopPlayers.values.forEach { _ = $0.play() }
+        jamSession.replayRemoteVoices()
     }
 
     /// Call when switching modes to stop lingering sounds
@@ -1051,6 +1225,7 @@ final class EngineController: ObservableObject {
         if soundFont {
             soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
         }
+        jamSession.replayRemoteVoices()
     }
 
     /// Persisted/loop-record label for the current mode.
@@ -1069,6 +1244,7 @@ final class EngineController: ObservableObject {
     }
 
     func stop() {
+        setRecordingTempo(halfSpeed: false)
         // Persist state before teardown
         let mode = currentModeString
         PersistenceManager.shared.lastSoundFont = selectedSoundFontInstrument.id
@@ -1099,6 +1275,7 @@ final class EngineController: ObservableObject {
         // Audio/camera — kill all voices immediately
         silenceAll()
         strudelBridge.stop()
+        stopAllLoops()
         handTracker.stopSession()
         handTracker.onHandsUpdate = nil
         strudelBridge.onBeat = nil

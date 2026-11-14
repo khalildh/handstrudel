@@ -1,0 +1,27 @@
+{
+  "song": "marimba-bounce",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 4.5,
+      "text": "Your hands →<br><em>marimba</em>",
+      "emoji": "🙌",
+      "say": "Your hands, but make it marimba."
+    },
+    {
+      "start": 5.0,
+      "end": 11.0,
+      "text": "Tracks 21 points<br><em>on each hand</em>",
+      "emoji": "👀",
+      "say": "It tracks twenty one points on each hand."
+    },
+    {
+      "start": 11.5,
+      "end": 18.0,
+      "text": "Pick any key.<br><em>Pick any sound.</em>",
+      "emoji": "🎵",
+      "say": "Pick any key. Pick any sound."
+    }
+  ],
+  "voice": "am_puck"
+}

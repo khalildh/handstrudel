@@ -1,0 +1,27 @@
+{
+  "song": "sci-fi-pad",
+  "voice": "am_adam",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 8.27,
+      "text": "Sci-fi movie<br><em>soundtrack</em>",
+      "emoji": "🚀",
+      "say": "Sci-fi movie soundtrack."
+    },
+    {
+      "start": 8.57,
+      "end": 16.23,
+      "text": "Made by moving<br><em>my hands in the air</em>",
+      "emoji": "🌌",
+      "say": "Made by moving my hands in the air."
+    },
+    {
+      "start": 16.53,
+      "end": 24.2,
+      "text": "Space movie<br><em>vibes, instantly</em>",
+      "emoji": "👽",
+      "say": "Space movie vibes, instantly."
+    }
+  ]
+}

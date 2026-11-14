@@ -1,0 +1,27 @@
+{
+  "song": "blues-harmonica",
+  "voice": "am_santa",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 9.87,
+      "text": "Blues harmonica,<br><em>no breath needed</em>",
+      "emoji": "🎶",
+      "say": "Blues harmonica. No breath needed."
+    },
+    {
+      "start": 10.17,
+      "end": 19.43,
+      "text": "Twelve-bar blues<br><em>in thirty seconds</em>",
+      "emoji": "🕶️",
+      "say": "Twelve bar blues, in thirty seconds."
+    },
+    {
+      "start": 19.73,
+      "end": 29,
+      "text": "Pinch it like<br><em>you mean it</em>",
+      "emoji": "🌧️",
+      "say": "Pinch it like you mean it."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "song": "eighties-ballad",
+  "voice": "af_nova",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 8.27,
+      "text": "80s prom<br><em>slow dance energy</em>",
+      "emoji": "🪩",
+      "say": "Eighties prom, slow dance energy."
+    },
+    {
+      "start": 8.57,
+      "end": 16.23,
+      "text": "FM electric piano,<br><em>from your camera</em>",
+      "emoji": "💜",
+      "say": "F M electric piano, straight from your camera."
+    },
+    {
+      "start": 16.53,
+      "end": 24.2,
+      "text": "Lights down.<br><em>Hands up.</em>",
+      "emoji": "🕺",
+      "say": "Lights down. Hands up."
+    }
+  ]
+}

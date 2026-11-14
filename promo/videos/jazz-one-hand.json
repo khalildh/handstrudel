@@ -1,0 +1,27 @@
+{
+  "song": "jazz-vibes",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 5.0,
+      "text": "Jazz chords<br><em>with one hand</em>",
+      "emoji": "🎷",
+      "say": "Jazz chords, with one hand."
+    },
+    {
+      "start": 5.5,
+      "end": 12.0,
+      "text": "ii – V – I?<br><em>No theory needed.</em>",
+      "emoji": "🧠",
+      "say": "Two, five, one? No theory needed."
+    },
+    {
+      "start": 12.5,
+      "end": 19.0,
+      "text": "Smooth vibraphone<br><em>straight from your camera</em>",
+      "emoji": "😮‍💨",
+      "say": "Smooth vibraphone, straight from your camera."
+    }
+  ],
+  "voice": "am_michael"
+}

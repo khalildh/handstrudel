@@ -96,3 +96,7 @@ src/
 - Strudel's `evalScope` must share one `@strudel/core` instance across all packages. This works because they're all npm deps (not CDN ESM imports). See comment in `strudel.ts`
 - `output: "export"` in next.config means no API routes or server components
 - `basePath` differs between dev (empty) and prod (`/handstrudel`)
+
+## Promo Videos
+
+`promo/` produces marketing videos of the real iOS app: `node promo/make.mjs`. It launches a Debug build in the Simulator with `HANDSTRUDEL_DEMO_SCRIPT`, which activates the DEBUG-only `DemoDirector` (scripted hands → normal hand pipeline, offline SoundFont capture). If Scale-mode wheel geometry in `ChordMelodyModeManager` changes, update `GEOM` in `promo/lib/choreo.mjs`. See `promo/README.md`.

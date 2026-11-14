@@ -1,0 +1,27 @@
+{
+  "song": "kalimba-study",
+  "voice": "af_jessica",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 7.89,
+      "text": "Study with me,<br><em>but make it kalimba</em>",
+      "emoji": "📚",
+      "say": "Study with me, but make it kalimba."
+    },
+    {
+      "start": 8.19,
+      "end": 15.47,
+      "text": "Thumb piano,<br><em>played with your hands</em>",
+      "emoji": "🎶",
+      "say": "A thumb piano, played with your whole hand."
+    },
+    {
+      "start": 15.77,
+      "end": 23.06,
+      "text": "Lock in.<br><em>You got this.</em>",
+      "emoji": "🍵",
+      "say": "Lock in. You got this."
+    }
+  ]
+}

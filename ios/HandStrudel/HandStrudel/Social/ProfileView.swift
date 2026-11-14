@@ -6,8 +6,6 @@ import SwiftUI
 /// (sign out, delete account).
 struct ProfileView: View {
     @ObservedObject var auth: AuthManager
-    @Environment(\.dismiss) private var dismiss
-
     @State private var videos: [Video] = []
     @State private var loading = false
     @State private var playing: Video?
@@ -16,40 +14,24 @@ struct ProfileView: View {
     @State private var showSignIn = false
     @State private var showBlocked = false
 
-    private let columns = [GridItem(.flexible(), spacing: 2), GridItem(.flexible(), spacing: 2),
-                           GridItem(.flexible(), spacing: 2)]
+    private let columns = [GridItem(.adaptive(minimum: 100), spacing: 6)]
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if !auth.isSignedIn || auth.needsProfileSetup {
-                    VStack(spacing: 16) {
-                        Image(systemName: "person.crop.circle").font(.system(size: 56)).foregroundStyle(.secondary)
-                        Text("Sign in to post your performances and keep them in one place.")
-                            .multilineTextAlignment(.center).foregroundStyle(.secondary)
-                        Button("Sign in") { showSignIn = true }.buttonStyle(.borderedProminent)
-                    }
-                    .padding(32)
-                } else {
-                    content
-                }
-            }
-            .navigationTitle(auth.profile?.username.map { "@\($0)" } ?? "Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
-                if auth.isSignedIn {
-                    ToolbarItem(placement: .primaryAction) {
-                        Menu {
-                            Button("Blocked users") { showBlocked = true }
-                            Link("Community Guidelines", destination: SocialConfig.guidelinesURL)
-                            Button("Sign out") { Task { await auth.signOut() } }
-                            Button("Delete account…", role: .destructive) { confirmDeleteAccount = true }
-                        } label: { Image(systemName: "ellipsis.circle") }
-                    }
-                }
+        VStack(alignment: .leading, spacing: 14) {
+            header
+                .padding(.horizontal, 21)
+                .padding(.top, 9)
+            if !auth.isSignedIn || auth.needsProfileSetup {
+                signedOut
+            } else {
+                content
             }
         }
+        .frame(maxWidth: 650)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(StudioStyle.background.ignoresSafeArea())
+        .foregroundStyle(StudioStyle.ink)
+        .tint(StudioStyle.accent)
         .task(id: auth.userId) { await load() }
         .sheet(isPresented: $showSignIn) { SignInView(auth: auth) }
         .sheet(isPresented: $showBlocked) { BlockedUsersView(auth: auth) }
@@ -69,23 +51,95 @@ struct ProfileView: View {
             }
         }
         .alert("Delete your account?", isPresented: $confirmDeleteAccount) {
-            Button("Delete forever", role: .destructive) { Task { if await auth.deleteAccount() { dismiss() } } }
+            Button("Delete forever", role: .destructive) { Task { _ = await auth.deleteAccount() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This permanently removes your profile and every video you've posted. It can't be undone.")
+            Text("This permanently removes your profile, videos, and comments. It can't be undone.")
+        }
+    }
+
+    private var header: some View {
+        HStack {
+            Text("Account")
+                .font(.system(size: 33, weight: .regular, design: .serif))
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            Menu {
+                if auth.isSignedIn {
+                    Button("Blocked users") { showBlocked = true }
+                    Button("Sign out") { Task { await auth.signOut() } }
+                    Button("Delete account…", role: .destructive) { confirmDeleteAccount = true }
+                }
+                Link("Community Guidelines", destination: SocialConfig.guidelinesURL)
+                Link("Terms of Use", destination: SocialConfig.termsURL)
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(StudioStyle.ink)
+                    .frame(width: 44, height: 44)
+                    .background(StudioStyle.surface, in: Circle())
+                    .overlay { Circle().strokeBorder(StudioStyle.border) }
+            }
+            .accessibilityLabel("Account settings")
+        }
+    }
+
+    private var signedOut: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 17) {
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(StudioStyle.accent)
+                    .frame(width: 58, height: 58)
+                    .background(StudioStyle.accent.opacity(0.10), in: Circle())
+                    .accessibilityHidden(true)
+                Text("Your performances")
+                    .font(.system(.largeTitle, design: .serif))
+                    .accessibilityAddTraits(.isHeader)
+                Text("Sign in to publish your clips and see them together on your profile.")
+                    .font(.subheadline)
+                    .foregroundStyle(StudioStyle.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Sign in") { showSignIn = true }
+                    .buttonStyle(StudioActionStyle())
+                    .padding(.top, 6)
+            }
+            .padding(21)
+            .frame(maxWidth: 480, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(LinearGradient(colors: [StudioStyle.accent.opacity(0.09), StudioStyle.surface],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+            .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(StudioStyle.border).allowsHitTesting(false) }
+            .padding(.horizontal, 21)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
         }
     }
 
     private var content: some View {
         ScrollView {
-            if videos.isEmpty && !loading {
-                Text("No posts yet. Record a clip and choose “Post to HandStrudel”.")
-                    .foregroundStyle(.secondary).multilineTextAlignment(.center).padding(40)
+            VStack(alignment: .leading, spacing: 9) {
+                if let username = auth.profile?.username {
+                    Text("@\(username)").font(.title2.weight(.semibold))
+                }
+                Text("Performances").font(.headline)
+                if loading {
+                    ProgressView().tint(StudioStyle.accent)
+                } else if videos.isEmpty {
+                    Text("No posts yet. Record a clip and choose “Post to HandStrudel”.")
+                        .font(.subheadline)
+                        .foregroundStyle(StudioStyle.muted)
+                }
             }
-            LazyVGrid(columns: columns, spacing: 2) {
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 12)
+
+            LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(videos) { v in
                     Button { playing = v } label: {
-                        Color.white.opacity(0.06)
+                        StudioStyle.surface
                             .aspectRatio(9 / 16, contentMode: .fit)
                             .overlay {
                                 AsyncImage(url: v.thumbURL) { img in img.resizable().scaledToFill() }
@@ -101,13 +155,17 @@ struct ProfileView: View {
                                     Image(systemName: "eye.slash.fill").font(.caption).padding(6)
                                 }
                             }
+                            .clipShape(RoundedRectangle(cornerRadius: 9))
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(v.caption.isEmpty ? "Play performance" : "Play \(v.caption)")
                     .contextMenu {
                         Button("Delete post", role: .destructive) { confirmDeleteVideo = v }
                     }
                 }
             }
         }
+        .padding(.horizontal, 21)
         .refreshable { await load() }
     }
 

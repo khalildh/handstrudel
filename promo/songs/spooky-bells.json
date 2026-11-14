@@ -1,0 +1,19 @@
+{
+  "name": "spooky bells",
+  "instrument": "tubular_bells",
+  "key": "A",
+  "scale": "Harmonic Minor",
+  "bpm": 70,
+  "beatsPerChord": 4,
+  "chords": [
+    "I",
+    "VI",
+    "IV",
+    "V",
+    "I",
+    "II",
+    "V",
+    "I"
+  ],
+  "melody": "1:2 5:2  6:2 3:2  4:1 6:1 8:2  7,:2 2:2  1:1 3:1 5:2  2:2 4:2  7,:1 2:1 5:2  1:4"
+}

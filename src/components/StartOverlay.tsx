@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PARAM_DEFS, HYDRA_PARAM_DEFS, INSTRUMENTS, DEFAULT_INSTRUMENT } from "../lib/music";
 import {
   MappingConfig,
@@ -207,6 +208,7 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
         <br />
         hands generate &amp; re-evaluate real Strudel code
       </div>
+      <Link className="watch-site-link start-watch-link" href="/watch">Watch community videos</Link>
     </div>
   );
 }

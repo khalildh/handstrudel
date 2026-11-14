@@ -1,0 +1,27 @@
+{
+  "song": "music-box-lullaby",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 5.0,
+      "text": "Made a lullaby<br><em>with zero lessons</em>",
+      "emoji": "🧸",
+      "say": "I made a lullaby with zero lessons."
+    },
+    {
+      "start": 5.5,
+      "end": 12.5,
+      "text": "Move your left hand<br><em>to change the chord</em>",
+      "emoji": "👈",
+      "say": "Move your left hand to change the chord."
+    },
+    {
+      "start": 13.0,
+      "end": 20.0,
+      "text": "Pinch with your right<br><em>to play a note</em>",
+      "emoji": "🤏",
+      "say": "Pinch with your right hand to play a note."
+    }
+  ],
+  "voice": "af_nicole"
+}

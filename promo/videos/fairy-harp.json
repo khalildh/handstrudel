@@ -1,0 +1,27 @@
+{
+  "song": "fairy-harp",
+  "voice": "af_aoede",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 8.69,
+      "text": "Fairycore,<br><em>but you're the fairy</em>",
+      "emoji": "🧚",
+      "say": "Fairycore, but you're the fairy."
+    },
+    {
+      "start": 8.99,
+      "end": 17.08,
+      "text": "Pinch the air.<br><em>The harp answers.</em>",
+      "emoji": "🪄",
+      "say": "Pinch the air, and the harp answers."
+    },
+    {
+      "start": 17.38,
+      "end": 25.46,
+      "text": "Every note<br><em>fits the key</em>",
+      "emoji": "✨",
+      "say": "Every single note fits the key."
+    }
+  ]
+}

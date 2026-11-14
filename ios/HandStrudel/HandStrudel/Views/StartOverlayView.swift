@@ -1,47 +1,120 @@
 import SwiftUI
 
+enum StudioStyle {
+    static let background = Color(red: 0.040, green: 0.049, blue: 0.048)
+    static let surface = Color(red: 0.079, green: 0.094, blue: 0.087)
+    static let ink = Color(red: 0.953, green: 0.964, blue: 0.932)
+    static let muted = Color(red: 0.647, green: 0.685, blue: 0.648)
+    static let accent = Color(red: 0.828, green: 0.974, blue: 0.455)
+    static let border = Color.white.opacity(0.12)
+    static let recording = Color(red: 1, green: 0.32, blue: 0.31)
+}
+
+struct StudioActionStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .padding(.horizontal, 18)
+            .foregroundStyle(StudioStyle.background)
+            .background(StudioStyle.accent.opacity(configuration.isPressed ? 0.80 : 1),
+                        in: RoundedRectangle(cornerRadius: 17))
+    }
+}
+
 struct StartOverlayView: View {
     let status: String
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
+    let starting: Bool
     let onStart: () -> Void
+    let onDrafts: () -> Void
+    let onSetups: () -> Void
 
-    @State private var starting = false
+    @State private var showSounds = false
     @State private var showInstrumentSheet = false
     @State private var showProgressionSheet = false
     @State private var showScaleSheet = false
+    @ScaledMetric(relativeTo: .largeTitle) private var headlineSize = 51.0
 
     var body: some View {
-        GeometryReader { _ in
-            ZStack {
-                LinearGradient(
-                    colors: [Color.black, Color(white: 0.06), Color.black],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    Spacer(minLength: 24)
-
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
                     title
-                        .padding(.bottom, 36)
-
                     heroCard
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 22)
-
-                    chipGrid
-                        .padding(.horizontal, 24)
-
-                    Spacer()
-
+                    Spacer(minLength: 0)
                     startButton
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 32)
+                    HStack {
+                        Button(action: onDrafts) {
+                            Label("Private drafts", systemImage: "film.stack")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .accessibilityIdentifier("private-drafts-button")
+                        Button(action: onSetups) {
+                            Label("Saved setups", systemImage: "bookmark")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(StudioStyle.muted)
+                    if status.hasPrefix("error:") {
+                        Text(status).font(.footnote).foregroundStyle(.orange)
+                    }
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 18)
+                .padding(.bottom, 20)
+                .frame(maxWidth: 520)
+                .frame(minHeight: geometry.size.height)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .background(StudioStyle.background.ignoresSafeArea())
+        .foregroundStyle(StudioStyle.ink)
+        .tint(StudioStyle.accent)
+        .sheet(isPresented: $showSounds) {
+            soundsSheet
+                .presentationDetents([.height(344), .large])
+                .presentationDragIndicator(.visible)
+        }
+        .task {
+            if storeManager.products.isEmpty {
+                await storeManager.loadProducts()
+            }
+        }
+    }
+
+    private var soundsSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    instrumentChip
+                    rowDivider
+                    progressionChip
+                    rowDivider
+                    keyChip
+                    rowDivider
+                    scaleChip
+                }
+                .background(StudioStyle.surface, in: RoundedRectangle(cornerRadius: 18))
+                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(StudioStyle.border) }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
+            }
+            .background(StudioStyle.background)
+            .navigationTitle("Sounds")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showSounds = false }
                 }
             }
         }
+        .tint(StudioStyle.accent)
         .sheet(isPresented: $showInstrumentSheet) {
             InstrumentPickerSheet(selected: $engine.selectedSoundFontInstrument,
                                   storeManager: storeManager)
@@ -60,113 +133,78 @@ struct StartOverlayView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .task {
-            if storeManager.products.isEmpty {
-                await storeManager.loadProducts()
-            }
-        }
     }
-
-    // MARK: - Title
 
     private var title: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 0) {
-                Text("hand")
-                    .font(.system(size: 44, weight: .ultraLight, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.7))
-                Text("strudel")
-                    .font(.system(size: 44, weight: .bold, design: .monospaced))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.green, .cyan],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+        VStack(alignment: .leading, spacing: 17) {
+            HStack(spacing: 8) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(StudioStyle.accent)
+                    .accessibilityHidden(true)
+                Text("handstrudel")
+                    .font(.subheadline.monospaced().weight(.semibold))
             }
-            Text("your hands are the instrument")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.45))
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Play the air.")
+                    .font(.system(size: headlineSize, weight: .regular, design: .serif))
+                    .tracking(-2)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Move your hands to make music.")
+                    .font(.subheadline)
+                    .foregroundStyle(StudioStyle.muted)
+            }
         }
     }
-
-    // MARK: - Hero card
 
     private var heroCard: some View {
-        VStack(spacing: 10) {
-            Text(engine.selectedSoundFontInstrument.emoji)
-                .font(.system(size: 54))
-
-            Text(engine.selectedSoundFontInstrument.name)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-
-            HStack(spacing: 6) {
-                Text("\(engine.selectedKey.rawValue) \(engine.selectedScale.rawValue)")
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.7))
-                Text("·")
-                    .foregroundColor(.white.opacity(0.35))
-                Text(engine.chordMelodyProgression.emoji)
-                    .font(.system(size: 13))
-                Text(engine.chordMelodyProgression.name)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.7))
+        VStack(spacing: 0) {
+            SoundArtwork(program: Int(engine.selectedSoundFontInstrument.program))
+                .frame(height: 225)
+                .accessibilityHidden(true)
+            Rectangle().fill(StudioStyle.border).frame(height: 1)
+            Button { showSounds = true } label: {
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(engine.selectedSoundFontInstrument.name)
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(StudioStyle.ink)
+                        Text("\(engine.selectedKey.rawValue) \(engine.selectedScale.rawValue)  /  \(engine.chordMelodyProgression.name)")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(StudioStyle.muted)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(StudioStyle.accent)
+                        .frame(width: 44, height: 44)
+                        .background(StudioStyle.accent.opacity(0.09), in: Circle())
+                }
+                .padding(16)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Change sound")
+            .accessibilityValue(engine.selectedSoundFontInstrument.name)
+            .disabled(starting)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 26)
-        .padding(.horizontal, 20)
-        .background(
-            RoundedRectangle(cornerRadius: 22)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.green.opacity(0.10), Color.cyan.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Chips
-
-    private var chipGrid: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                instrumentChip
-                progressionChip
-            }
-            HStack(spacing: 10) {
-                keyChip
-                scaleChip
-            }
-        }
+        .background(StudioStyle.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 23))
+        .overlay { RoundedRectangle(cornerRadius: 23).strokeBorder(StudioStyle.border).allowsHitTesting(false) }
     }
 
     private var instrumentChip: some View {
         Button(action: { showInstrumentSheet = true }) {
-            chipBody(
-                emoji: engine.selectedSoundFontInstrument.emoji,
-                caption: "INSTRUMENT",
-                value: engine.selectedSoundFontInstrument.name
-            )
+            soundRow("Instrument", value: engine.selectedSoundFontInstrument.name, icon: "waveform")
         }
+        .buttonStyle(.plain)
     }
 
     private var progressionChip: some View {
         Button(action: { showProgressionSheet = true }) {
-            chipBody(
-                emoji: engine.chordMelodyProgression.emoji,
-                caption: "CHORDS",
-                value: engine.chordMelodyProgression.name
-            )
+            soundRow("Chords", value: engine.chordMelodyProgression.name, icon: "music.note.list")
         }
+        .buttonStyle(.plain)
     }
 
     private var keyChip: some View {
@@ -181,7 +219,7 @@ struct StartOverlayView: View {
                 }
             }
         } label: {
-            chipBody(emoji: nil, caption: "KEY", value: engine.selectedKey.rawValue)
+            soundRow("Key", value: engine.selectedKey.rawValue, icon: "music.note", chevron: "chevron.up.chevron.down")
         }
     }
 
@@ -189,78 +227,106 @@ struct StartOverlayView: View {
     /// visible lock badge, which SwiftUI menus can't render.
     private var scaleChip: some View {
         Button(action: { showScaleSheet = true }) {
-            chipBody(emoji: nil, caption: "SCALE", value: engine.selectedScale.rawValue)
+            soundRow("Scale", value: engine.selectedScale.rawValue, icon: "pianokeys")
         }
+        .buttonStyle(.plain)
     }
 
-    private func chipBody(emoji: String?, caption: String, value: String) -> some View {
-        HStack(spacing: 10) {
-            if let emoji {
-                Text(emoji).font(.system(size: 22))
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(caption)
-                    .font(.system(size: 9, weight: .heavy, design: .rounded))
-                    .tracking(1.2)
-                    .foregroundColor(.white.opacity(0.35))
-                Text(value)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.9))
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 4)
-            Image(systemName: "chevron.down")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.white.opacity(0.35))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+    private var rowDivider: some View {
+        Rectangle().fill(StudioStyle.border).frame(height: 1).padding(.leading, 53)
     }
 
-    // MARK: - Start button
+    private func soundRow(_ title: String, value: String, icon: String, chevron: String = "chevron.right") -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.body.weight(.medium))
+                .foregroundStyle(StudioStyle.accent)
+                .frame(width: 26)
+                .accessibilityHidden(true)
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(StudioStyle.ink)
+            Spacer(minLength: 0)
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(StudioStyle.muted)
+                .multilineTextAlignment(.trailing)
+            Image(systemName: chevron)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(StudioStyle.muted)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 13)
+        .frame(minHeight: 53)
+        .contentShape(Rectangle())
+    }
 
     private var startButton: some View {
         Group {
             if starting {
-                VStack(spacing: 8) {
-                    ProgressView().tint(.green)
-                    Text(status)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(.green.opacity(0.7))
+                HStack(spacing: 10) {
+                    ProgressView().tint(StudioStyle.accent)
+                    Text(status).font(.caption.monospaced())
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 58)
+                .frame(minHeight: 54)
+                .accessibilityElement(children: .combine)
             } else {
-                Button(action: {
-                    starting = true
-                    onStart()
-                }) {
-                    Text("START")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .tracking(2)
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 58)
-                        .background(
-                            LinearGradient(
-                                colors: [.green, Color(red: 0.0, green: 0.8, blue: 0.6)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .cornerRadius(18)
-                        .shadow(color: .green.opacity(0.4), radius: 18)
+                Button(action: onStart) {
+                    HStack {
+                        Text("Start playing")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .accessibilityHidden(true)
+                    }
                 }
+                .buttonStyle(StudioActionStyle())
                 .accessibilityIdentifier("start-button")
+            }
+        }
+    }
+}
+
+private struct SoundArtwork: View {
+    let program: Int
+
+    var body: some View {
+        Canvas { context, size in
+            let field = CGRect(origin: .zero, size: size)
+            context.fill(Path(field), with: .radialGradient(
+                Gradient(colors: [Color(red: 0.17, green: 0.25, blue: 0.12), StudioStyle.background]),
+                center: CGPoint(x: size.width * 0.55, y: size.height * 0.37),
+                startRadius: 0, endRadius: max(size.width * 0.65, size.height)
+            ))
+
+            var grid = Path()
+            for x in stride(from: 14.0, to: size.width, by: 14) {
+                for y in stride(from: 14.0, to: size.height, by: 14) {
+                    grid.addEllipse(in: CGRect(x: x, y: y, width: 1.3, height: 1.3))
+                }
+            }
+            context.fill(grid, with: .color(StudioStyle.muted.opacity(0.27)))
+
+            // Each GM program changes the phase and harmonics of the weave.
+            let phase = Double(program) * 0.19
+            let harmonic = Double(2 + program % 4)
+            for line in 0..<25 {
+                let layer = Double(line) / 24
+                var trace = Path()
+                for step in 0...120 {
+                    let t = Double(step) / 120
+                    let envelope = pow(max(0, sin(t * .pi)), 0.78)
+                    let fundamental = sin(t * .pi * 3.1 + layer * 2.7 + phase)
+                    let overtone = cos(t * .pi * harmonic + layer * 4 + phase)
+                    let y = size.height * (0.29 + layer * 0.39)
+                        + (fundamental * 43 + overtone * 18) * envelope
+                    let point = CGPoint(x: 17 + t * (size.width - 34), y: y)
+                    if step == 0 { trace.move(to: point) } else { trace.addLine(to: point) }
+                }
+                context.stroke(trace, with: .linearGradient(
+                    Gradient(colors: [StudioStyle.accent.opacity(0.10), StudioStyle.accent.opacity(0.85),
+                                      Color(red: 0.26, green: 0.74, blue: 0.55).opacity(0.34)]),
+                    startPoint: .zero, endPoint: CGPoint(x: size.width, y: size.height * 0.2)
+                ), lineWidth: line.isMultiple(of: 6) ? 1.4 : 0.65)
             }
         }
     }
@@ -273,19 +339,11 @@ struct StartOverlayView: View {
 private struct ProBadge: View {
     var body: some View {
         Text("PRO")
-            .font(.system(size: 9, weight: .heavy, design: .rounded))
-            .foregroundColor(.white)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .background(
-                Capsule().fill(
-                    LinearGradient(
-                        colors: [Color.orange, Color.pink],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-            )
+            .font(.caption2.monospaced().weight(.semibold))
+            .foregroundStyle(StudioStyle.accent)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(StudioStyle.accent.opacity(0.10), in: Capsule())
     }
 }
 
@@ -305,7 +363,7 @@ private func proPaywall(storeManager: StoreManager) -> some View {
             "120+ additional GM instruments",
             "Every scale — modes, harmonic minor, exotic",
             "Every chord progression — jazz, cinematic, world, and more",
-            "Premium camera filters + hand themes",
+            "One-time purchase",
         ],
         storeManager: storeManager
     )
@@ -338,13 +396,15 @@ private struct InstrumentPickerSheet: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                 }
-                .background(Color(white: 0.08))
+                .background(StudioStyle.surface)
 
                 List(SOUNDFONT_INSTRUMENTS.filter { $0.category == category }) { inst in
                     row(for: inst)
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
+            .background(StudioStyle.background)
             .navigationTitle("Instrument")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showPaywall) {
@@ -366,38 +426,28 @@ private struct InstrumentPickerSheet: View {
             }
         }) {
             HStack(spacing: 12) {
-                Text(inst.emoji)
-                    .font(.system(size: 22))
-                    .opacity(locked ? 0.55 : 1.0)
                 Text(inst.name)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(locked ? .primary.opacity(0.55) : .primary)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(locked ? StudioStyle.muted : StudioStyle.ink)
                 if locked { ProBadge() }
                 Spacer()
                 if selected.id == inst.id && !locked {
                     Image(systemName: "checkmark")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.green)
+                        .foregroundStyle(StudioStyle.accent)
                 }
             }
         }
+        .listRowBackground(StudioStyle.background)
     }
 
     private func categoryChip(_ cat: GMCategory) -> some View {
         let isActive = category == cat
         return Button(action: { category = cat }) {
-            HStack(spacing: 5) {
-                Text(cat.emoji).font(.system(size: 12))
-                Text(cat.displayName)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.7))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                Capsule().fill(isActive ? Color.green.opacity(0.15) : Color.primary.opacity(0.05))
-            )
+            pickerCategory(cat.displayName, selected: isActive)
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }
 
@@ -429,13 +479,15 @@ private struct ProgressionPickerSheet: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                 }
-                .background(Color(white: 0.08))
+                .background(StudioStyle.surface)
 
                 List(CHORD_PROGRESSIONS.filter { $0.category == category }) { prog in
                     row(for: prog)
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
+            .background(StudioStyle.background)
             .navigationTitle("Chord Progression")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showPaywall) {
@@ -457,43 +509,33 @@ private struct ProgressionPickerSheet: View {
             }
         }) {
             HStack(spacing: 12) {
-                Text(prog.emoji)
-                    .font(.system(size: 22))
-                    .opacity(locked ? 0.55 : 1.0)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(prog.name)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundColor(locked ? .primary.opacity(0.55) : .primary)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(locked ? StudioStyle.muted : StudioStyle.ink)
                     Text("\(prog.degrees.count) chords")
-                        .font(.system(size: 11, design: .rounded))
-                        .foregroundColor(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(StudioStyle.muted)
                 }
                 if locked { ProBadge() }
                 Spacer()
                 if selected.id == prog.id && !locked {
                     Image(systemName: "checkmark")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.green)
+                        .foregroundStyle(StudioStyle.accent)
                 }
             }
         }
+        .listRowBackground(StudioStyle.background)
     }
 
     private func categoryChip(_ cat: ProgressionCategory) -> some View {
         let isActive = category == cat
         return Button(action: { category = cat }) {
-            HStack(spacing: 5) {
-                Text(cat.emoji).font(.system(size: 12))
-                Text(cat.displayName)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .green : .primary.opacity(0.7))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                Capsule().fill(isActive ? Color.green.opacity(0.15) : Color.primary.opacity(0.05))
-            )
+            pickerCategory(cat.displayName, selected: isActive)
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }
 
@@ -511,6 +553,8 @@ private struct ScalePickerSheet: View {
                 row(for: scale)
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(StudioStyle.background)
             .navigationTitle("Scale")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showPaywall) {
@@ -533,16 +577,28 @@ private struct ScalePickerSheet: View {
         }) {
             HStack(spacing: 12) {
                 Text(scale.rawValue)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(locked ? .primary.opacity(0.55) : .primary)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(locked ? StudioStyle.muted : StudioStyle.ink)
                 if locked { ProBadge() }
                 Spacer()
                 if selected == scale && !locked {
                     Image(systemName: "checkmark")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.green)
+                        .foregroundStyle(StudioStyle.accent)
                 }
             }
         }
+        .listRowBackground(StudioStyle.background)
     }
+}
+
+private func pickerCategory(_ title: String, selected: Bool) -> some View {
+    Text(title)
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(selected ? StudioStyle.background : StudioStyle.ink)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 7)
+        .background(selected ? StudioStyle.accent : Color.white.opacity(0.06), in: Capsule())
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
 }

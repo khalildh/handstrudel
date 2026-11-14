@@ -8,6 +8,10 @@
 # misc
 .DS_Store
 *.pem
+/.claude/scheduled_tasks.lock
+
+# iOS local build products
+/ios/HandStrudel/build/
 
 # debug
 npm-debug.log*
@@ -22,6 +26,8 @@ next-env.d.ts
 
 # Android
 android/.gradle/
+android/.kotlin/
+android/app/.cxx/
 android/app/build/
 android/build/
 android/local.properties

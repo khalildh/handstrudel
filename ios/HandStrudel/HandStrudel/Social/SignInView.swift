@@ -22,6 +22,8 @@ struct SignInView: View {
                     signInForm
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(StudioStyle.background)
             .navigationTitle(auth.isSignedIn ? "Your profile" : "Sign in")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -32,6 +34,7 @@ struct SignInView: View {
                 Button("OK", role: .cancel) {}
             } message: { Text(auth.errorMessage ?? "") }
         }
+        .tint(StudioStyle.accent)
         .onChange(of: auth.needsProfileSetup) { needs in
             if !needs && auth.isSignedIn { dismiss() }
         }
@@ -40,7 +43,10 @@ struct SignInView: View {
     private var signInForm: some View {
         Form {
             Section {
-                Text(reason).foregroundStyle(.secondary)
+                Text(reason)
+                    .font(.subheadline)
+                    .foregroundStyle(StudioStyle.muted)
+                    .listRowBackground(StudioStyle.surface)
                 SignInWithAppleButton(.signIn) { _ in } onCompletion: { _ in }
                     .signInWithAppleButtonStyle(.white)
                     .frame(height: 48)
@@ -51,6 +57,7 @@ struct SignInView: View {
                             .onTapGesture { Task { await auth.signInWithApple() } }
                     }
                     .listRowInsets(EdgeInsets())
+                    .listRowBackground(StudioStyle.surface)
             }
             if SocialConfig.emailSignInEnabled { emailSection }
         }
@@ -64,19 +71,23 @@ struct SignInView: View {
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .listRowBackground(StudioStyle.surface)
                 if codeSent {
                     TextField("6-digit code", text: $code)
                         .textContentType(.oneTimeCode)
                         .keyboardType(.numberPad)
+                        .listRowBackground(StudioStyle.surface)
                     Button("Sign in") {
                         Task { busy = true; await auth.verifyEmailCode(code, email: email); busy = false }
                     }
                     .disabled(code.count < 6 || busy)
+                    .listRowBackground(StudioStyle.surface)
                 } else {
                     Button("Email me a code") {
                         Task { busy = true; codeSent = await auth.sendEmailCode(to: email); busy = false }
                     }
                     .disabled(!email.contains("@") || busy)
+                    .listRowBackground(StudioStyle.surface)
                 }
             }
         }

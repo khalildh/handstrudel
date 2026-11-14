@@ -1,0 +1,27 @@
+{
+  "song": "funk-clavinet",
+  "voice": "bm_lewis",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 6.42,
+      "text": "Funk with<br><em>one pinch</em>",
+      "emoji": "🕺",
+      "say": "Funk, with one pinch."
+    },
+    {
+      "start": 6.72,
+      "end": 12.54,
+      "text": "Clavinet: the<br><em>funkiest keyboard</em>",
+      "emoji": "🎹",
+      "say": "Clavinet. The funkiest keyboard ever made."
+    },
+    {
+      "start": 12.84,
+      "end": 18.66,
+      "text": "Your hands<br><em>have rhythm now</em>",
+      "emoji": "🔥",
+      "say": "Your hands have rhythm now."
+    }
+  ]
+}

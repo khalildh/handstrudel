@@ -9,7 +9,6 @@ final class GridModeController: ModeController {
         let strudelBridge = engine.strudelBridge
         let haptics = engine.haptics
         let loopRecorder = engine.loopRecorder
-        let jamSession = engine.jamSession
 
         gridModeManager.videoAspect = engine.handTracker.videoWidth / engine.handTracker.videoHeight
         let screenBounds = UIScreen.main.bounds
@@ -58,13 +57,14 @@ final class GridModeController: ModeController {
                 haptics.noteTrigger()
                 engine.lastGridNote = name
                 loopRecorder.recordEvent(.noteOn(midi: midi, waveform: engine.selectedWaveform, velocity: vel), currentTime: elapsed)
-                jamSession.sendEvent(.noteOn(midi: midi, waveform: engine.selectedWaveform, velocity: vel))
+                engine.holdJamVoice(hand, pitches: [midi], velocity: vel)
             case .noteOff(let hand):
                 strudelBridge.noteOff(hand: hand)
+                engine.releaseJamVoice(hand)
                 loopRecorder.recordEvent(.noteOff(hand: hand), currentTime: elapsed)
-                jamSession.sendEvent(.noteOff(hand: hand))
             case .slide(let hand, let midi, let name):
                 strudelBridge.noteSlide(hand: hand, midi: midi)
+                engine.slideJamVoice(hand, pitches: [midi])
                 engine.lastGridNote = name
             }
         }

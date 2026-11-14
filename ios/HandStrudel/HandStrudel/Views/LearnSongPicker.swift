@@ -21,12 +21,8 @@ struct LearnSongPicker: View {
                     GridItem(.flexible(), spacing: 12),
                 ], spacing: 12) {
                     ForEach(BUNDLED_SONGS) { song in
-                        SongCard(song: song)
-                            .onTapGesture {
-                                onSelect(song)
-                                dismiss()
-                            }
-                            .accessibilityElement(children: .combine)
+                        Button { select(song) } label: { SongCard(song: song) }
+                            .buttonStyle(.plain)
                             .accessibilityIdentifier("song-\(song.name)")
                     }
                 }
@@ -61,7 +57,6 @@ struct LearnSongPicker: View {
 
                 // MARK: - Import Section
                 sectionHeader("IMPORT")
-
                 Button(action: {
                     // Placeholder: MIDI import not yet implemented
                 }) {
@@ -91,6 +86,11 @@ struct LearnSongPicker: View {
         .background(Color.black.ignoresSafeArea())
     }
 
+    private func select(_ song: LearnSong) {
+        onSelect(song)
+        dismiss()
+    }
+
     // MARK: - Components
 
     private func sectionHeader(_ title: String) -> some View {
@@ -110,9 +110,7 @@ struct LearnSongPicker: View {
 
     private func practiceButton(label: String, icon: String, generator: @escaping () -> LearnSong) -> some View {
         Button(action: {
-            let song = generator()
-            onSelect(song)
-            dismiss()
+            select(generator())
         }) {
             VStack(spacing: 8) {
                 Image(systemName: icon)

@@ -5,10 +5,7 @@ import RevenueCat
 @main
 struct HandStrudelApp: App {
     init() {
-        // Configure audio session for playback + recording compatibility
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
-        try? session.setActive(true)
+        restoreInstrumentAudio()
 
         // Configure RevenueCat
         Purchases.logLevel = .error
@@ -24,5 +21,16 @@ struct HandStrudelApp: App {
                     UIApplication.shared.isIdleTimerDisabled = true
                 }
         }
+    }
+}
+
+func restoreInstrumentAudio() {
+    let session = AVAudioSession.sharedInstance()
+    do {
+        // FaceTime can hold exclusive microphone access while allowing playback.
+        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try session.setActive(true)
+    } catch {
+        debugPrint("Instrument audio setup failed:", error)
     }
 }

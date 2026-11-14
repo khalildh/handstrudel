@@ -24,6 +24,7 @@
 		372DDDFE5ECB97237C94192A /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 060174F53A17DCA947630D4A /* ProfileView.swift */; };
 		375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D986625C7BF30952FBAED619 /* OnboardingView.swift */; };
 		380966C71A0162507C985C6C /* StartOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74287CD261130ADF57405FF3 /* StartOverlayView.swift */; };
+		4E3F10DA602E4A40A107F24B /* RecordingDraftsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */; };
 		39D369B9022407E72D974DB4 /* HandStrudelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFF850F99F55C84692AAF2B /* HandStrudelTests.swift */; };
 		3A9EDA3981D97A38C0BD9C52 /* MotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60006BC6A28FE1029F6097F /* MotionManager.swift */; };
 		3FDADBDC4BFF18F21A29F680 /* LoopRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EE16108C9368E03A5293FC /* LoopRecorder.swift */; };
@@ -77,6 +78,7 @@
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
 		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
 		BB7B62E284871FE2BC2ADED4 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C138C66B358C6656F91075 /* FeedView.swift */; };
+		41E77ED1FB1145CD9E24A8D1 /* CommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDF2811984345419B3AA17D /* CommentsView.swift */; };
 		BF459746DBE08887CD29CFF3 /* SaveGestureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C89256347633541234267B8 /* SaveGestureDetector.swift */; };
 		C9D0CB8C617776591C669A1D /* HandTrackingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B142B01D3AC4B3E120D108 /* HandTrackingManager.swift */; };
 		CHORDMELODYMGRTEST000003 /* ChordMelodyModeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHORDMELODYMGRTEST000004 /* ChordMelodyModeManagerTests.swift */; };
@@ -135,6 +137,7 @@
 		15EE16108C9368E03A5293FC /* LoopRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopRecorder.swift; sourceTree = "<group>"; };
 		18B0EF83FDEC95F58B860F5A /* HandMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandMapper.swift; sourceTree = "<group>"; };
 		18C138C66B358C6656F91075 /* FeedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
+		FDDF2811984345419B3AA17D /* CommentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsView.swift; sourceTree = "<group>"; };
 		1C85B4858D833EF68AAD427C /* LearnSongPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSongPicker.swift; sourceTree = "<group>"; };
 		2105F77EC139355C8EC8FB3D /* JamSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamSession.swift; sourceTree = "<group>"; };
 		21E972CF1E53A24CA899C1A5 /* StoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreManager.swift; sourceTree = "<group>"; };
@@ -157,6 +160,7 @@
 		6C89256347633541234267B8 /* SaveGestureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGestureDetector.swift; sourceTree = "<group>"; };
 		6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverlayView.swift; sourceTree = "<group>"; };
 		74287CD261130ADF57405FF3 /* StartOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartOverlayView.swift; sourceTree = "<group>"; };
+		5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDraftsView.swift; sourceTree = "<group>"; };
 		7944BC24ED82EBCC08239937 /* SignInView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelApp.swift; sourceTree = "<group>"; };
 		7F54EF812D2A064C69B1BDD3 /* AuthManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
@@ -275,6 +279,7 @@
 				D986625C7BF30952FBAED619 /* OnboardingView.swift */,
 				A12C5F5938E3A6C96D9D33A2 /* PaywallOverlay.swift */,
 				74287CD261130ADF57405FF3 /* StartOverlayView.swift */,
+				5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */,
 				F15B500CE35D9D44107CDAC4 /* StoreView.swift */,
 			);
 			path = Views;
@@ -428,6 +433,7 @@
 				0F27BAFEE657ED1D0F721C12 /* VideoUploader.swift */,
 				2E5A25B5F3A32C16D8AA1825 /* FeedService.swift */,
 				18C138C66B358C6656F91075 /* FeedView.swift */,
+				FDDF2811984345419B3AA17D /* CommentsView.swift */,
 			);
 			name = Social;
 			path = Social;
@@ -502,6 +508,9 @@
 					EB6C91B49BB8F9A04096CC97 = {
 						DevelopmentTeam = TVAG3T3Y65;
 						ProvisioningStyle = Automatic;
+						SystemCapabilities = {
+							com.apple.AssociatedDomains = { enabled = 1; };
+						};
 					};
 				};
 			};
@@ -608,6 +617,7 @@
 				61F3ED12A7BAB424D09491E8 /* Snippet.swift in Sources */,
 				30EEA2665C3FBD9C4CD3A32A /* SpatialAudioManager.swift in Sources */,
 				380966C71A0162507C985C6C /* StartOverlayView.swift in Sources */,
+				4E3F10DA602E4A40A107F24B /* RecordingDraftsView.swift in Sources */,
 				B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */,
 				1D40AE3AA1F2B1FA4B31CBB2 /* StoreView.swift in Sources */,
 				D75E25A96408DCA1BE5AA284 /* StrudelBridge.swift in Sources */,
@@ -623,6 +633,7 @@
 				9428BDE6E6BECDC9EAA5FC3B /* VideoUploader.swift in Sources */,
 				E1591791628BC7B6856F32FF /* FeedService.swift in Sources */,
 				BB7B62E284871FE2BC2ADED4 /* FeedView.swift in Sources */,
+				41E77ED1FB1145CD9E24A8D1 /* CommentsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

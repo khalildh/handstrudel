@@ -1,0 +1,27 @@
+{
+  "song": "sad-violin",
+  "voice": "af_river",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 9.68,
+      "text": "Sad violin<br><em>for your L</em>",
+      "emoji": "🎻",
+      "say": "Sad violin, for your L."
+    },
+    {
+      "start": 9.98,
+      "end": 19.06,
+      "text": "No bow. No violin.<br><em>Still emotional.</em>",
+      "emoji": "😢",
+      "say": "No bow. No violin. Still emotional."
+    },
+    {
+      "start": 19.36,
+      "end": 28.43,
+      "text": "Your hands<br><em>carry the feels</em>",
+      "emoji": "💔",
+      "say": "Your hands carry the feels."
+    }
+  ]
+}

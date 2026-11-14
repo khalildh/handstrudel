@@ -24,13 +24,9 @@ final class HandStrudelUITests: XCTestCase {
     private func launchToSession() {
         app.launchArguments.append("--uitesting")
         app.launch()
-        // Tap first preset and LET'S GO
-        let firstPreset = element("preset-Dreamy")
-        XCTAssertTrue(firstPreset.waitForExistence(timeout: 5), "Preset card should exist")
-        firstPreset.tap()
-        let letsGo = element("lets-go-button")
-        XCTAssertTrue(letsGo.waitForExistence(timeout: 2), "LET'S GO should exist")
-        letsGo.tap()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
         // Wait for session to appear
         let closeBtn = element("close-button")
         XCTAssertTrue(closeBtn.waitForExistence(timeout: 5), "Session should start")
@@ -47,14 +43,9 @@ final class HandStrudelUITests: XCTestCase {
     private func launchToSessionWithOnboarding() {
         app.launchArguments.append(contentsOf: ["--uitesting", "--reset-onboarding"])
         app.launch()
-        let firstPreset = element("preset-Dreamy")
-        if firstPreset.waitForExistence(timeout: 5) {
-            firstPreset.tap()
-        }
-        let letsGo = element("lets-go-button")
-        if letsGo.waitForExistence(timeout: 2) {
-            letsGo.tap()
-        }
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
     }
 
     /// All modes live behind an "Other modes" disclosure at the bottom of the
@@ -90,74 +81,173 @@ final class HandStrudelUITests: XCTestCase {
 
     func testLaunch_showsStartOverlay() {
         launchToStart()
-        // Title is split into two Text views: "hand" + "strudel"
-        XCTAssertTrue(app.staticTexts["strudel"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["handstrudel"].waitForExistence(timeout: 5))
     }
 
     func testStartOverlay_showsSubtitle() {
         launchToStart()
-        XCTAssertTrue(app.staticTexts["your hands are the instrument"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Move your hands to make music."].waitForExistence(timeout: 5))
     }
 
-    func testStartOverlay_showsPickAVibe() {
-        launchToStart()
-        XCTAssertTrue(app.staticTexts["PICK A VIBE"].waitForExistence(timeout: 5))
+    func testMusic_privateDraftsOpensWithoutAccount() {
+        app.launchArguments.append("--uitesting")
+        app.launch()
+        let drafts = element("private-drafts-button")
+        XCTAssertTrue(drafts.waitForExistence(timeout: 5))
+        drafts.tap()
+        XCTAssertTrue(app.navigationBars["Private drafts"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Done"].exists)
     }
 
-    func testStartOverlay_showsPresetCards() {
-        launchToStart()
-        XCTAssertTrue(element("preset-Dreamy").waitForExistence(timeout: 5))
-        XCTAssertTrue(element("preset-Gritty").exists)
-        XCTAssertTrue(element("preset-Bouncy").exists)
-        XCTAssertTrue(element("preset-Chill").exists)
+    func testFeed_commentsSheetOpensWithoutAccount() throws {
+        guard let key = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_COMMENTS_KEY"] else {
+            throw XCTSkip("Requires the local Supabase comments fixture.")
+        }
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = "http://127.0.0.1:54321"
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let button = element("video-comments-button")
+        XCTAssertTrue(button.waitForExistence(timeout: 10))
+        button.tap()
+        XCTAssertTrue(app.staticTexts["Comments"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Great playing!"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Sign in to comment"].exists)
+        app.buttons["Close comments"].tap()
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
     }
 
-    func testStartOverlay_letsGoButtonExists() {
-        launchToStart()
-        XCTAssertTrue(element("lets-go-button").waitForExistence(timeout: 5))
+    func testFeed_creatorProfileAndFollowingGuestState() throws {
+        guard let key = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_COMMENTS_KEY"] else {
+            throw XCTSkip("Requires the local Supabase creator fixture.")
+        }
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = "http://127.0.0.1:54321"
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let creator = app.buttons["@comments_smoke"].firstMatch
+        XCTAssertTrue(creator.waitForExistence(timeout: 10))
+        creator.tap()
+        XCTAssertTrue(app.navigationBars["Creator"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Performances"].waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+        app.buttons["Following"].tap()
+        XCTAssertTrue(app.buttons["Sign in to follow creators"].waitForExistence(timeout: 5))
     }
 
-    func testStartOverlay_tapPreset_showsSelection() {
-        launchToStart()
-        let preset = element("preset-Dreamy")
-        XCTAssertTrue(preset.waitForExistence(timeout: 5))
-        preset.tap()
-        let btn = element("lets-go-button")
-        XCTAssertTrue(btn.waitForExistence(timeout: 2))
-        XCTAssertTrue(btn.isEnabled)
+    func testFeed_challengeAndPrivateBookmarkEntryPoints() throws {
+        guard let key = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_DISCOVERY_KEY"] else {
+            throw XCTSkip("Requires the local weekly challenge fixture.")
+        }
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = "http://127.0.0.1:54321"
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let challenge = element("weekly-challenge")
+        XCTAssertTrue(challenge.waitForExistence(timeout: 10))
+        challenge.tap()
+        XCTAssertTrue(app.staticTexts["Eight bar warmup"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Watch the backing clip"].waitForExistence(timeout: 5))
+        let empty = app.staticTexts["No takes yet. Play along and post a take to join this week's challenge."]
+        if !empty.isHittable { app.swipeUp() }
+        XCTAssertTrue(empty.waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+        let saved = element("saved-performances")
+        XCTAssertTrue(saved.waitForExistence(timeout: 5))
+        saved.tap()
+        XCTAssertTrue(app.navigationBars["Sign in"].waitForExistence(timeout: 5))
     }
 
-    func testStartOverlay_tapDifferentPreset() {
+    func testMainNavigation_opensFeedAndAccount() {
         launchToStart()
-        let dreamy = element("preset-Dreamy")
-        XCTAssertTrue(dreamy.waitForExistence(timeout: 5))
-        dreamy.tap()
-
-        let bouncy = element("preset-Bouncy")
-        bouncy.tap()
-
-        let btn = element("lets-go-button")
-        XCTAssertTrue(btn.isEnabled)
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        XCTAssertFalse(element("tab-learn").exists)
+        XCTAssertFalse(element("tab-sounds").exists)
+        captureIfRequested("01-Music")
+        feed.tap()
+        XCTAssertTrue(app.staticTexts["Feed"].waitForExistence(timeout: 5))
+        XCTAssertFalse(element("start-button").exists)
+        if ProcessInfo.processInfo.environment["HANDSTRUDEL_CAPTURE_UI"] == "1" {
+            _ = app.buttons["Share video"].firstMatch.waitForExistence(timeout: 10)
+            captureIfRequested("02-Feed")
+        }
+        element("tab-account").tap()
+        XCTAssertTrue(app.buttons["Account settings"].waitForExistence(timeout: 5))
+        captureIfRequested("03-Account")
+        element("tab-music").tap()
+        XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
     }
 
-    func testStartOverlay_showsLetsGoText() {
+    func testSounds_showsMusicSettings() {
         launchToStart()
-        // "LET'S GO" is a Button label, not a standalone staticText
-        let btn = element("lets-go-button")
-        XCTAssertTrue(btn.waitForExistence(timeout: 5))
-        XCTAssertTrue(btn.label.contains("LET"))
+        let changeSound = app.buttons["Change sound"]
+        XCTAssertTrue(changeSound.waitForExistence(timeout: 5))
+        changeSound.tap()
+        XCTAssertTrue(app.staticTexts["Instrument"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Chords"].exists)
+        XCTAssertTrue(app.staticTexts["Key"].exists)
+        XCTAssertTrue(app.staticTexts["Scale"].exists)
+        captureIfRequested("04-Sounds")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
+    }
+
+    func testMusic_showsStartButton() {
+        launchToStart()
+        XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("start-button").label.contains("Start playing"))
     }
 
     // MARK: - Session Start Tests
 
-    func testLetsGo_startsSession() {
+    func testMusic_startsSession() {
         launchToSession()
         XCTAssertTrue(element("close-button").exists)
+        captureIfRequested("05-Performance")
+    }
+
+    private func captureIfRequested(_ name: String) {
+        guard ProcessInfo.processInfo.environment["HANDSTRUDEL_CAPTURE_UI"] == "1" else { return }
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     func testSession_showsSettingsButton() {
         launchToSession()
         XCTAssertTrue(element("settings-button").waitForExistence(timeout: 2))
+    }
+
+    func testSession_showsSharePlayButton() {
+        launchToSession()
+        let jam = element("shareplay-jam-button")
+        XCTAssertTrue(jam.waitForExistence(timeout: 5))
+        XCTAssertTrue(jam.isHittable)
+        XCTAssertEqual(jam.label, "Start SharePlay jam")
+    }
+
+    func testSession_halfSpeedRecordingToggle() {
+        launchToSession()
+        let toggle = element("half-speed-recording")
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        let previous = toggle.value as? String
+        XCTAssertTrue(previous == "On" || previous == "Off")
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, previous == "On" ? "Off" : "On")
+        XCTAssertTrue(element("record-button").exists)
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, previous)
     }
 
     func testSession_showsRecordButton() {
@@ -170,7 +260,7 @@ final class HandStrudelUITests: XCTestCase {
         let closeBtn = element("close-button")
         XCTAssertTrue(closeBtn.waitForExistence(timeout: 3))
         closeBtn.tap()
-        XCTAssertTrue(app.staticTexts["PICK A VIBE"].waitForExistence(timeout: 10))
+        XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
     }
 
     // MARK: - Onboarding Tests
@@ -181,18 +271,18 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(gotIt.waitForExistence(timeout: 5), "Onboarding should show")
     }
 
-    func testOnboarding_showsWelcomeText() {
+    func testOnboarding_highlightsFirstNote() {
         launchToSessionWithOnboarding()
-        XCTAssertTrue(app.staticTexts["welcome to"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("onboarding-first-note").waitForExistence(timeout: 5))
     }
 
-    func testOnboarding_showsTips() {
+    func testOnboarding_showsPinchAfterFirstNote() {
         launchToSessionWithOnboarding()
-        _ = element("onboarding-got-it").waitForExistence(timeout: 5)
-        // Onboarding was rewritten to match Split (the new default mode).
-        XCTAssertTrue(app.staticTexts["Left half = chords"].exists)
-        XCTAssertTrue(app.staticTexts["Right half = melody"].exists)
-        XCTAssertTrue(app.staticTexts["Pinch — or just tap"].exists)
+        let note = element("onboarding-first-note")
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        note.tap()
+        XCTAssertTrue(app.staticTexts["Now try a pinch"].waitForExistence(timeout: 5))
+        XCTAssertFalse(note.exists)
     }
 
     func testOnboarding_gotItDismisses() {
@@ -406,23 +496,11 @@ final class HandStrudelUITests: XCTestCase {
     // MARK: - Navigation Flow Tests
 
     func testFullFlow_startToSessionAndSettings() {
-        app.launchArguments.append("--uitesting")
-        app.launch()
-
-        // Start overlay visible
-        XCTAssertTrue(app.staticTexts["PICK A VIBE"].waitForExistence(timeout: 5))
-
-        // Select preset and start
-        let preset = element("preset-Dreamy")
-        XCTAssertTrue(preset.waitForExistence(timeout: 5))
-        preset.tap()
-        element("lets-go-button").tap()
-        XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
-
-        // Open settings and switch mode
+        launchToSession()
         element("settings-button").tap()
-        XCTAssertTrue(app.staticTexts["MODE"].waitForExistence(timeout: 3))
-        element("mode-grid").tap()
+        XCTAssertTrue(app.staticTexts["HARMONY"].waitForExistence(timeout: 5))
+        switchToMode("mode-grid")
+        app.swipeDown()
         XCTAssertTrue(app.staticTexts["Range"].waitForExistence(timeout: 2))
     }
 
@@ -430,9 +508,9 @@ final class HandStrudelUITests: XCTestCase {
         launchToSession()
 
         element("settings-button").tap()
-        _ = app.staticTexts["MODE"].waitForExistence(timeout: 3)
+        _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
 
-        element("mode-learn").tap()
+        switchToMode("mode-learn")
         _ = app.staticTexts["LEARN"].waitForExistence(timeout: 3)
 
         let song = element("song-Twinkle Twinkle")

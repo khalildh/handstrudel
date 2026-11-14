@@ -1,0 +1,27 @@
+{
+  "song": "deep-cello",
+  "voice": "bm_george",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 9.41,
+      "text": "Cello, but it's<br><em>your hands</em>",
+      "emoji": "🎻",
+      "say": "Cello, but it's your hands."
+    },
+    {
+      "start": 9.71,
+      "end": 18.52,
+      "text": "Deep notes.<br><em>Zero practice.</em>",
+      "emoji": "🖤",
+      "say": "Deep notes. Zero practice."
+    },
+    {
+      "start": 18.82,
+      "end": 27.63,
+      "text": "Dorian mode,<br><em>if you're fancy</em>",
+      "emoji": "🧐",
+      "say": "Dorian mode, if you're fancy."
+    }
+  ]
+}

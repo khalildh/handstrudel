@@ -4,10 +4,14 @@ struct ControlSheet: View {
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
     @Binding var hideSkeletonWhenRecording: Bool
+    @Binding var recordPerformanceMicrophone: Bool
     @State private var showStore = false
     @State private var showLearnPicker = false
     @State private var paywallPackId: String?
     @State private var showAudioExport = false
+    @State private var audioExportError: String?
+    @State private var exportingLoop = false
+    @State private var showSetups = false
     @State private var exportedAudioURL: URL?
     @State private var soundFontCategory: GMCategory = DEFAULT_SOUNDFONT_INSTRUMENT.category
     @State private var customProgressionText = ""
@@ -43,6 +47,8 @@ struct ControlSheet: View {
                     sectionDivider
                 }
                 harmonySection
+                Button { showSetups = true } label: { Label("Saved setups", systemImage: "bookmark") }
+                    .buttonStyle(.bordered)
 
                 // The Strudel waveform / sampled-instrument picker only has
                 // an audible effect when the active mode is voiced through the
@@ -118,6 +124,12 @@ struct ControlSheet: View {
         .sheet(isPresented: $showStore) {
             StoreView(storeManager: storeManager)
         }
+        .sheet(isPresented: $showSetups) {
+            SoundSetupsView(engine: engine, store: storeManager) { setup in
+                engine.applySoundSetup(setup, store: storeManager)
+                showSetups = false
+            }
+        }
         .sheet(isPresented: $showLearnPicker) {
             LearnSongPicker { song in
                 engine.loadLearnSong(song)
@@ -126,9 +138,14 @@ struct ControlSheet: View {
         }
         .sheet(isPresented: $showAudioExport) {
             if let url = exportedAudioURL {
-                ShareSheet(activityItems: [url])
+                ShareSheet(activityItems: [url]).onDisappear { try? FileManager.default.removeItem(at: url) }
             }
         }
+        .alert("Audio export", isPresented: Binding(
+            get: { audioExportError != nil }, set: { if !$0 { audioExportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(audioExportError ?? "") }
         .sheet(item: $paywallPackId) { packId in
             paywallSheet(for: packId)
                 .presentationDetents([.medium, .large])
@@ -182,7 +199,7 @@ struct ControlSheet: View {
         case StoreManager.partyPack: return ("Party Pack", "9 high-energy party presets", ["EDM", "DnB", "Dubstep", "Rave", "Reggaeton", "Future Bass", "Techno", "Garage", "Phonk"])
         case StoreManager.kit808: return ("808 Kit", "8 hip-hop & urban drum patterns", ["Boom Bap", "Drill", "Lo-Fi Hip Hop", "R&B", "Afrobeat", "Bounce", "Jersey Club", "Memphis"])
         case StoreManager.kitElectronic: return ("Electronic Kit", "8 electronic drum patterns", ["Techno", "Breakbeat", "IDM", "Jungle", "Ambient", "Industrial", "2-Step", "Synthwave"])
-        case StoreManager.pro: return ("Pro Upgrade", "Unlock every instrument, scale, and chord progression.", ["120+ additional GM instruments", "Every scale — modes, harmonic minor, exotic", "Every chord progression — jazz, cinematic, world, and more", "Premium camera filters + hand themes"])
+        case StoreManager.pro: return ("Pro Upgrade", "Unlock every instrument, scale, and chord progression.", ["120+ additional GM instruments", "Every scale — modes, harmonic minor, exotic", "Every chord progression — jazz, cinematic, world, and more", "One-time purchase"])
         default: return ("Pack", "Premium content", [])
         }
     }
@@ -1327,7 +1344,7 @@ struct ControlSheet: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Capsule().fill(Color.green.opacity(0.15)))
-                            Text("\(loop.events.count) events")
+                            Text(loop.hasCapturedAudio == true ? "Captured audio" : "Note events")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundColor(.secondary)
                             Text("\(String(format: "%.1f", loop.duration))s")
@@ -1340,12 +1357,15 @@ struct ControlSheet: View {
 
                     // Export audio
                     Button(action: {
+                        exportingLoop = true
                         Task {
-                            if let url = try? await AudioExporter.exportLoop(loop) {
-                                await MainActor.run {
-                                    exportedAudioURL = url
-                                    showAudioExport = true
-                                }
+                            defer { exportingLoop = false }
+                            do {
+                                if loop.hasCapturedAudio == true { exportedAudioURL = try AudioExporter.shareCaptured(loop) }
+                                else { exportedAudioURL = try await AudioExporter.exportLoop(loop) }
+                                showAudioExport = true
+                            } catch {
+                                audioExportError = "Couldn't export this loop. The original is still saved."
                             }
                         }
                     }) {
@@ -1353,6 +1373,8 @@ struct ControlSheet: View {
                             .font(.system(size: 14))
                             .foregroundColor(.green.opacity(0.6))
                     }
+                    .accessibilityLabel(loop.hasCapturedAudio == true ? "Export WAV" : "Export approximate M4A")
+                    .disabled(exportingLoop)
 
                     // Delete
                     Button(action: { engine.deleteLoop(loop.id) }) {
@@ -1371,6 +1393,7 @@ struct ControlSheet: View {
             sectionHeader("RECORDING", icon: "video")
 
             pillToggle("Hide hand tracking in recordings", icon: "hand.raised.slash", isOn: $hideSkeletonWhenRecording)
+            pillToggle("Include microphone (solo takes)", icon: "mic", isOn: $recordPerformanceMicrophone)
         }
     }
 
@@ -1448,5 +1471,66 @@ struct ControlSheet: View {
                 }
             }
         }
+    }
+}
+
+struct SoundSetupsView: View {
+    @ObservedObject var engine: EngineController
+    @ObservedObject var store: StoreManager
+    let onUse: (SoundSetup) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var setups = PersistenceManager.shared.loadSetups()
+    @State private var name = ""
+
+    private var cleanName: String { String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40)) }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if engine.isRunning, let sound = engine.currentSoundSetup, sound.isValid {
+                    Section("Current sound") {
+                        TextField("Setup name", text: $name)
+                        Button("Save current setup") {
+                            setups.insert(NamedSoundSetup(id: UUID(), name: cleanName, sound: sound), at: 0)
+                            PersistenceManager.shared.saveSetups(setups)
+                            name = ""
+                        }
+                        .disabled(cleanName.isEmpty)
+                    }
+                }
+                Section("Saved on this device") {
+                    if setups.isEmpty {
+                        Text("Open Music and use Settings to save an instrument setup.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(setups) { setup in
+                        let locked = !setup.sound.requiredPacks.allSatisfy { store.isUnlocked($0) }
+                        Button { onUse(setup.sound) } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(setup.name)
+                                    Text([setup.sound.instrumentName, setup.sound.key.rawValue, setup.sound.scale.rawValue]
+                                        .compactMap { $0 }.joined(separator: " / "))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if locked { Image(systemName: "lock").accessibilityLabel("Requires a sound pack") }
+                            }
+                        }
+                        .disabled(locked || !setup.sound.isValid)
+                    }
+                    .onDelete { indices in
+                        setups.remove(atOffsets: indices)
+                        PersistenceManager.shared.saveSetups(setups)
+                    }
+                }
+            }
+            .navigationTitle("Saved setups")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+            }
+        }
+        .tint(StudioStyle.accent)
     }
 }

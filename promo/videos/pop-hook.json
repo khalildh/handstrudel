@@ -1,0 +1,27 @@
+{
+  "song": "pop-hook",
+  "voice": "af_sarah",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 6.67,
+      "text": "I wrote a pop hook<br><em>in 20 seconds</em>",
+      "emoji": "✍️",
+      "say": "I wrote a pop hook in twenty seconds."
+    },
+    {
+      "start": 6.97,
+      "end": 13.03,
+      "text": "Four chords.<br><em>Endless songs.</em>",
+      "emoji": "🎤",
+      "say": "Four chords. Endless songs."
+    },
+    {
+      "start": 13.33,
+      "end": 19.4,
+      "text": "Your<br><em>turn</em>",
+      "emoji": "🔁",
+      "say": "Your turn."
+    }
+  ]
+}

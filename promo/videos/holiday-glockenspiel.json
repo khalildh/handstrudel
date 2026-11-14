@@ -1,0 +1,27 @@
+{
+  "song": "holiday-glockenspiel",
+  "voice": "am_santa",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 6.67,
+      "text": "Holiday jingle,<br><em>made in the air</em>",
+      "emoji": "🎄",
+      "say": "A holiday jingle, made in the air."
+    },
+    {
+      "start": 6.97,
+      "end": 13.03,
+      "text": "Glockenspiel sparkle,<br><em>no mallets</em>",
+      "emoji": "🔔",
+      "say": "Glockenspiel sparkle. No mallets."
+    },
+    {
+      "start": 13.33,
+      "end": 19.4,
+      "text": "Send this to<br><em>the group chat</em>",
+      "emoji": "🎁",
+      "say": "Send this to the group chat."
+    }
+  ]
+}

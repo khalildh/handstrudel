@@ -6,7 +6,7 @@ export default function Privacy() {
       <p><strong>Last updated:</strong> November 2026</p>
 
       <h2>Overview</h2>
-      <p>HandStrudel is a hand-tracking musical instrument app. Your privacy matters to us. This policy explains what data we collect and how we use it. You can play HandStrudel without an account; an account is only needed to post videos.</p>
+      <p>HandStrudel is a hand-tracking musical instrument app. Your privacy matters to us. This policy explains what data we collect and how we use it. You can play, watch videos, and read comments without an account. You need an account to post videos or comments and use other social features.</p>
 
       <h2>Data processed only on your device</h2>
       <h3>Camera</h3>
@@ -24,7 +24,8 @@ export default function Privacy() {
         <li><strong>Account identifiers:</strong> a user ID, and your email address (or Apple&apos;s private relay address if you use Sign in with Apple and hide your email).</li>
         <li><strong>Profile:</strong> the username you choose and when you accepted our terms.</li>
         <li><strong>Your posts:</strong> the videos, thumbnails, and captions you post, plus the instrument and play mode used. <strong>Posts are public.</strong></li>
-        <li><strong>Activity:</strong> likes, follows, blocks, and reports you make.</li>
+        <li><strong>Your comments:</strong> the text you post, its timestamp, and the video or comment you reply to. <strong>Comments and your username are public.</strong></li>
+        <li><strong>Activity:</strong> likes, follows, blocks, reports, and the performances you save. Your saved list is private to your account.</li>
       </ul>
       <p>We use this only to run HandStrudel: to sign you in, show your posts, power the feed, keep the community safe, and contact you about your account. We don&apos;t sell your data, show ads, or track you across other apps or websites.</p>
 
@@ -41,7 +42,8 @@ export default function Privacy() {
       <h2>Your choices</h2>
       <ul>
         <li>Delete any of your posts at any time from your profile.</li>
-        <li>Delete your account from your profile (<strong>⋯ → Delete account</strong>). This permanently removes your profile, posts, and files from our systems.</li>
+        <li>Delete your comments using the menu beside them.</li>
+        <li>Delete your account from your profile (<strong>⋯ → Delete account</strong>). This permanently removes your profile, posts, comments, and files from our systems.</li>
         <li>Email us to ask for a copy of your data or to correct it.</li>
       </ul>
 

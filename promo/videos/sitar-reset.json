@@ -1,0 +1,27 @@
+{
+  "song": "sitar-reset",
+  "voice": "af_heart",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 9.41,
+      "text": "30-second<br><em>reset</em>",
+      "emoji": "🪷",
+      "say": "Your thirty second reset."
+    },
+    {
+      "start": 9.71,
+      "end": 18.52,
+      "text": "Sitar.<br><em>No strings attached.</em>",
+      "emoji": "🌿",
+      "say": "Sitar. No strings attached."
+    },
+    {
+      "start": 18.82,
+      "end": 27.63,
+      "text": "Breathe in. Pinch.<br><em>Breathe out.</em>",
+      "emoji": "🧘",
+      "say": "Breathe in. Pinch. Breathe out."
+    }
+  ]
+}

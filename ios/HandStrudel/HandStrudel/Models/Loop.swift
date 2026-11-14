@@ -22,9 +22,10 @@ struct RecordedLoop: Identifiable, Codable {
     let name: String
     let mode: String         // "grid", "drum", "melodic"
     let createdAt: Date
+    var hasCapturedAudio: Bool? = nil
 
-    init(events: [LoopEvent], duration: Double, bpm: Double, name: String, mode: String) {
-        self.id = UUID()
+    init(id: UUID = UUID(), events: [LoopEvent], duration: Double, bpm: Double, name: String, mode: String) {
+        self.id = id
         self.events = events
         self.duration = duration
         self.bpm = bpm

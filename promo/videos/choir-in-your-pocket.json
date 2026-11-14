@@ -1,0 +1,27 @@
+{
+  "song": "pocket-choir",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 5.5,
+      "text": "A whole choir<br><em>in your pocket</em>",
+      "emoji": "😇",
+      "say": "A whole choir, in your pocket."
+    },
+    {
+      "start": 6.0,
+      "end": 13.5,
+      "text": "Left hand: harmony<br><em>Right hand: melody</em>",
+      "emoji": "🙌",
+      "say": "Left hand, harmony. Right hand, melody."
+    },
+    {
+      "start": 14.0,
+      "end": 21.0,
+      "text": "No mic. No keys.<br><em>Just your camera.</em>",
+      "emoji": "📱",
+      "say": "No mic. No keys. Just your camera."
+    }
+  ],
+  "voice": "af_heart"
+}

@@ -1,0 +1,27 @@
+{
+  "song": "campfire-guitar",
+  "voice": "am_liam",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 6.93,
+      "text": "Never touched<br><em>a guitar</em>",
+      "emoji": "🎸",
+      "say": "Never touched a guitar in my life."
+    },
+    {
+      "start": 7.23,
+      "end": 13.57,
+      "text": "My camera<br><em>doesn't know that</em>",
+      "emoji": "🤫",
+      "say": "My camera doesn't know that."
+    },
+    {
+      "start": 13.87,
+      "end": 20.2,
+      "text": "Campfire songs,<br><em>played in the air</em>",
+      "emoji": "🏕️",
+      "say": "Campfire songs, played in the air."
+    }
+  ]
+}

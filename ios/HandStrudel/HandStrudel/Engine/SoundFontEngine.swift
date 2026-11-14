@@ -68,6 +68,20 @@ final class SoundFontEngine {
         }
         soundFontURL = url
 
+        #if DEBUG
+        // Promo demo: render offline (no audio hardware), pumped in real time
+        // into the capture file. The Simulator's audio server can deadlock
+        // AVAudioEngine hardware output, and offline capture is sample-exact.
+        if Self.demoOfflineRendering {
+            do {
+                try engine.enableManualRenderingMode(.offline, format: Self.demoFormat,
+                                                     maximumFrameCount: 4096)
+            } catch {
+                log("manual rendering mode failed: \(error)")
+            }
+        }
+        #endif
+
         engine.attach(sampler)
         engine.connect(sampler, to: engine.mainMixerNode, format: nil)
 
@@ -79,6 +93,10 @@ final class SoundFontEngine {
         }
 
         guard loadProgram(program, force: true) else { return false }
+
+        #if DEBUG
+        if Self.demoOfflineRendering { startDemoPump() }
+        #endif
 
         isAvailable = true
         log("ready — soundfont=\(url.lastPathComponent) program=\(program)")
@@ -134,6 +152,32 @@ final class SoundFontEngine {
         activeNotes[voice] = nil
     }
 
+    /// Remote voice IDs are temporary, so release their routing as well as the note.
+    func releaseTemporaryVoice(_ voice: String) {
+        noteOff(voice: voice)
+        voiceChannels[voice] = nil
+        voiceVelocity[voice] = nil
+    }
+
+    /// Hard-cut a sustained voice: release it AND send MIDI "all sound off"
+    /// (CC 120) on its channel so the SF2 release envelope is bypassed.
+    /// Use this when the pad needs to go silent immediately — e.g. the chord
+    /// hand disappears — so pad-y instruments (Choir, Strings, synth pads
+    /// with 2-4s releases) don't linger and read as "still playing."
+    func hardStop(voice: String) {
+        guard isAvailable, let ch = voiceChannels[voice] else { return }
+        if let active = activeNotes[voice] {
+            sampler.stopNote(active.midi, onChannel: active.channel)
+            activeNotes[voice] = nil
+        }
+        // CC 120 = All Sound Off. Cuts the envelope tail on this channel
+        // regardless of the SF2's release time. CC 123 (All Notes Off)
+        // would still respect the release; 120 is the hard variant.
+        if !activeNotes.values.contains(where: { $0.channel == ch }) {
+            sampler.sendController(120, withValue: 0, onChannel: ch)
+        }
+    }
+
     /// Move a sustained voice to a new pitch. `AVAudioUnitSampler` has no
     /// portamento, so this re-articulates at the voice's last velocity — close
     /// enough for melody glides and pad voicing changes.
@@ -182,9 +226,11 @@ final class SoundFontEngine {
 
     private func channel(for voice: String) -> UInt8 {
         if let ch = voiceChannels[voice] { return ch }
-        // Reserve channels 0–6 for sustained voices; wrap if we somehow exceed.
-        let ch = nextChannel
-        nextChannel = (nextChannel + 1) % 7
+        // Use an idle channel first to keep overlapping pitches independent.
+        let busy = Set(activeNotes.values.map(\.channel))
+        let ch = (0..<7).map { (nextChannel + UInt8($0)) % 7 }
+            .first { !busy.contains($0) } ?? nextChannel
+        nextChannel = (ch + 1) % 7
         voiceChannels[voice] = ch
         return ch
     }
@@ -223,3 +269,56 @@ final class SoundFontEngine {
         #endif
     }
 }
+
+#if DEBUG
+// MARK: - Promo capture (DEBUG only)
+
+/// Offline-render state for promo capture. File-scoped so the extension can
+/// hold it without touching the main class's stored properties.
+@MainActor private var demoPumpTimer: Timer?
+@MainActor private var demoPumpStart: CFTimeInterval = 0
+@MainActor private var demoFramesRendered: AVAudioFramePosition = 0
+@MainActor private var demoCaptureFile: AVAudioFile?
+
+extension SoundFontEngine {
+    static let demoOfflineRendering =
+        ProcessInfo.processInfo.environment["HANDSTRUDEL_DEMO_SCRIPT"] != nil
+    static let demoFormat = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
+
+    /// Pull audio out of the offline engine at wall-clock pace so notes
+    /// triggered by the (real-time) hand pipeline land at the right moment.
+    fileprivate func startDemoPump() {
+        demoPumpStart = CACurrentMediaTime()
+        demoFramesRendered = 0
+        let buffer = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat,
+                                      frameCapacity: engine.manualRenderingMaximumFrameCount)!
+        let t = Timer(timeInterval: 0.004, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let target = AVAudioFramePosition((CACurrentMediaTime() - demoPumpStart) * Self.demoFormat.sampleRate)
+                while demoFramesRendered < target {
+                    let n = AVAudioFrameCount(min(Int64(buffer.frameCapacity), target - demoFramesRendered))
+                    guard let status = try? self.engine.renderOffline(n, to: buffer), status == .success else { return }
+                    demoFramesRendered += AVAudioFramePosition(buffer.frameLength)
+                    if let file = demoCaptureFile { try? file.write(from: buffer) }
+                }
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        demoPumpTimer = t
+        log("offline demo pump running")
+    }
+
+    /// Record everything the sampler plays to `url` (CAF, float PCM).
+    func startCapture(to url: URL) {
+        demoCaptureFile = try? AVAudioFile(forWriting: url, settings: Self.demoFormat.settings,
+                                           commonFormat: .pcmFormatFloat32, interleaved: false)
+        log(demoCaptureFile == nil ? "capture: could not open \(url.path)" : "capture started → \(url.path)")
+    }
+
+    func stopCapture() {
+        demoCaptureFile = nil // closes + flushes the file
+        log("capture stopped")
+    }
+}
+#endif

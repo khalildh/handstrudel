@@ -1,0 +1,27 @@
+{
+  "song": "paris-accordion",
+  "voice": "bf_emma",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 5.78,
+      "text": "POV: a café<br><em>in Paris</em>",
+      "emoji": "🥐",
+      "say": "P O V: a little café in Paris."
+    },
+    {
+      "start": 6.08,
+      "end": 11.27,
+      "text": "Accordion,<br><em>no bellows required</em>",
+      "emoji": "🪗",
+      "say": "Accordion. No bellows required."
+    },
+    {
+      "start": 11.57,
+      "end": 16.75,
+      "text": "Croissant<br><em>not included</em>",
+      "emoji": "☕",
+      "say": "Croissant not included."
+    }
+  ]
+}

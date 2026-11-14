@@ -1,0 +1,34 @@
+{
+  "song": "dreamy-piano",
+  "captions": [
+    {
+      "start": 0.3,
+      "end": 3.2,
+      "text": "No keys.<br>No lessons.<br><em>Just your hands.</em>",
+      "emoji": "🤯",
+      "say": "No keys. No lessons. Just your hands."
+    },
+    {
+      "start": 3.6,
+      "end": 8.6,
+      "text": "Left hand<br><em>picks the chord</em>",
+      "emoji": "👈",
+      "say": "Your left hand picks the chord."
+    },
+    {
+      "start": 9.0,
+      "end": 14.0,
+      "text": "Right hand<br><em>plays the melody</em>",
+      "emoji": "👉",
+      "say": "Your right hand plays the melody."
+    },
+    {
+      "start": 14.4,
+      "end": 19.4,
+      "text": "Pinch to play.<br><em>Every note is in key.</em>",
+      "emoji": "🎹",
+      "say": "Pinch to play. Every note is in key."
+    }
+  ],
+  "voice": "af_heart"
+}

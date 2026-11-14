@@ -436,14 +436,14 @@ final class ChordMelodyModeManagerQuantizeTests: XCTestCase {
 
     func testQuantize_chordChangeWaitsForBoundary() {
         let m = makeManager()
-        // Establish the pad at the far-left zone.
-        let zoneA = makeHandData(pinch: 0.0, pinchX: 0.05, pinchY: 0.5)
+        // Pinch to establish the pad at the far-left zone.
+        let zoneA = makeHandData(pinch: 0.9, pinchX: 0.05, pinchY: 0.5)
         _ = m.tick(hands: HandsState(left: zoneA, right: nil),
                    chordTones: chordTones, melodyTones: melodyTones,
                    quantize: true, gridBoundaryCrossed: true)
 
-        // Move to the far-right zone (different chord degree).
-        let zoneB = makeHandData(pinch: 0.0, pinchX: 0.95, pinchY: 0.5)
+        // Keep holding the pinch while moving to the far-right zone.
+        let zoneB = makeHandData(pinch: 0.9, pinchX: 0.95, pinchY: 0.5)
         let before = m.tick(hands: HandsState(left: zoneB, right: nil),
                             chordTones: chordTones, melodyTones: melodyTones,
                             quantize: true, gridBoundaryCrossed: false)
