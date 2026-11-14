@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { COMMENT_PAGE_SIZE, loadPublicComments, type PublicComment, type PublicVideo } from "../../lib/public-feed";
+import { WatchIcon } from "./watch-design";
 
 export default function WatchComments({ video }: { video: PublicVideo }) {
   const [open, setOpen] = useState(false);
@@ -10,7 +11,7 @@ export default function WatchComments({ video }: { video: PublicVideo }) {
 
   return (
     <details className="watch-comments" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>Comments <span>{video.comment_count ?? 0}</span></summary>
+      <summary><WatchIcon name="message" /> Comments <span>{video.comment_count ?? 0}</span><WatchIcon name="chevron" /></summary>
       {open && (
         <div className="watch-comment-panel">
           <WatchCommentList videoID={video.id} />
