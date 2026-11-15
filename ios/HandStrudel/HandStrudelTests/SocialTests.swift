@@ -358,7 +358,30 @@ final class SocialTests: XCTestCase {
         }
         let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
         let page = try await FeedService.followingPage(user: user, from: client.from)
-        XCTAssertTrue(page.isEmpty)
+        XCTAssertTrue(page.videos.isEmpty)
+        XCTAssertTrue(page.confirmedNoFollows)
+    }
+
+    func testFollowingEmptyViewOnlyClaimsNoFollowsWhenConfirmed() async throws {
+        let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
+        let responses = [
+            (200, "[]", true),
+            (200, "[{\"followee_id\":\"\(Self.discoveryUser)\"}]", false),
+            (403, #"{"code":"42501","message":"permission denied"}"#, false),
+        ]
+        for (status, body, expectedNoFollows) in responses {
+            let client = discoveryClient { request in
+                if request.path == "/following_videos" { return (200, "[]") }
+                XCTAssertEqual(request.path, "/follows")
+                XCTAssertEqual(request.queryItems?.first(where: { $0.name == "follower_id" })?.value,
+                               "eq.\(Self.discoveryViewer)")
+                XCTAssertEqual(request.queryItems?.first(where: { $0.name == "limit" })?.value, "1")
+                return (status, body)
+            }
+            let page = try await FeedService.followingPage(user: user, from: client.from)
+            XCTAssertTrue(page.videos.isEmpty)
+            XCTAssertEqual(page.confirmedNoFollows, expectedNoFollows)
+        }
     }
 
     func testFollowingFallsBackToVisiblePostsWithTheFullPaginationTimestamp() async throws {
@@ -376,9 +399,11 @@ final class SocialTests: XCTestCase {
         }
         let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
         let first = try await FeedService.followingPage(user: user, from: client.from)
-        let post = try XCTUnwrap(first.first)
+        let post = try XCTUnwrap(first.videos.first)
+        XCTAssertFalse(first.confirmedNoFollows)
         let next = try await FeedService.followingPage(user: user, after: post, from: client.from)
-        XCTAssertTrue(next.isEmpty)
+        XCTAssertTrue(next.videos.isEmpty)
+        XCTAssertFalse(next.confirmedNoFollows)
     }
 
     func testFollowingDoesNotHideAnAuthorizationFailure() async throws {
@@ -393,6 +418,37 @@ final class SocialTests: XCTestCase {
         } catch let error as PostgrestError {
             XCTAssertEqual(error.code, "42501")
         }
+    }
+
+    @MainActor
+    func testFollowingModelSeparatesFallbackErrorFromConfirmedEmptyRetry() async throws {
+        let viewer = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
+        let denied = discoveryClient { request in
+            if request.path == "/following_videos" { return Self.missingView }
+            XCTAssertEqual(request.path, "/follows")
+            return (403, #"{"code":"42501","message":"permission denied"}"#)
+        }
+        let model = FeedModel()
+        model.followingOnly = true
+        await model.refresh(user: viewer) { user in
+            try await FeedService.followingPage(user: user, from: denied.from)
+        }
+        XCTAssertEqual(model.error, "Couldn't load posts from creators you follow.")
+        XCTAssertFalse(model.confirmedNoFollows)
+        XCTAssertFalse(model.loading)
+
+        let empty = discoveryClient { request in
+            if request.path == "/following_videos" { return Self.missingView }
+            XCTAssertEqual(request.path, "/follows")
+            return (200, "[]")
+        }
+        await model.refresh(user: viewer) { user in
+            try await FeedService.followingPage(user: user, from: empty.from)
+        }
+        XCTAssertTrue(model.videos.isEmpty)
+        XCTAssertNil(model.error)
+        XCTAssertTrue(model.confirmedNoFollows)
+        XCTAssertFalse(model.loading)
     }
 
     func testMissingBookmarkTableAndLibraryReportThatSavingIsUnavailable() async throws {

@@ -308,14 +308,16 @@ struct FeedView: View {
                 ProgressView("Loading videos")
             } else {
                 Image(systemName: "play.rectangle").font(.system(size: 40)).foregroundStyle(palette.accent)
-                Text(model.error ?? (model.followingOnly ? "No performances from creators you follow yet" : "No performances yet"))
+                Text(emptyFeedTitle)
                     .font(.title3.bold()).multilineTextAlignment(.center)
                 if model.followingOnly {
                     if !auth.isSignedIn {
                         Button("Sign in to follow creators") { showSignIn = true }.buttonStyle(StudioActionStyle())
                     } else {
                         if model.error == nil {
-                            Text("Follow a creator from Latest to see their posts here.")
+                            Text(model.confirmedNoFollows
+                                 ? "Follow a creator from Latest to see their posts here."
+                                 : "New public posts from creators you follow will appear here.")
                                 .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         }
                         Button("Browse latest") { model.followingOnly = false }.buttonStyle(StudioActionStyle())
@@ -330,6 +332,13 @@ struct FeedView: View {
         .padding(24)
         .frame(maxWidth: 360)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var emptyFeedTitle: String {
+        if let error = model.error { return error }
+        guard model.followingOnly else { return "No performances yet" }
+        if auth.isSignedIn, model.confirmedNoFollows { return "You aren't following any creators yet" }
+        return "No performances from creators you follow yet"
     }
 
     private func requireSignIn(_ action: @escaping (UUID) -> Void) {
@@ -410,6 +419,7 @@ final class FeedModel: ObservableObject {
     @Published var loading = false
     @Published var error: String?
     @Published var followingOnly = false
+    @Published private(set) var confirmedNoFollows = false
     @Published private(set) var savedIDs = Set<UUID>()
     private var reachedEnd = false
     private var generation = 0
@@ -432,20 +442,32 @@ final class FeedModel: ObservableObject {
         videos[index].backingEnabled = fresh.backingEnabled
     }
 
-    func refresh(user: UUID?) async {
+    func refresh(user: UUID?, loadFollowingPage: (UUID) async throws -> FeedService.FollowingPage = {
+        try await FeedService.followingPage(user: $0)
+    }) async {
         generation += 1
         let request = generation
         let followingOnly = self.followingOnly
         if viewer != user { savedIDs = []; bookmarkRevision += 1 }
         viewer = user
         loading = true; error = nil; reachedEnd = false
+        confirmedNoFollows = false
         videos = []; current = 0; following = []
         defer { if request == generation { loading = false } }
         guard !followingOnly || user != nil else { return }
         do {
-            let page = try await fetchPage(followingOnly: followingOnly, user: user)
+            let page: [Video]
+            var noFollows = false
+            if followingOnly, let user {
+                let result = try await loadFollowingPage(user)
+                page = result.videos
+                noFollows = result.confirmedNoFollows
+            } else {
+                page = try await FeedService.page()
+            }
             guard !Task.isCancelled, request == generation else { return }
             videos = page
+            confirmedNoFollows = noFollows
             reachedEnd = videos.count < FeedService.pageSize
             await loadPageDetails(page, request: request)
             while !Task.isCancelled, request == generation, !reachedEnd, current >= videos.count - 3 {
@@ -486,10 +508,10 @@ final class FeedModel: ObservableObject {
         _ = await (bookmarks, follows)
     }
 
-    private func fetchPage(after last: Video? = nil, followingOnly: Bool, user: UUID?) async throws -> [Video] {
+    private func fetchPage(after last: Video, followingOnly: Bool, user: UUID?) async throws -> [Video] {
         if followingOnly {
             guard let user else { return [] }
-            return try await FeedService.followingPage(user: user, after: last)
+            return try await FeedService.followingPage(user: user, after: last).videos
         }
         return try await FeedService.page(after: last)
     }
