@@ -1,3 +1,4 @@
+import RevenueCat
 import XCTest
 @testable import HandStrudel
 
@@ -65,6 +66,7 @@ final class StoreManagerTests: XCTestCase {
 
     func testEntitlementId_pro() {
         XCTAssertEqual(StoreManager.entitlementId(for: "pro"), StoreManager.entitlementPro)
+        XCTAssertEqual(StoreManager.entitlementId(for: StoreManager.pro), StoreManager.entitlementPro)
     }
 
     func testEntitlementId_filterAndVisual_mapToPlusFeatures() {
@@ -121,39 +123,203 @@ final class StoreManagerTests: XCTestCase {
     // MARK: - Initial state
 
     func testInitialState_purchasedIdsEmpty() {
-        let store = StoreManager()
+        let store = emptyStore()
         XCTAssertTrue(store.purchasedIds.isEmpty)
     }
 
     func testInitialState_productsEmpty() {
-        let store = StoreManager()
+        let store = emptyStore()
         XCTAssertTrue(store.products.isEmpty)
     }
 
     func testInitialState_isLoadingFalse() {
-        let store = StoreManager()
+        let store = emptyStore()
         XCTAssertFalse(store.isLoading)
     }
 
     func testInitialState_hasProAccessFalse() {
-        let store = StoreManager()
+        let store = emptyStore()
         XCTAssertFalse(store.hasProAccess)
     }
 
     func testInitialState_hasSubscriptionFalse() {
-        let store = StoreManager()
+        let store = emptyStore()
         XCTAssertFalse(store.hasSubscription)
     }
 
     func testInitialState_hasPlusFeaturesFalse() {
-        let store = StoreManager()
+        let store = emptyStore()
         XCTAssertFalse(store.hasPlusFeatures)
     }
 
     func testInitialState_isUnlockedFalse() {
-        let store = StoreManager()
+        let store = emptyStore()
         // Without a customerInfo, isUnlocked returns false in release config
         XCTAssertFalse(store.isUnlocked(StoreManager.studioPack))
         XCTAssertFalse(store.isUnlocked("anything"))
+    }
+
+    // MARK: - Restore
+
+    func testRestore_lifetimeProUnlocksProPaywallButNotPlus() async {
+        let info = customerInfo(productId: StoreManager.pro, entitlementIds: [StoreManager.entitlementPro])
+        let store = StoreManager { info }
+
+        let result = await store.restorePurchases(for: StoreManager.pro)
+
+        XCTAssertEqual(result, .accessAvailable)
+        XCTAssertTrue(store.isUnlocked(StoreManager.pro))
+        XCTAssertTrue(store.hasProAccess)
+        XCTAssertFalse(store.hasPlusFeatures)
+        XCTAssertFalse(store.hasSubscription)
+        XCTAssertFalse(store.isRestoring)
+    }
+
+    func testRestore_bothPlusPlansGrantProAndPlusFeatures() async {
+        for plan in [StoreManager.plusMonthly, StoreManager.plusYearly] {
+            let info = customerInfo(
+                productId: plan,
+                entitlementIds: [StoreManager.entitlementPro, StoreManager.entitlementPlusFeatures],
+                expiration: Date().addingTimeInterval(86_400)
+            )
+            let store = StoreManager { info }
+
+            let result = await store.restorePurchases()
+
+            XCTAssertEqual(result, .accessAvailable, plan)
+            XCTAssertTrue(store.hasSubscription, plan)
+            XCTAssertTrue(store.isUnlocked(StoreManager.pro), plan)
+            XCTAssertTrue(store.hasPlusFeatures, plan)
+        }
+    }
+
+    func testRestore_reportsWhenActivePurchaseDoesNotUnlockRequestedItem() async {
+        let info = customerInfo(productId: StoreManager.pro, entitlementIds: [StoreManager.entitlementPro])
+        let store = StoreManager { info }
+
+        let result = await store.restorePurchases(for: "filter_pack")
+
+        XCTAssertEqual(result, .requestedItemUnavailable)
+        XCTAssertFalse(store.isUnlocked("filter_pack"))
+        XCTAssertTrue(store.hasProAccess)
+    }
+
+    func testRestore_reportsNoActivePurchasesForEmptyAccount() async {
+        let store = emptyStore()
+
+        let result = await store.restorePurchases()
+
+        XCTAssertEqual(result, .noActivePurchases)
+        XCTAssertFalse(store.isRestoring)
+    }
+
+    func testRestore_doesNotCountExpiredSubscriptionHistoryAsActive() async {
+        let info = customerInfo(
+            productId: StoreManager.plusYearly,
+            entitlementIds: [StoreManager.entitlementPro, StoreManager.entitlementPlusFeatures],
+            expiration: Date().addingTimeInterval(-86_400)
+        )
+        let store = StoreManager { info }
+
+        let result = await store.restorePurchases()
+
+        XCTAssertEqual(result, .noActivePurchases)
+        XCTAssertTrue(store.purchasedIds.contains(StoreManager.plusYearly))
+        XCTAssertFalse(store.hasSubscription)
+        XCTAssertFalse(store.hasProAccess)
+        XCTAssertFalse(store.hasPlusFeatures)
+    }
+
+    func testRestore_failurePreservesEntitlementsAndAllowsRetry() async {
+        let info = customerInfo(productId: StoreManager.pro, entitlementIds: [StoreManager.entitlementPro])
+        var calls = 0
+        let store = StoreManager {
+            calls += 1
+            if calls == 2 { throw URLError(.notConnectedToInternet) }
+            return info
+        }
+
+        let first = await store.restorePurchases()
+        let failed = await store.restorePurchases(for: StoreManager.pro)
+
+        XCTAssertEqual(first, .accessAvailable)
+        XCTAssertEqual(failed, .failed)
+        XCTAssertTrue(store.hasProAccess)
+        XCTAssertFalse(store.isRestoring)
+
+        let retry = await store.restorePurchases()
+        XCTAssertEqual(retry, .accessAvailable)
+        XCTAssertEqual(calls, 3)
+    }
+
+    func testRestore_cancellationHasItsOwnOutcome() async {
+        let store = StoreManager { throw ErrorCode.purchaseCancelledError as NSError }
+
+        let result = await store.restorePurchases()
+
+        XCTAssertEqual(result, .cancelled)
+        XCTAssertFalse(store.isRestoring)
+    }
+
+    func testRestore_ignoresDuplicateWhileRequestIsInFlight() async {
+        let info = customerInfo()
+        let (requests, started) = AsyncStream<Void>.makeStream()
+        let (responses, complete) = AsyncStream<CustomerInfo>.makeStream()
+        var calls = 0
+        let store = StoreManager {
+            calls += 1
+            guard calls == 1 else { return info }
+            started.yield(())
+            var iterator = responses.makeAsyncIterator()
+            return await iterator.next() ?? info
+        }
+        let first = Task { await store.restorePurchases() }
+        var iterator = requests.makeAsyncIterator()
+        _ = await iterator.next()
+
+        XCTAssertTrue(store.isRestoring)
+        let duplicate = await store.restorePurchases()
+        XCTAssertNil(duplicate)
+        XCTAssertTrue(store.isRestoring)
+        XCTAssertEqual(calls, 1)
+
+        complete.yield(info)
+        complete.finish()
+        started.finish()
+        let result = await first.value
+        XCTAssertEqual(result, .noActivePurchases)
+        XCTAssertFalse(store.isRestoring)
+    }
+
+    private func emptyStore() -> StoreManager {
+        let info = customerInfo()
+        return StoreManager { info }
+    }
+
+    private func customerInfo(
+        productId: String? = nil,
+        entitlementIds: [String] = [],
+        expiration: Date? = nil
+    ) -> CustomerInfo {
+        let now = Date()
+        var entitlements: [String: EntitlementInfo] = [:]
+        var expirations: [String: Date] = [:]
+        if let productId {
+            expirations[productId] = expiration
+            let isActive = expiration.map { $0 > now } ?? true
+            for id in entitlementIds {
+                entitlements[id] = EntitlementInfo(
+                    identifier: id, isActive: isActive, willRenew: isActive && expiration != nil, periodType: .normal,
+                    expirationDate: expiration, store: .appStore, productIdentifier: productId,
+                    isSandbox: true, ownershipType: .purchased
+                )
+            }
+        }
+        return CustomerInfo(
+            entitlements: EntitlementInfos(entitlements: entitlements),
+            expirationDatesByProductId: expirations,
+            allPurchasedProductIds: Set(productId.map { [$0] } ?? []),
+            requestDate: now, firstSeen: now, originalAppUserId: "test-user"
+        )
     }
 }
