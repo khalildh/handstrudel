@@ -75,7 +75,7 @@ final class SoundFontEngine {
         // Promo demo: render offline (no audio hardware), pumped in real time
         // into the capture file. The Simulator's audio server can deadlock
         // AVAudioEngine hardware output, and offline capture is sample-exact.
-        if Self.demoOfflineRendering {
+        if Self.demoOfflineRendering || ProcessInfo.processInfo.arguments.contains("--uitest-delayed-web-audio") {
             do {
                 try engine.enableManualRenderingMode(.offline, format: Self.demoFormat,
                                                      maximumFrameCount: 4096)

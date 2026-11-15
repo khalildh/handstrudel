@@ -40,6 +40,24 @@ final class SocialTests: XCTestCase {
         XCTAssertTrue(updated[2].accessibilityActivate())
         await fulfillment(of: [released], timeout: 1)
     }
+    func testWebAudioWaitsForItsPromiseBeforeReportingReady() async throws {
+        var states = ["waiting", "loading", "ready"].makeIterator()
+        var polls = 0
+        try await StrudelBridge.waitForWebAudio(pollNanoseconds: 1_000_000) {
+            polls += 1
+            return states.next()
+        }
+        XCTAssertEqual(polls, 3)
+    }
+
+    func testFailedWebAudioDoesNotMarkTheEngineReady() async throws {
+        do {
+            try await StrudelBridge.waitForWebAudio { "failed" }
+            XCTFail("Failed initialization must not open a WebAudio-only session")
+        } catch {
+            XCTAssertEqual((error as NSError).code, 2)
+        }
+    }
     func testStudioPreviewFollowsSelectedKeyScaleAndChord() throws {
         let free = try XCTUnwrap(CHORD_PROGRESSIONS.first { $0.id == "free" })
         let secondDegree = try XCTUnwrap(ChordProgression.parse("2 5 1"))

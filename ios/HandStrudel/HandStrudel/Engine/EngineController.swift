@@ -386,14 +386,19 @@ final class EngineController: ObservableObject {
     private var uiTimer: Timer?
     private var structTimer: Timer?
     private(set) var startTime: Date?
+    private var startupTask: Task<Void, Never>?
+    private var startupGeneration = 0
+    @Published private(set) var auxiliaryAudioIssue: String?
 
     @Published private(set) var playInput: StudioPlayInput = .air
 
     func start(config: MappingConfig, advanced: Bool, input: StudioPlayInput = .air) {
-        debugLog("start() called")
+        guard !isRunning, startupTask == nil else { return }
         self.config = config
         self.advanced = advanced
         playInput = input
+        auxiliaryAudioIssue = nil
+        isPaused = false
 
         // Always start in melodic mode
         learnModeEnabled = false
@@ -403,77 +408,80 @@ final class EngineController: ObservableObject {
         rawParams = defs
         smoothed = defs
 
+        var delayedWebFixture = false
         #if DEBUG
-        // UI tests never invoke AVFoundation's camera permission prompt.
-        if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+        let arguments = ProcessInfo.processInfo.arguments
+        delayedWebFixture = arguments.contains("--uitest-delayed-web-audio")
+        if arguments.contains("--uitesting"), !delayedWebFixture {
             startCameraIfRequested()
             isRunning = true
             return
         }
         #endif
 
-        status = "initialising strudel..."
-        debugLog("status set to initialising")
+        status = "Preparing instrument…"
+        startupGeneration += 1
+        let generation = startupGeneration
+        if activeMode is SoundFontModeController,
+           soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program) {
+            openStudioSession(startCamera: !delayedWebFixture)
+        }
 
-        // Start Strudel in WebView
-        Task {
+        startupTask = Task { [weak self] in
+            guard let self else { return }
+            defer { if self.startupGeneration == generation { self.startupTask = nil } }
             do {
-                strudelBridge.onLog = { [weak self] msg in
-                    debugLog("JS: \(msg)")
-                    DispatchQueue.main.async {
-                        self?.status = msg
-                    }
+                if delayedWebFixture {
+                    try await Task.sleep(nanoseconds: 8_000_000_000)
+                } else {
+                    try await strudelBridge.initialize()
                 }
-                debugLog("calling strudelBridge.initialize()")
-                try await strudelBridge.initialize()
-                debugLog("strudelBridge.initialize() returned")
-
-                // Evaluate initial signal-based code
-                debugLog("evaluating initial code...")
-                let code = buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                strudelBridge.evaluate(code)
-                lastStructKey = String(structIdx)
-
-                handTracker.onHandsUpdate = { [weak self] hands in
-                    self?.handleHandsUpdate(hands)
-                }
-                startCameraIfRequested()
-
-                // Beat callback
-                strudelBridge.onBeat = { [weak self] beat in
-                    DispatchQueue.main.async {
-                        guard let self else { return }
-                        let oldBeat = self.currentBeat
-                        self.currentBeat = beat
-                        if beat != oldBeat {
-                            self.haptics.beatPulse(isDownbeat: beat == 0)
-                            // Advance the quantize clock by one quarter note and
-                            // learn the tempo from the gap between beats.
-                            let now = CACurrentMediaTime()
-                            if self.quantizeBeatWallTime > 0 {
-                                let delta = now - self.quantizeBeatWallTime
-                                if delta > 0.05 && delta < 2.0 / self.recordingTempoScale {
-                                    self.quantizeQuarterPeriod = delta
-                                }
-                            }
-                            self.quantizeBeatWallTime = now
-                            self.quantizeBeatIndex += 1
-                        }
-                    }
-                }
-
-                debugLog("starting display link and timers...")
-                startTime = Date()
-                startDisplayLink()
-                startTimers()
-
-                debugLog("all started, setting isRunning=true")
-                status = playInput == .air ? "running -- wave your hands" : "running -- touch the wheel"
-                isRunning = true
-                jamSession.replayRemoteVoices()
+                guard startupGeneration == generation, !Task.isCancelled else { return }
+                connectWebAudio()
+                if !isRunning { openStudioSession(startCamera: !delayedWebFixture) }
+                else { jamSession.replayRemoteVoices() }
             } catch {
+                guard startupGeneration == generation, !Task.isCancelled else { return }
                 debugLog("start error: \(error.localizedDescription)")
-                status = "error: \(error.localizedDescription)"
+                if isRunning {
+                    auxiliaryAudioIssue = "Web synths and drum loops couldn't load. Your native instrument is still available."
+                } else {
+                    status = "error: \(error.localizedDescription) Try again."
+                }
+            }
+        }
+    }
+
+    private func openStudioSession(startCamera: Bool) {
+        handTracker.onHandsUpdate = { [weak self] hands in self?.handleHandsUpdate(hands) }
+        if startCamera { startCameraIfRequested() }
+        startTime = Date()
+        startDisplayLink()
+        startTimers()
+        status = "Playing"
+        isRunning = true
+        jamSession.replayRemoteVoices()
+    }
+
+    private func connectWebAudio() {
+        guard strudelBridge.isReady else { return }
+        strudelBridge.setTempoScale(recordingTempoScale, bpm: manualBPM)
+        lastStructKey = ""
+        strudelBridge.onBeat = { [weak self] beat in
+            DispatchQueue.main.async {
+                guard let self, self.isRunning else { return }
+                let oldBeat = self.currentBeat
+                self.currentBeat = beat
+                if beat != oldBeat {
+                    self.haptics.beatPulse(isDownbeat: beat == 0)
+                    let now = CACurrentMediaTime()
+                    if self.quantizeBeatWallTime > 0 {
+                        let delta = now - self.quantizeBeatWallTime
+                        if delta > 0.05 && delta < 2.0 / self.recordingTempoScale { self.quantizeQuarterPeriod = delta }
+                    }
+                    self.quantizeBeatWallTime = now
+                    self.quantizeBeatIndex += 1
+                }
             }
         }
     }
@@ -561,12 +569,14 @@ final class EngineController: ObservableObject {
 
         let isLive = playingSet.isEmpty && !trackPlaying
         guard isLive, !isPaused else { return }
+        let mode = activeMode
+        guard strudelBridge.isReady || mode is SoundFontModeController else { return }
 
         if recordingTempoScale != 1 {
             let effectiveBPM = smoothed["bpm"] ?? manualBPM
             if effectiveBPM != lastReportedTempo { strudelBridge.updateTempo(effectiveBPM); lastReportedTempo = effectiveBPM }
         }
-        activeMode.tick(self)
+        mode.tick(self)
 
         tickLoopPlayback()
         tickLoopRecordingProgress()
@@ -624,7 +634,7 @@ final class EngineController: ObservableObject {
     }
 
     private func playJamVoices(_ voices: [String: JamHeldVoice], peer: UUID) {
-        let desired = isRunning && !isPaused ? voices : [:]
+        let desired = isRunning && !isPaused ? voices.filter { $0.value.program != nil || strudelBridge.isReady } : [:]
         let previous = remoteJamVoices[peer] ?? [:]
         let prefix = "jam-\(peer.uuidString.lowercased())-"
         var playing: [String: RemoteJamVoice] = [:]
@@ -1079,6 +1089,7 @@ final class EngineController: ObservableObject {
     }
 
     func evaluateDrumLoopsIfChanged(modePrefix: String) {
+        guard strudelBridge.isReady else { return }
         let key = "\(modePrefix)|\(drumStateKey)"
         guard key != lastStructKey else { return }
         lastStructKey = key
@@ -1319,6 +1330,10 @@ final class EngineController: ObservableObject {
     }
 
     func stop() {
+        startupGeneration += 1
+        startupTask?.cancel()
+        startupTask = nil
+        auxiliaryAudioIssue = nil
         setRecordingTempo(halfSpeed: false)
         // Persist state before teardown
         let mode = currentModeString

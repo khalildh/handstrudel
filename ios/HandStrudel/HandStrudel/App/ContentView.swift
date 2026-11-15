@@ -437,8 +437,8 @@ struct ContentView: View {
         }
         startingSession = true
         destination = .music
-        engine.start(config: DEFAULT_MAPPING, advanced: false, input: preferredInput)
         if setup == nil { engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true) }
+        engine.start(config: DEFAULT_MAPPING, advanced: false, input: preferredInput)
     }
 
     private func changePlayInput(_ input: StudioPlayInput) {
@@ -555,8 +555,8 @@ struct ContentView: View {
         }
         demo.onBeginCapture = { [engine] url in engine.soundFontEngine.startCapture(to: url) }
         demo.onEndCapture = { [engine] in engine.soundFontEngine.stopCapture() }
-        engine.start(config: DEFAULT_MAPPING, advanced: false)
         engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true)
+        engine.start(config: DEFAULT_MAPPING, advanced: false)
     }
     #endif
 
@@ -990,6 +990,14 @@ struct ContentView: View {
                 if !isRecording, !recorderBusy, recordCountdown == 0,
                    hasSeenOnboarding || !engine.scaleChordMelodyModeEnabled {
                     cameraInputStatus
+                }
+                if let issue = engine.auxiliaryAudioIssue, !isRecording, recordCountdown == 0 {
+                    Text(issue)
+                        .font(.caption).multilineTextAlignment(.center)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 16)
+                        .allowsHitTesting(false)
                 }
 
                 // Floating code pill — hide in grid/drum/learn/chord/soundfont mode

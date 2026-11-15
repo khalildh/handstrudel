@@ -93,9 +93,11 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
 
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
+        #if DEBUG
         if #available(iOS 16.4, *) {
             webView.isInspectable = true
         }
+        #endif
 
         debugLog("loading HTML file")
         if let htmlURL = Bundle.main.url(forResource: "strudel-engine", withExtension: "html") {
@@ -122,46 +124,47 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
     var view: WKWebView { webView }
 
     func initialize() async throws {
-        debugLog("initialize() called, waiting for module ready...")
-
-        // Poll for module ready with timeout (simpler and more reliable than continuations)
-        let deadline = Date().addingTimeInterval(20)
-        var moduleReady = false
-
-        while Date() < deadline {
-            let result = try? await webView.evaluateJavaScript("window._moduleReady === true")
-            if let ready = result as? Bool, ready {
-                moduleReady = true
-                break
-            }
-            // Check for errors and module started status
-            let started = try? await webView.evaluateJavaScript("window._moduleStarted === true")
-            let lastErr = try? await webView.evaluateJavaScript("window._lastError")
-            debugLog("module not ready yet, moduleStarted=\(started ?? false), lastError=\(lastErr ?? "none")")
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
-        }
-
-        guard moduleReady else {
-            debugLog("TIMEOUT: module never became ready")
-            // Try to get any JS errors
-            let errors = try? await webView.evaluateJavaScript("document.body?.innerText || 'no body'")
-            debugLog("page content: \(errors ?? "nil")")
-            throw NSError(domain: "StrudelBridge", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "JS module load timed out after 20s"])
-        }
-
-        debugLog("module ready! calling initStrudel()...")
+        guard !isReady else { return }
+        // A cancelled Swift session can leave JavaScript initialization in flight.
+        // Keep one promise per document and wait on its actual result on retry.
+        let script = """
+        (() => {
+          if (window._moduleReady !== true || typeof window.initStrudel !== 'function') return 'waiting';
+          if (!window._handStrudelInitState) {
+            window._handStrudelInitState = 'loading';
+            Promise.resolve().then(() => window.initStrudel()).then(
+              () => { window._handStrudelInitState = 'ready'; },
+              () => { window._handStrudelInitState = 'failed'; }
+            );
+          }
+          return window._handStrudelInitState;
+        })()
+        """
         do {
-            _ = try await webView.evaluateJavaScript("initStrudel()")
-        } catch {
-            // "unsupported type" is OK — initStrudel ran fine, WKWebView just can't serialize the Promise result
-            debugLog("initStrudel eval result: \(error.localizedDescription)")
+            try await Self.waitForWebAudio { (try? await self.webView.evaluateJavaScript(script)) as? String }
+            isReady = true
+        } catch let error as NSError {
+            if error.domain == "StrudelBridge", error.code == 2 {
+                _ = try? await webView.evaluateJavaScript("delete window._handStrudelInitState")
+            }
+            throw error
         }
-        // Wait a beat for async init to finish
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        let ready = try? await webView.evaluateJavaScript("window._moduleReady === true && typeof strudelEval === 'function'")
-        debugLog("post-init check: \(ready ?? false)")
-        isReady = true
+    }
+
+    static func waitForWebAudio(timeout: TimeInterval = 20, pollNanoseconds: UInt64 = 150_000_000,
+                                readState: () async -> String?) async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        while ProcessInfo.processInfo.systemUptime < deadline {
+            try Task.checkCancellation()
+            let state = await readState()
+            try Task.checkCancellation()
+            if state == "ready" { return }
+            if state == "failed" {
+                throw NSError(domain: "StrudelBridge", code: 2, userInfo: [NSLocalizedDescriptionKey: "The web audio engine couldn't start."])
+            }
+            try await Task.sleep(nanoseconds: pollNanoseconds)
+        }
+        throw NSError(domain: "StrudelBridge", code: 1, userInfo: [NSLocalizedDescriptionKey: "The web audio engine took too long to load."])
     }
 
     func evaluate(_ code: String) {
