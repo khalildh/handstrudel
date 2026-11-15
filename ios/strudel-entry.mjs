@@ -578,8 +578,14 @@ window.noteSlide = function(hand, midi) {
 
 // Legacy one-shot (kept for backward compat)
 window.playNote = function(midi, waveform, vel, duration) {
-    window.noteOn('oneshot', midi, waveform, vel);
-    setTimeout(() => window.noteOff('oneshot'), (duration || 0.3) * 1000);
+    const id = `oneshot-${midi}`;
+    window.noteOn(id, midi, waveform, vel);
+    const voice = window._voices[id];
+    if (!voice) return;
+    // A retrigger can replace this pitch before the original timer fires.
+    setTimeout(() => {
+        if (window._voices[id] === voice) window.noteOff(id);
+    }, (duration || 0.3) * 1000);
 };
 
 window._moduleReady = true;
