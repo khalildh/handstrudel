@@ -300,6 +300,7 @@ final class EngineController: ObservableObject {
 
     init() {
         loadPersistedState()
+        handTracker.onCameraAccessBlocked = { [weak self] in self?.fallBackToTouch() }
         jamSession.onRemoteEvent = { [weak self] event in self?.playJamEvent(event) }
         jamSession.onRemoteVoices = { [weak self] peer, voices in self?.playJamVoices(voices, peer: peer) }
         jamSession.onSessionCleared = { [weak self] in self?.silenceJamAudio() }
@@ -429,7 +430,7 @@ final class EngineController: ObservableObject {
         let generation = startupGeneration
         if activeMode is SoundFontModeController,
            soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program) {
-            openStudioSession(startCamera: !delayedWebFixture)
+            openStudioSession()
         }
 
         startupTask = Task { [weak self] in
@@ -443,7 +444,7 @@ final class EngineController: ObservableObject {
                 }
                 guard startupGeneration == generation, !Task.isCancelled else { return }
                 connectWebAudio()
-                if !isRunning { openStudioSession(startCamera: !delayedWebFixture) }
+                if !isRunning { openStudioSession() }
                 else { jamSession.replayRemoteVoices() }
             } catch {
                 guard startupGeneration == generation, !Task.isCancelled else { return }
@@ -457,9 +458,9 @@ final class EngineController: ObservableObject {
         }
     }
 
-    private func openStudioSession(startCamera: Bool) {
+    private func openStudioSession() {
         handTracker.onHandsUpdate = { [weak self] hands in self?.handleHandsUpdate(hands) }
-        if startCamera { startCameraIfRequested() }
+        startCameraIfRequested()
         startTime = Date()
         startDisplayLink()
         startTimers()
@@ -516,6 +517,14 @@ final class EngineController: ObservableObject {
         }
         #endif
         handTracker.startSession()
+    }
+
+    private func fallBackToTouch() {
+        guard playInput == .air else { return }
+        // Access can be denied while the player is already holding a touch note.
+        playInput = .touch
+        currentHands = HandsState()
+        handsState = HandsState()
     }
 
     private nonisolated func handleHandsUpdate(_ hands: HandsState) {

@@ -80,6 +80,7 @@ final class HandTrackingManager: NSObject, ObservableObject {
 
     var previewLayer: AVCaptureVideoPreviewLayer?
     var onHandsUpdate: ((HandsState) -> Void)?
+    var onCameraAccessBlocked: (() -> Void)?
     @Published private(set) var cameraIssue: CameraIssue?
     private var requestingCamera = false
     private var wantsCamera = false
@@ -128,22 +129,26 @@ final class HandTrackingManager: NSObject, ObservableObject {
                     self.requestingCamera = false
                     guard self.wantsCamera else { return }
                     if granted { self.setupAndStart() }
-                    else { self.cameraIssue = .permissionDenied }
+                    else { self.reportBlockedCameraAccess(.permissionDenied) }
                 }
             }
             return
         case .authorized:
             setupAndStart()
         case .denied:
-            cameraIssue = .permissionDenied
-            return
+            reportBlockedCameraAccess(.permissionDenied)
         case .restricted:
-            cameraIssue = .restricted
-            return
+            reportBlockedCameraAccess(.restricted)
         @unknown default:
             cameraIssue = .unavailable
             return
         }
+    }
+
+    private func reportBlockedCameraAccess(_ issue: CameraIssue) {
+        wantsCamera = false
+        cameraIssue = issue
+        onCameraAccessBlocked?()
     }
 
     private func setupAndStart() {
@@ -232,7 +237,7 @@ final class HandTrackingManager: NSObject, ObservableObject {
     }
 
     #if DEBUG
-    func simulatePermissionDeniedForUITest() { cameraIssue = .permissionDenied }
+    func simulatePermissionDeniedForUITest() { reportBlockedCameraAccess(.permissionDenied) }
     #endif
 
     @objc private func captureRecovered(_ notification: Notification) {

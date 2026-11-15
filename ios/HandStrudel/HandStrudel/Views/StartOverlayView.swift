@@ -15,7 +15,9 @@ struct StudioActionStyle: ButtonStyle {
 
 struct StudioInputPicker: View {
     @Environment(\.studioPalette) private var palette
+    @Environment(\.openURL) private var openURL
     @Binding var selection: StudioPlayInput
+    @ObservedObject var tracker: HandTrackingManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -29,6 +31,12 @@ struct StudioInputPicker: View {
             Text(selection == .air ? "Use gestures or tap. Gestures use the front camera." : "Play the wheel by touch. The camera stays off.")
                 .font(.caption)
                 .foregroundStyle(palette.muted)
+            if tracker.cameraIssue == .permissionDenied {
+                Button("Open Camera Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                }
+                .font(.caption.weight(.semibold))
+            }
         }
     }
 }
@@ -41,7 +49,6 @@ struct StartOverlayView: View {
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
     let starting: Bool
-    @Binding var preferredInput: StudioPlayInput
     let onStart: () -> Void
     let onDrafts: () -> Void
     let onLoops: () -> Void
@@ -95,7 +102,6 @@ struct StartOverlayView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 title
-                StudioInputPicker(selection: $preferredInput).disabled(starting)
                 heroCard
                 libraryShortcuts
             }

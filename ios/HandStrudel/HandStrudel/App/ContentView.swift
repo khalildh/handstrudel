@@ -366,7 +366,6 @@ struct ContentView: View {
                         engine: engine,
                         storeManager: storeManager,
                         starting: startingSession,
-                        preferredInput: $preferredInput,
                         onStart: { startSession() },
                         onDrafts: { showDrafts = true },
                         onLoops: { showLoops = true },
@@ -2326,7 +2325,6 @@ private struct JamInvitation: UIViewControllerRepresentable, Identifiable {
 private struct CameraRecoveryBanner: View {
     @Environment(\.studioPalette) private var palette
     @ObservedObject var tracker: HandTrackingManager
-    @Environment(\.openURL) private var openURL
     let onRetry: () -> Void
     let onTouch: () -> Void
 
@@ -2337,11 +2335,7 @@ private struct CameraRecoveryBanner: View {
                 HStack {
                     Button("Use touch only", action: onTouch)
                         .accessibilityIdentifier("camera-recovery-touch")
-                    if issue == .permissionDenied {
-                        Button("Open Settings") {
-                            if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                        }
-                    } else if issue == .unavailable {
+                    if issue == .unavailable {
                         Button("Try camera again", action: onRetry)
                     }
                 }
