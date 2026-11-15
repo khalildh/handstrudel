@@ -11,7 +11,10 @@ function loadScript(src: string): Promise<void> {
     script.src = src;
     script.crossOrigin = "anonymous";
     script.onload = () => resolve();
-    script.onerror = reject;
+    script.onerror = (error) => {
+      script.remove();
+      reject(error);
+    };
     document.head.appendChild(script);
   });
 }
@@ -46,7 +49,7 @@ export async function initializeMediaPipe(
   canvasEl: HTMLCanvasElement,
   handsRef: React.MutableRefObject<HandsState>,
   onParams: () => void,
-): Promise<void> {
+): Promise<() => void> {
   await loadScript(
     "https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js",
   );
@@ -115,4 +118,5 @@ export async function initializeMediaPipe(
   });
 
   await camera.start();
+  return () => camera.stop();
 }

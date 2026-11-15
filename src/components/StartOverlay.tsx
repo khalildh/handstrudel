@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { WatchIcon } from "../app/watch/watch-design";
 import { PARAM_DEFS, HYDRA_PARAM_DEFS, INSTRUMENTS, DEFAULT_INSTRUMENT } from "../lib/music";
 import {
   MappingConfig,
@@ -21,10 +22,32 @@ interface MappingPreset {
 
 interface StartOverlayProps {
   onStart: (config: MappingConfig, hydraConfig: MappingConfig, advanced: boolean, instrument: string) => void;
-  fading?: boolean;
+  starting: boolean;
+  status: string;
+  error: string;
 }
 
-export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
+function GestureArtwork() {
+  return (
+    <figure className="studio-art" aria-hidden="true">
+      <svg className="studio-orbit" viewBox="0 0 380 240" fill="none">
+        <path d="M54 120h272M190 15v210" stroke="#b5c4ff" strokeDasharray="3 7" opacity=".45" />
+        {Array.from({ length: 9 }, (_, i) => (
+          <ellipse key={i} cx="190" cy="120" rx={65 + i * 7} ry={35 + i * 3}
+            transform={`rotate(${-49 + i * 12} 190 120)`}
+            stroke={i < 3 ? "#e5f298" : "#b5c4ff"} opacity={.84 - i * .06} />
+        ))}
+        <circle cx="127" cy="102" r="24" fill="#e5f298" fillOpacity=".13" stroke="#e5f298" strokeOpacity=".45" />
+        <circle cx="127" cy="102" r="5" fill="#e5f298" />
+        <circle cx="255" cy="141" r="20" fill="#e8ecff" fillOpacity=".12" stroke="#e8ecff" strokeOpacity=".5" />
+        <circle cx="255" cy="141" r="4" fill="#e8ecff" />
+      </svg>
+      <figcaption><span>FIG. 01</span><span>GESTURE / SIGNAL</span></figcaption>
+    </figure>
+  );
+}
+
+export default function StartOverlay({ onStart, starting, status, error }: StartOverlayProps) {
   const [advanced, setAdvanced] = useState(false);
   const [config, setConfig] = useState<MappingConfig>({
     left:  { ...DEFAULT_MAPPING.left },
@@ -119,107 +142,84 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
   const axes = advanced ? AXIS_DEFS : AXIS_DEFS.filter((a) => a.basic);
 
   return (
-    <div id="start" style={fading ? { opacity: 0 } : undefined}>
-      <h1>HANDSTRUDEL</h1>
-
-      <div className="start-options">
-        <Link className="start-watch-link" href="/watch" prefetch={false}>
-          <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-            <circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" />
-            <path d="m8 6 6 4-6 4z" fill="currentColor" />
-          </svg>
-          <span>
-            <strong>Watch performances</strong>
-            <small>No camera needed</small>
-          </span>
-          <svg className="start-watch-arrow" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-            <path d="M3 8h9M8 4l4 4-4 4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </Link>
-        <button className="advanced-toggle" onClick={toggleAdvanced}>
-          {advanced ? "ADVANCED" : "SIMPLE"}
-        </button>
+    <main id="start" aria-labelledby="studio-title">
+      <div className="studio-intro">
+        <div className="studio-intro-copy">
+          <p className="studio-eyebrow"><span /> THE BROWSER INSTRUMENT</p>
+          <h1 id="studio-title">Make music<br /><em>in the air.</em></h1>
+          <p className="studio-lede">Turn your webcam into an instrument. Move your hands to shape a live pattern and hear it change as you play.</p>
+          <Link className="studio-watch-link" href="/watch" prefetch={false}>
+            <WatchIcon name="play" /> Watch performances <WatchIcon name="next" />
+          </Link>
+        </div>
+        <GestureArtwork />
       </div>
 
-      <div className={`config-grid ${advanced ? "config-grid-advanced" : ""}`}>
-        {(["left", "right"] as const).map((hand) => (
-          <div
-            key={hand}
-            className={`config-col ${advanced ? "config-col-advanced" : ""} config-${hand}`}
-          >
-            <div className={`config-title ${hand === "left" ? "gl" : "gr"}`}>
-              {hand === "left" ? "LEFT HAND" : "RIGHT HAND"}
-            </div>
-            {axes.map((axis) => (
-              <div key={axis.key} className={`config-row ${advanced ? "config-row-compact" : ""}`}>
-                <span className="config-icon">{axis.icon}</span>
-                <select
-                  className={`config-select config-select-${hand}`}
-                  value={config[hand][axis.key] ?? "none"}
-                  onChange={(e) => update(hand, axis.key, e.target.value)}
-                >
-                  <option value="none">—</option>
-                  {PARAM_DEFS.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.label}
-                    </option>
-                  ))}
-                  <option value="save">💾 save</option>
-                  <option value="instrument">🎹 instrument</option>
-                </select>
-                <select
-                  className={`config-select config-select-hydra`}
-                  value={hydraConfig[hand][axis.key] ?? "none"}
-                  onChange={(e) => updateHydra(hand, axis.key, e.target.value)}
-                >
-                  <option value="none">—</option>
-                  {HYDRA_PARAM_DEFS.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
+      <div className="studio-setup">
+        <div className="studio-setup-heading">
+          <p className="studio-index">01 / SETUP</p>
+          <h2>Start a session</h2>
+          <p>Pick a sound, allow camera access, and hold your hands in view.</p>
+        </div>
+        <label className="instrument-row">
+          <span className="instrument-label">Instrument</span>
+          <select className="config-select instrument-select" value={instrument}
+            onChange={(e) => setInstrument(e.target.value)}>
+            {INSTRUMENTS.map((inst) => (
+              <option key={inst.id} value={inst.id}>{inst.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <button id="start-btn" disabled={starting} onClick={() => onStart(config, hydraConfig, advanced, instrument)}>
+          <WatchIcon name="play" /> {starting ? status : "Start camera"} <WatchIcon name="next" />
+        </button>
+        <p className="studio-camera-note" aria-live="polite">
+          {starting ? "Your session is opening..." : "Camera stays off until you start. No account needed."}
+        </p>
+        {error && <p className="studio-error" role="alert">{error}</p>}
+
+        <details className="studio-mappings">
+          <summary>Customize gesture mapping <WatchIcon name="chevron" /></summary>
+          <div className="studio-mapping-options">
+            <p>Choose what each movement changes in the sound and visuals.</p>
+            <button className="advanced-toggle" aria-pressed={advanced} onClick={toggleAdvanced}>Advanced</button>
+          </div>
+          <div className={`config-grid ${advanced ? "config-grid-advanced" : ""}`}>
+            {(["left", "right"] as const).map((hand) => (
+              <div key={hand} className={`config-col config-${hand}`}>
+                <h3 className={`config-title ${hand === "left" ? "gl" : "gr"}`}>{hand} hand</h3>
+                {axes.map((axis) => (
+                  <div key={axis.key} className="config-row">
+                    <span className="config-icon">{axis.label}</span>
+                    <select className="config-select"
+                      aria-label={`${hand} hand ${axis.label} sound`}
+                      value={config[hand][axis.key] ?? "none"}
+                      onChange={(e) => update(hand, axis.key, e.target.value)}>
+                      <option value="none">No sound</option>
+                      {PARAM_DEFS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+                      <option value="save">Save snippet</option>
+                      <option value="instrument">Change instrument</option>
+                    </select>
+                    <select className="config-select config-select-hydra"
+                      aria-label={`${hand} hand ${axis.label} visual`}
+                      value={hydraConfig[hand][axis.key] ?? "none"}
+                      onChange={(e) => updateHydra(hand, axis.key, e.target.value)}>
+                      <option value="none">No visual</option>
+                      {HYDRA_PARAM_DEFS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+                    </select>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
-        ))}
+          <div className="preset-actions">
+            <button className="preset-btn" onClick={handleExport}>Export preset</button>
+            <button className="preset-btn" onClick={() => fileInputRef.current?.click()}>Import preset</button>
+            <input ref={fileInputRef} type="file" accept=".json" hidden onChange={handleImport} />
+          </div>
+        </details>
       </div>
-
-      <div className="instrument-row">
-        <span className="instrument-label">🎹 sound</span>
-        <select
-          className="config-select instrument-select"
-          value={instrument}
-          onChange={(e) => setInstrument(e.target.value)}
-        >
-          {INSTRUMENTS.map((inst) => (
-            <option key={inst.id} value={inst.id}>
-              {inst.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="preset-actions">
-        <button className="preset-btn" onClick={handleExport}>export</button>
-        <button className="preset-btn" onClick={() => fileInputRef.current?.click()}>import</button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          style={{ display: "none" }}
-          onChange={handleImport}
-        />
-      </div>
-
-      <button id="start-btn" onClick={() => onStart(config, hydraConfig, advanced, instrument)}>
-        ▶ START
-      </button>
-      <div className="hint">
-        allow camera when prompted
-        <br />
-        hands generate &amp; re-evaluate real Strudel code
-      </div>
-    </div>
+    </main>
   );
 }

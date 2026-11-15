@@ -100,7 +100,7 @@ test("the browser studio is reachable without requesting the camera on arrival",
     await page.goto(homeUrl);
     await page.getByRole("link", { name: "Try in browser" }).click();
     await page.waitForURL(url => url.pathname === playPath);
-    await page.locator("#start").getByRole("button", { name: /START/ }).waitFor();
+    await page.locator("#start").getByRole("button", { name: "Start camera" }).waitFor();
     assert.equal(await page.evaluate(() => window.cameraRequests), 0);
   } finally {
     await page.close();

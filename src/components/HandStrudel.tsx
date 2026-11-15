@@ -58,10 +58,11 @@ function buildTrackCode(slots: number[], speed: number, snippets: SavedSnippet[]
 }
 
 export default function HandStrudel() {
-  const [overlay, setOverlay] = useState<"visible" | "fading" | "hidden">(
-    "visible",
-  );
-  const [status, setStatus] = useState("click start");
+  const [studioLive, setStudioLive] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState("");
+  const [status, setStatus] = useState("Camera off");
+  const startingRef = useRef(false);
   const [config, setConfig] = useState<MappingConfig>(DEFAULT_MAPPING);
   const [hydraConfig, setHydraConfig] = useState<MappingConfig>(DEFAULT_HYDRA_MAPPING);
   const [advanced, setAdvanced] = useState(false);
@@ -141,6 +142,9 @@ export default function HandStrudel() {
   const animFrameRef = useRef(0);
   const uiTimerRef = useRef(0);
   const structTimerRef = useRef(0);
+  const strudelDisposeRef = useRef<(() => void) | null>(null);
+  const cameraStopRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(false);
 
   const handleImportSnippets = useCallback((snippets: SavedSnippet[]) => {
     savedSnippetsRef.current = [...savedSnippetsRef.current, ...snippets];
@@ -283,6 +287,10 @@ export default function HandStrudel() {
   }, [recording, recordingAspect]);
 
   const handleStart = useCallback(async (cfg: MappingConfig, hCfg: MappingConfig, adv: boolean, instrument: string) => {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    setStarting(true);
+    setStartError("");
     setConfig(cfg);
     setHydraConfig(hCfg);
     setAdvanced(adv);
@@ -299,14 +307,15 @@ export default function HandStrudel() {
     paramsRef.current = { ...defs };
     smoothedRef.current = { ...defs };
 
-    // Fade out overlay
-    setOverlay("fading");
-    setTimeout(() => setOverlay("hidden"), 300);
-
-    setStatus("initialising strudel…");
+    setStatus("Loading sound");
 
     try {
-      const { evaluate, evalHydra, audioCtx, recordingDest } = await initializeStrudel();
+      const video = videoRef.current;
+      const overlayCanvas = canvasRef.current;
+      if (!video?.parentElement || !overlayCanvas) throw new Error("Missing camera preview");
+      const { evaluate, evalHydra, audioCtx, recordingDest, dispose } = await initializeStrudel(video.parentElement);
+      if (!mountedRef.current) { dispose(); return; }
+      strudelDisposeRef.current = dispose;
       evaluateRef.current = evaluate;
       evalHydraRef.current = evalHydra;
       audioCtxRef.current = audioCtx;
@@ -317,26 +326,26 @@ export default function HandStrudel() {
       const initCode = buildSignalCode(structIdxRef.current, cfg, instrumentRef.current);
       console.log("Initial code (signal-based):", initCode);
       await evaluate(initCode);
+      if (!mountedRef.current) return;
       lastCodeRef.current = initCode;
       lastStructKeyRef.current = getStructuralKey(structIdxRef.current);
 
-      setStatus("requesting camera…");
+      setStatus("Waiting for camera");
 
-      if (!videoRef.current || !canvasRef.current) {
-        throw new Error("Video or canvas element not found");
-      }
-
-      await initializeMediaPipe(
-        videoRef.current,
-        canvasRef.current,
+      const stopCamera = await initializeMediaPipe(
+        video,
+        overlayCanvas,
         handsRef,
         () => {
           mapHandsToParams(handsRef.current, paramsRef.current, configRef.current);
           mapHandsToParams(handsRef.current, paramsRef.current, hydraConfigRef.current);
         },
       );
+      if (!mountedRef.current) { stopCamera(); return; }
+      cameraStopRef.current = stopCamera;
 
-      setStatus("running — wave your hands");
+      setStatus("Camera live");
+      setStudioLive(true);
       setCanRecord(true);
 
       // Rotate struct every 8s
@@ -470,25 +479,42 @@ export default function HandStrudel() {
         setSavedSnippets(savedSnippetsRef.current);
       }, 66);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setStatus("error: " + msg);
-      setOverlay("visible");
+      strudelDisposeRef.current?.();
+      strudelDisposeRef.current = null;
+      if (!mountedRef.current) return;
+      setStatus("Camera off");
+      if (err instanceof Error && err.name === "NotAllowedError") {
+        setStartError("Camera access was blocked. Allow it in your browser's site settings, then try again.");
+      } else if (err instanceof Error && err.name === "NotFoundError") {
+        setStartError("No camera was found. Connect a camera, then try again.");
+      } else {
+        setStartError("The studio couldn't start. Check your connection and camera, then try again.");
+      }
       console.error(err);
+    } finally {
+      startingRef.current = false;
+      if (mountedRef.current) setStarting(false);
     }
   }, []);
 
   // Cleanup on unmount
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (uiTimerRef.current) clearInterval(uiTimerRef.current);
       if (structTimerRef.current) clearInterval(structTimerRef.current);
       if (recTimerRef.current) clearInterval(recTimerRef.current);
+      cameraStopRef.current?.();
+      cameraStopRef.current = null;
+      strudelDisposeRef.current?.();
+      strudelDisposeRef.current = null;
     };
   }, []);
 
   return (
-    <div id="app" className={sidebarOpen ? "sidebar-open" : undefined}>
+    <div id="app" className={`studio ${studioLive ? "studio-live" : "studio-ready"}${sidebarOpen ? " sidebar-open" : ""}`}>
       <Header
         status={status}
         canRecord={canRecord}
@@ -498,17 +524,20 @@ export default function HandStrudel() {
         onToggleRecording={handleToggleRecording}
         onAspectChange={setRecordingAspect}
         sidebarOpen={sidebarOpen}
-        onToggleSidebar={overlay === "hidden" ? () => setSidebarOpen((v) => !v) : undefined}
+        studioLive={studioLive}
+        onToggleSidebar={studioLive ? () => setSidebarOpen((v) => !v) : undefined}
       />
       <CameraView videoRef={videoRef} canvasRef={canvasRef}>
-        {overlay !== "hidden" && (
+        {!studioLive && (
           <StartOverlay
             onStart={handleStart}
-            fading={overlay === "fading"}
+            starting={starting}
+            status={status}
+            error={startError}
           />
         )}
       </CameraView>
-      <Sidebar
+      {studioLive && <Sidebar
         codeHL={uiState.codeHL}
         hydraCodeHL={uiState.hydraCodeHL}
         smoothed={uiState.smoothed}
@@ -532,7 +561,7 @@ export default function HandStrudel() {
         onImportSnippets={handleImportSnippets}
         instrument={instrument}
         onInstrumentChange={handleInstrumentChange}
-      />
+      />}
     </div>
   );
 }
