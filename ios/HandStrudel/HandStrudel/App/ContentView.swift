@@ -909,6 +909,7 @@ struct ContentView: View {
                     melodyOctaveShift: engine.chordMelodyModeManager.currentMelodyOctaveShift
                 )
                 .ignoresSafeArea()
+                .accessibilityHidden(true)
 
                 // Multitouch / drag layer on top of the visualization. Each
                 // finger lights up its zone and re-fires when it crosses into
@@ -918,6 +919,8 @@ struct ContentView: View {
                     melodyCount: melodyCount,
                     swapHands: engine.chordMelodySwapHands,
                     enabled: !engine.isPaused && scenePhase == .active,
+                    chordLabels: chordNames,
+                    melodyLabels: melodyMidis.map { midiNoteName($0) },
                     onZoneEnter: { voice, zone in splitTouchEnter(parentVoice: voice, zone: zone) },
                     onZoneExit: { voice in splitTouchExit(parentVoice: voice) },
                     touchedChordSubzones: $splitTouchChordZones,

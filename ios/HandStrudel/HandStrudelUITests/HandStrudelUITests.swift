@@ -613,6 +613,8 @@ final class HandStrudelUITests: XCTestCase {
         element("onboarding-got-it").tap()
         XCTAssertTrue(element("touch-camera-off").waitForExistence(timeout: 5))
         XCTAssertFalse(element("camera-recovery-touch").exists)
+        XCTAssertTrue(app.buttons["wheel-note-0"].exists)
+        XCTAssertTrue(app.buttons["wheel-chord-0"].exists)
 
         app.terminate()
         app.launchArguments = ["--uitesting"]
