@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "test:web": "playwright test",
+    "bundle:ios-audio": "node ios/bundle-strudel.mjs",
+    "test:ios-web-audio": "node --test ios/strudel-audio-startup.test.mjs",
     "gen:config": "node scripts/gen-music-config.mjs",
     "verify:config": "node scripts/gen-music-config.mjs && git diff --exit-code -- src/lib/music-data.generated.ts ios/HandStrudel/HandStrudel/Models/MusicConfig.generated.swift"
   },
@@ -25,6 +27,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "esbuild": "0.27.0",
     "typescript": "^5.7.0"
   }
 }
