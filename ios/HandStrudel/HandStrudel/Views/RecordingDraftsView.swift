@@ -3,6 +3,8 @@ import Photos
 import SwiftUI
 
 struct RecordingDraft: Codable, Identifiable, Equatable {
+    static let titleLimit = 60
+
     let id: UUID
     let createdAt: Date
     let instrument: String?
@@ -12,8 +14,18 @@ struct RecordingDraft: Codable, Identifiable, Equatable {
     var recordedAtHalfSpeed: Bool? = nil
     var trimStart: Double?
     var trimEnd: Double?
+    var title: String? = nil
 
+    var displayTitle: String { title ?? instrument ?? "Performance" }
     var outputScale: Double { recordedAtHalfSpeed == true ? 0.5 : 1 }
+
+    static func normalizedTitle(_ input: String) -> String? {
+        let singleLine = input.split { character in
+            character.isWhitespace || character.unicodeScalars.allSatisfy { $0.properties.generalCategory == .control }
+        }.joined(separator: " ")
+        let title = String(singleLine.prefix(titleLimit)).trimmingCharacters(in: .whitespaces)
+        return title.isEmpty ? nil : title
+    }
 }
 
 struct DraftTrimSelection: Equatable {
@@ -113,9 +125,25 @@ final class RecordingDrafts: ObservableObject {
         if !drafts.contains(where: { $0.id == draft.id }) { drafts.insert(draft, at: 0) }
     }
 
-    func saveTrim(_ draft: RecordingDraft) throws {
-        try writeMetadata(draft)
-        if let index = drafts.firstIndex(where: { $0.id == draft.id }) { drafts[index] = draft }
+    @discardableResult
+    func saveTrim(_ draft: RecordingDraft) throws -> RecordingDraft {
+        try updateDraft(draft.id) {
+            $0.trimStart = draft.trimStart
+            $0.trimEnd = draft.trimEnd
+        }
+    }
+
+    func rename(_ id: UUID, to title: String) throws -> RecordingDraft {
+        try updateDraft(id) { $0.title = RecordingDraft.normalizedTitle(title) }
+    }
+
+    private func updateDraft(_ id: UUID, _ update: (inout RecordingDraft) -> Void) throws -> RecordingDraft {
+        guard let index = drafts.firstIndex(where: { $0.id == id }) else { throw DraftError.missingDraft }
+        var updated = drafts[index]
+        update(&updated)
+        try writeMetadata(updated)
+        drafts[index] = updated
+        return updated
     }
 
     func delete(_ draft: RecordingDraft) throws {
@@ -223,7 +251,7 @@ final class RecordingDraftExport: Identifiable {
 }
 
 private enum DraftError: LocalizedError {
-    case unreadable, invalidTrim, photosDenied, noAudio
+    case unreadable, invalidTrim, photosDenied, noAudio, missingDraft
 
     var errorDescription: String? {
         switch self {
@@ -231,6 +259,7 @@ private enum DraftError: LocalizedError {
         case .invalidTrim: return "This trim no longer fits the video. Reset it or choose a new range before exporting."
         case .noAudio: return "This take doesn't have an audio track to export."
         case .photosDenied: return "Allow HandStrudel to add photos in Settings, or use Share to save the video to Files."
+        case .missingDraft: return "This draft is no longer in Private drafts."
         }
     }
 }
@@ -265,7 +294,10 @@ struct RecordingDraftsView: View {
                             editor(draft)
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(draft.instrument ?? "Performance").font(.headline)
+                                Text(draft.displayTitle).font(.headline).lineLimit(2)
+                                if draft.title != nil, let instrument = draft.instrument {
+                                    Text(instrument).font(.subheadline).foregroundStyle(.secondary)
+                                }
                                 Text(draft.createdAt.formatted(date: .abbreviated, time: .shortened))
                                     .font(.subheadline).foregroundStyle(.secondary)
                             }
@@ -306,6 +338,7 @@ private struct RecordingDraftEditor: View {
     @State private var fineTrimExpanded = false
     @State private var exportTask: Task<Void, Never>?
     @State private var message: String?
+    @State private var showNameEditor = false
     @State private var confirmDelete = false
     @State private var sharing: RecordingDraftExport?
     @State private var posting: RecordingDraftExport?
@@ -320,6 +353,22 @@ private struct RecordingDraftEditor: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 17) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(draft.displayTitle)
+                        .font(.title2.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                    Button {
+                        player?.pause()
+                        showNameEditor = true
+                    } label: {
+                        Label(draft.title == nil ? "Name private draft" : "Rename private draft", systemImage: "pencil")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityIdentifier("rename-private-draft")
+                    .disabled(busy)
+                }
                 VideoPlayer(player: player)
                     .frame(height: 330)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -394,6 +443,11 @@ private struct RecordingDraftEditor: View {
             exportTask?.cancel()
         }
         .interactiveDismissDisabled(busy)
+        .sheet(isPresented: $showNameEditor) {
+            PrivateDraftNameEditor(name: draft.title ?? "") { name in
+                draft = try store.rename(draft.id, to: name)
+            }
+        }
         .sheet(item: $sharing) { copy in
             ShareSheet(activityItems: [copy.url])
                 .onDisappear(perform: copy.remove)
@@ -491,8 +545,7 @@ private struct RecordingDraftEditor: View {
         updated.trimEnd = trim.isFullLength ? nil : trim.end
         if updated == draft { return }
         do {
-            try store.saveTrim(updated)
-            draft = updated
+            draft = try store.saveTrim(updated)
             message = nil
         }
         catch { message = error.localizedDescription }
@@ -703,5 +756,45 @@ private struct DraftTrimFilmstrip: View {
     private func update(_ edge: DraftTrimSelection.Edge, trim: DraftTrimSelection, to value: Double, commit: Bool) {
         let next = trim.moving(edge, to: value)
         onEdit(next, edge == .start ? next.start : next.end, commit)
+    }
+}
+
+private struct PrivateDraftNameEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @State var name: String
+    @State private var error: String?
+    let onSave: (String) throws -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Draft name", text: $name)
+                        .accessibilityIdentifier("private-draft-name")
+                        .submitLabel(.done)
+                        .onSubmit(save)
+                    if let error {
+                        Text(error).foregroundStyle(.red)
+                    }
+                } footer: {
+                    Text("This name stays on this device and isn't shared or posted. Leave it blank to remove it. Only the first \(RecordingDraft.titleLimit) characters are saved.")
+                }
+            }
+            .navigationTitle("Private draft name")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save", action: save) }
+            }
+        }
+    }
+
+    private func save() {
+        do {
+            try onSave(name)
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }

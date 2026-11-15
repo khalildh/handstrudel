@@ -1018,6 +1018,57 @@ final class SocialTests: XCTestCase {
     }
 
     @MainActor
+    func testPrivateDraftRenamePersistsWithoutChangingTrimOrVideo() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = RecordingDrafts(directory: directory)
+        var legacy = try store.begin(instrument: "Piano", mode: "Scale", halfSpeed: true)
+        let source = store.videoURL(for: legacy.id)
+        let clip = try await Self.makeClip(width: 180, height: 320, seconds: 2)
+        try FileManager.default.moveItem(at: clip, to: source)
+        try store.complete(legacy)
+        legacy.trimStart = 0.25
+        legacy.trimEnd = 1.5
+        try store.saveTrim(legacy)
+        let originalVideo = try Data(contentsOf: source)
+        let sidecar = source.deletingLastPathComponent().appendingPathComponent("draft.json")
+        let legacyJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: sidecar)) as? [String: Any])
+        XCTAssertNil(legacyJSON["title"])
+
+        let reopened = RecordingDrafts(directory: directory)
+        XCTAssertEqual(reopened.drafts, [legacy])
+        var expected = legacy
+        expected.title = "Evening take"
+        XCTAssertEqual(try reopened.rename(legacy.id, to: " \n Evening\t  take \r\n"), expected)
+        XCTAssertEqual(reopened.drafts, [expected])
+        XCTAssertEqual(RecordingDrafts(directory: directory).drafts, [expected])
+        XCTAssertEqual(try Data(contentsOf: source), originalVideo)
+
+        // A trim edit made from an older snapshot must not overwrite the private name.
+        var newTrim = legacy
+        newTrim.trimEnd = 1.75
+        expected.trimEnd = newTrim.trimEnd
+        XCTAssertEqual(try reopened.saveTrim(newTrim), expected)
+        XCTAssertEqual(RecordingDrafts(directory: directory).drafts, [expected])
+
+        expected.title = nil
+        XCTAssertEqual(try reopened.rename(legacy.id, to: " \n\t "), expected)
+        XCTAssertEqual(RecordingDrafts(directory: directory).drafts, [expected])
+        XCTAssertEqual(try Data(contentsOf: source), originalVideo)
+    }
+
+    func testPrivateDraftTitleNormalizesWhitespaceAndBoundsGraphemes() {
+        let performer = "\u{1F469}\u{200D}\u{1F3A4}"
+        let limit = RecordingDraft.titleLimit
+        XCTAssertEqual(RecordingDraft.normalizedTitle("  A\u{0}  B \n C "), "A B C")
+        XCTAssertNil(RecordingDraft.normalizedTitle("\u{0}\t\n"))
+        XCTAssertEqual(RecordingDraft.normalizedTitle(String(repeating: performer, count: limit + 1)),
+                       String(repeating: performer, count: limit))
+        XCTAssertEqual(RecordingDraft.normalizedTitle(String(repeating: "a", count: limit - 1) + " b")?.count,
+                       limit - 1, "The cutoff must not leave trailing whitespace")
+    }
+
+    @MainActor
     func testFeedBitrateFitsSixtySecondUpload() {
         let bitrate = VideoUploader.targetVideoBitrate(duration: 60) + VideoUploader.audioBitrate
         XCTAssertLessThan(bitrate * 60 / 8, 15 * 1024 * 1024)
