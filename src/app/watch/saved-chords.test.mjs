@@ -5,7 +5,8 @@ import { after, before, test } from "node:test";
 // Point NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_MEDIA_BASE_URL at a local
 // placeholder in Next. Browser routes supply all data; no backend is required.
 // With Playwright on NODE_PATH or installed: node --test src/app/watch/saved-chords.test.mjs
-const { chromium } = createRequire(import.meta.url)("playwright");
+const playwright = createRequire(import.meta.url)("playwright");
+const browserType = process.env.HANDSTRUDEL_TEST_BROWSER === "webkit" ? playwright.webkit : playwright.chromium;
 const base = new URL(process.env.WATCH_TEST_BASE_URL || "http://127.0.0.1:43236");
 const id = "30000000-0000-0000-0000-000000000201";
 const clip = {
@@ -14,7 +15,7 @@ const clip = {
 };
 const pop = { version: 1, key: "C", scale: "Major", progression: "pop", mode: "splitchordmelody" };
 let browser;
-before(async () => { browser = await chromium.launch(); });
+before(async () => { browser = await browserType.launch(); });
 after(async () => { await browser?.close(); });
 
 async function showChords(page, setup, expected, names) {

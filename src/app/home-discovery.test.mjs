@@ -5,7 +5,8 @@ import { after, before, test } from "node:test";
 // Start Next on port 43246 with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_MEDIA_BASE_URL
 // pointed at a local placeholder. With Playwright installed or on NODE_PATH:
 // node --test src/app/home-discovery.test.mjs
-const { chromium } = createRequire(import.meta.url)("playwright");
+const playwright = createRequire(import.meta.url)("playwright");
+const browserType = process.env.HANDSTRUDEL_TEST_BROWSER === "webkit" ? playwright.webkit : playwright.chromium;
 const base = new URL(process.env.HOME_TEST_BASE_URL || "http://127.0.0.1:43246");
 const watchPath = `${base.pathname.replace(/\/$/, "")}/watch`;
 const video = {
@@ -15,7 +16,7 @@ const video = {
 };
 
 let browser;
-before(async () => { browser = await chromium.launch(); });
+before(async () => { browser = await browserType.launch(); });
 after(async () => { await browser?.close(); });
 
 for (const viewport of [
