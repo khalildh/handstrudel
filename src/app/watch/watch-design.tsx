@@ -27,7 +27,7 @@ export function WatchHeader({ creator = false }: { creator?: boolean }) {
       </Link>
       <nav className="watch-nav" aria-label="Main navigation">
         <Link className="watch-nav-feed" href="/watch" aria-current={creator ? undefined : "page"}>Watch</Link>
-        <Link className="watch-action watch-create" href="/">Make music <WatchIcon name="arrow" /></Link>
+        <Link className="watch-action watch-create" href="/play" prefetch={false}>Make music <WatchIcon name="arrow" /></Link>
       </nav>
     </header>
   );
