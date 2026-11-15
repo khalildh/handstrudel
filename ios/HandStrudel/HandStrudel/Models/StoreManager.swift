@@ -35,15 +35,19 @@ final class StoreManager: ObservableObject {
     @Published var products: [StoreProduct] = []
     @Published var purchasedIds: Set<String> = []
     @Published var isLoading = false
+    @Published private(set) var isRestoring = false
 
     // MARK: - Private
 
     private var customerInfo: CustomerInfo?
     private var listenerTask: Task<Void, Never>?
+    private let restoreCustomerInfo: @MainActor () async throws -> CustomerInfo
 
     // MARK: - Init
 
-    init() {
+    convenience init() {
+        self.init(restoreCustomerInfo: { try await Purchases.shared.restorePurchases() })
+
         // Initial fetch
         Task { await refreshCustomerInfo() }
 
@@ -53,6 +57,11 @@ final class StoreManager: ObservableObject {
                 await MainActor.run { self?.apply(info) }
             }
         }
+    }
+
+    // Allows restore tests to run without starting live RevenueCat observers.
+    init(restoreCustomerInfo: @escaping @MainActor () async throws -> CustomerInfo) {
+        self.restoreCustomerInfo = restoreCustomerInfo
     }
 
     deinit {
@@ -116,12 +125,42 @@ final class StoreManager: ObservableObject {
 
     // MARK: - Restore
 
-    func restorePurchases() async {
+    enum RestoreOutcome: Hashable, Identifiable {
+        case accessAvailable
+        case noActivePurchases
+        case requestedItemUnavailable
+        case cancelled
+        case failed
+
+        var id: Self { self }
+    }
+
+    /// A nil outcome means another restore is already in progress.
+    func restorePurchases(for packId: String? = nil) async -> RestoreOutcome? {
+        guard !isRestoring else { return nil }
+        isRestoring = true
+        defer { isRestoring = false }
+
         do {
-            let info = try await Purchases.shared.restorePurchases()
+            let info = try await restoreCustomerInfo()
             apply(info)
+
+            if let packId, isUnlocked(packId) {
+                return .accessAvailable
+            }
+
+            // Purchase history can include expired subscriptions. Only active access counts.
+            let hasActivePurchase = hasSubscription || info.entitlements.active.keys.contains {
+                Self.legacyProductId(forEntitlement: $0) != nil || $0 == Self.entitlementPlusFeatures
+            }
+            guard hasActivePurchase else { return .noActivePurchases }
+            return packId == nil ? .accessAvailable : .requestedItemUnavailable
         } catch {
+            if error is CancellationError || error as? ErrorCode == .purchaseCancelledError {
+                return .cancelled
+            }
             print("[StoreManager] Failed to restore: \(error)")
+            return .failed
         }
     }
 
@@ -166,7 +205,7 @@ final class StoreManager: ObservableObject {
         case "party", partyPack: return entitlementParty
         case "kit_808", kit808: return entitlementKit808
         case "kit_electronic", kitElectronic: return entitlementKitElectronic
-        case "pro": return entitlementPro
+        case "pro", pro: return entitlementPro
         // Filters, hand themes, premium scales — Plus-only features
         case "filter_pack", "visual_pack", "theme_pack", "scale_pack":
             return entitlementPlusFeatures

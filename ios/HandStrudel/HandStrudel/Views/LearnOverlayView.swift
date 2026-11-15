@@ -19,26 +19,19 @@ struct LearnOverlayView: View {
     let isCountingDown: Bool
     var onPlayAgain: () -> Void
     var onPickSong: () -> Void
+    var onTapLane: (Int) -> Void
+    var onViewportChange: (CGSize) -> Void
 
     var body: some View {
         GeometryReader { geo in
-            let topPad = geo.size.height * 0.15
-            let bottomPad = geo.size.height * 0.20
+            let topPad = geo.size.height * LearnLaneLayout.top
+            let bottomPad = geo.size.height * LearnLaneLayout.bottom
             let usableHeight = geo.size.height - topPad - bottomPad
             let laneHeight = usableHeight / CGFloat(max(1, noteCount))
             let hitLineX = geo.size.width * 0.25
 
             // Aspect fill correction (same as grid overlay)
-            let scrAspect = geo.size.width / geo.size.height
-            let correctedY: (Double) -> CGFloat = { vy in
-                if videoAspect > scrAspect {
-                    return CGFloat(vy) * geo.size.height
-                } else {
-                    let vis = videoAspect / scrAspect
-                    let off = (1 - vis) / 2
-                    return (CGFloat(vy) - off) / vis * geo.size.height
-                }
-            }
+            let scrAspect = geo.size.width / max(1, geo.size.height)
             let correctedX: (Double) -> CGFloat = { vx in
                 if videoAspect > scrAspect {
                     let vis = scrAspect / videoAspect
@@ -49,13 +42,11 @@ struct LearnOverlayView: View {
                 }
             }
 
-            let leftLane: Int? = leftPinchY.map { py in
-                let screenY = correctedY(py) - topPad
-                return max(0, min(noteCount - 1, Int(screenY / laneHeight)))
+            let leftLane = leftPinchY.flatMap { py in
+                LearnLaneLayout.cameraLane(y: py, noteCount: noteCount, videoAspect: videoAspect, viewportAspect: scrAspect)
             }
-            let rightLane: Int? = rightPinchY.map { py in
-                let screenY = correctedY(py) - topPad
-                return max(0, min(noteCount - 1, Int(screenY / laneHeight)))
+            let rightLane = rightPinchY.flatMap { py in
+                LearnLaneLayout.cameraLane(y: py, noteCount: noteCount, videoAspect: videoAspect, viewportAspect: scrAspect)
             }
 
             ZStack {
@@ -66,8 +57,8 @@ struct LearnOverlayView: View {
                     ForEach(0..<noteCount, id: \.self) { i in
                         let noteIdx = noteCount - 1 - i
                         let isEven = i % 2 == 0
-                        let isLeftHere = leftLane == i
-                        let isRightHere = rightLane == i
+                        let isLeftHere = leftLane == noteIdx
+                        let isRightHere = rightLane == noteIdx
 
                         ZStack {
                             Rectangle()
@@ -78,17 +69,6 @@ struct LearnOverlayView: View {
                                     : isRightHere ? Color.pink.opacity(0.08)
                                     : Color.white.opacity(isEven ? 0.03 : 0.0)
                                 )
-
-                            // Lane label on left margin
-                            HStack {
-                                if noteIdx < scaleNotes.count {
-                                    Text(midiNoteName(scaleNotes[noteIdx]))
-                                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                        .foregroundColor(.white.opacity(0.4))
-                                        .padding(.leading, 6)
-                                }
-                                Spacer()
-                            }
 
                             // Lane divider
                             VStack {
@@ -164,6 +144,37 @@ struct LearnOverlayView: View {
                         .shadow(color: .pink.opacity(rightPinching ? 0.5 : 0), radius: 6)
                 }
 
+                if !songComplete, !songName.isEmpty {
+                    Text("Tap a note here as it reaches the line")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(.black.opacity(0.70), in: Capsule())
+                        .position(x: geo.size.width / 2, y: max(20, topPad - 13))
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier("learn-touch-hint")
+                    ForEach(0..<noteCount, id: \.self) { row in
+                        let lane = noteCount - 1 - row
+                        if scaleNotes.indices.contains(lane) {
+                            let note = midiNoteName(scaleNotes[lane])
+                            Button { onTapLane(lane) } label: {
+                                Text(note)
+                                    .font(.caption2.monospaced().weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .background(.black.opacity(0.47), in: RoundedRectangle(cornerRadius: 5))
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: max(42, hitLineX - 12), height: max(1, laneHeight - 1))
+                            .position(x: hitLineX / 2, y: topPad + (Double(row) + 0.5) * laneHeight)
+                            .accessibilityLabel("Play \(note)")
+                            .accessibilityIdentifier("learn-lane-\(lane)")
+                        }
+                    }
+                }
+
                 // MARK: - Score HUD (top-right corner)
                 VStack(alignment: .trailing, spacing: 4) {
                     HStack(spacing: 12) {
@@ -232,8 +243,9 @@ struct LearnOverlayView: View {
                     )
                 }
             }
+            .onAppear { onViewportChange(geo.size) }
+            .onChange(of: geo.size, perform: onViewportChange)
         }
-        .allowsHitTesting(songComplete)
     }
 
     // MARK: - Note Colors

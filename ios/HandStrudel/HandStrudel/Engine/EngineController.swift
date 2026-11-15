@@ -2,6 +2,13 @@ import SwiftUI
 import QuartzCore
 import AVFAudio
 
+enum StudioPlayInput: String, CaseIterable, Identifiable {
+    case air, touch
+
+    var id: Self { self }
+    var label: String { self == .air ? "Air + touch" : "Touch only" }
+}
+
 struct Waveform: Identifiable {
     let id: String
     let name: String
@@ -150,6 +157,7 @@ final class EngineController: ObservableObject {
     @Published var loopRecordingProgress: Double = 0
     @Published var savedLoops = [RecordedLoop]()
     @Published var playingLoopIds = Set<UUID>()
+    @Published private(set) var loopRecordingBars = 4
     private var audioLoopPlayers: [UUID: AVAudioPlayer] = [:]
 
     // Learn mode (Guitar Hero-style guided play)
@@ -160,6 +168,8 @@ final class EngineController: ObservableObject {
     @Published var learnHitEffects: [LearnModeManager.HitEffect] = []
     @Published var learnSongComplete = false
     @Published var currentLearnSong: LearnSong? = nil
+    private(set) var learnViewportAspect: Double = 0.5
+    private var learnSceneActive = true
 
     // Grid mode (pinch-to-play)
     @Published var gridModeEnabled = false
@@ -335,6 +345,8 @@ final class EngineController: ObservableObject {
 
         // Restore saved data
         savedLoops = pm.loadLoops()
+        loopRecordingBars = pm.lastLoopBars
+        loopRecorder.selectedBars = loopRecordingBars
         savedSnippets = pm.loadSnippets()
 
         // Recompute cached scale notes for restored key/scale
@@ -377,11 +389,19 @@ final class EngineController: ObservableObject {
     private var uiTimer: Timer?
     private var structTimer: Timer?
     private(set) var startTime: Date?
+    private var startupTask: Task<Void, Never>?
+    private var startupGeneration = 0
+    @Published private(set) var auxiliaryAudioIssue: String?
 
-    func start(config: MappingConfig, advanced: Bool) {
-        debugLog("start() called")
+    @Published private(set) var playInput: StudioPlayInput = .air
+
+    func start(config: MappingConfig, advanced: Bool, input: StudioPlayInput = .air) {
+        guard !isRunning, startupTask == nil else { return }
         self.config = config
         self.advanced = advanced
+        playInput = input
+        auxiliaryAudioIssue = nil
+        isPaused = false
 
         // Always start in melodic mode
         learnModeEnabled = false
@@ -391,87 +411,117 @@ final class EngineController: ObservableObject {
         rawParams = defs
         smoothed = defs
 
-        // UITesting bypass: skip audio/camera, just show the UI
-        if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+        var delayedWebFixture = false
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        delayedWebFixture = arguments.contains("--uitest-delayed-web-audio")
+        let realWebFixture = arguments.contains("--uitest-real-web-audio")
+        if realWebFixture { switchMode(grid: false, drums: false, learn: false) }
+        if arguments.contains("--uitesting"), !delayedWebFixture, !realWebFixture {
+            startCameraIfRequested()
             isRunning = true
             return
         }
+        #endif
 
-        status = "initialising strudel..."
-        debugLog("status set to initialising")
+        status = "Preparing instrument…"
+        startupGeneration += 1
+        let generation = startupGeneration
+        if activeMode is SoundFontModeController,
+           soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program) {
+            openStudioSession(startCamera: !delayedWebFixture)
+        }
 
-        // Start Strudel in WebView
-        Task {
+        startupTask = Task { [weak self] in
+            guard let self else { return }
+            defer { if self.startupGeneration == generation { self.startupTask = nil } }
             do {
-                strudelBridge.onLog = { [weak self] msg in
-                    debugLog("JS: \(msg)")
-                    DispatchQueue.main.async {
-                        self?.status = msg
-                    }
+                if delayedWebFixture {
+                    try await Task.sleep(nanoseconds: 8_000_000_000)
+                } else {
+                    try await strudelBridge.initialize()
                 }
-                debugLog("calling strudelBridge.initialize()")
-                try await strudelBridge.initialize()
-                debugLog("strudelBridge.initialize() returned")
-
-                // Evaluate initial signal-based code
-                debugLog("evaluating initial code...")
-                let code = buildSignalCode(structIdx: structIdx, config: config, waveform: selectedWaveform)
-                strudelBridge.evaluate(code)
-                lastStructKey = String(structIdx)
-
-                debugLog("requesting camera...")
-                status = "requesting camera..."
-
-                // Start camera + hand tracking
-                handTracker.onHandsUpdate = { [weak self] hands in
-                    self?.handleHandsUpdate(hands)
-                }
-                handTracker.startSession()
-                debugLog("camera started")
-
-                // Beat callback
-                strudelBridge.onBeat = { [weak self] beat in
-                    DispatchQueue.main.async {
-                        guard let self else { return }
-                        let oldBeat = self.currentBeat
-                        self.currentBeat = beat
-                        if beat != oldBeat {
-                            self.haptics.beatPulse(isDownbeat: beat == 0)
-                            // Advance the quantize clock by one quarter note and
-                            // learn the tempo from the gap between beats.
-                            let now = CACurrentMediaTime()
-                            if self.quantizeBeatWallTime > 0 {
-                                let delta = now - self.quantizeBeatWallTime
-                                if delta > 0.05 && delta < 2.0 / self.recordingTempoScale {
-                                    self.quantizeQuarterPeriod = delta
-                                }
-                            }
-                            self.quantizeBeatWallTime = now
-                            self.quantizeBeatIndex += 1
-                        }
-                    }
-                }
-
-                debugLog("starting display link and timers...")
-                startTime = Date()
-                startDisplayLink()
-                startTimers()
-
-                debugLog("all started, setting isRunning=true")
-                status = "running -- wave your hands"
-                isRunning = true
-                jamSession.replayRemoteVoices()
+                guard startupGeneration == generation, !Task.isCancelled else { return }
+                connectWebAudio()
+                if !isRunning { openStudioSession(startCamera: !delayedWebFixture) }
+                else { jamSession.replayRemoteVoices() }
             } catch {
+                guard startupGeneration == generation, !Task.isCancelled else { return }
                 debugLog("start error: \(error.localizedDescription)")
-                status = "error: \(error.localizedDescription)"
+                if isRunning {
+                    auxiliaryAudioIssue = "Web synths and drum loops couldn't load. Your native instrument is still available."
+                } else {
+                    status = "error: \(error.localizedDescription) Try again."
+                }
             }
         }
+    }
+
+    private func openStudioSession(startCamera: Bool) {
+        handTracker.onHandsUpdate = { [weak self] hands in self?.handleHandsUpdate(hands) }
+        if startCamera { startCameraIfRequested() }
+        startTime = Date()
+        startDisplayLink()
+        startTimers()
+        status = "Playing"
+        isRunning = true
+        jamSession.replayRemoteVoices()
+    }
+
+    private func connectWebAudio() {
+        guard strudelBridge.isReady else { return }
+        strudelBridge.setTempoScale(recordingTempoScale, bpm: manualBPM)
+        lastStructKey = ""
+        strudelBridge.onBeat = { [weak self] beat in
+            DispatchQueue.main.async {
+                guard let self, self.isRunning else { return }
+                let oldBeat = self.currentBeat
+                self.currentBeat = beat
+                if beat != oldBeat {
+                    self.haptics.beatPulse(isDownbeat: beat == 0)
+                    let now = CACurrentMediaTime()
+                    if self.quantizeBeatWallTime > 0 {
+                        let delta = now - self.quantizeBeatWallTime
+                        if delta > 0.05 && delta < 2.0 / self.recordingTempoScale { self.quantizeQuarterPeriod = delta }
+                    }
+                    self.quantizeBeatWallTime = now
+                    self.quantizeBeatIndex += 1
+                }
+            }
+        }
+    }
+
+    func setPlayInput(_ input: StudioPlayInput) {
+        guard input != playInput else { return }
+        playInput = input
+        guard isRunning else { return }
+        if input == .air {
+            startCameraIfRequested()
+        } else {
+            handTracker.stopSession()
+            currentHands = HandsState()
+            handsState = HandsState()
+            silenceAll()
+        }
+    }
+
+    func startCameraIfRequested() {
+        guard playInput == .air else { return }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            if ProcessInfo.processInfo.arguments.contains("--uitest-camera-denied") {
+                handTracker.simulatePermissionDeniedForUITest()
+            }
+            return
+        }
+        #endif
+        handTracker.startSession()
     }
 
     private nonisolated func handleHandsUpdate(_ hands: HandsState) {
         // Called from background processingQueue — dispatch to main for @MainActor state
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
+            guard let self, self.playInput == .air else { return }
             self.currentHands = hands
             // Skip param mapping in grid/drum mode — hands control notes/hits, not synth params
             if !self.gridModeEnabled && !self.drumModeEnabled {
@@ -524,12 +574,14 @@ final class EngineController: ObservableObject {
 
         let isLive = playingSet.isEmpty && !trackPlaying
         guard isLive, !isPaused else { return }
+        let mode = activeMode
+        guard strudelBridge.isReady || mode is SoundFontModeController else { return }
 
         if recordingTempoScale != 1 {
             let effectiveBPM = smoothed["bpm"] ?? manualBPM
             if effectiveBPM != lastReportedTempo { strudelBridge.updateTempo(effectiveBPM); lastReportedTempo = effectiveBPM }
         }
-        activeMode.tick(self)
+        mode.tick(self)
 
         tickLoopPlayback()
         tickLoopRecordingProgress()
@@ -587,7 +639,7 @@ final class EngineController: ObservableObject {
     }
 
     private func playJamVoices(_ voices: [String: JamHeldVoice], peer: UUID) {
-        let desired = isRunning && !isPaused ? voices : [:]
+        let desired = isRunning && !isPaused ? voices.filter { $0.value.program != nil || strudelBridge.isReady } : [:]
         let previous = remoteJamVoices[peer] ?? [:]
         let prefix = "jam-\(peer.uuidString.lowercased())-"
         var playing: [String: RemoteJamVoice] = [:]
@@ -829,7 +881,43 @@ final class EngineController: ObservableObject {
         learnModeManager.loadSong(song, scaleNotes: gridNotes, bpm: song.bpm)
         manualBPM = song.bpm
         currentLearnSong = song
-        learnSongComplete = false
+        updateLearnPause()
+        updateLearnUI()
+    }
+
+    func updateLearnViewport(_ size: CGSize) {
+        guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else { return }
+        learnViewportAspect = size.width / size.height
+    }
+
+    func tapLearnLane(_ lane: Int) {
+        guard learnModeEnabled, !learnSongComplete, !isPaused, learnSceneActive else { return }
+        let notes = scaleNotes(key: selectedKey, scale: selectedScale,
+                               baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
+        guard notes.indices.contains(lane) else { return }
+        let hit = learnModeManager.tapLane(lane, elapsed: learnElapsed)
+        strudelBridge.playNote(midi: hit ?? notes[lane], waveform: selectedWaveform, velocity: 0.7, duration: 0.3)
+        if hit != nil { haptics.learnPerfectHit() }
+        else { haptics.noteTrigger() }
+        updateLearnUI()
+    }
+
+    func updateLearnUI() {
+        learnScore = learnModeManager.score
+        learnVisibleNotes = learnModeManager.visibleNotes
+        learnHitEffects = learnModeManager.hitEffects
+        learnSongComplete = learnModeManager.songComplete
+    }
+
+    func setLearnSceneActive(_ active: Bool) {
+        learnSceneActive = active
+        updateLearnPause()
+    }
+
+    private var learnElapsed: Double { startTime.map { Date().timeIntervalSince($0) } ?? 0 }
+
+    private func updateLearnPause() {
+        learnModeManager.setPaused(isPaused || !learnSceneActive, elapsed: learnElapsed)
     }
 
     private static let maxSnippets = 50
@@ -910,31 +998,98 @@ final class EngineController: ObservableObject {
         return false
     }
 
-    func toggleLoopPlayback(_ loopId: UUID) {
+    @discardableResult
+    func toggleLoopPlayback(_ loopId: UUID) -> Bool {
         if playingLoopIds.contains(loopId) {
             audioLoopPlayers.removeValue(forKey: loopId)?.stop()
             loopRecorder.removeLoop(loopId)
             playingLoopIds.remove(loopId)
+            return true
         } else if let loop = savedLoops.first(where: { $0.id == loopId }) {
             if loop.hasCapturedAudio == true {
                 if let player = try? AVAudioPlayer(contentsOf: AudioExporter.capturedURL(loop.id)) {
                     player.numberOfLoops = -1
                     player.enableRate = true
                     player.rate = Float(recordingTempoScale)
+                    player.volume = Float(loop.effectiveGain)
                     audioLoopPlayers[loop.id] = player
                     if (!isPaused || player.prepareToPlay()) && (isPaused || player.play()) {
                         playingLoopIds.insert(loop.id)
+                        return true
                     } else {
                         audioLoopPlayers[loop.id] = nil
                     }
                 }
-                return
+                return false
             }
+            guard isRunning else { return false }
             let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
             loopRecorder.addLoop(loop, startTime: elapsed)
             playingLoopIds.insert(loopId)
+            return true
+        }
+        return false
+    }
+
+    func setLoopRecordingBars(_ value: Int) {
+        guard LoopRecorder.barOptions.contains(value) else { return }
+        loopRecordingBars = value
+        loopRecorder.selectedBars = value
+        PersistenceManager.shared.lastLoopBars = value
+    }
+
+    @discardableResult
+    func renameLoop(_ id: UUID, to proposedName: String) -> Bool {
+        let name = RecordedLoop.cleanName(proposedName)
+        guard !name.isEmpty, let index = savedLoops.firstIndex(where: { $0.id == id }) else { return false }
+        savedLoops[index].name = name
+        persistLoops()
+        return true
+    }
+
+    func setLoopGain(_ gain: Double, for id: UUID) {
+        guard let index = savedLoops.firstIndex(where: { $0.id == id }), savedLoops[index].hasCapturedAudio == true else { return }
+        savedLoops[index].gain = RecordedLoop.clampedGain(gain)
+        audioLoopPlayers[id]?.volume = Float(savedLoops[index].effectiveGain)
+    }
+
+    func toggleLoopMute(_ id: UUID) {
+        guard let index = savedLoops.firstIndex(where: { $0.id == id }), savedLoops[index].hasCapturedAudio == true else { return }
+        savedLoops[index].muted = savedLoops[index].muted != true
+        audioLoopPlayers[id]?.volume = Float(savedLoops[index].effectiveGain)
+        persistLoops()
+    }
+
+    func persistLoops() {
+        PersistenceManager.shared.saveLoops(savedLoops)
+    }
+
+    #if DEBUG
+    func importLoopFixtureIfRequested() {
+        let process = ProcessInfo.processInfo
+        guard process.arguments.contains("--uitesting"),
+              let path = process.environment["HANDSTRUDEL_TEST_LOOP_CLIP"],
+              let token = process.environment["HANDSTRUDEL_TEST_LOOP_ID"],
+              let id = UUID(uuidString: token),
+              !savedLoops.contains(where: { $0.id == id }) else { return }
+        let source = URL(fileURLWithPath: path)
+        let destination = AudioExporter.capturedURL(id)
+        do {
+            let audio = try AVAudioFile(forReading: source)
+            let duration = Double(audio.length) / audio.fileFormat.sampleRate
+            guard duration.isFinite, duration > 0 else { return }
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: source, to: destination)
+            var loop = RecordedLoop(id: id, events: [], duration: duration, bpm: 120,
+                                    name: "Studio fixture \(id.uuidString.prefix(6))", mode: "scalechordmelody")
+            loop.hasCapturedAudio = true
+            savedLoops.insert(loop, at: 0)
+            persistLoops()
+        } catch {
+            debugLog("Loop fixture failed: \(error.localizedDescription)")
         }
     }
+    #endif
 
     func deleteLoop(_ loopId: UUID) {
         audioLoopPlayers.removeValue(forKey: loopId)?.stop()
@@ -1006,6 +1161,7 @@ final class EngineController: ObservableObject {
     }
 
     func evaluateDrumLoopsIfChanged(modePrefix: String) {
+        guard strudelBridge.isReady else { return }
         let key = "\(modePrefix)|\(drumStateKey)"
         guard key != lastStructKey else { return }
         lastStructKey = key
@@ -1193,6 +1349,7 @@ final class EngineController: ObservableObject {
     /// Pause audio (control sheet open)
     func pause() {
         isPaused = true
+        updateLearnPause()
         audioLoopPlayers.values.forEach { $0.pause() }
         silenceAll()
     }
@@ -1200,6 +1357,7 @@ final class EngineController: ObservableObject {
     /// Resume audio (control sheet closed)
     func resume() {
         isPaused = false
+        updateLearnPause()
         audioLoopPlayers.values.forEach { _ = $0.play() }
         jamSession.replayRemoteVoices()
     }
@@ -1244,6 +1402,10 @@ final class EngineController: ObservableObject {
     }
 
     func stop() {
+        startupGeneration += 1
+        startupTask?.cancel()
+        startupTask = nil
+        auxiliaryAudioIssue = nil
         setRecordingTempo(halfSpeed: false)
         // Persist state before teardown
         let mode = currentModeString

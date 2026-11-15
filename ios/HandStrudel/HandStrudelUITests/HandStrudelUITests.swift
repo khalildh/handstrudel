@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 final class HandStrudelUITests: XCTestCase {
@@ -6,6 +7,11 @@ final class HandStrudelUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
+        if ProcessInfo.processInfo.environment["HANDSTRUDEL_OFFLINE_SMOKE"] == "1" {
+            app.launchEnvironment["SUPABASE_URL"] = "http://127.0.0.1:1"
+            app.launchEnvironment["SUPABASE_ANON_KEY"] = "offline-ui-smoke"
+            app.launchEnvironment["MEDIA_BASE_URL"] = "http://127.0.0.1:1"
+        }
     }
 
     // MARK: - Helpers
@@ -41,40 +47,44 @@ final class HandStrudelUITests: XCTestCase {
 
     /// Launch app with onboarding reset and start session
     private func launchToSessionWithOnboarding() {
-        app.launchArguments.append(contentsOf: ["--uitesting", "--reset-onboarding"])
+        app.launchArguments.append(contentsOf: ["--uitesting", "--reset-onboarding", "--reset-studio-input"])
         app.launch()
         let start = element("start-button")
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         start.tap()
     }
 
-    /// All modes live behind an "Other modes" disclosure at the bottom of the
-    /// settings sheet now. Tests that switch modes need to scroll there and
-    /// expand it first. Assumes the sheet is already open.
     private func expandOtherModes() {
-        // SwiftUI's DisclosureGroup label can show up as either a static text
-        // or a button depending on iOS version — match both.
-        var attempts = 0
-        while attempts < 8 {
-            let asText = app.staticTexts["Other modes"]
-            let asButton = app.buttons["Other modes"]
-            if asText.isHittable { asText.tap(); return }
-            if asButton.isHittable { asButton.tap(); return }
-            app.swipeUp()
-            attempts += 1
-        }
+        let disclosure = app.buttons["music-other-modes"].firstMatch
+        revealInMusicSettings(disclosure)
+        if !element("mode-melodic").exists { disclosure.tap() }
     }
 
     /// Switch to a mode that's hidden behind the "Other modes" disclosure.
     /// Returns the mode element after expansion + tapping.
-    @discardableResult
-    private func switchToMode(_ identifier: String) -> XCUIElement {
+    private func switchToMode(_ identifier: String) {
         expandOtherModes()
         let mode = element(identifier)
-        if mode.waitForExistence(timeout: 2), mode.isHittable {
-            mode.tap()
+        XCTAssertTrue(mode.waitForExistence(timeout: 3))
+        revealInMusicSettings(mode)
+        mode.tap()
+    }
+
+    private func revealInMusicSettings(_ item: XCUIElement) {
+        let scroll = app.scrollViews["music-settings-scroll"].firstMatch
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5))
+        for _ in 0..<6 {
+            if item.isHittable { return }
+            scroll.swipeUp()
         }
-        return mode
+        XCTAssertTrue(item.isHittable)
+    }
+
+    private func closeMusicSettings() {
+        let done = app.buttons["music-settings-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        done.tap()
+        XCTAssertTrue(element("settings-button").waitForExistence(timeout: 5))
     }
 
     // MARK: - Start Overlay Tests
@@ -86,7 +96,33 @@ final class HandStrudelUITests: XCTestCase {
 
     func testStartOverlay_showsSubtitle() {
         launchToStart()
-        XCTAssertTrue(app.staticTexts["Move your hands to make music."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Play music with a gesture or a touch."].waitForExistence(timeout: 5))
+    }
+
+    func testStartPlayingStaysReachableAtLargestDynamicType() {
+        app.launchArguments += [
+            "--uitesting", "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+        ]
+        app.launch()
+
+        let start = app.buttons["start-button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        XCTAssertTrue(start.isHittable)
+        let startY = start.frame.minY
+
+        let brand = app.staticTexts["handstrudel"]
+        XCTAssertTrue(brand.isHittable)
+        XCTAssertGreaterThan(brand.frame.height, 28, "Expected accessibility-size text")
+
+        app.scrollViews.firstMatch.swipeUp()
+        XCTAssertFalse(brand.isHittable, "The Studio content should have scrolled")
+        XCTAssertTrue(start.isHittable)
+        XCTAssertEqual(start.frame.minY, startY, accuracy: 1)
+        captureIfRequested("Studio-Pinned-Start")
+
+        start.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
     }
 
     func testAppearanceSwitchesAndPersistsAfterRelaunch() {
@@ -115,6 +151,186 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(paper.isSelected)
         app.buttons["theme-volt"].tap()
         XCTAssertTrue(app.buttons["theme-volt"].isSelected)
+    }
+
+    func testNamingPrivateDraftKeepsTheTrimInTheEditor() throws {
+        guard let file = ProcessInfo.processInfo.environment["HANDSTRUDEL_DRAFT_TEST_CLIP"] else {
+            throw XCTSkip("Set TEST_RUNNER_HANDSTRUDEL_DRAFT_TEST_CLIP to a simulator-readable MP4.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["HANDSTRUDEL_TEST_CLIP"] = file
+        app.launch()
+        let selection = element("draft-trim-range")
+        XCTAssertTrue(selection.waitForExistence(timeout: 8))
+        let before = selection.label
+        let rename = app.buttons["rename-private-draft"]
+        if !rename.isHittable { app.swipeDown() }
+        rename.tap()
+        let field = app.textFields["private-draft-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let name = "Warmup \(UUID().uuidString.prefix(6))"
+        field.tap()
+        field.typeText(name)
+        app.navigationBars["Private draft name"].buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
+        XCTAssertEqual(selection.label, before)
+    }
+
+    func testDraftFilmstripAdjustsAndResetsARealClip() throws {
+        guard let file = ProcessInfo.processInfo.environment["HANDSTRUDEL_DRAFT_TEST_CLIP"] else {
+            throw XCTSkip("Set TEST_RUNNER_HANDSTRUDEL_DRAFT_TEST_CLIP to a simulator-readable MP4 to test the editor.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["HANDSTRUDEL_TEST_CLIP"] = file
+        app.launch()
+        let timeline = element("draft-filmstrip")
+        XCTAssertTrue(timeline.waitForExistence(timeout: 12))
+        let range = element("draft-trim-range")
+        XCTAssertTrue(range.exists)
+        let original = range.label
+        let fine = element("draft-fine-trim")
+        if !fine.isHittable { app.swipeUp() }
+        fine.tap()
+        let nudge = app.buttons["Start 0.1 seconds later"]
+        XCTAssertTrue(nudge.waitForExistence(timeout: 5))
+        if !nudge.isHittable { app.swipeUp() }
+        nudge.tap()
+        XCTAssertNotEqual(range.label, original)
+        let play = element("draft-play-selection")
+        if !play.isHittable { app.swipeDown() }
+        play.tap()
+        let reset = app.buttons["draft-trim-reset"]
+        if !reset.isHittable { app.swipeDown() }
+        reset.tap()
+        XCTAssertEqual(range.label, original)
+    }
+
+    func testMusicCanSavePresetBeforeOpeningTheWheel() {
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        let library = element("music-presets-button")
+        XCTAssertTrue(library.waitForExistence(timeout: 5))
+        if !library.isHittable { app.swipeUp() }
+        library.tap()
+        let field = app.textFields["preset-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let name = "Home check \(UUID().uuidString.prefix(6))"
+        field.tap()
+        field.typeText(name)
+        app.buttons["Save current preset"].tap()
+        XCTAssertTrue(app.staticTexts[name].exists)
+        let transfer = app.buttons["preset-transfer"]
+        XCTAssertTrue(transfer.isHittable)
+        transfer.tap()
+        XCTAssertTrue(app.buttons["Import preset file"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Export all presets"].isEnabled)
+        XCTAssertFalse(element("close-button").exists)
+    }
+
+    func testNativeWheelOpensWhileWebAudioIsDelayedAndStaysClosedAfterExit() {
+        app.launchArguments = ["--uitesting", "--uitest-delayed-web-audio"]
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        let close = element("close-button")
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "Native wheel should open before the 8-second WebAudio fixture")
+        let onboarding = element("onboarding-got-it")
+        if onboarding.exists { onboarding.tap() }
+        close.tap()
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        let revived = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"), object: close)
+        revived.isInverted = true
+        XCTAssertEqual(XCTWaiter.wait(for: [revived], timeout: 8.5), .completed)
+    }
+
+    func testWebOnlyStudioOpensThroughWKWebViewWhileDrumCatalogIsStalled() {
+        app.launchArguments = ["--uitesting", "--uitest-real-web-audio"]
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        let close = element("close-button")
+        XCTAssertTrue(close.waitForExistence(timeout: 15), "The actual WebAudio bridge should initialize without the drum catalog")
+        let onboarding = element("onboarding-got-it")
+        if onboarding.exists { onboarding.tap() }
+        XCTAssertTrue(element("settings-button").exists)
+        close.tap()
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+    }
+
+    func testLoopShelfOpensBeforeStartingTheWheel() {
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        let shelf = app.buttons["music-loop-shelf"]
+        XCTAssertTrue(shelf.waitForExistence(timeout: 5))
+        if !shelf.isHittable { app.swipeUp() }
+        shelf.tap()
+        XCTAssertTrue(app.staticTexts["Loop shelf"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("loop-recording-length").exists)
+        XCTAssertFalse(element("close-button").exists)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(shelf.waitForExistence(timeout: 5))
+    }
+
+    func testLoopShelfPlaysRenamesAndRemovesCapturedWAV() throws {
+        guard let file = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOOP_TEST_CLIP"] else {
+            throw XCTSkip("Set TEST_RUNNER_HANDSTRUDEL_LOOP_TEST_CLIP to a simulator-readable WAV.")
+        }
+        let id = UUID()
+        let name = "Studio fixture \(id.uuidString.prefix(6))"
+        let renamed = "Night loop \(id.uuidString.prefix(6))"
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["HANDSTRUDEL_TEST_LOOP_CLIP"] = file
+        app.launchEnvironment["HANDSTRUDEL_TEST_LOOP_ID"] = id.uuidString
+        app.launch()
+
+        func openShelf() {
+            let shelf = app.buttons["music-loop-shelf"]
+            XCTAssertTrue(shelf.waitForExistence(timeout: 5))
+            if !shelf.isHittable { app.swipeUp() }
+            shelf.tap()
+            XCTAssertTrue(app.staticTexts["Loop shelf"].waitForExistence(timeout: 5))
+        }
+
+        openShelf()
+        let play = app.buttons["Play \(name)"]
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        play.tap()
+        let stop = app.buttons["Stop \(name)"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        stop.tap()
+        let gain = app.sliders["Volume for \(name)"]
+        XCTAssertTrue(gain.exists)
+        gain.adjust(toNormalizedSliderPosition: 0.4)
+        XCTAssertNotEqual(gain.value as? String, "100%")
+        app.buttons["Mute \(name)"].tap()
+        XCTAssertTrue(app.buttons["Unmute \(name)"].exists)
+        app.buttons["Actions for \(name)"].tap()
+        app.buttons["Rename"].tap()
+        let rename = app.alerts["Rename loop"]
+        let field = rename.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: name.count) + renamed)
+        XCTAssertEqual(field.value as? String, renamed)
+        rename.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts[renamed].waitForExistence(timeout: 5))
+
+        app.buttons["Done"].tap()
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "HANDSTRUDEL_TEST_LOOP_CLIP")
+        app.launchEnvironment.removeValue(forKey: "HANDSTRUDEL_TEST_LOOP_ID")
+        app.launch()
+        openShelf()
+        XCTAssertTrue(app.buttons["Unmute \(renamed)"].exists)
+        XCTAssertNotEqual(app.sliders["Volume for \(renamed)"].value as? String, "100%")
+        app.buttons["Actions for \(renamed)"].tap()
+        app.buttons["Delete"].tap()
+        let confirm = app.buttons["Delete loop"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertFalse(app.staticTexts[renamed].exists)
     }
 
     func testMusic_privateDraftsOpensWithoutAccount() {
@@ -152,6 +368,46 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(studioPresets.waitForExistence(timeout: 5))
     }
 
+    func testSavedPresetStartsNativeWheelWithCameraOffWhileWebAudioIsDelayed() {
+        app.launchArguments = ["--uitesting", "--uitest-delayed-web-audio", "--reset-studio-input", "--uitest-camera-denied"]
+        app.launch()
+        let inputs = app.segmentedControls["studio-play-input"]
+        let touch = inputs.buttons["Touch only"]
+        XCTAssertTrue(touch.waitForExistence(timeout: 5))
+        if !touch.isHittable { app.swipeUp() }
+        touch.tap()
+        defer {
+            app.terminate()
+            app.launchArguments = ["--uitesting", "--reset-studio-input"]
+            app.launch()
+        }
+
+        let library = element("music-presets-button")
+        XCTAssertTrue(library.waitForExistence(timeout: 5))
+        if !library.isHittable { app.swipeUp() }
+        library.tap()
+        let name = "Touch preset \(UUID().uuidString.prefix(6))"
+        let field = app.textFields["preset-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(name)
+        app.buttons["Save current preset"].tap()
+        let preset = app.staticTexts[name]
+        XCTAssertTrue(preset.waitForExistence(timeout: 5))
+        preset.tap()
+
+        let close = element("close-button")
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        let onboarding = element("onboarding-got-it")
+        if onboarding.exists { onboarding.tap() }
+        XCTAssertTrue(element("touch-camera-off").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["wheel-chord-0"].exists)
+        XCTAssertFalse(element("camera-recovery-touch").exists)
+        close.tap()
+        XCTAssertTrue(touch.waitForExistence(timeout: 5))
+        XCTAssertTrue(touch.isSelected)
+    }
+
     func testFeed_commentsSheetOpensWithoutAccount() throws {
         guard let key = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_COMMENTS_KEY"] else {
             throw XCTSkip("Requires the local Supabase comments fixture.")
@@ -187,6 +443,154 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.searchFields.firstMatch.exists)
         app.buttons["Done"].tap()
         XCTAssertTrue(search.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testFeedRetryRecoversTheSameClipAndRestoresSeeking() async throws {
+        guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_FEED_RETRY_FIXTURE_URL"],
+              let endpoint = URL(string: address), endpoint.host == "127.0.0.1" else {
+            throw XCTSkip("Set HANDSTRUDEL_FEED_RETRY_FIXTURE_URL to a loopback media-control fixture.")
+        }
+        func setAvailability(_ available: Bool) async throws {
+            let url = URL(string: "/__fixture/feed-media?available=\(available ? 1 : 0)", relativeTo: endpoint)!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            let (_, response) = try await URLSession.shared.data(for: request)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 204)
+        }
+        try await setAvailability(false)
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = address
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "retry-media-fixture"
+        app.launchEnvironment["MEDIA_BASE_URL"] = address
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let retry = app.buttons["feed-retry-video"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.exists)
+        let slider = app.sliders["feed-video-progress"].firstMatch
+        XCTAssertFalse(slider.exists)
+
+        try await setAvailability(true)
+        retry.tap()
+        XCTAssertTrue(slider.waitForExistence(timeout: 10))
+        XCTAssertFalse(retry.exists)
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.exists)
+        let actualPlayback = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@", "0:01"), object: slider)
+        await fulfillment(of: [actualPlayback], timeout: 9)
+        slider.adjust(toNormalizedSliderPosition: 0.8)
+        XCTAssertTrue((slider.value as? String)?.contains("0:03") == true)
+    }
+
+    func testFeedProgressScrubsARealVideoWithoutPaging() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_FEED_MEDIA_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with a real MP4 served from FIXTURE_CLIP.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let first = app.staticTexts["Evening loop"].firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        let slider = app.sliders["feed-video-progress"].firstMatch
+        XCTAssertTrue(slider.waitForExistence(timeout: 8))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.43)).tap()
+        slider.adjust(toNormalizedSliderPosition: 0.82)
+        XCTAssertTrue((slider.value as? String)?.contains("0:03") == true, "Expected seek near three seconds: \(slider.value ?? "none")")
+        XCTAssertTrue(first.isHittable)
+        let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.31))
+        let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.72))
+        lower.press(forDuration: 0.05, thenDragTo: upper)
+        let second = app.staticTexts["Second performance"].firstMatch
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
+    }
+
+    @MainActor
+    func testFeedSearchBroadensHandleMiss() async throws {
+        guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_SEARCH_FIXTURE_URL"] else {
+            throw XCTSkip("Start scripts/search-ui-fixture.mjs and set HANDSTRUDEL_SEARCH_FIXTURE_URL.")
+        }
+        let fixture = try XCTUnwrap(URL(string: address))
+        let port = try XCTUnwrap(fixture.port)
+        guard address == "http://127.0.0.1:\(port)", (1...65535).contains(port) else {
+            return XCTFail("Search UI tests require an HTTP fixture on 127.0.0.1.")
+        }
+
+        let key = "search-fixture-\(UUID().uuidString)"
+        struct FixtureStatus: Decodable {
+            let fixture: String
+            let searches: [String]
+        }
+        func fixtureSearches() async throws -> [String] {
+            var request = URLRequest(url: fixture.appendingPathComponent("__search_fixture"),
+                                     cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 5)
+            request.setValue(key, forHTTPHeaderField: "apikey")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+            let status = try JSONDecoder().decode(FixtureStatus.self, from: data)
+            XCTAssertEqual(status.fixture, "handstrudel-search")
+            return status.searches
+        }
+
+        // Validate the fixture before launching an app that would otherwise default to production.
+        let initialSearches = try await fixtureSearches()
+        XCTAssertTrue(initialSearches.isEmpty)
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = address
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launchEnvironment["MEDIA_BASE_URL"] = address
+        app.launch()
+
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let search = app.buttons["search-posts"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+
+        let field = app.searchFields.firstMatch
+        let guidance = app.staticTexts["Enter at least two characters. Use @ to search posts by creator handle."]
+        let broaden = app.buttons["Broaden search"]
+        let clip = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Search fixture piano take")).firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(guidance.exists)
+        let initialValue = field.value as? String ?? ""
+        XCTAssertTrue(initialValue.isEmpty || initialValue == "Caption, instrument, or creator")
+        XCTAssertFalse(broaden.exists)
+        XCTAssertFalse(clip.exists)
+
+        field.tap()
+        field.typeText("@l")
+        XCTAssertEqual(field.value as? String, "@l")
+        let guidanceDisappeared = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+                                                           object: guidance)
+        guidanceDisappeared.isInverted = true
+        await fulfillment(of: [guidanceDisappeared], timeout: 1)
+        let shortSearches = try await fixtureSearches()
+        XCTAssertTrue(shortSearches.isEmpty, "One character after @ must not trigger a search.")
+
+        field.typeText("o")
+        let handleMiss = app.staticTexts["No posts match that handle"]
+        XCTAssertTrue(handleMiss.waitForExistence(timeout: 5))
+        XCTAssertTrue(broaden.exists)
+        XCTAssertFalse(clip.exists)
+        let scopedSearches = try await fixtureSearches()
+        XCTAssertEqual(scopedSearches, ["handle"])
+
+        broaden.tap()
+        XCTAssertTrue(clip.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, "lo")
+        XCTAssertFalse(handleMiss.exists)
+        XCTAssertFalse(broaden.exists)
+        let finalSearches = try await fixtureSearches()
+        XCTAssertEqual(finalSearches, ["handle", "broadened"])
     }
 
     func testFeedSwipesBetweenTwoPerformances() throws {
@@ -355,6 +759,9 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(author.waitForExistence(timeout: 8))
         author.tap()
         XCTAssertTrue(app.staticTexts["Loop Maker"].waitForExistence(timeout: 5))
+        let likes = element("profile-likes-received")
+        XCTAssertEqual(likes.label, "Likes received")
+        XCTAssertEqual(likes.value as? String, "42")
         XCTAssertTrue(app.buttons["Share profile"].exists)
         let spotlight = app.buttons["profile-latest-performance"]
         XCTAssertTrue(spotlight.waitForExistence(timeout: 5))
@@ -373,6 +780,31 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
     }
 
+    func testCreatorLikesReachableAtLargestDynamicType() throws {
+        app.launchArguments += [
+            "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+        ]
+        try launchWithProfileFixture()
+        element("tab-feed").tap()
+        let author = app.buttons["@loopmaker"].firstMatch
+        XCTAssertTrue(author.waitForExistence(timeout: 8))
+        author.tap()
+
+        let title = app.staticTexts["Loop Maker"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(title.frame.height, 45, "Expected the accessibility-size profile header")
+
+        let likes = element("profile-likes-received")
+        for _ in 0..<2 where !likes.isHittable {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(likes.isHittable)
+        XCTAssertEqual(likes.label, "Likes received")
+        XCTAssertEqual(likes.value as? String, "42")
+        captureIfRequested("Artist-Profile-Largest-Text")
+    }
+
     func testPlayThisSoundFromFeedOpensMusicSession() throws {
         try launchWithProfileFixture()
         element("tab-feed").tap()
@@ -389,6 +821,9 @@ final class HandStrudelUITests: XCTestCase {
         signInToProfile()
         let edit = app.buttons["Edit profile"]
         XCTAssertTrue(edit.waitForExistence(timeout: 12))
+        let likes = element("profile-likes-received")
+        let zero = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "0"), object: likes)
+        XCTAssertEqual(XCTWaiter.wait(for: [zero], timeout: 5), .completed)
         edit.tap()
         let name = app.textFields["Display name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -403,6 +838,20 @@ final class HandStrudelUITests: XCTestCase {
         captureIfRequested("Account-Artist")
         app.buttons["Make music"].tap()
         XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
+    }
+
+    func testFollowingWithNoFollowsIsNotAConnectionError() throws {
+        try launchWithProfileFixture()
+        signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 12))
+        element("tab-feed").tap()
+        let following = app.segmentedControls.buttons["Following"].firstMatch
+        XCTAssertTrue(following.waitForExistence(timeout: 8))
+        following.tap()
+        XCTAssertTrue(app.staticTexts["You aren't following any creators yet"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["Try again"].exists)
+        app.buttons["Browse latest"].tap()
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 8))
     }
 
     func testProfileCanRemoveExistingPhoto() throws {
@@ -597,6 +1046,58 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertFalse(note.exists)
     }
 
+    func testTouchOnlyStartsWithoutCameraAndRemembersChoice() {
+        app.launchArguments = ["--uitesting", "--reset-onboarding", "--reset-studio-input", "--uitest-camera-denied"]
+        app.launch()
+        let input = app.segmentedControls["studio-play-input"]
+        let touch = input.buttons["Touch only"]
+        XCTAssertTrue(touch.waitForExistence(timeout: 5))
+        if !touch.isHittable { app.swipeUp() }
+        touch.tap()
+        element("start-button").tap()
+        let note = element("onboarding-first-note")
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        note.tap()
+        XCTAssertTrue(app.staticTexts["Tap or slide to play"].exists)
+        element("onboarding-got-it").tap()
+        XCTAssertTrue(element("touch-camera-off").waitForExistence(timeout: 5))
+        XCTAssertFalse(element("camera-recovery-touch").exists)
+        XCTAssertTrue(app.buttons["wheel-note-0"].exists)
+        XCTAssertTrue(app.buttons["wheel-chord-0"].exists)
+
+        app.terminate()
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        XCTAssertTrue(touch.waitForExistence(timeout: 5))
+        XCTAssertTrue(touch.isSelected)
+        if !touch.isHittable { app.swipeUp() }
+        input.buttons["Air + touch"].tap()
+    }
+
+    func testDeniedCameraCanSwitchToTouchWithoutLeavingSession() {
+        app.launchArguments = ["--uitesting", "--reset-onboarding", "--reset-studio-input", "--uitest-camera-denied"]
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        if !start.isHittable { app.swipeUp() }
+        start.tap()
+        let onboarding = element("onboarding-got-it")
+        XCTAssertTrue(onboarding.waitForExistence(timeout: 5))
+        onboarding.tap()
+        let fallback = app.buttons["camera-recovery-touch"]
+        XCTAssertTrue(fallback.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Open Settings"].exists)
+        fallback.tap()
+        XCTAssertTrue(element("touch-camera-off").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("close-button").exists)
+        XCTAssertFalse(fallback.exists)
+        element("close-button").tap()
+        let air = app.segmentedControls["studio-play-input"].buttons["Air + touch"]
+        XCTAssertTrue(air.waitForExistence(timeout: 5))
+        if !air.isHittable { app.swipeUp() }
+        air.tap()
+    }
+
     func testOnboarding_gotItDismisses() {
         launchToSessionWithOnboarding()
         let gotIt = element("onboarding-got-it")
@@ -634,7 +1135,7 @@ final class HandStrudelUITests: XCTestCase {
         // routed through the SoundFont sampler). Switch to Melodic to bring
         // them back; that's the mode whose entire point is the Strudel synth.
         switchToMode("mode-melodic")
-        app.swipeDown()   // dismiss + reopen so the sheet redraws past hidden sections
+        closeMusicSettings()
         element("settings-button").tap()
         let sound = app.staticTexts["SOUND"]
         if !sound.exists { app.swipeUp() }
@@ -646,7 +1147,7 @@ final class HandStrudelUITests: XCTestCase {
         element("settings-button").tap()
         _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
         switchToMode("mode-melodic")
-        app.swipeDown()
+        closeMusicSettings()
         element("settings-button").tap()
         let bpm = app.staticTexts["BPM"]
         if !bpm.exists { app.swipeUp() }
@@ -659,7 +1160,6 @@ final class HandStrudelUITests: XCTestCase {
         launchToSession()
         element("settings-button").tap()
         _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
-        // All modes live in the bottom-of-sheet "Other modes" disclosure now.
         expandOtherModes()
         XCTAssertTrue(element("mode-melodic").waitForExistence(timeout: 2))
         XCTAssertTrue(element("mode-grid").exists)
@@ -672,8 +1172,11 @@ final class HandStrudelUITests: XCTestCase {
         element("settings-button").tap()
         _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
         switchToMode("mode-grid")
-        app.swipeDown()
-        XCTAssertTrue(app.staticTexts["Range"].waitForExistence(timeout: 3))
+        closeMusicSettings()
+        let oneOctave = app.buttons["grid-range-1"]
+        XCTAssertTrue(oneOctave.waitForExistence(timeout: 3))
+        oneOctave.tap()
+        XCTAssertTrue(oneOctave.isSelected)
     }
 
     func testModeSwitching_tapDrums() {
@@ -682,10 +1185,12 @@ final class HandStrudelUITests: XCTestCase {
         _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
         switchToMode("mode-drums")
         // Reopen the sheet so we can confirm the mode chip is now selected.
-        app.swipeDown()
+        closeMusicSettings()
         element("settings-button").tap()
         expandOtherModes()
-        XCTAssertTrue(element("mode-drums").waitForExistence(timeout: 2))
+        let drums = element("mode-drums")
+        XCTAssertTrue(drums.waitForExistence(timeout: 3))
+        XCTAssertTrue(drums.isSelected)
     }
 
     func testModeSwitching_tapLearn_showsSongPicker() {
@@ -701,14 +1206,14 @@ final class HandStrudelUITests: XCTestCase {
         element("settings-button").tap()
         _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
         switchToMode("mode-grid")
-        sleep(1)
+        closeMusicSettings()
         element("settings-button").tap()
         _ = app.staticTexts["HARMONY"].waitForExistence(timeout: 3)
         switchToMode("mode-melodic")
-        sleep(1)
+        closeMusicSettings()
         element("settings-button").tap()
         expandOtherModes()
-        XCTAssertTrue(element("mode-melodic").waitForExistence(timeout: 2))
+        XCTAssertTrue(element("mode-melodic").isSelected)
     }
 
     // MARK: - Harmony Tests
@@ -742,7 +1247,7 @@ final class HandStrudelUITests: XCTestCase {
         // BPM is hidden in chord-melody-family modes (the default Split). Pop
         // into Melodic where the tempo slider belongs.
         switchToMode("mode-melodic")
-        app.swipeDown()
+        closeMusicSettings()
         element("settings-button").tap()
         let bpm = app.staticTexts["BPM"]
         if !bpm.exists { app.swipeUp() }
@@ -751,6 +1256,19 @@ final class HandStrudelUITests: XCTestCase {
     }
 
     // MARK: - Learn Song Picker Tests
+
+    func testLearnSongStartsWithTouchableLanes() {
+        launchToSession()
+        element("settings-button").tap()
+        switchToMode("mode-learn")
+        let song = element("song-Twinkle Twinkle")
+        XCTAssertTrue(song.waitForExistence(timeout: 5))
+        song.tap()
+        let lane = app.buttons["learn-lane-0"]
+        XCTAssertTrue(lane.waitForExistence(timeout: 8))
+        XCTAssertTrue(element("learn-touch-hint").exists)
+        lane.tap()
+    }
 
     func testLearnSongPicker_showsMelodies() {
         launchToSession()
@@ -812,8 +1330,8 @@ final class HandStrudelUITests: XCTestCase {
         element("settings-button").tap()
         XCTAssertTrue(app.staticTexts["HARMONY"].waitForExistence(timeout: 5))
         switchToMode("mode-grid")
-        app.swipeDown()
-        XCTAssertTrue(app.staticTexts["Range"].waitForExistence(timeout: 2))
+        closeMusicSettings()
+        XCTAssertTrue(app.buttons["grid-range-2"].waitForExistence(timeout: 3))
     }
 
     func testFullFlow_learnModeSongSelection() {

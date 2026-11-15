@@ -1,4 +1,4 @@
-import { CHORD_PROGRESSIONS } from "./music-data.generated";
+import { CHORD_PROGRESSIONS, IOS_KEY_SEMITONES, IOS_NOTE_NAMES, IOS_SCALE_INTERVALS } from "./music-data.generated";
 
 const feedBase = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://eygrtqbtbhktptphqdnn.supabase.co";
 const publicKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_V6B0E_NNyf0ClZ13WpHegQ_W-wXH_im";
@@ -17,7 +17,7 @@ export interface PublicVideo {
   width: number | null;
   height: number | null;
   created_at: string;
-  sound_setup?: { version?: number; key?: string; scale?: string; bpm?: number; progression?: string; customDegrees?: number[] } | null;
+  sound_setup?: PublicSoundSetup | null;
   comments_enabled?: boolean;
   comment_count?: number;
   backing_enabled?: boolean;
@@ -25,17 +25,59 @@ export interface PublicVideo {
   source_username?: string | null;
 }
 
+interface PublicSoundSetup {
+  version?: number;
+  key?: string;
+  scale?: string;
+  bpm?: number;
+  progression?: string;
+  customDegrees?: number[];
+  mode?: string;
+}
+
+const triadModes = new Set(["chordmelody", "radialchordmelody", "splitchordmelody"]);
+const chordQualities = new Map([
+  ["4,7", "maj"], ["3,7", "min"], ["3,6", "dim"], ["4,8", "aug"],
+  ["4,7,11", "maj7"], ["4,7,10", "7"], ["3,7,10", "min7"], ["3,7,11", "min(maj7)"],
+  ["3,6,10", "min7b5"], ["3,6,9", "dim7"], ["4,8,11", "maj7#5"],
+]);
+
+function savedChordNames(setup: PublicSoundSetup, degrees: readonly number[]): string[] | null {
+  const seventh = setup.mode === "scalechordmelody";
+  if (!degrees.length || (!seventh && !triadModes.has(setup.mode ?? ""))) return null;
+  const tonic = IOS_KEY_SEMITONES.get(setup.key ?? "");
+  const scale = IOS_SCALE_INTERVALS.get(setup.scale ?? "");
+  // Shorter iOS scales wrap degrees back onto earlier roots. Keep those layouts numeric.
+  if (tonic === undefined || scale?.length !== 7) return null;
+  const names: string[] = [];
+  for (const degree of degrees) {
+    const root = scale[degree];
+    // MusicTheory.swift stacks notes 2, 4, and (in Scale mode) 6 scale steps above the root.
+    const intervals = (seventh ? [2, 4, 6] : [2, 4]).map(step => (scale[(degree + step) % scale.length] - root + 12) % 12);
+    const quality = chordQualities.get(intervals.join(","));
+    if (!quality) return null;
+    names.push(IOS_NOTE_NAMES[(tonic + root) % 12] + quality);
+  }
+  return names;
+}
+
 export function describeClipChords(setup: PublicVideo["sound_setup"]) {
   if (setup?.version !== 1 || typeof setup.progression !== "string") return null;
-  if (setup.progression === "free") return { label: "Chord layout", name: "Free layout", degrees: null };
+  if (setup.progression === "free") return {
+    label: "Chord layout", name: "Free layout", degrees: null,
+    names: savedChordNames(setup, CHORD_PROGRESSIONS.get("free")?.degrees ?? []),
+  };
   if (setup.progression === "custom") {
     const degrees = setup.customDegrees;
     if (!Array.isArray(degrees) || !degrees.length || degrees.length > 64 ||
         !degrees.every(d => Number.isInteger(d) && d >= 0 && d <= 6)) return null;
-    return { label: "Chord progression", name: "Custom", degrees: degrees.map(d => d + 1) };
+    return { label: "Chord progression", name: "Custom", degrees: degrees.map(d => d + 1), names: savedChordNames(setup, degrees) };
   }
   const preset = CHORD_PROGRESSIONS.get(setup.progression);
-  return preset ? { label: "Chord progression", name: preset.name, degrees: preset.degrees.map(d => d + 1) } : null;
+  return preset ? {
+    label: "Chord progression", name: preset.name, degrees: preset.degrees.map(d => d + 1),
+    names: savedChordNames(setup, preset.degrees),
+  } : null;
 }
 
 export interface PublicComment {
@@ -51,6 +93,7 @@ export interface PublicCreator {
   username: string;
   display_name: string | null;
   avatar_key?: string | null;
+  likes_received?: number | null;
 }
 
 export const COMMENT_PAGE_SIZE = 20;

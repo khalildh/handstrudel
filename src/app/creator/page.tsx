@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import CreatorProfile from "./creator-profile";
+import "./creator.css";
 
 export const metadata: Metadata = {
   title: "Creator profile · HandStrudel",

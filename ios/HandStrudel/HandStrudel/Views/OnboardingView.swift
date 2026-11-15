@@ -6,8 +6,12 @@ struct OnboardingView: View {
     let noteName: String
     let melodyLaneCount: Int
     let swapHands: Bool
+    let cameraEnabled: Bool
+    @ObservedObject var tracker: HandTrackingManager
     let playFirstNote: () -> Void
     @State private var played = false
+
+    private var canSuggestPinching: Bool { cameraEnabled && tracker.cameraIssue == nil }
 
     var body: some View {
         GeometryReader { geometry in
@@ -39,11 +43,13 @@ struct OnboardingView: View {
                 VStack {
                     Spacer()
                     VStack(alignment: .leading, spacing: 9) {
-                        Text(played ? "Now try a pinch" : "Play your first note")
+                        Text(played ? (canSuggestPinching ? "Now try a pinch" : "Tap or slide to play") : "Play your first note")
                             .font(.system(.title2, design: .serif))
                             .accessibilityAddTraits(.isHeader)
                         Text(played
-                             ? "Hold your hand over a note and pinch your thumb and index finger. You can also tap or drag on the wheel."
+                             ? (canSuggestPinching
+                                ? "Hold your hand over a note and pinch your thumb and index finger. You can also tap or drag on the wheel."
+                                : "Tap or slide across the wheel for a melody. Touch its other half to play chords.")
                              : "Tap the highlighted note on the wheel.")
                             .font(.subheadline)
                             .foregroundStyle(palette.muted)

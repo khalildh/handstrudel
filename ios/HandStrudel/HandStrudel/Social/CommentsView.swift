@@ -383,10 +383,16 @@ struct CommentsView: View {
             hasMore = items.count == FeedService.commentPageSize
             replies = [:]
             replyOffsets = [:]
-            if let replyTarget, !items.contains(where: { $0.id == replyTarget.id }) { self.replyTarget = nil }
+            replyTarget = Self.replyTargetAfterRefresh(replyTarget, firstPage: items)
         } catch {
             if !Task.isCancelled { errorMessage = "Couldn't load comments. Pull down to try again." }
         }
+    }
+
+    static func replyTargetAfterRefresh(_ target: VideoComment?, firstPage: [VideoComment]) -> VideoComment? {
+        guard let target else { return nil }
+        // The first page may omit older threads. Only the server can confirm a reply is unavailable.
+        return firstPage.first(where: { $0.id == target.id }) ?? target
     }
 
     private func loadReplies(_ parent: UUID, append: Bool = false) async throws {

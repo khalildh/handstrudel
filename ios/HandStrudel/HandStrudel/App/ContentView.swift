@@ -65,6 +65,7 @@ struct ContentView: View {
     @State private var hasOpenedFeed = false
     @State private var startingSession = false
     @State private var showDrafts = false
+    @State private var showLoops = false
     @State private var showSetups = false
     @State private var soundError: String?
     @State private var sharedSoundLoad: Task<Void, Never>?
@@ -78,6 +79,7 @@ struct ContentView: View {
     @State private var reviewingDraft: RecordingDraft?
     @State private var retakeRequested = false
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @AppStorage("studioPlayInput") private var preferredInput: StudioPlayInput = .air
     @State private var showSheet = false
     @State private var isRecording = false
     @State private var recordingUsesMicrophone = false
@@ -116,7 +118,7 @@ struct ContentView: View {
 
     private var canShowReview: Bool {
         reviewReadyThisSession && scenePhase == .active && destination == .music
-            && !engine.isRunning && !startingSession && !showDrafts && !showSetups && reviewingDraft == nil
+            && !engine.isRunning && !startingSession && !showDrafts && !showLoops && !showSetups && reviewingDraft == nil
             && linkedComments == nil && linkedPerformance == nil && soundError == nil && recordingError == nil
             && jamInvitation == nil && jamError == nil
     }
@@ -140,7 +142,8 @@ struct ContentView: View {
                             let midi = notes.isEmpty ? 60 : notes[notes.count / 2]
                             OnboardingView(hasSeenOnboarding: $hasSeenOnboarding,
                                            noteName: pitchClassName(midi), melodyLaneCount: notes.count,
-                                           swapHands: engine.chordMelodySwapHands) {
+                                           swapHands: engine.chordMelodySwapHands,
+                                           cameraEnabled: engine.playInput == .air, tracker: engine.handTracker) {
                                 playFirstNote(midi)
                             }
                                 .transition(.opacity)
@@ -175,7 +178,9 @@ struct ContentView: View {
                 hasSeenOnboarding = false
             }
             #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--reset-studio-input") { preferredInput = .air }
             startDemoIfRequested()
+            engine.importLoopFixtureIfRequested()
             // Open a sample take in the simulator, which cannot record with ReplayKit.
             if let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
                 DispatchQueue.main.async { openSampleDraft(at: URL(fileURLWithPath: path)) }
@@ -185,6 +190,11 @@ struct ContentView: View {
         .sheet(isPresented: $showDrafts) {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil,
                                 onSuccessfulTake: recordReviewMilestone)
+        }
+        .sheet(isPresented: $showLoops) {
+            LoopShelfView(engine: engine)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showSetups, onDismiss: {
             if engine.isRunning { engine.resume() }
@@ -289,6 +299,7 @@ struct ContentView: View {
             backing?.player.volume = Float(BackingTrackVolume.clamped(volume))
         }
         .onChange(of: scenePhase) { phase in
+            engine.setLearnSceneActive(phase == .active)
             if phase == .background {
                 backing?.player.pause()
                 backingPlaying = false
@@ -297,7 +308,7 @@ struct ContentView: View {
                 else if !recorderBusy { cancelCountdown() }
             }
             if phase == .active, engine.isRunning, engine.handTracker.cameraIssue != nil {
-                engine.handTracker.startSession()
+                engine.startCameraIfRequested()
             }
         }
         .onChange(of: engine.status) { status in
@@ -309,14 +320,14 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
             guard !engine.isRunning, let presetId = notification.object as? String else { return }
             if let preset = PRESETS.first(where: { $0.id == presetId }) {
-                engine.start(config: preset.mapping, advanced: false)
+                engine.start(config: preset.mapping, advanced: false, input: preferredInput)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .siriStartMode)) { notification in
             guard let mode = notification.object as? String else { return }
             if !engine.isRunning {
                 // Start with default preset first
-                engine.start(config: DEFAULT_MAPPING, advanced: false)
+                engine.start(config: DEFAULT_MAPPING, advanced: false, input: preferredInput)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 switch mode {
@@ -355,8 +366,10 @@ struct ContentView: View {
                         engine: engine,
                         storeManager: storeManager,
                         starting: startingSession,
+                        preferredInput: $preferredInput,
                         onStart: { startSession() },
                         onDrafts: { showDrafts = true },
+                        onLoops: { showLoops = true },
                         onSetups: { showSetups = true }
                     )
                 case .account:
@@ -432,8 +445,13 @@ struct ContentView: View {
         }
         startingSession = true
         destination = .music
-        engine.start(config: DEFAULT_MAPPING, advanced: false)
         if setup == nil { engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true) }
+        engine.start(config: DEFAULT_MAPPING, advanced: false, input: preferredInput)
+    }
+
+    private func changePlayInput(_ input: StudioPlayInput) {
+        preferredInput = input
+        engine.setPlayInput(input)
     }
 
     private func trySharedSound(_ setup: SoundSetup) {
@@ -545,8 +563,8 @@ struct ContentView: View {
         }
         demo.onBeginCapture = { [engine] url in engine.soundFontEngine.startCapture(to: url) }
         demo.onEndCapture = { [engine] in engine.soundFontEngine.stopCapture() }
-        engine.start(config: DEFAULT_MAPPING, advanced: false)
         engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true)
+        engine.start(config: DEFAULT_MAPPING, advanced: false)
     }
     #endif
 
@@ -772,21 +790,7 @@ struct ContentView: View {
                 .frame(width: 0, height: 0)
                 .allowsHitTesting(false)
 
-            // Full-screen camera with filter
-            ZStack {
-                CameraView(handTracker: engine.handTracker)
-
-                // Filter overlay
-                if let color = engine.selectedFilter.overlayColor {
-                    color.opacity(engine.selectedFilter.overlayOpacity)
-                        .blendMode(engine.selectedFilter.blendMode)
-                }
-            }
-            .saturation(engine.selectedFilter.saturation)
-            .contrast(engine.selectedFilter.contrast)
-            .brightness(engine.selectedFilter.brightness)
-            .hueRotation(.degrees(engine.selectedFilter.hueRotation))
-            .ignoresSafeArea()
+            performanceBackdrop
 
             // The Weave — the music made visible. Lives under the hand
             // skeleton so your hands stay the clear instrument. Melodic-family
@@ -914,6 +918,7 @@ struct ContentView: View {
                     melodyOctaveShift: engine.chordMelodyModeManager.currentMelodyOctaveShift
                 )
                 .ignoresSafeArea()
+                .accessibilityHidden(true)
 
                 // Multitouch / drag layer on top of the visualization. Each
                 // finger lights up its zone and re-fires when it crosses into
@@ -923,6 +928,8 @@ struct ContentView: View {
                     melodyCount: melodyCount,
                     swapHands: engine.chordMelodySwapHands,
                     enabled: !engine.isPaused && scenePhase == .active,
+                    chordLabels: chordNames,
+                    melodyLabels: melodyMidis.map { midiNoteName($0) },
                     onZoneEnter: { voice, zone in splitTouchEnter(parentVoice: voice, zone: zone) },
                     onZoneExit: { voice in splitTouchExit(parentVoice: voice) },
                     touchedChordSubzones: $splitTouchChordZones,
@@ -955,7 +962,9 @@ struct ContentView: View {
                     onPlayAgain: {
                         if let song = engine.currentLearnSong { engine.loadLearnSong(song) }
                     },
-                    onPickSong: { showLearnPicker = true }
+                    onPickSong: { showLearnPicker = true },
+                    onTapLane: engine.tapLearnLane,
+                    onViewportChange: engine.updateLearnViewport
                 )
                 .ignoresSafeArea()
             }
@@ -986,8 +995,17 @@ struct ContentView: View {
                     backingControls(backing)
                         .padding(.horizontal, 16)
                 }
-                if hasSeenOnboarding || !engine.scaleChordMelodyModeEnabled {
-                    CameraRecoveryBanner(tracker: engine.handTracker)
+                if !isRecording, !recorderBusy, recordCountdown == 0,
+                   hasSeenOnboarding || !engine.scaleChordMelodyModeEnabled {
+                    cameraInputStatus
+                }
+                if let issue = engine.auxiliaryAudioIssue, !isRecording, recordCountdown == 0 {
+                    Text(issue)
+                        .font(.caption).multilineTextAlignment(.center)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 16)
+                        .allowsHitTesting(false)
                 }
 
                 // Floating code pill — hide in grid/drum/learn/chord/soundfont mode
@@ -1054,7 +1072,7 @@ struct ContentView: View {
                 DragGesture(minimumDistance: 50)
                     .onEnded { value in
                         // Don't swipe filters while using drum XY pad or grid
-                        guard !engine.drumModeEnabled && !engine.gridModeEnabled && !showBackingMixer else { return }
+                        guard engine.playInput == .air, !engine.drumModeEnabled && !engine.gridModeEnabled && !showBackingMixer else { return }
                         guard abs(value.translation.width) > abs(value.translation.height) else { return }
                         let filters = CAMERA_FILTERS.filter { !$0.isPremium || storeManager.isUnlocked($0.packId ?? "") }
                         guard let currentIdx = filters.firstIndex(where: { $0.id == engine.selectedFilter.id }) else { return }
@@ -1084,12 +1102,51 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showSheet) {
-            ControlSheet(engine: engine, storeManager: storeManager, hideSkeletonWhenRecording: $hideSkeletonWhenRecording,
+            ControlSheet(engine: engine, storeManager: storeManager,
+                         playInput: Binding(get: { engine.playInput }, set: changePlayInput),
+                         hideSkeletonWhenRecording: $hideSkeletonWhenRecording,
                          recordPerformanceMicrophone: $recordPerformanceMicrophone)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .onAppear { engine.pause() }
                 .onDisappear { engine.resume() }
+        }
+    }
+
+    @ViewBuilder private var performanceBackdrop: some View {
+        if engine.playInput == .air {
+            ZStack {
+                CameraView(handTracker: engine.handTracker)
+                if let color = engine.selectedFilter.overlayColor {
+                    color.opacity(engine.selectedFilter.overlayOpacity).blendMode(engine.selectedFilter.blendMode)
+                }
+            }
+            .saturation(engine.selectedFilter.saturation)
+            .contrast(engine.selectedFilter.contrast)
+            .brightness(engine.selectedFilter.brightness)
+            .hueRotation(.degrees(engine.selectedFilter.hueRotation))
+            .ignoresSafeArea()
+        } else {
+            RadialGradient(colors: [palette.mediaAccent.opacity(0.11), .black], center: .center, startRadius: 10, endRadius: 350)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder private var cameraInputStatus: some View {
+        if engine.playInput == .air {
+            CameraRecoveryBanner(tracker: engine.handTracker, onRetry: engine.startCameraIfRequested) {
+                changePlayInput(.touch)
+            }
+        } else {
+            Label("Camera off", systemImage: "video.slash")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.black.opacity(0.6), in: Capsule())
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("touch-camera-off")
         }
     }
 
@@ -1395,6 +1452,9 @@ struct ContentView: View {
                             Circle().fill(engine.gridOctaveRange == range ? Color.green : Color.white.opacity(0.1))
                         )
                 }
+                .accessibilityLabel(range == 1 ? "One octave" : "\(range) octaves")
+                .accessibilityIdentifier("grid-range-\(range)")
+                .accessibilityAddTraits(engine.gridOctaveRange == range ? .isSelected : [])
             }
         }
         .padding(.horizontal, 8)
@@ -1658,7 +1718,16 @@ struct ContentView: View {
     private var bottomControls: some View {
         HStack(spacing: 16) {
             // Loop record button
-            loopRecordButton
+            VStack(spacing: 2) {
+                loopRecordButton
+                Button("Loops") { showLoops = true }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 44, minHeight: 28)
+                    .background(.black.opacity(0.64), in: Capsule())
+                    .accessibilityIdentifier("stage-loop-shelf")
+                    .disabled(activeAudioLoop != nil || isRecording || recorderBusy || recordCountdown > 0)
+            }
 
             Spacer()
 
@@ -2258,17 +2327,29 @@ private struct CameraRecoveryBanner: View {
     @Environment(\.studioPalette) private var palette
     @ObservedObject var tracker: HandTrackingManager
     @Environment(\.openURL) private var openURL
+    let onRetry: () -> Void
+    let onTouch: () -> Void
 
     var body: some View {
         if let issue = tracker.cameraIssue {
-            HStack {
-                Text(issue).font(.caption)
-                Button("Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(issue.message).font(.caption)
+                HStack {
+                    Button("Use touch only", action: onTouch)
+                        .accessibilityIdentifier("camera-recovery-touch")
+                    if issue == .permissionDenied {
+                        Button("Open Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                        }
+                    } else if issue == .unavailable {
+                        Button("Try camera again", action: onRetry)
+                    }
                 }
                 .font(.caption.weight(.semibold))
+                .buttonStyle(.bordered)
                 .tint(palette.mediaAccent)
             }
+            .foregroundStyle(.white)
             .padding(10)
             .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 20)

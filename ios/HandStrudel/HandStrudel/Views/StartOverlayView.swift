@@ -13,15 +13,38 @@ struct StudioActionStyle: ButtonStyle {
     }
 }
 
+struct StudioInputPicker: View {
+    @Environment(\.studioPalette) private var palette
+    @Binding var selection: StudioPlayInput
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Picker("Play input", selection: $selection) {
+                ForEach(StudioPlayInput.allCases) { input in
+                    Text(input.label).tag(input)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("studio-play-input")
+            Text(selection == .air ? "Use gestures or tap. Gestures use the front camera." : "Play the wheel by touch. The camera stays off.")
+                .font(.caption)
+                .foregroundStyle(palette.muted)
+        }
+    }
+}
+
 struct StartOverlayView: View {
     @Environment(\.studioPalette) private var palette
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let status: String
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
     let starting: Bool
+    @Binding var preferredInput: StudioPlayInput
     let onStart: () -> Void
     let onDrafts: () -> Void
+    let onLoops: () -> Void
     let onSetups: () -> Void
 
     @State private var showSounds = false
@@ -35,40 +58,19 @@ struct StartOverlayView: View {
     @ScaledMetric(relativeTo: .largeTitle) private var headlineSize = 51.0
 
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    title
-                    heroCard
-                    Spacer(minLength: 0)
-                    startButton
-                    HStack {
-                        Button(action: onDrafts) {
-                            Label("Private drafts", systemImage: "film.stack")
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .accessibilityIdentifier("private-drafts-button")
-                        Button(action: onSetups) {
-                            Label("Presets", systemImage: "square.stack")
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .accessibilityIdentifier("music-presets-button")
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(palette.muted)
-                    if status.hasPrefix("error:") {
-                        Text(status).font(.footnote).foregroundStyle(.orange)
-                    }
+        VStack(spacing: 0) {
+            studioContent
+            VStack(alignment: .leading, spacing: 8) {
+                if status.hasPrefix("error:") {
+                    Text(status).font(.footnote).foregroundStyle(.orange)
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, 18)
-                .padding(.bottom, 20)
-                .frame(maxWidth: 520)
-                .frame(minHeight: geometry.size.height)
-                .frame(maxWidth: .infinity)
+                startButton
             }
-            .scrollIndicators(.hidden)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 12)
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
+            .layoutPriority(1)
         }
         .background(palette.background.ignoresSafeArea())
         .foregroundStyle(palette.ink)
@@ -86,6 +88,51 @@ struct StartOverlayView: View {
             if storeManager.products.isEmpty {
                 await storeManager.loadProducts()
             }
+        }
+    }
+
+    private var studioContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                title
+                StudioInputPicker(selection: $preferredInput).disabled(starting)
+                heroCard
+                libraryShortcuts
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var libraryShortcuts: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+        return layout {
+            libraryShortcut("Private drafts", icon: "film.stack", action: onDrafts)
+                .accessibilityIdentifier("private-drafts-button")
+            libraryShortcut("Presets", icon: "square.stack", action: onSetups)
+                .accessibilityIdentifier("music-presets-button")
+            libraryShortcut("Loops", icon: "repeat", action: onLoops)
+                .accessibilityIdentifier("music-loop-shelf")
+        }
+        .font(.subheadline.weight(.semibold))
+        .buttonStyle(.plain)
+        .foregroundStyle(palette.muted)
+    }
+
+    private func libraryShortcut(_ title: LocalizedStringKey, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
         }
     }
 
@@ -164,7 +211,7 @@ struct StartOverlayView: View {
                     .font(.system(size: headlineSize, weight: .regular, design: .serif))
                     .tracking(-2)
                     .accessibilityAddTraits(.isHeader)
-                Text("Move your hands to make music.")
+                Text("Play music with a gesture or a touch.")
                     .font(.subheadline)
                     .foregroundStyle(palette.muted)
             }
@@ -395,8 +442,11 @@ struct StartOverlayView: View {
             if starting {
                 HStack(spacing: 10) {
                     ProgressView().tint(palette.accent)
-                    Text(status).font(.caption.monospaced())
+                    Text(status)
+                        .font(.caption.monospaced())
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(.vertical, 8)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 54)
                 .accessibilityElement(children: .combine)
@@ -404,10 +454,13 @@ struct StartOverlayView: View {
                 Button { stopPreview(); onStart() } label: {
                     HStack {
                         Text("Start playing")
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                         Spacer()
                         Image(systemName: "arrow.up.right")
                             .accessibilityHidden(true)
                     }
+                    .padding(.vertical, 8)
                 }
                 .buttonStyle(StudioActionStyle())
                 .accessibilityIdentifier("start-button")

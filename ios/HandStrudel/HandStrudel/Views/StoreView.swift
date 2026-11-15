@@ -39,6 +39,8 @@ struct StoreView: View {
                 sectionHeader("HANDSTRUDEL+")
                 subscriptionRow
 
+                RestorePurchasesButton(storeManager: storeManager)
+
                 // Required policy links — also surfaced inside the RevenueCat
                 // paywall, but kept here so they're always reachable from the
                 // Store screen regardless of paywall state.
@@ -272,6 +274,64 @@ struct StoreView: View {
             Text(text)
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundColor(.white.opacity(0.7))
+        }
+    }
+}
+
+struct RestorePurchasesButton: View {
+    @ObservedObject var storeManager: StoreManager
+    var packId: String? = nil
+    var onRestoreStarted: (() -> Void)? = nil
+    var onRestored: (() -> Void)? = nil
+
+    @State private var outcome: StoreManager.RestoreOutcome?
+
+    var body: some View {
+        Button {
+            onRestoreStarted?()
+            Task {
+                guard let result = await storeManager.restorePurchases(for: packId) else { return }
+                if result == .accessAvailable, let onRestored {
+                    onRestored()
+                } else {
+                    outcome = result
+                }
+            }
+        } label: {
+            HStack {
+                if storeManager.isRestoring {
+                    ProgressView()
+                        .tint(.white)
+                        .accessibilityHidden(true)
+                    Text("Restoring Purchases…")
+                } else {
+                    Text("Restore Purchases")
+                }
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundColor(.white.opacity(0.75))
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .disabled(storeManager.isRestoring)
+        .accessibilityIdentifier("store-restore-purchases")
+        .alert(item: $outcome) { result in
+            Alert(title: Text("Restore Purchases"), message: message(for: result))
+        }
+    }
+
+    private func message(for result: StoreManager.RestoreOutcome) -> Text {
+        switch result {
+        case .accessAvailable:
+            return Text("Your available purchases are up to date.")
+        case .noActivePurchases:
+            return Text("No active HandStrudel purchases were found. Check that you’re using the Apple Account you bought them with.")
+        case .requestedItemUnavailable:
+            return Text("Your available purchases are up to date, but they don’t include this item.")
+        case .cancelled:
+            return Text("Restore was canceled. You can try again whenever you’re ready.")
+        case .failed:
+            return Text("We couldn’t restore your purchases. Please try again.")
         }
     }
 }

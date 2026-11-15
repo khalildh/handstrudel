@@ -85,14 +85,15 @@ struct PaywallOverlay: View {
                         .background(Color.green)
                         .cornerRadius(16)
                     }
-                    .disabled(purchasing)
+                    .disabled(purchasing || storeManager.isRestoring)
                     .accessibilityIdentifier("paywall-unlock")
 
-                    Button(action: restoreTapped) {
-                        Text("Restore Purchases")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
+                    RestorePurchasesButton(
+                        storeManager: storeManager,
+                        packId: packId,
+                        onRestoreStarted: { errorMessage = nil },
+                        onRestored: { dismiss() }
+                    )
                     .disabled(purchasing)
 
                     if let errorMessage {
@@ -122,18 +123,6 @@ struct PaywallOverlay: View {
                 }
             } catch {
                 errorMessage = error.localizedDescription
-            }
-            purchasing = false
-        }
-    }
-
-    private func restoreTapped() {
-        purchasing = true
-        errorMessage = nil
-        Task {
-            await storeManager.restorePurchases()
-            if storeManager.isUnlocked(packId) {
-                dismiss()
             }
             purchasing = false
         }

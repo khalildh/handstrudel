@@ -7,14 +7,27 @@ final class AudioExporter {
     }
 
     static func shareCaptured(_ loop: RecordedLoop) throws -> URL {
-        let output = FileManager.default.temporaryDirectory.appending(path: "HandStrudel-\(UUID()).wav")
-        try FileManager.default.copyItem(at: capturedURL(loop.id), to: output)
+        try shareCaptured(at: capturedURL(loop.id), duration: loop.duration, into: FileManager.default.temporaryDirectory)
+    }
+
+    static func shareCaptured(at source: URL, duration: Double, into directory: URL) throws -> URL {
+        let audio = try AVAudioFile(forReading: source)
+        let frames = audio.length
+        // Capture saves duration from the number of frames written. A truncated WAV can still open.
+        guard frames > 0, (duration * audio.fileFormat.sampleRate).rounded() == Double(frames) else {
+            throw SocialError.message("The captured audio file is incomplete.")
+        }
+        let output = directory.appending(path: "HandStrudel-\(UUID()).wav")
+        try FileManager.default.copyItem(at: source, to: output)
         return output
     }
     /// Render a loop to an M4A file and return the URL
     static func exportLoop(_ loop: RecordedLoop, waveform: String = "sawtooth") async throws -> URL {
         let sampleRate: Double = 44100
         let duration = loop.duration
+        guard duration.isFinite, duration > 0, duration <= 120 else {
+            throw SocialError.message("This older loop has an unsupported duration.")
+        }
         let frameCount = AVAudioFrameCount(duration * sampleRate)
 
         let settings: [String: Any] = [
@@ -25,7 +38,7 @@ final class AudioExporter {
         ]
 
         let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(loop.name)_\(Int(Date().timeIntervalSince1970)).m4a")
+            .appendingPathComponent("HandStrudel-\(UUID()).m4a")
 
         // Create a buffer for the entire loop
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!

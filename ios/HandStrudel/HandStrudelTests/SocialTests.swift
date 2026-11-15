@@ -6,6 +6,109 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    func testFeedProgressBoundsSeekInsideClipAndFormatsDuration() throws {
+        XCTAssertNil(FeedPlaybackPosition(duration: .infinity, seconds: 1))
+        XCTAssertNil(FeedPlaybackPosition(duration: 0, seconds: 1))
+        XCTAssertNil(FeedPlaybackPosition(duration: 4, seconds: .nan))
+        let end = try XCTUnwrap(FeedPlaybackPosition(duration: 4, seconds: 9))
+        XCTAssertEqual(end.seconds, 4)
+        XCTAssertGreaterThan(end.seekSeconds, 3.9)
+        XCTAssertLessThan(end.seekSeconds, 4)
+        XCTAssertEqual(FeedPlaybackPosition(duration: 4, seconds: -3)?.seconds, 0)
+        XCTAssertEqual(FeedPlaybackPosition.timeLabel(61), "1:01")
+    }
+
+    @MainActor
+    func testAccessibleWheelReusesFocusAndReleasesAnActivatedNote() async throws {
+        let wheel = SplitTouchUIView(frame: CGRect(x: 0, y: 0, width: 390, height: 790))
+        wheel.updateAccessibleNotes(chords: ["Cmaj7", "Fmaj7"], melody: ["C4", "D4", "E4"])
+        let initial = try XCTUnwrap(wheel.accessibilityElements as? [UIAccessibilityElement])
+        XCTAssertEqual(initial.map(\.accessibilityLabel), ["Chord Cmaj7", "Chord Fmaj7", "Note C4", "Note D4", "Note E4"])
+        XCTAssertEqual(initial[0].accessibilityCustomActions?.count, 2)
+        XCTAssertLessThan(initial[0].accessibilityFrameInContainerSpace.midX, 195)
+        XCTAssertGreaterThan(initial[2].accessibilityFrameInContainerSpace.midX, 195)
+        wheel.swapHands = true
+        wheel.updateAccessibleNotes(chords: ["Dmin7", "G7"], melody: ["D4", "E4", "F4"])
+        let updated = try XCTUnwrap(wheel.accessibilityElements as? [UIAccessibilityElement])
+        XCTAssertTrue(initial[2] === updated[2])
+        XCTAssertEqual(updated[2].accessibilityLabel, "Note D4")
+        XCTAssertLessThan(updated[2].accessibilityFrameInContainerSpace.midX, 195)
+        let released = expectation(description: "Preview voice was released")
+        var voiceID: String?
+        wheel.onZoneEnter = { id, zone in voiceID = id; XCTAssertEqual(zone, .melody(0)) }
+        wheel.onZoneExit = { id in XCTAssertEqual(id, voiceID); released.fulfill() }
+        XCTAssertTrue(updated[2].accessibilityActivate())
+        await fulfillment(of: [released], timeout: 1)
+    }
+    func testWebAudioWaitsForItsPromiseBeforeReportingReady() async throws {
+        var states = ["waiting", "loading", "ready"].makeIterator()
+        var polls = 0
+        try await StrudelBridge.waitForWebAudio(pollNanoseconds: 1_000_000) {
+            polls += 1
+            return states.next()
+        }
+        XCTAssertEqual(polls, 3)
+    }
+
+    func testFailedWebAudioDoesNotMarkTheEngineReady() async throws {
+        do {
+            try await StrudelBridge.waitForWebAudio { "failed" }
+            XCTFail("Failed initialization must not open a WebAudio-only session")
+        } catch {
+            XCTAssertEqual((error as NSError).code, 2)
+        }
+    }
+
+    func testCapturedLoopMixPersistsAndOlderLoopsKeepUnityGain() throws {
+        let suite = "loop-mix-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PersistenceManager(defaults: defaults)
+        var loop = RecordedLoop(events: [], duration: 2, bpm: 120, name: "Test", mode: "scale")
+        let legacy = try JSONDecoder().decode(RecordedLoop.self, from: JSONEncoder().encode(loop))
+        XCTAssertEqual(legacy.effectiveGain, 1)
+        XCTAssertEqual(RecordedLoop.cleanName("  Evening\nLoop  "), "EveningLoop")
+        XCTAssertEqual(RecordedLoop.clampedGain(.nan), 1)
+        XCTAssertEqual(RecordedLoop.clampedGain(-2), 0)
+        loop.name = "Evening Loop"
+        loop.hasCapturedAudio = true
+        loop.gain = 0.35
+        loop.muted = true
+        store.saveLoops([loop])
+        let restored = try XCTUnwrap(store.loadLoops().first)
+        XCTAssertEqual(restored.name, "Evening Loop")
+        XCTAssertEqual(restored.id, loop.id)
+        XCTAssertEqual(restored.playbackGain, 0.35)
+        XCTAssertEqual(restored.effectiveGain, 0)
+        XCTAssertEqual(store.lastLoopBars, 4)
+        store.lastLoopBars = 1
+        store.lastLoopBars = 17
+        XCTAssertEqual(PersistenceManager(defaults: defaults).lastLoopBars, 1)
+    }
+    @MainActor
+    func testAccountDeletionFailureIsUnconfirmedAndDoesNotSignOut() async {
+        var signOutCount = 0
+        let result = await AuthManager.performAccountDeletion(
+            request: { throw URLError(.timedOut) },
+            signOut: { signOutCount += 1 }
+        )
+
+        XCTAssertEqual(result, .unconfirmed)
+        XCTAssertEqual(signOutCount, 0)
+    }
+
+    @MainActor
+    func testAccountDeletionSignsOutAfterSuccessfulRequest() async {
+        var calls: [String] = []
+        let result = await AuthManager.performAccountDeletion(
+            request: { calls.append("delete") },
+            signOut: { calls.append("sign out") }
+        )
+
+        XCTAssertEqual(result, .deleted)
+        XCTAssertEqual(calls, ["delete", "sign out"])
+    }
+
     func testStudioPreviewFollowsSelectedKeyScaleAndChord() throws {
         let free = try XCTUnwrap(CHORD_PROGRESSIONS.first { $0.id == "free" })
         let secondDegree = try XCTUnwrap(ChordProgression.parse("2 5 1"))
@@ -104,6 +207,40 @@ final class SocialTests: XCTestCase {
         XCTAssertFalse(peer.accept(JamHeldState(sequence: 3, voices: ["invalid voice": initial]), now: 4))
     }
 
+    func testJamNativeLongHoldRecoversAfterHeartbeatBlackout() {
+        let chord = JamHeldVoice(pitches: [60, 64, 67, 71], program: 40, waveform: "triangle", velocity: 0.6)
+        let voices = ["pad": chord]
+        var peer = JamPeerState()
+        XCTAssertTrue(peer.accept(JamHeldState(sequence: 1, voices: voices), now: 0))
+
+        // Deliver only every fourth 0.5 s heartbeat for a 12 s native hold.
+        for tick in 1...24 {
+            let now = Double(tick) * 0.5
+            XCTAssertFalse(peer.expire(now: now), "Hold expired at \(now) s")
+            if tick.isMultiple(of: 4) {
+                XCTAssertFalse(peer.accept(JamHeldState(sequence: UInt64(tick + 1), voices: voices), now: now),
+                               "Heartbeat retriggered audio at \(now) s")
+            }
+            XCTAssertEqual(peer.voices, voices)
+        }
+
+        // Lose every heartbeat after 12 s. A duplicate must not renew the watchdog.
+        XCTAssertFalse(peer.accept(JamHeldState(sequence: 25, voices: voices), now: 14))
+        XCTAssertFalse(peer.expire(now: 14.25))
+        XCTAssertTrue(peer.expire(now: 14.5))
+        XCTAssertFalse(peer.accept(JamHeldState(sequence: 25, voices: voices), now: 14.75))
+        XCTAssertTrue(peer.voices.isEmpty)
+
+        // The next fresh snapshot restores the same attack; a heartbeat delayed
+        // until after the release must not bring the chord back.
+        XCTAssertTrue(peer.accept(JamHeldState(sequence: 31, voices: voices), now: 15))
+        XCTAssertEqual(peer.voices, voices)
+        let delayedHeartbeat = JamHeldState(sequence: 32, voices: voices)
+        XCTAssertTrue(peer.accept(JamHeldState(sequence: 33, voices: [:]), now: 16))
+        XCTAssertFalse(peer.accept(delayedHeartbeat, now: 16.5))
+        XCTAssertTrue(peer.voices.isEmpty)
+    }
+
     func testJamCarriesScaleChordAndInstrument() throws {
         let event = JamEvent.notes(pitches: [60, 64, 67, 71], program: 40,
                                    waveform: "triangle", velocity: 0.6, duration: 0.45)
@@ -143,6 +280,33 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(size.width, 720)
         XCTAssertEqual(Int(size.height) % 2, 0)
         XCTAssertEqual(size.height / size.width, 2532.0 / 1170.0, accuracy: 0.01)
+    }
+
+    @MainActor
+    func testFeedClipReportsMissingMediaOnEachPlaybackAttempt() async {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).mp4")
+        for attempt in 1...2 {
+            let failed = expectation(description: "Missing clip reports failure on attempt \(attempt)")
+            let player = AVQueuePlayer()
+            let looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+            let monitor = FeedClipFailureMonitor(player: player, looper: looper) { failed.fulfill() }
+            player.play()
+            await fulfillment(of: [failed], timeout: 5)
+            player.pause()
+            withExtendedLifetime((looper, monitor)) {}
+        }
+    }
+
+    func testPublicCreatorDecodesLikesReceivedAndSupportsOldRows() throws {
+        func creator(_ total: String) throws -> PublicCreator {
+            try JSONDecoder().decode(PublicCreator.self, from: Data(
+                """
+                {"id":"71000000-0000-4000-8000-000000000001","username":"keys","display_name":null\(total)}
+                """.utf8))
+        }
+        XCTAssertEqual(try creator(",\"likes_received\":1243").likesReceived, 1243)
+        XCTAssertEqual(try creator(",\"likes_received\":0").likesReceived, 0)
+        XCTAssertNil(try creator("").likesReceived)
     }
 
     func testFeedVideoDecodes() throws {
@@ -185,6 +349,26 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(search.filter(after: "cursor"), "and(or(\(search.filter)),or(cursor))")
     }
 
+    func testSearchCanBroadenAHandleMissWithoutChangingTheTerm() throws {
+        let handle = try XCTUnwrap(PostSearch(" @Cloud_Music "))
+        XCTAssertTrue(handle.isHandleSearch)
+        let input = try XCTUnwrap(handle.broaderInput)
+        XCTAssertEqual(input, "Cloud_Music")
+
+        let broader = try XCTUnwrap(PostSearch(input))
+        XCTAssertFalse(broader.isHandleSearch)
+        XCTAssertEqual(broader.text, handle.text)
+        XCTAssertTrue(broader.filter.contains(handle.filter))
+        XCTAssertTrue(broader.filter.contains("display_name.imatch"))
+        XCTAssertNil(broader.broaderInput)
+    }
+
+    func testSearchCannotBroadenToAnotherHandleSearch() throws {
+        let handle = try XCTUnwrap(PostSearch("@ @cloud_music"))
+        XCTAssertTrue(handle.isHandleSearch)
+        XCTAssertNil(handle.broaderInput)
+    }
+
     func testCreatorLoadsFromVisibleFeedWhenCreatorViewIsMissing() async throws {
         let client = discoveryClient { request in
             if request.path == "/public_creators" { return Self.missingView }
@@ -210,7 +394,30 @@ final class SocialTests: XCTestCase {
         }
         let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
         let page = try await FeedService.followingPage(user: user, from: client.from)
-        XCTAssertTrue(page.isEmpty)
+        XCTAssertTrue(page.videos.isEmpty)
+        XCTAssertTrue(page.confirmedNoFollows)
+    }
+
+    func testFollowingEmptyViewOnlyClaimsNoFollowsWhenConfirmed() async throws {
+        let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
+        let responses = [
+            (200, "[]", true),
+            (200, "[{\"followee_id\":\"\(Self.discoveryUser)\"}]", false),
+            (403, #"{"code":"42501","message":"permission denied"}"#, false),
+        ]
+        for (status, body, expectedNoFollows) in responses {
+            let client = discoveryClient { request in
+                if request.path == "/following_videos" { return (200, "[]") }
+                XCTAssertEqual(request.path, "/follows")
+                XCTAssertEqual(request.queryItems?.first(where: { $0.name == "follower_id" })?.value,
+                               "eq.\(Self.discoveryViewer)")
+                XCTAssertEqual(request.queryItems?.first(where: { $0.name == "limit" })?.value, "1")
+                return (status, body)
+            }
+            let page = try await FeedService.followingPage(user: user, from: client.from)
+            XCTAssertTrue(page.videos.isEmpty)
+            XCTAssertEqual(page.confirmedNoFollows, expectedNoFollows)
+        }
     }
 
     func testFollowingFallsBackToVisiblePostsWithTheFullPaginationTimestamp() async throws {
@@ -228,9 +435,11 @@ final class SocialTests: XCTestCase {
         }
         let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
         let first = try await FeedService.followingPage(user: user, from: client.from)
-        let post = try XCTUnwrap(first.first)
+        let post = try XCTUnwrap(first.videos.first)
+        XCTAssertFalse(first.confirmedNoFollows)
         let next = try await FeedService.followingPage(user: user, after: post, from: client.from)
-        XCTAssertTrue(next.isEmpty)
+        XCTAssertTrue(next.videos.isEmpty)
+        XCTAssertFalse(next.confirmedNoFollows)
     }
 
     func testFollowingDoesNotHideAnAuthorizationFailure() async throws {
@@ -245,6 +454,37 @@ final class SocialTests: XCTestCase {
         } catch let error as PostgrestError {
             XCTAssertEqual(error.code, "42501")
         }
+    }
+
+    @MainActor
+    func testFollowingModelSeparatesFallbackErrorFromConfirmedEmptyRetry() async throws {
+        let viewer = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
+        let denied = discoveryClient { request in
+            if request.path == "/following_videos" { return Self.missingView }
+            XCTAssertEqual(request.path, "/follows")
+            return (403, #"{"code":"42501","message":"permission denied"}"#)
+        }
+        let model = FeedModel()
+        model.followingOnly = true
+        await model.refresh(user: viewer) { user in
+            try await FeedService.followingPage(user: user, from: denied.from)
+        }
+        XCTAssertEqual(model.error, "Couldn't load posts from creators you follow.")
+        XCTAssertFalse(model.confirmedNoFollows)
+        XCTAssertFalse(model.loading)
+
+        let empty = discoveryClient { request in
+            if request.path == "/following_videos" { return Self.missingView }
+            XCTAssertEqual(request.path, "/follows")
+            return (200, "[]")
+        }
+        await model.refresh(user: viewer) { user in
+            try await FeedService.followingPage(user: user, from: empty.from)
+        }
+        XCTAssertTrue(model.videos.isEmpty)
+        XCTAssertNil(model.error)
+        XCTAssertTrue(model.confirmedNoFollows)
+        XCTAssertFalse(model.loading)
     }
 
     func testMissingBookmarkTableAndLibraryReportThatSavingIsUnavailable() async throws {
@@ -357,6 +597,36 @@ final class SocialTests: XCTestCase {
         started.continuation.finish()
     }
 
+    @MainActor
+    func testCommentRefreshKeepsReplyTargetOutsideFirstPage() async {
+        let target = commentRoot()
+        let firstPage = (0..<FeedService.commentPageSize).map { index in
+            commentRoot(videoID: target.videoId, createdAt: target.createdAt.addingTimeInterval(Double(index + 1)))
+        }
+
+        let refreshedTarget = CommentsView.replyTargetAfterRefresh(target, firstPage: firstPage)
+
+        XCTAssertEqual(refreshedTarget, target)
+    }
+
+    @MainActor
+    func testCommentRefreshUsesLatestRowForSameReplyTarget() async {
+        let target = commentRoot()
+        var fresh = target
+        fresh.likeCount = 1
+        let firstPage = [commentRoot(videoID: target.videoId), fresh]
+
+        let refreshedTarget = CommentsView.replyTargetAfterRefresh(target, firstPage: firstPage)
+
+        XCTAssertEqual(refreshedTarget, fresh)
+        XCTAssertNil(CommentsView.replyTargetAfterRefresh(nil, firstPage: firstPage))
+    }
+
+    private func commentRoot(videoID: UUID = UUID(), createdAt: Date = Date(timeIntervalSince1970: 1)) -> VideoComment {
+        VideoComment(id: UUID(), videoId: videoID, userId: UUID(), parentId: nil, body: "A comment",
+                     createdAt: createdAt, username: "listener", replyCount: 0)
+    }
+
     func testCommentBodyValidationAndReplyDecoding() throws {
         XCTAssertFalse(VideoComment.isValidBody(" \t\n "))
         XCTAssertTrue(VideoComment.isValidBody(" " + String(repeating: "a", count: 300) + "\n"))
@@ -419,6 +689,36 @@ final class SocialTests: XCTestCase {
         defer { capture.discard() }
         XCTAssertThrowsError(try capture.finish())
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    func testCapturedLoopExportRejectsTruncatedWAV() throws {
+        let manager = FileManager.default
+        let directory = manager.temporaryDirectory.appending(path: UUID().uuidString)
+        let exports = directory.appending(path: "Exports")
+        try manager.createDirectory(at: exports, withIntermediateDirectories: true)
+        defer { try? manager.removeItem(at: directory) }
+
+        let source = directory.appending(path: "Capture.wav")
+        let capture = CapturedLoopFile(url: source)
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 480))
+        buffer.frameLength = 480
+        let samples = try XCTUnwrap(buffer.floatChannelData)
+        for channel in 0..<2 {
+            samples[channel].initialize(repeating: 0.25, count: 480)
+        }
+        capture.appendPCM(buffer)
+        let duration = try capture.finish()
+        let original = try Data(contentsOf: source)
+        let shared = try AudioExporter.shareCaptured(at: source, duration: duration, into: exports)
+        XCTAssertEqual(try Data(contentsOf: shared), original)
+
+        // Remove half the 24-bit stereo sample data without changing the header.
+        let truncated = original.dropLast(240 * 2 * 3)
+        try truncated.write(to: source)
+        XCTAssertThrowsError(try AudioExporter.shareCaptured(at: source, duration: duration, into: exports))
+        XCTAssertEqual(try manager.contentsOfDirectory(atPath: exports.path), [shared.lastPathComponent])
+        XCTAssertEqual(try Data(contentsOf: source), truncated)
     }
 
     func testReplayKitSamplePathPreservesGapsAndSkipsOverlaps() throws {
@@ -497,6 +797,53 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(setups.first?.sound.presetDetails, "D Minor · 100 BPM · 1-4-5")
     }
 
+    @MainActor
+    func testPresetPackRoundTripsWithoutReplacingPresetsOrUnlockingPacks() throws {
+        let suite = "pack-test-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let target = PersistenceManager(defaults: defaults)
+        let premiumInstrument = try XCTUnwrap(SOUNDFONT_INSTRUMENTS.first { $0.packId != nil })
+        let sound = SoundSetup(instrument: premiumInstrument.id, waveform: "sine", key: .D, scale: .minor,
+                               progression: "custom", customDegrees: [0, 3, 4], mode: .scalechordmelody,
+                               bpm: 100, useSoundFont: true, autoStrum: true, padVolume: 0.3, gridOctave: 3, gridRange: 2)
+        XCTAssertTrue(target.addPreset(sound, named: "Existing"))
+        let existingID = target.loadSetups().first?.id
+        let portable = NamedSoundSetup(id: UUID(), name: "Portable", sound: sound)
+        let data = try SoundPresetPack([portable, portable]).encoded()
+        let pack = try SoundPresetPack.decode(data)
+        XCTAssertEqual(try target.importPresetPack(pack), 1)
+        XCTAssertEqual(try target.importPresetPack(pack), 0)
+        let saved = target.loadSetups()
+        XCTAssertEqual(saved.map(\.name), ["Portable", "Existing"])
+        XCTAssertEqual(saved.last?.id, existingID)
+        XCTAssertNotEqual(saved.first?.id, portable.id)
+        XCTAssertEqual(saved.first?.sound.requiredPacks, sound.requiredPacks)
+        XCTAssertFalse(EngineController().applySoundSetup(sound, store: StoreManager()))
+
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        payload["version"] = 2
+        XCTAssertThrowsError(try SoundPresetPack.decode(JSONSerialization.data(withJSONObject: payload)))
+        XCTAssertThrowsError(try SoundPresetPack.decode(Data(repeating: 32, count: SoundPresetPack.byteLimit + 1)))
+        XCTAssertThrowsError(try SoundPresetPack([NamedSoundSetup(id: UUID(), name: " ", sound: sound)]))
+        XCTAssertEqual(target.loadSetups().count, 2)
+    }
+
+    @MainActor
+    func testMusicHomeCanSaveTheSelectedScaleWheelBeforeStarting() throws {
+        let engine = EngineController()
+        engine.selectedKey = .E
+        engine.selectedScale = .major
+        engine.scaleUseSoundFont = true
+        engine.chordMelodyProgression = try XCTUnwrap(ChordProgression.parse("2 5 1"))
+        let sound = try XCTUnwrap(engine.soundSetupForSaving)
+        XCTAssertFalse(engine.isRunning)
+        XCTAssertEqual(sound.mode, .scalechordmelody)
+        XCTAssertEqual(sound.key, .E)
+        XCTAssertEqual(sound.customDegrees, [1, 4, 0])
+        XCTAssertTrue(sound.isValid)
+    }
+
     func testPlayAlongCountInUsesFourBeatsAndScalesForHalfSpeed() throws {
         let regular = RecordingCountIn(sourceBPM: 120, halfSpeed: false)
         let halfSpeed = RecordingCountIn(sourceBPM: 120, halfSpeed: true)
@@ -564,18 +911,62 @@ final class SocialTests: XCTestCase {
         try drafts.complete(draft)
         XCTAssertEqual(RecordingDrafts(directory: directory).drafts.first?.recordedAtHalfSpeed, true)
         let full = try await drafts.makeExport(for: draft)
-        defer { try? FileManager.default.removeItem(at: full) }
-        let fullDuration = try await AVURLAsset(url: full).load(.duration).seconds
+        defer { full.remove() }
+        let fullDuration = try await AVURLAsset(url: full.url).load(.duration).seconds
         XCTAssertEqual(fullDuration, 2, accuracy: 0.08)
         draft.trimStart = 1
         draft.trimEnd = 3
         try drafts.saveTrim(draft)
         let trimmed = try await drafts.makeExport(for: draft)
-        defer { try? FileManager.default.removeItem(at: trimmed) }
-        let trimmedDuration = try await AVURLAsset(url: trimmed).load(.duration).seconds
+        defer { trimmed.remove() }
+        let trimmedDuration = try await AVURLAsset(url: trimmed.url).load(.duration).seconds
         let originalDuration = try await AVURLAsset(url: raw).load(.duration).seconds
         XCTAssertEqual(trimmedDuration, 1, accuracy: 0.08)
         XCTAssertEqual(originalDuration, 4, accuracy: 0.08)
+    }
+
+    @MainActor
+    func testHalfSpeedDraftVideoPreservesMusicalPitch() async throws {
+        guard let fixture = ProcessInfo.processInfo.environment["HANDSTRUDEL_HALF_SPEED_AUDIO_FIXTURE"] else {
+            throw XCTSkip("Set TEST_RUNNER_HANDSTRUDEL_HALF_SPEED_AUDIO_FIXTURE to a four-second video with an A440 tone.")
+        }
+        let files = FileManager.default
+        let directory = files.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? files.removeItem(at: directory) }
+        let drafts = RecordingDrafts(directory: directory)
+        let draft = try drafts.begin(instrument: nil, mode: nil, halfSpeed: true)
+        let source = drafts.videoURL(for: draft.id)
+        let original = try Data(contentsOf: URL(fileURLWithPath: fixture))
+        try original.write(to: source)
+        try drafts.complete(draft)
+
+        let video = try await drafts.makeExport(for: draft)
+        defer { video.remove() }
+        let asset = AVURLAsset(url: video.url)
+        let duration = try await asset.load(.duration).seconds
+        XCTAssertEqual(duration, 2, accuracy: 0.1)
+        XCTAssertFalse(try Data(contentsOf: video.url).isEmpty)
+        XCTAssertEqual(try Data(contentsOf: source), original)
+
+        // Decode the audio stream from the finished MP4, not a parallel render.
+        let extractor = try XCTUnwrap(AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A))
+        let audio = directory.appendingPathComponent("decoded-audio.m4a")
+        extractor.outputURL = audio
+        extractor.outputFileType = .m4a
+        await extractor.export()
+        XCTAssertEqual(extractor.status, .completed, extractor.error?.localizedDescription ?? "")
+        let file = try AVAudioFile(forReading: audio)
+        let rate = file.processingFormat.sampleRate
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                                   frameCapacity: AVAudioFrameCount(min(file.length, 192_000))))
+        try file.read(into: buffer)
+        let channel = try XCTUnwrap(buffer.floatChannelData)[0]
+        let range = Int(rate * 0.5)..<Int(rate * 1.5)
+        guard range.upperBound < Int(buffer.frameLength) else { return XCTFail("Missing the center audio") }
+        let crossings = range.filter { channel[$0 - 1] <= 0 && channel[$0] > 0 }.count
+        let peak = range.map { abs(channel[$0]) }.max() ?? 0
+        XCTAssertGreaterThan(peak, 0.01)
+        XCTAssertEqual(Double(crossings) * rate / Double(range.count), 440, accuracy: 15)
     }
 
     @MainActor
@@ -595,6 +986,23 @@ final class SocialTests: XCTestCase {
     }
 
     @MainActor
+    func testDraftTrimClampsBothHandlesAndRejectsInvalidSavedRanges() throws {
+        let trim = try XCTUnwrap(DraftTrimSelection(duration: 4, start: 1, end: 3))
+        XCTAssertEqual(trim.moving(.start, to: -1).start, 0)
+        XCTAssertEqual(trim.moving(.start, to: 4).start, 2.75)
+        XCTAssertEqual(trim.moving(.end, to: -1).end, 1.25)
+        XCTAssertEqual(trim.moving(.end, to: 5).end, 4)
+        XCTAssertEqual(trim.moving(.start, to: .nan), trim)
+        XCTAssertEqual(trim.range.duration.seconds, 2, accuracy: 0.001)
+        XCTAssertNil(DraftTrimSelection(duration: 4, start: 1, end: 5))
+        XCTAssertNil(DraftTrimSelection(duration: 4, start: 3, end: 1))
+        XCTAssertNil(DraftTrimSelection(duration: Double.infinity))
+        let short = try XCTUnwrap(DraftTrimSelection(duration: 0.1))
+        XCTAssertEqual(short.moving(.start, to: 0.09), short)
+        XCTAssertEqual(short.moving(.end, to: 0.01), short)
+    }
+
+    @MainActor
     func testDraftPersistsTrimAndExportsWithoutChangingSource() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -611,20 +1019,133 @@ final class SocialTests: XCTestCase {
         let reopened = RecordingDrafts(directory: dir)
         XCTAssertEqual(reopened.drafts, [draft])
         let export = try await reopened.makeExport(for: draft)
-        defer { try? FileManager.default.removeItem(at: export) }
-        let trimmed = try await AVURLAsset(url: export).load(.duration).seconds
+        defer { export.remove() }
+        let trimmed = try await AVURLAsset(url: export.url).load(.duration).seconds
         let original = try await AVURLAsset(url: source).load(.duration).seconds
         XCTAssertEqual(trimmed, 1, accuracy: 0.1)
         XCTAssertEqual(original, 2, accuracy: 0.1)
         do {
-            let unexpectedAudio = try await reopened.makeExport(for: draft, audioOnly: true)
-            try? FileManager.default.removeItem(at: unexpectedAudio)
+            _ = try await reopened.makeExport(for: draft, audioOnly: true)
             XCTFail("An audio export needs a recorded audio track")
         } catch {
             XCTAssertEqual(error.localizedDescription, "This take doesn't have an audio track to export.")
         }
+        var broken = draft
+        broken.trimEnd = 99
+        do {
+            let unexpected = try await reopened.makeExport(for: broken)
+            unexpected.remove()
+            XCTFail("Invalid saved trim must never export the entire original")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("trim no longer fits"))
+        }
+        XCTAssertEqual(RecordingDrafts(directory: dir).drafts, [draft])
         try reopened.delete(draft)
         XCTAssertTrue(RecordingDrafts(directory: dir).drafts.isEmpty)
+    }
+
+    @MainActor
+    func testDraftExportDiscardsCopyWhenWriterFinishesAfterCancellation() async throws {
+        let files = FileManager.default
+        let dir = files.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try files.createDirectory(at: dir, withIntermediateDirectories: false)
+        defer { try? files.removeItem(at: dir) }
+
+        let task = Task {
+            try await RecordingDraftExport.prepare(in: dir, audioOnly: false) { output in
+                withUnsafeCurrentTask { $0?.cancel() }
+                // Simulate a writer that doesn't observe the cancellation.
+                try Data([1, 2, 3]).write(to: output)
+            }
+        }
+        do {
+            _ = try await task.value
+            XCTFail("A cancelled export should not hand a copy to its consumer")
+        } catch is CancellationError {
+            XCTAssertEqual(try files.contentsOfDirectory(atPath: dir.path), [])
+        }
+    }
+
+    @MainActor
+    func testDraftExportCleansPartialOutputAndRetainsRetryCopyUntilReleased() async throws {
+        struct WriteFailed: Error {}
+        let files = FileManager.default
+        let dir = files.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try files.createDirectory(at: dir, withIntermediateDirectories: false)
+        defer { try? files.removeItem(at: dir) }
+        let data = Data([1, 2, 3])
+
+        do {
+            _ = try await RecordingDraftExport.prepare(in: dir, audioOnly: true) { output in
+                try data.write(to: output)
+                throw WriteFailed()
+            }
+            XCTFail("Expected the export to fail")
+        } catch is WriteFailed {
+            XCTAssertEqual(try files.contentsOfDirectory(atPath: dir.path), [])
+        }
+
+        var copy: RecordingDraftExport? = try await RecordingDraftExport.prepare(in: dir, audioOnly: true) { output in
+            try data.write(to: output)
+        }
+        let url = try XCTUnwrap(copy?.url)
+        withExtendedLifetime(copy) {
+            XCTAssertEqual(url.pathExtension, "m4a")
+            XCTAssertEqual(try? Data(contentsOf: url), data)
+        }
+        copy = nil
+        XCTAssertEqual(try files.contentsOfDirectory(atPath: dir.path), [])
+    }
+
+    @MainActor
+    func testPrivateDraftRenamePersistsWithoutChangingTrimOrVideo() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = RecordingDrafts(directory: directory)
+        var legacy = try store.begin(instrument: "Piano", mode: "Scale", halfSpeed: true)
+        let source = store.videoURL(for: legacy.id)
+        let clip = try await Self.makeClip(width: 180, height: 320, seconds: 2)
+        try FileManager.default.moveItem(at: clip, to: source)
+        try store.complete(legacy)
+        legacy.trimStart = 0.25
+        legacy.trimEnd = 1.5
+        try store.saveTrim(legacy)
+        let originalVideo = try Data(contentsOf: source)
+        let sidecar = source.deletingLastPathComponent().appendingPathComponent("draft.json")
+        let legacyJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: sidecar)) as? [String: Any])
+        XCTAssertNil(legacyJSON["title"])
+
+        let reopened = RecordingDrafts(directory: directory)
+        XCTAssertEqual(reopened.drafts, [legacy])
+        var expected = legacy
+        expected.title = "Evening take"
+        XCTAssertEqual(try reopened.rename(legacy.id, to: " \n Evening\t  take \r\n"), expected)
+        XCTAssertEqual(reopened.drafts, [expected])
+        XCTAssertEqual(RecordingDrafts(directory: directory).drafts, [expected])
+        XCTAssertEqual(try Data(contentsOf: source), originalVideo)
+
+        // A trim edit made from an older snapshot must not overwrite the private name.
+        var newTrim = legacy
+        newTrim.trimEnd = 1.75
+        expected.trimEnd = newTrim.trimEnd
+        XCTAssertEqual(try reopened.saveTrim(newTrim), expected)
+        XCTAssertEqual(RecordingDrafts(directory: directory).drafts, [expected])
+
+        expected.title = nil
+        XCTAssertEqual(try reopened.rename(legacy.id, to: " \n\t "), expected)
+        XCTAssertEqual(RecordingDrafts(directory: directory).drafts, [expected])
+        XCTAssertEqual(try Data(contentsOf: source), originalVideo)
+    }
+
+    func testPrivateDraftTitleNormalizesWhitespaceAndBoundsGraphemes() {
+        let performer = "\u{1F469}\u{200D}\u{1F3A4}"
+        let limit = RecordingDraft.titleLimit
+        XCTAssertEqual(RecordingDraft.normalizedTitle("  A\u{0}  B \n C "), "A B C")
+        XCTAssertNil(RecordingDraft.normalizedTitle("\u{0}\t\n"))
+        XCTAssertEqual(RecordingDraft.normalizedTitle(String(repeating: performer, count: limit + 1)),
+                       String(repeating: performer, count: limit))
+        XCTAssertEqual(RecordingDraft.normalizedTitle(String(repeating: "a", count: limit - 1) + " b")?.count,
+                       limit - 1, "The cutoff must not leave trailing whitespace")
     }
 
     @MainActor

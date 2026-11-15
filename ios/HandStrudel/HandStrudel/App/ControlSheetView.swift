@@ -1,13 +1,17 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ControlSheet: View {
     @Environment(\.studioPalette) private var palette
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
+    @Binding var playInput: StudioPlayInput
     @Binding var hideSkeletonWhenRecording: Bool
     @Binding var recordPerformanceMicrophone: Bool
     @State private var showStore = false
     @State private var showLearnPicker = false
+    @State private var startLessonOnDismiss = false
     @State private var paywallPackId: String?
     @State private var showAudioExport = false
     @State private var audioExportError: String?
@@ -17,31 +21,17 @@ struct ControlSheet: View {
     @State private var soundFontCategory: GMCategory = DEFAULT_SOUNDFONT_INSTRUMENT.category
     @State private var customProgressionText = ""
     @State private var progressionCategory: ProgressionCategory = .essentials
-    /// "Other modes" disclosure — collapsed by default so the mode picker
-    /// surfaces only Split. Auto-expands on appear when the active mode is one
-    /// of the buried ones, so returning users don't have to dig for their mode.
+    /// Keep secondary modes out of the way until the player requests them.
     @State private var showOtherModes = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                // Header with store button
-                HStack {
-                    Spacer()
-                    Button(action: { showStore = true }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "bag.fill")
-                                .font(.system(size: 12, weight: .medium))
-                            Text("Store")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        }
-                        .foregroundColor(palette.ink.opacity(0.7))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(palette.ink.opacity(0.08)))
-                        .overlay(Capsule().stroke(palette.ink.opacity(0.12), lineWidth: 0.5))
-                    }
+                VStack(alignment: .leading, spacing: 8) {
+                    sectionHeader("PLAY INPUT", icon: "hand.tap")
+                    StudioInputPicker(selection: $playInput)
                 }
+                sectionDivider
 
                 if hasModeContextControls {
                     modeSection
@@ -50,6 +40,8 @@ struct ControlSheet: View {
                 harmonySection
                 Button { showSetups = true } label: { Label("Presets", systemImage: "square.stack") }
                     .buttonStyle(.bordered)
+                sectionDivider
+                otherModesPickerSection
 
                 // The Strudel waveform / sampled-instrument picker only has
                 // an audible effect when the active mode is voiced through the
@@ -116,12 +108,11 @@ struct ControlSheet: View {
                     trackSection
                 }
 
-                sectionDivider
-                otherModesPickerSection
-
             }
             .padding(20)
         }
+        .accessibilityIdentifier("music-settings-scroll")
+        .safeAreaInset(edge: .top, spacing: 0) { settingsHeader }
         .background(palette.background.ignoresSafeArea())
         .sheet(isPresented: $showStore) {
             StoreView(storeManager: storeManager)
@@ -132,9 +123,12 @@ struct ControlSheet: View {
                 showSetups = false
             }
         }
-        .sheet(isPresented: $showLearnPicker) {
+        .sheet(isPresented: $showLearnPicker, onDismiss: {
+            if startLessonOnDismiss { startLessonOnDismiss = false; dismiss() }
+        }) {
             LearnSongPicker { song in
                 engine.loadLearnSong(song)
+                startLessonOnDismiss = true
                 showLearnPicker = false
             }
         }
@@ -161,6 +155,47 @@ struct ControlSheet: View {
     }
 
     // MARK: - Helpers
+
+    private var settingsHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                settingsTitle
+                Spacer(minLength: 4)
+                settingsActions
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                settingsTitle
+                settingsActions
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.background)
+        .overlay(alignment: .bottom) { sectionDivider }
+    }
+
+    private var settingsTitle: some View {
+        Text("Music settings")
+            .font(.system(.title2, design: .serif))
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var settingsActions: some View {
+        HStack(spacing: 10) {
+            Button { showStore = true } label: {
+                Image(systemName: "bag")
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("Store")
+            Button("Done") { dismiss() }
+                .fontWeight(.semibold)
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityIdentifier("music-settings-done")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(palette.accent)
+    }
 
     private var sectionDivider: some View {
         Rectangle()
@@ -580,7 +615,25 @@ struct ControlSheet: View {
     /// every other section to find this.
     private var otherModesPickerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            DisclosureGroup(isExpanded: $showOtherModes) {
+            Button { withAnimation(.easeInOut(duration: 0.18)) { showOtherModes.toggle() } } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "ellipsis.circle").accessibilityHidden(true)
+                    Text("Other modes").font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 8)
+                    Text(currentModeName).font(.caption).foregroundStyle(palette.muted)
+                    Image(systemName: showOtherModes ? "chevron.up" : "chevron.down")
+                        .font(.caption).accessibilityHidden(true)
+                }
+                .frame(minHeight: 44)
+                .foregroundStyle(palette.ink)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Other modes")
+            .accessibilityValue(showOtherModes ? "Expanded, \(currentModeName)" : "Collapsed, \(currentModeName)")
+            .accessibilityIdentifier("music-other-modes")
+
+            if showOtherModes {
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
                         modeButton("Split", icon: "circle.lefthalf.filled", mode: .splitChordMelody)
@@ -603,20 +656,27 @@ struct ControlSheet: View {
                         modeButton("Learn", icon: "music.note.list", mode: .learn)
                     }
                 }
-                .padding(.top, 8)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 11))
-                    Text("Other modes")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                }
-                .foregroundColor(palette.ink.opacity(0.45))
             }
-            .tint(palette.ink.opacity(0.5))
-            .onAppear {
-                if currentMode != .splitChordMelody { showOtherModes = true }
-            }
+        }
+        .onAppear {
+            if currentMode != .splitChordMelody && currentMode != .scaleChordMelody { showOtherModes = true }
+        }
+    }
+
+    private var currentModeName: String {
+        switch currentMode {
+        case .melodic: return "Melodic"
+        case .flow: return "Flow"
+        case .hybrid: return "Hybrid"
+        case .lead: return "Lead"
+        case .grid: return "Grid"
+        case .drums: return "Drums"
+        case .learn: return "Learn"
+        case .chordMelody: return "Chord + Melody"
+        case .radialChordMelody: return "Radial"
+        case .splitChordMelody: return "Split"
+        case .scaleChordMelody: return "Scale"
+        case .soundFont: return "SoundFont"
         }
     }
 
@@ -645,6 +705,7 @@ struct ControlSheet: View {
             )
         }
         .accessibilityIdentifier("mode-\(mode.rawValue)")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
     private func soundFontCategoryChip(_ cat: GMCategory) -> some View {
@@ -1313,14 +1374,14 @@ struct ControlSheet: View {
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundColor(.secondary)
                 ForEach(LoopRecorder.barOptions, id: \.self) { bars in
-                    Button(action: { engine.loopRecorder.selectedBars = bars }) {
+                    Button(action: { engine.setLoopRecordingBars(bars) }) {
                         Text("\(bars) bars")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(engine.loopRecorder.selectedBars == bars ? palette.accent : .secondary)
+                            .foregroundColor(engine.loopRecordingBars == bars ? palette.accent : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(
-                                Capsule().fill(engine.loopRecorder.selectedBars == bars ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
+                                Capsule().fill(engine.loopRecordingBars == bars ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
                             )
                     }
                 }
@@ -1476,6 +1537,147 @@ struct ControlSheet: View {
     }
 }
 
+struct LoopShelfView: View {
+    @Environment(\.studioPalette) private var palette
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var engine: EngineController
+    @State private var renameTarget: RecordedLoop?
+    @State private var nextName = ""
+    @State private var deleteTarget: RecordedLoop?
+    @State private var exportURL: URL?
+    @State private var isExporting = false
+    @State private var message: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    Label("PRIVATE AUDIO LIBRARY", systemImage: "waveform")
+                        .font(.caption.monospaced().weight(.semibold)).foregroundStyle(palette.accent)
+                    Text("Loop shelf").font(.system(.largeTitle, design: .serif)).accessibilityAddTraits(.isHeader)
+                    Text(engine.isRunning ? "Layer loops with the live instrument." : "Preview captured audio without opening the wheel.")
+                        .font(.subheadline).foregroundStyle(palette.muted)
+                    Picker("New recording length", selection: Binding(get: { engine.loopRecordingBars }, set: engine.setLoopRecordingBars)) {
+                        ForEach(LoopRecorder.barOptions, id: \.self) { bars in
+                            Text(bars == 1 ? "1 bar" : "\(bars) bars").tag(bars)
+                        }
+                    }
+                    .accessibilityIdentifier("loop-recording-length")
+                    if engine.savedLoops.isEmpty {
+                        Label("No loops yet", systemImage: "repeat").font(.headline)
+                        Text("Tap the repeat button on the wheel to capture app audio.")
+                            .font(.subheadline).foregroundStyle(palette.muted)
+                    }
+                    ForEach(engine.savedLoops) { loop in loopRow(loop) }
+                    if isExporting { ProgressView("Preparing audio") }
+                }
+                .padding(20)
+                .frame(maxWidth: 540)
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .background(palette.background.ignoresSafeArea())
+            .foregroundStyle(palette.ink)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        .tint(palette.accent)
+        .onDisappear {
+            engine.persistLoops()
+            if !engine.isRunning { engine.stopAllLoops() }
+        }
+        .sheet(item: $exportURL) { url in
+            ShareSheet(activityItems: [url])
+                .onDisappear { try? FileManager.default.removeItem(at: url) }
+        }
+        .alert("Rename loop", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } }),
+               presenting: renameTarget) { loop in
+            TextField("Loop name", text: $nextName)
+            Button("Save") { _ = engine.renameLoop(loop.id, to: nextName) }
+                .disabled(RecordedLoop.cleanName(nextName).isEmpty)
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Delete this loop?", isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
+                            titleVisibility: .visible, presenting: deleteTarget) { loop in
+            Button("Delete loop", role: .destructive) { engine.deleteLoop(loop.id) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in Text("Any WAV copies you've shared will stay where you saved them.") }
+        .alert("Loops", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(message ?? "") }
+    }
+
+    private func loopRow(_ loop: RecordedLoop) -> some View {
+        let playing = engine.playingLoopIds.contains(loop.id)
+        let captured = loop.hasCapturedAudio == true
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Button {
+                    if !engine.toggleLoopPlayback(loop.id) { message = "This loop couldn't play. Its audio file may be unavailable." }
+                } label: {
+                    Image(systemName: playing ? "stop.fill" : "play.fill")
+                        .foregroundStyle(palette.onAccent)
+                        .frame(width: 44, height: 44)
+                        .background(palette.accent, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!captured && !engine.isRunning)
+                .accessibilityLabel("\(playing ? "Stop" : "Play") \(loop.name)")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(loop.name).font(.headline)
+                    Text(captured ? "WAV · \(loop.duration.formatted(.number.precision(.fractionLength(1)))) s" : "Older note-event loop")
+                        .font(.caption.monospacedDigit()).foregroundStyle(palette.muted)
+                }
+                Spacer(minLength: 3)
+                Menu {
+                    Button("Rename", systemImage: "pencil") { nextName = loop.name; renameTarget = loop }
+                    Button(captured ? "Export original WAV" : "Export approximate M4A", systemImage: "square.and.arrow.up") { export(loop) }
+                        .disabled(isExporting)
+                    Button("Delete", systemImage: "trash", role: .destructive) { deleteTarget = loop }
+                } label: {
+                    Image(systemName: "ellipsis.circle").frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Actions for \(loop.name)")
+            }
+            if captured {
+                HStack(spacing: 10) {
+                    Button {
+                        engine.toggleLoopMute(loop.id)
+                    } label: {
+                        Image(systemName: loop.muted == true ? "speaker.slash.fill" : "speaker.wave.2")
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(palette.accent)
+                    .accessibilityLabel(loop.muted == true ? "Unmute \(loop.name)" : "Mute \(loop.name)")
+                    Slider(value: Binding(get: { loop.playbackGain }, set: { engine.setLoopGain($0, for: loop.id) }),
+                           in: 0...1, step: 0.05, onEditingChanged: { if !$0 { engine.persistLoops() } })
+                        .accessibilityLabel("Volume for \(loop.name)")
+                    Text(loop.playbackGain, format: .percent.precision(.fractionLength(0)))
+                        .font(.caption.monospacedDigit()).foregroundStyle(palette.muted)
+                        .accessibilityHidden(true)
+                }
+            } else if !engine.isRunning {
+                Text("Open the wheel to play this older loop.").font(.caption).foregroundStyle(palette.muted)
+            }
+        }
+        .padding(12)
+        .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border).allowsHitTesting(false) }
+    }
+
+    private func export(_ loop: RecordedLoop) {
+        guard !isExporting else { return }
+        isExporting = true
+        Task {
+            defer { isExporting = false }
+            do {
+                if loop.hasCapturedAudio == true { exportURL = try AudioExporter.shareCaptured(loop) }
+                else { exportURL = try await AudioExporter.exportLoop(loop) }
+            } catch { message = "Couldn't export this loop. The original is still saved." }
+        }
+    }
+}
+
 struct SoundSetupsView: View {
     @Environment(\.studioPalette) private var palette
     @ObservedObject var engine: EngineController
@@ -1484,13 +1686,19 @@ struct SoundSetupsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var setups = PersistenceManager.shared.loadSetups()
     @State private var name = ""
+    @State private var choosingImport = false
+    @State private var showingImportReview = false
+    @State private var pendingImport: SoundPresetPack?
+    @State private var showingExport = false
+    @State private var exportDocument: SoundPresetFile?
+    @State private var message: String?
 
     private var cleanName: String { String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40)) }
 
     var body: some View {
         NavigationStack {
             List {
-                if engine.isRunning, let sound = engine.currentSoundSetup, sound.isValid {
+                if let sound = engine.soundSetupForSaving, sound.isValid {
                     Section("Current sound") {
                         TextField("Preset name", text: $name)
                             .accessibilityIdentifier("preset-name")
@@ -1523,6 +1731,10 @@ struct SoundSetupsView: View {
                             }
                         }
                         .disabled(locked || !setup.sound.isValid)
+                        .contextMenu {
+                            Button("Export this preset", systemImage: "square.and.arrow.up") { export([setup]) }
+                                .disabled(!setup.sound.isValid)
+                        }
                     }
                     .onDelete { indices in
                         setups.remove(atOffsets: indices)
@@ -1534,8 +1746,80 @@ struct SoundSetupsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button("Import preset file", systemImage: "square.and.arrow.down") { choosingImport = true }
+                            .accessibilityIdentifier("preset-import")
+                        Button("Export all presets", systemImage: "square.and.arrow.up") { export(setups) }
+                            .accessibilityIdentifier("preset-export")
+                            .disabled(setups.isEmpty)
+                    } label: {
+                        Label("Move or back up presets", systemImage: "arrow.up.arrow.down")
+                    }
+                    .accessibilityIdentifier("preset-transfer")
+                    .accessibilityHint("Preset files carry settings, not recordings or purchased sound packs.")
+                }
             }
         }
         .tint(palette.accent)
+        .fileImporter(isPresented: $choosingImport, allowedContentTypes: [.json]) { result in
+            switch result {
+            case .success(let url):
+                Task {
+                    do {
+                        pendingImport = try await Task.detached(priority: .userInitiated) { try SoundPresetPack.read(from: url) }.value
+                        showingImportReview = true
+                    } catch { message = error.localizedDescription }
+                }
+            case .failure(let error): message = error.localizedDescription
+            }
+        }
+        .fileExporter(isPresented: $showingExport, document: exportDocument,
+                      contentType: .json, defaultFilename: "HandStrudel Presets") { result in
+            if case .failure(let error) = result { message = error.localizedDescription }
+            exportDocument = nil
+        }
+        .confirmationDialog("Import HandStrudel presets?", isPresented: $showingImportReview, titleVisibility: .visible) {
+            Button("Import presets") {
+                guard let pendingImport else { return }
+                self.pendingImport = nil
+                do {
+                    let count = try PersistenceManager.shared.importPresetPack(pendingImport)
+                    setups = PersistenceManager.shared.loadSetups()
+                    message = count == 0 ? "These presets are already saved on this device." : "Imported \(count) of \(pendingImport.presets.count) presets."
+                } catch { message = error.localizedDescription }
+            }
+            Button("Cancel", role: .cancel) { pendingImport = nil }
+        } message: {
+            if let pendingImport {
+                Text("This file contains \(pendingImport.presets.count) presets. Existing presets won't be replaced.")
+            }
+        }
+        .alert("Presets", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(message ?? "") }
+    }
+
+    private func export(_ setups: [NamedSoundSetup]) {
+        do {
+            exportDocument = SoundPresetFile(data: try SoundPresetPack(setups).encoded())
+            showingExport = true
+        } catch { message = error.localizedDescription }
+    }
+}
+
+private struct SoundPresetFile: FileDocument {
+    static let readableContentTypes: [UTType] = [.json]
+    let data: Data
+
+    init(data: Data) { self.data = data }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else { throw CocoaError(.fileReadCorruptFile) }
+        self.data = data
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
     }
 }

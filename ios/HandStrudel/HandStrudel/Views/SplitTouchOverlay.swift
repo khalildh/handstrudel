@@ -14,6 +14,8 @@ struct SplitTouchOverlay: UIViewRepresentable {
     let melodyCount: Int
     let swapHands: Bool
     let enabled: Bool
+    let chordLabels: [String]
+    let melodyLabels: [String]
 
     /// Fired when a touch enters a zone — either on touch-begin or after a
     /// drag crosses into a new zone. The voice ID is unique per touch+zone
@@ -48,6 +50,7 @@ struct SplitTouchOverlay: UIViewRepresentable {
         uiView.onActiveMelodyChanged = { lanes in
             DispatchQueue.main.async { self.touchedMelodyLanes = lanes }
         }
+        uiView.updateAccessibleNotes(chords: chordLabels, melody: melodyLabels)
     }
 
     static func dismantleUIView(_ uiView: SplitTouchUIView, coordinator: ()) {
@@ -66,6 +69,12 @@ struct ChordSubzone: Hashable {
 enum SplitTouchZone: Hashable {
     case chord(ChordSubzone)
     case melody(Int)   // lane
+}
+
+private final class SplitAccessibilityNote: UIAccessibilityElement {
+    var play: (() -> Bool)?
+
+    override func accessibilityActivate() -> Bool { play?() ?? false }
 }
 
 final class SplitTouchUIView: UIView {
@@ -90,10 +99,88 @@ final class SplitTouchUIView: UIView {
         var zone: SplitTouchZone?
     }
     private var states: [UITouch: TouchState] = [:]
+    private var previewVoices: [String: SplitTouchZone] = [:]
     private static var nextVoiceCounter: Int = 0
+    private var chordLabels: [String] = []
+    private var melodyLabels: [String] = []
+    private var accessibleNotes: [SplitTouchZone: SplitAccessibilityNote] = [:]
 
     private let probe = ChordMelodyModeManager()
     private var releaseScheduled = false
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layoutAccessibleNotes()
+    }
+
+    func updateAccessibleNotes(chords: [String], melody: [String]) {
+        chordLabels = chords
+        melodyLabels = melody
+        layoutAccessibleNotes()
+    }
+
+    private func layoutAccessibleNotes() {
+        guard isUserInteractionEnabled, outerR > 0 else { accessibilityElements = []; return }
+        var ordered: [SplitAccessibilityNote] = []
+        let radius = outerR * (ChordMelodyModeManager.splitDeadzone + ChordMelodyModeManager.splitOctaveBandThreshold) / 2
+
+        func insert(_ zone: SplitTouchZone, label: String, id: String, wedge: Int, count: Int, right: Bool) {
+            let note = accessibleNotes[zone] ?? makeAccessibleNote(zone)
+            accessibleNotes[zone] = note
+            note.accessibilityLabel = label
+            note.accessibilityIdentifier = id
+            let angle = Double(wedge) * .pi / Double(count) + .pi / (2 * Double(count))
+            let x = wheelCenter.x + sin(angle) * radius * (right ? 1 : -1)
+            let y = wheelCenter.y - cos(angle) * radius
+            let hitSize = min(44, max(22, .pi * radius / CGFloat(count)))
+            note.accessibilityFrameInContainerSpace = CGRect(x: x - hitSize / 2, y: y - hitSize / 2, width: hitSize, height: hitSize)
+            ordered.append(note)
+        }
+
+        for (index, label) in chordLabels.enumerated() {
+            insert(.chord(ChordSubzone(wedge: index, octave: 0)), label: "Chord \(label)", id: "wheel-chord-\(index)",
+                   wedge: index, count: chordLabels.count, right: swapHands)
+        }
+        for (index, label) in melodyLabels.enumerated() {
+            insert(.melody(index), label: "Note \(label)", id: "wheel-note-\(index)",
+                   wedge: melodyLabels.count - 1 - index, count: melodyLabels.count, right: !swapHands)
+        }
+        if !(accessibilityElements as? [SplitAccessibilityNote] ?? []).elementsEqual(ordered, by: { $0 === $1 }) {
+            accessibilityElements = ordered
+        }
+    }
+
+    private func makeAccessibleNote(_ zone: SplitTouchZone) -> SplitAccessibilityNote {
+        let note = SplitAccessibilityNote(accessibilityContainer: self)
+        note.accessibilityTraits = .button
+        note.accessibilityHint = "Double-tap to play"
+        note.play = { [weak self] in self?.preview(zone) ?? false }
+        if case let .chord(subzone) = zone {
+            note.accessibilityCustomActions = [
+                UIAccessibilityCustomAction(name: "Play an octave lower") { [weak self] _ in
+                    self?.preview(.chord(ChordSubzone(wedge: subzone.wedge, octave: -1))) ?? false
+                },
+                UIAccessibilityCustomAction(name: "Play an octave higher") { [weak self] _ in
+                    self?.preview(.chord(ChordSubzone(wedge: subzone.wedge, octave: 1))) ?? false
+                },
+            ]
+        }
+        return note
+    }
+
+    private func preview(_ zone: SplitTouchZone) -> Bool {
+        guard isUserInteractionEnabled, previewVoices.count < 8, let onZoneEnter else { return false }
+        let voice = allocVoice()
+        previewVoices[voice] = zone
+        onZoneEnter(voice, zone)
+        emit()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak self] in
+            guard let self, self.previewVoices.removeValue(forKey: voice) != nil else { return }
+            self.onZoneExit?(voice)
+            self.emit()
+        }
+        return true
+    }
 
     private func allocVoice() -> String {
         Self.nextVoiceCounter &+= 1
@@ -176,12 +263,13 @@ final class SplitTouchUIView: UIView {
     }
 
     func scheduleRelease() {
-        guard !states.isEmpty, !releaseScheduled else { return }
+        guard (!states.isEmpty || !previewVoices.isEmpty), !releaseScheduled else { return }
         releaseScheduled = true
         DispatchQueue.main.async {
             self.releaseScheduled = false
-            let voices = self.states.values.compactMap(\.voice)
+            let voices = self.states.values.compactMap(\.voice) + Array(self.previewVoices.keys)
             self.states.removeAll()
+            self.previewVoices.removeAll()
             for voice in voices { self.onZoneExit?(voice) }
             self.emit()
         }
@@ -190,11 +278,10 @@ final class SplitTouchUIView: UIView {
     private func emit() {
         var chords: Set<ChordSubzone> = []
         var melody: Set<Int> = []
-        for state in states.values {
-            switch state.zone {
+        for zone in states.values.compactMap(\.zone) + Array(previewVoices.values) {
+            switch zone {
             case .chord(let sub): chords.insert(sub)
             case .melody(let lane): melody.insert(lane)
-            case nil: break
             }
         }
         onActiveChordChanged?(chords)

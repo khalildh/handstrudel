@@ -1,0 +1,189 @@
+.creator-page .watch-hero-copy {
+  flex: 1;
+}
+
+.creator-library-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--watch-line);
+}
+
+.creator-library-heading h2 {
+  margin: 0;
+}
+
+.creator-search {
+  display: flex;
+  flex: 0 1 365px;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.creator-search-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-inline: 10px 4px;
+  border: 1px solid var(--watch-line);
+  border-radius: 10px;
+  color: var(--watch-muted);
+  background: var(--watch-surface);
+}
+
+.creator-search-field:focus-within {
+  border-color: var(--watch-blue);
+}
+
+.creator-search input, .creator-share-url {
+  min-width: 0;
+  width: 100%;
+  color: var(--watch-ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.creator-search input {
+  min-height: 42px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.creator-search input:focus-visible {
+  outline-offset: 0;
+}
+
+.creator-search input::placeholder {
+  color: var(--watch-muted);
+  font-size: 13px;
+}
+
+.creator-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.creator-search-clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 38px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--watch-blue);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.creator-search-clear:hover {
+  background: var(--watch-blue-soft);
+}
+
+.creator-search-error {
+  flex-basis: 100%;
+  color: var(--watch-ink);
+  font-size: 13px;
+}
+
+.creator-results-status:not(:empty) {
+  margin: 12px 0;
+}
+
+.creator-performances .watch-action[aria-disabled="true"] {
+  opacity: .55;
+  cursor: wait;
+}
+
+.creator-page .creator-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(190px, 45%), 1fr));
+  gap: clamp(10px, 2vw, 16px);
+  list-style: none;
+}
+
+.creator-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--watch-line);
+  border-radius: 14px;
+  background: var(--watch-surface);
+}
+
+.creator-card:hover, .creator-card:focus-within {
+  border-color: var(--watch-blue);
+}
+
+.creator-page .creator-clip {
+  flex: 1;
+  border: 0;
+  background: transparent;
+}
+
+.creator-card .creator-clip-copy {
+  padding: 11px 12px;
+}
+
+.creator-card time {
+  color: var(--watch-muted);
+  font-size: 11px;
+}
+
+.creator-share-profile {
+  margin-top: 12px;
+}
+
+.creator-share-clip > button {
+  position: absolute;
+  inset-block-start: 7px;
+  inset-inline-end: 7px;
+  width: 42px;
+  padding-inline: 0;
+  border-radius: 50%;
+  background: var(--watch-surface);
+  color: var(--watch-blue);
+  font-size: 17px;
+}
+
+.creator-share-status {
+  color: var(--watch-blue);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.creator-share-profile > .creator-share-status:not(:empty) {
+  margin-top: 6px;
+}
+
+.creator-share-clip > .creator-share-status:not(:empty) {
+  margin: 0 12px 8px;
+}
+
+.creator-share-url {
+  display: block;
+  max-width: 26rem;
+  margin-top: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--watch-line);
+  border-radius: 8px;
+  background: var(--watch-surface);
+}
+
+.creator-share-clip .creator-share-url {
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+}
+
+@media (max-width: 760px) {
+  .creator-search {
+    flex-basis: 100%;
+  }
+}

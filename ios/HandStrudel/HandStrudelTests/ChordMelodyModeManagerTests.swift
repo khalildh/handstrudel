@@ -91,6 +91,60 @@ final class ChordMelodyModeManagerTests: XCTestCase {
         XCTAssertFalse(m.melodyResting)
     }
 
+    func testHeldMelodyGlidesThroughShortTrackingDropoutWithoutRetriggering() {
+        let manager = radialManager()
+        XCTAssertTrue(melodyTick(manager, pinch: 0.95, now: 1).contains(where: isMelodyOn))
+        XCTAssertTrue(melodyTick(manager, pinch: nil, now: 1.016).isEmpty)
+        XCTAssertTrue(melodyTick(manager, pinch: nil, now: 1.049).isEmpty)
+        XCTAssertTrue(melodyTick(manager, pinch: 0.95, now: 1.065).isEmpty)
+        XCTAssertTrue(manager.isMelodyHandPinching)
+        XCTAssertTrue(melodyTick(manager, pinch: 0.2, now: 1.066).contains(where: isMelodyOff))
+    }
+
+    func testLongTrackingLossReleasesOnceAndAllowsFreshMelodyAttack() {
+        let manager = radialManager()
+        _ = melodyTick(manager, pinch: 0.95, now: 1)
+        XCTAssertTrue(melodyTick(manager, pinch: nil, now: 1.016).isEmpty)
+        XCTAssertTrue(melodyTick(manager, pinch: nil, now: 1.100).contains(where: isMelodyOff))
+        XCTAssertTrue(melodyTick(manager, pinch: nil, now: 1.150).isEmpty)
+        XCTAssertFalse(manager.isMelodyHandPinching)
+        XCTAssertTrue(melodyTick(manager, pinch: 0.95, now: 1.151).contains(where: isMelodyOn))
+    }
+
+    func testReappearanceAfterLongGapDoesNotSlideAStaleMelodyNote() {
+        let manager = radialManager()
+        _ = melodyTick(manager, pinch: 0.95, now: 1)
+        XCTAssertTrue(melodyTick(manager, pinch: nil, now: 1.020).isEmpty)
+        let resumed = melodyTick(manager, pinch: 0.95, now: 1.150)
+        XCTAssertEqual(resumed.count, 2)
+        XCTAssertTrue(resumed.first.map(isMelodyOff) ?? false)
+        XCTAssertTrue(resumed.last.map(isMelodyOn) ?? false)
+    }
+
+    func testQuantizedMelodyNeverFiresForAnUnseenPendingAttack() {
+        let manager = radialManager()
+        XCTAssertTrue(melodyTick(manager, pinch: 0.95, now: 1, quantize: true).isEmpty)
+        XCTAssertTrue(melodyTick(manager, pinch: nil, now: 1.01, quantize: true, boundary: true).isEmpty)
+        XCTAssertFalse(manager.isMelodyHandPinching)
+    }
+
+    private func melodyTick(_ manager: ChordMelodyModeManager, pinch: Double?, now: TimeInterval,
+                            quantize: Bool = false, boundary: Bool = false) -> [ChordMelodyModeManager.Action] {
+        let hands = HandsState(right: pinch.map { makeHand(pinchX: 0.75, pinchY: 0.3, pinch: $0) })
+        return manager.tick(hands: hands, chordTones: { _ in [] }, melodyTones: { _ in [60, 64, 67] },
+                            quantize: quantize, gridBoundaryCrossed: boundary, now: now)
+    }
+
+    private func isMelodyOn(_ action: ChordMelodyModeManager.Action) -> Bool {
+        if case .melodyOn = action { return true }
+        return false
+    }
+
+    private func isMelodyOff(_ action: ChordMelodyModeManager.Action) -> Bool {
+        if case .melodyOff = action { return true }
+        return false
+    }
+
     // MARK: - splitWedgeIndex (angle → wedge per semicircle)
 
     /// Left semicircle covers angles [180°, 360°). The arc fans from top
@@ -274,6 +328,31 @@ final class ChordMelodyModeManagerTests: XCTestCase {
         XCTAssertEqual(m.currentChordMidi, [62, 65, 69, 72])
         m.touchChordDegree = nil
         XCTAssertTrue((0..<6).flatMap { _ in tick() }.contains(where: isPadOn))
+    }
+
+    func testAccentRetriggerOnlyLetsNewestTimerReleaseThatPitch() {
+        var releases = SamplerAccentReleases()
+        let first = releases.strike(60)
+        let other = releases.strike(67)
+        let second = releases.strike(60)
+
+        XCTAssertFalse(first.replacesEarlierStrike)
+        XCTAssertTrue(second.replacesEarlierStrike)
+        XCTAssertFalse(releases.shouldRelease(60, token: first.token))
+        XCTAssertTrue(releases.shouldRelease(67, token: other.token))
+        XCTAssertTrue(releases.shouldRelease(60, token: second.token))
+        XCTAssertFalse(releases.shouldRelease(60, token: second.token))
+    }
+
+    func testAccentTimerBeforeSilenceCannotReleaseNotesAfterResume() {
+        var releases = SamplerAccentReleases()
+        let beforePause = releases.strike(60)
+        releases.clear()
+        let afterResume = releases.strike(60)
+
+        XCTAssertFalse(afterResume.replacesEarlierStrike)
+        XCTAssertFalse(releases.shouldRelease(60, token: beforePause.token))
+        XCTAssertTrue(releases.shouldRelease(60, token: afterResume.token))
     }
 
     @MainActor

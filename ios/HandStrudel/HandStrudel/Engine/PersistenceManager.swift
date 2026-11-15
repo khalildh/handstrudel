@@ -32,6 +32,20 @@ final class PersistenceManager {
         return true
     }
 
+    @discardableResult
+    func importPresetPack(_ pack: SoundPresetPack) throws -> Int {
+        try pack.validate()
+        let existing = loadSetups()
+        var imported: [NamedSoundSetup] = []
+        for entry in pack.presets {
+            let duplicate = existing.contains { $0.name == entry.name && $0.sound == entry.sound }
+                || imported.contains { $0.name == entry.name && $0.sound == entry.sound }
+            if !duplicate { imported.append(NamedSoundSetup(id: UUID(), name: entry.name, sound: entry.sound)) }
+        }
+        if !imported.isEmpty { saveSetups(imported + existing) }
+        return imported.count
+    }
+
     // MARK: - Settings
 
     var lastPresetId: String? {
@@ -98,6 +112,14 @@ final class PersistenceManager {
 
     // MARK: - Loops
 
+    var lastLoopBars: Int {
+        get {
+            let stored = defaults.integer(forKey: "loopRecordingBars")
+            return LoopRecorder.barOptions.contains(stored) ? stored : 4
+        }
+        set { if LoopRecorder.barOptions.contains(newValue) { defaults.set(newValue, forKey: "loopRecordingBars") } }
+    }
+
     func saveLoops(_ loops: [RecordedLoop]) {
         if let data = try? JSONEncoder().encode(loops) {
             defaults.set(data, forKey: loopsKey)
@@ -152,6 +174,74 @@ struct NamedSoundSetup: Identifiable, Codable {
     let id: UUID
     let name: String
     let sound: SoundSetup
+}
+
+struct SoundPresetPack: Codable {
+    static let byteLimit = 256 * 1024
+    static let countLimit = 128
+    private static let signature = "handstrudel-presets"
+
+    struct Entry: Codable, Equatable {
+        let name: String
+        let sound: SoundSetup
+
+        var isValid: Bool {
+            !name.isEmpty && name.count <= 40 && name == name.trimmingCharacters(in: .whitespacesAndNewlines)
+                && !name.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
+                && sound.isValid
+        }
+    }
+
+    private var format = SoundPresetPack.signature
+    private var version = 1
+    private(set) var presets: [Entry]
+
+    init(_ setups: [NamedSoundSetup]) throws {
+        presets = setups.map { Entry(name: $0.name, sound: $0.sound) }
+        try validate()
+    }
+
+    fileprivate func validate() throws {
+        guard format == Self.signature, version == 1 else { throw PackError.wrongFormat }
+        guard (1...Self.countLimit).contains(presets.count) else { throw PackError.capacity }
+        guard presets.allSatisfy(\.isValid) else { throw PackError.invalidPreset }
+    }
+
+    static func decode(_ data: Data) throws -> Self {
+        guard !data.isEmpty && data.count <= byteLimit else { throw PackError.capacity }
+        guard let pack = try? JSONDecoder().decode(Self.self, from: data) else { throw PackError.wrongFormat }
+        try pack.validate()
+        return pack
+    }
+
+    static func read(from url: URL) throws -> Self {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let file = try FileHandle(forReadingFrom: url)
+        defer { try? file.close() }
+        let data = try file.read(upToCount: byteLimit + 1) ?? Data()
+        return try decode(data)
+    }
+
+    func encoded() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(self)
+        guard data.count <= Self.byteLimit else { throw PackError.capacity }
+        return data
+    }
+
+    enum PackError: LocalizedError {
+        case wrongFormat, capacity, invalidPreset
+
+        var errorDescription: String? {
+            switch self {
+            case .wrongFormat: return "This isn't a compatible HandStrudel preset file."
+            case .capacity: return "Use a preset file with 1 to 128 presets and no more than 256 KB."
+            case .invalidPreset: return "A preset in this file has unsupported or invalid settings. Nothing was imported."
+            }
+        }
+    }
 }
 
 struct SoundSetup: Codable, Equatable {
@@ -215,10 +305,19 @@ struct SoundSetup: Codable, Equatable {
 extension EngineController {
     var currentSoundSetup: SoundSetup? {
         guard !learnModeEnabled, let mode = SoundSetup.Mode(rawValue: currentModeString) else { return nil }
+        return buildSoundSetup(mode: mode, useSoundFont: activeSoundFontRouting)
+    }
+
+    var soundSetupForSaving: SoundSetup? {
+        if isRunning { return currentSoundSetup }
+        return buildSoundSetup(mode: .scalechordmelody, useSoundFont: scaleUseSoundFont)
+    }
+
+    private func buildSoundSetup(mode: SoundSetup.Mode, useSoundFont: Bool) -> SoundSetup {
         return SoundSetup(instrument: selectedSoundFontInstrument.id, waveform: selectedWaveform,
                           key: selectedKey, scale: selectedScale, progression: chordMelodyProgression.id,
                           customDegrees: chordMelodyProgression.isCustom ? chordMelodyProgression.degrees : nil,
-                          mode: mode, bpm: manualBPM, useSoundFont: activeSoundFontRouting,
+                          mode: mode, bpm: manualBPM, useSoundFont: useSoundFont,
                           autoStrum: chordMelodyAutoStrum, padVolume: chordMelodyPadVolume,
                           gridOctave: gridBaseOctave, gridRange: gridOctaveRange)
     }

@@ -20,7 +20,10 @@ export default function WatchFeed() {
   const [input, setInput] = useState("");
   const [search, setSearch] = useState<ReturnType<typeof postSearch>>(null);
   const [searchHint, setSearchHint] = useState(false);
-  const [playOnSelect, setPlayOnSelect] = useState(false);
+  const [autoplayNext, setAutoplayNext] = useState(false);
+  const [mediaFailureFor, setMediaFailureFor] = useState<string>();
+  const [playBlockedFor, setPlayBlockedFor] = useState<string>();
+  const pendingPlay = useRef<string | null>(null);
   const [sharedLink, setSharedLink] = useState<{ id: string; message: string }>();
   const [embedFor, setEmbedFor] = useState<string>();
   const embedInput = useRef<HTMLTextAreaElement>(null);
@@ -34,8 +37,11 @@ export default function WatchFeed() {
   const chords = describeClipChords(setup);
   const author = selected ? creatorHref(selected.username) : null;
   const currentIndex = videos.findIndex((video) => video.id === selected?.id);
+  const previousVideo = currentIndex > 0 ? videos[currentIndex - 1] : undefined;
   const nextVideo = videos[currentIndex + 1];
   const poster = selected ? mediaURL(selected.thumb_key) : undefined;
+  const videoSource = selected ? mediaURL(selected.video_key) : undefined;
+  const mediaFailed = selected && (!videoSource || mediaFailureFor === selected.id);
   const embedURL = selected && isVideoID(selected.id) ? `https://handstrudel.com/embed?v=${selected.id}` : null;
   const embedMarkup = embedURL ? `<iframe src="${embedURL}" title="HandStrudel performance" width="360" height="640" style="max-width:100%;border:0" loading="lazy" allowfullscreen></iframe>` : "";
   const presetDetails = [
@@ -73,9 +79,22 @@ export default function WatchFeed() {
     return () => request.abort();
   }, [id, listed, attempt]);
 
+  const selectedID = selected?.id;
   useEffect(() => {
-    if (playOnSelect) void player.current?.play().catch(() => {});
-  }, [selected?.id, playOnSelect]);
+    if (!selectedID || pendingPlay.current !== selectedID) return;
+    pendingPlay.current = null;
+    let current = true;
+    void player.current?.play().catch((error: unknown) => {
+      if (current && error instanceof DOMException && error.name === "NotAllowedError") setPlayBlockedFor(selectedID);
+    });
+    return () => { current = false; };
+  }, [selectedID]);
+
+  useEffect(() => {
+    const cancelPendingPlay = () => { pendingPlay.current = null; };
+    window.addEventListener("popstate", cancelPendingPlay);
+    return () => window.removeEventListener("popstate", cancelPendingPlay);
+  }, []);
 
   function retry() {
     paging.current?.abort();
@@ -94,7 +113,7 @@ export default function WatchFeed() {
     setMore(false);
     setError("");
     setVideos([]);
-    setPlayOnSelect(false);
+    pendingPlay.current = null;
     setSearch(next);
     if (id) router.replace("/watch", { scroll: false });
   }
@@ -132,13 +151,31 @@ export default function WatchFeed() {
     }
   }
 
-  function choose(video: PublicVideo) {
-    if (video.id === selected?.id) void player.current?.play().catch(() => {});
-    setPlayOnSelect(true);
-    router.push(`/watch?v=${video.id}`, { scroll: false });
-    if (stage.current && stage.current.getBoundingClientRect().top < 0) {
+  function choose(video: PublicVideo, fromAutoplay = false) {
+    if (video.id === selected?.id) {
+      void player.current?.play().catch(() => {});
+      return;
+    }
+    pendingPlay.current = video.id;
+    setPlayBlockedFor(undefined);
+    setMediaFailureFor(undefined);
+    const href = `/watch?v=${video.id}`;
+    if (fromAutoplay) router.replace(href, { scroll: false });
+    else router.push(href, { scroll: false });
+    if (!fromAutoplay && stage.current && stage.current.getBoundingClientRect().top < 0) {
       stage.current.scrollIntoView({ block: "start" });
     }
+  }
+
+  function retryVideo() {
+    const target = player.current;
+    if (!target || !selected) return;
+    setMediaFailureFor(undefined);
+    setPlayBlockedFor(undefined);
+    target.load();
+    void target.play().catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "NotAllowedError") setPlayBlockedFor(selected.id);
+    });
   }
 
   async function share(video: PublicVideo) {
@@ -170,17 +207,48 @@ export default function WatchFeed() {
         <section ref={stage} className="watch-stage" aria-label="Video player">
           {selected ? (
             <>
-              <div className="watch-screen" key={selected.id}>
+              <div className="watch-screen">
                 {poster && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img className="watch-screen-wash" src={poster} alt="" aria-hidden="true" onError={(event) => { event.currentTarget.hidden = true; }} />
+                  <img key={poster} className="watch-screen-wash" src={poster} alt="" aria-hidden="true" onError={(event) => { event.currentTarget.hidden = true; }} />
                 )}
                 <div className="watch-screen-label" aria-hidden="true"><WatchIcon name="wave" /> ON SCREEN</div>
-                <video ref={player} controls playsInline preload="metadata" poster={poster}
-                  src={mediaURL(selected.video_key)}
-                  aria-label={`Performance by @${selected.username}`} />
+                <video ref={player} controls={!mediaFailed} playsInline preload="metadata" poster={poster}
+                  src={videoSource} aria-label={`Performance by @${selected.username}`} aria-hidden={mediaFailed || undefined}
+                  onPlaying={() => setPlayBlockedFor(undefined)}
+                  onError={() => setMediaFailureFor(selected.id)}
+                  onEnded={() => { if (autoplayNext && nextVideo) choose(nextVideo, true); }} />
+                {mediaFailed && (
+                  <div className="watch-media-error">
+                    <p role="status">{videoSource ? "This video couldn't play." : "This video file is unavailable."}</p>
+                    {videoSource && <button type="button" className="watch-action" onClick={retryVideo}>Retry video</button>}
+                  </div>
+                )}
               </div>
+              <section className="watch-queue" aria-label="Playback queue">
+                <div className="watch-queue-nav">
+                  <button type="button" className="watch-action" disabled={!previousVideo}
+                    aria-label="Previous performance" onClick={() => { if (previousVideo) choose(previousVideo); }}>
+                    <WatchIcon name="back" /> <span>Previous</span>
+                  </button>
+                  <button type="button" className="watch-action" disabled={!nextVideo}
+                    aria-label="Next performance" onClick={() => { if (nextVideo) choose(nextVideo); }}>
+                    <span>Next</span> <WatchIcon name="next" />
+                  </button>
+                </div>
+                <div className="watch-queue-copy" aria-live="polite">
+                  <span>{nextVideo ? "UP NEXT" : "QUEUE"}</span>
+                  <strong>{nextVideo ? clipTitle(nextVideo) : more ? "Load more in Discover" : "End of queue"}</strong>
+                </div>
+                <label className="watch-autoplay">
+                  <input type="checkbox" checked={autoplayNext} onChange={(event) => setAutoplayNext(event.target.checked)} />
+                  Autoplay next
+                </label>
+              </section>
               <div className="watch-caption">
+                {playBlockedFor === selected.id && !mediaFailed && (
+                  <p className="watch-inline-status" role="status">Press play to start this video. Your browser paused autoplay.</p>
+                )}
                 <div className="watch-caption-heading">
                   <div>
                     <h2>{clipTitle(selected)}</h2>
@@ -225,6 +293,9 @@ export default function WatchFeed() {
                       <p className="watch-preset watch-preset-chords">
                         <span className="watch-preset-label">{chords.label}:</span>
                         <span>{chords.name}{chords.degrees && ` (${chords.degrees.join("–")})`}</span>
+                        {chords.names && <span className="watch-preset-chord-names">
+                          <span className="watch-preset-label">Chords in this setup: </span>{chords.names.join(" · ")}
+                        </span>}
                       </p>
                     )}
                   </div>
@@ -299,9 +370,6 @@ export default function WatchFeed() {
           {error && videos.length > 0 && <p role="status">{error}</p>}
           {more && <button className="watch-action" type="button" onClick={loadMore} disabled={loadingMore}>
             {loadingMore ? "Loading…" : "Load more"}
-          </button>}
-          {nextVideo && selected && <button className="watch-action watch-next" type="button" onClick={() => choose(nextVideo)}>
-            Next performance <WatchIcon name="next" />
           </button>}
         </section>
       </div>

@@ -60,6 +60,19 @@ struct HandsState {
 }
 
 final class HandTrackingManager: NSObject, ObservableObject {
+    enum CameraIssue {
+        case permissionDenied, restricted, unavailable, interrupted
+
+        var message: String {
+            switch self {
+            case .permissionDenied: return "Camera access is off. You can still play by touch."
+            case .restricted: return "Camera use is restricted. You can still play by touch."
+            case .unavailable: return "Camera unavailable. You can still play by touch."
+            case .interrupted: return "Camera in use. You can still play by touch."
+            }
+        }
+    }
+
     private let captureSession = AVCaptureSession()
     private let videoOutput = AVCaptureVideoDataOutput()
     private let handPoseRequest = VNDetectHumanHandPoseRequest()
@@ -67,7 +80,7 @@ final class HandTrackingManager: NSObject, ObservableObject {
 
     var previewLayer: AVCaptureVideoPreviewLayer?
     var onHandsUpdate: ((HandsState) -> Void)?
-    @Published private(set) var cameraIssue: String?
+    @Published private(set) var cameraIssue: CameraIssue?
     private var requestingCamera = false
     private var wantsCamera = false
     private var captureGeneration = 0
@@ -115,17 +128,20 @@ final class HandTrackingManager: NSObject, ObservableObject {
                     self.requestingCamera = false
                     guard self.wantsCamera else { return }
                     if granted { self.setupAndStart() }
-                    else { self.cameraIssue = "Camera access is off. You can still play by touch." }
+                    else { self.cameraIssue = .permissionDenied }
                 }
             }
             return
         case .authorized:
             setupAndStart()
-        case .denied, .restricted:
-            cameraIssue = "Camera access is off. You can still play by touch."
+        case .denied:
+            cameraIssue = .permissionDenied
+            return
+        case .restricted:
+            cameraIssue = .restricted
             return
         @unknown default:
-            cameraIssue = "Camera unavailable. You can still play by touch."
+            cameraIssue = .unavailable
             return
         }
     }
@@ -136,7 +152,7 @@ final class HandTrackingManager: NSObject, ObservableObject {
         if previewLayer != nil { runCapture(); return }
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
               let input = try? AVCaptureDeviceInput(device: device) else {
-            cameraIssue = "Camera unavailable. You can still play by touch."
+            cameraIssue = .unavailable
             return
         }
 
@@ -191,13 +207,14 @@ final class HandTrackingManager: NSObject, ObservableObject {
                 self.requestingCamera = false
                 guard self.wantsCamera else { return }
                 self.isRunning = running
-                self.cameraIssue = running ? nil : "Camera unavailable. You can still play by touch."
+                self.cameraIssue = running ? nil : .unavailable
             }
         }
     }
 
     func stopSession() {
         wantsCamera = false
+        cameraIssue = nil
         captureGeneration += 1
         if AVCaptureDevice.authorizationStatus(for: .video) != .notDetermined {
             requestingCamera = false
@@ -209,10 +226,14 @@ final class HandTrackingManager: NSObject, ObservableObject {
     @objc private func captureInterrupted(_ notification: Notification) {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.wantsCamera else { return }
-            self.cameraIssue = "Camera in use. You can still play by touch."
+            self.cameraIssue = .interrupted
             self.onHandsUpdate?(HandsState())
         }
     }
+
+    #if DEBUG
+    func simulatePermissionDeniedForUITest() { cameraIssue = .permissionDenied }
+    #endif
 
     @objc private func captureRecovered(_ notification: Notification) {
         DispatchQueue.main.async { [weak self] in

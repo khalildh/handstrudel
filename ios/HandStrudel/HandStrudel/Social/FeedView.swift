@@ -1,5 +1,6 @@
 import AVFoundation
 import AVKit
+import Combine
 import SwiftUI
 import UIKit
 
@@ -307,14 +308,16 @@ struct FeedView: View {
                 ProgressView("Loading videos")
             } else {
                 Image(systemName: "play.rectangle").font(.system(size: 40)).foregroundStyle(palette.accent)
-                Text(model.error ?? (model.followingOnly ? "No performances from creators you follow yet" : "No performances yet"))
+                Text(emptyFeedTitle)
                     .font(.title3.bold()).multilineTextAlignment(.center)
                 if model.followingOnly {
                     if !auth.isSignedIn {
                         Button("Sign in to follow creators") { showSignIn = true }.buttonStyle(StudioActionStyle())
                     } else {
                         if model.error == nil {
-                            Text("Follow a creator from Latest to see their posts here.")
+                            Text(model.confirmedNoFollows
+                                 ? "Follow a creator from Latest to see their posts here."
+                                 : "New public posts from creators you follow will appear here.")
                                 .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         }
                         Button("Browse latest") { model.followingOnly = false }.buttonStyle(StudioActionStyle())
@@ -329,6 +332,13 @@ struct FeedView: View {
         .padding(24)
         .frame(maxWidth: 360)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var emptyFeedTitle: String {
+        if let error = model.error { return error }
+        guard model.followingOnly else { return "No performances yet" }
+        if auth.isSignedIn, model.confirmedNoFollows { return "You aren't following any creators yet" }
+        return "No performances from creators you follow yet"
     }
 
     private func requireSignIn(_ action: @escaping (UUID) -> Void) {
@@ -409,6 +419,7 @@ final class FeedModel: ObservableObject {
     @Published var loading = false
     @Published var error: String?
     @Published var followingOnly = false
+    @Published private(set) var confirmedNoFollows = false
     @Published private(set) var savedIDs = Set<UUID>()
     private var reachedEnd = false
     private var generation = 0
@@ -431,20 +442,32 @@ final class FeedModel: ObservableObject {
         videos[index].backingEnabled = fresh.backingEnabled
     }
 
-    func refresh(user: UUID?) async {
+    func refresh(user: UUID?, loadFollowingPage: (UUID) async throws -> FeedService.FollowingPage = {
+        try await FeedService.followingPage(user: $0)
+    }) async {
         generation += 1
         let request = generation
         let followingOnly = self.followingOnly
         if viewer != user { savedIDs = []; bookmarkRevision += 1 }
         viewer = user
         loading = true; error = nil; reachedEnd = false
+        confirmedNoFollows = false
         videos = []; current = 0; following = []
         defer { if request == generation { loading = false } }
         guard !followingOnly || user != nil else { return }
         do {
-            let page = try await fetchPage(followingOnly: followingOnly, user: user)
+            let page: [Video]
+            var noFollows = false
+            if followingOnly, let user {
+                let result = try await loadFollowingPage(user)
+                page = result.videos
+                noFollows = result.confirmedNoFollows
+            } else {
+                page = try await FeedService.page()
+            }
             guard !Task.isCancelled, request == generation else { return }
             videos = page
+            confirmedNoFollows = noFollows
             reachedEnd = videos.count < FeedService.pageSize
             await loadPageDetails(page, request: request)
             while !Task.isCancelled, request == generation, !reachedEnd, current >= videos.count - 3 {
@@ -485,10 +508,10 @@ final class FeedModel: ObservableObject {
         _ = await (bookmarks, follows)
     }
 
-    private func fetchPage(after last: Video? = nil, followingOnly: Bool, user: UUID?) async throws -> [Video] {
+    private func fetchPage(after last: Video, followingOnly: Bool, user: UUID?) async throws -> [Video] {
         if followingOnly {
             guard let user else { return [] }
-            return try await FeedService.followingPage(user: user, after: last)
+            return try await FeedService.followingPage(user: user, after: last).videos
         }
         return try await FeedService.page(after: last)
     }
@@ -753,6 +776,7 @@ private struct PublicCreatorView: View {
                     if let creator {
                         CreatorProfileHeader(username: creator.username, displayName: creator.displayName,
                                              avatarKey: creator.avatarKey ?? videos.first?.avatarKey, counts: counts,
+                                             likesReceived: creator.likesReceived,
                                              isOwner: auth.userId == creatorId) {
                             if auth.userId != creatorId {
                                 Button(action: changeFollow) {
@@ -880,11 +904,13 @@ private struct PostSearchView: View {
     var body: some View {
         NavigationStack {
             List {
-                if PostSearch(input) == nil {
-                    Text("Search captions, instruments, or creators. Use @ to search by handle.")
+                if let search = PostSearch(input) {
+                    if results.isEmpty && !busy && !failed {
+                        emptyResults(for: search)
+                    }
+                } else {
+                    Text("Enter at least two characters. Use @ to search posts by creator handle.")
                         .foregroundStyle(.secondary)
-                } else if results.isEmpty && !busy && !failed {
-                    Text("No matching posts.").foregroundStyle(.secondary)
                 }
                 ForEach(results) { video in
                     Button { opened = video } label: { PerformanceListRow(video: video) }
@@ -892,7 +918,8 @@ private struct PostSearchView: View {
                 }
                 if busy { ProgressView("Searching posts") }
                 if failed {
-                    Text("Couldn't load search results.").foregroundStyle(.secondary)
+                    Text(cursor == nil ? "Couldn't load search results." : "Couldn't load more results.")
+                        .foregroundStyle(.secondary)
                     Button("Try again") { loadNextPage() }
                 } else if more && !busy {
                     Button("Load more") { loadNextPage() }
@@ -923,6 +950,28 @@ private struct PostSearchView: View {
             }
         }
         .tint(palette.accent)
+    }
+
+    @ViewBuilder
+    private func emptyResults(for search: PostSearch) -> some View {
+        let broaderInput = search.broaderInput
+        VStack(alignment: .leading, spacing: 6) {
+            Text(search.isHandleSearch ? "No posts match that handle" : "No matching posts")
+                .font(.headline)
+            if broaderInput != nil {
+                Text("Check the handle, or also search captions, instruments, and creator names.")
+                    .foregroundStyle(.secondary)
+            } else if search.isHandleSearch {
+                Text("Check the spelling or try a different handle.")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Try a shorter search, a different instrument, or a creator's name.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        if let broaderInput {
+            Button("Broaden search") { input = broaderInput }
+        }
     }
 
     private func reset() {
@@ -1316,22 +1365,71 @@ private struct FeedCell: View {
     let source: (UUID) -> Void
     @State private var paused = false
     @State private var confirmDelete = false
+    @StateObject private var playback = FeedPlaybackController()
+    @State private var failedClipID: UUID?
+    @State private var playbackAttempt = 0
+
+    private var playbackFailed: Bool { failedClipID == video.id }
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            LoopingPlayer(url: video.videoURL, thumb: video.thumbURL, playing: isCurrent && !paused, muted: muted)
-                .allowsHitTesting(false)
-            Color.clear.contentShape(Rectangle()).onTapGesture { paused.toggle() }
+            LoopingPlayer(url: video.videoURL, thumb: video.thumbURL, playback: playback,
+                          isCurrent: isCurrent, playing: !paused && !playbackFailed,
+                          muted: muted, durationHint: video.durationS) {
+                failedClipID = video.id
+            }
+            .id(playbackAttempt)
+            .allowsHitTesting(false)
+            Color.clear.contentShape(Rectangle()).onTapGesture {
+                if !playbackFailed { paused.toggle() }
+            }
             LinearGradient(colors: [.clear, .black.opacity(0.88)], startPoint: .center, endPoint: .bottom)
                 .allowsHitTesting(false)
-            if paused {
+            if isCurrent && playbackFailed {
+                VStack(spacing: 8) {
+                    Text("Couldn't play this video.")
+                        .font(.subheadline.weight(.semibold))
+                    Button("Retry video") {
+                        failedClipID = nil
+                        paused = false
+                        playbackAttempt += 1
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(palette.mediaAccent)
+                    .foregroundStyle(palette.mediaOnAccent)
+                    .accessibilityIdentifier("feed-retry-video")
+                }
+                .foregroundStyle(.white)
+                .padding(12)
+                .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 12))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if paused && !playbackFailed {
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: 54))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-            HStack(alignment: .bottom, spacing: 12) {
+            VStack(spacing: 0) {
+                postControls
+                if isCurrent && !playbackFailed { FeedProgressStrip(playback: playback) }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 15)
+            .padding(.bottom, isCurrent && !playbackFailed && playback.position != nil ? 3 : 16)
+        }
+        .accessibilityActions {
+            if !playbackFailed {
+                Button(paused ? "Play video" : "Pause video") { paused.toggle() }
+            }
+        }
+        .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive, action: delete)
+        }
+    }
+
+    private var postControls: some View {
+        HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) { author; followButton }
@@ -1402,13 +1500,6 @@ private struct FeedCell: View {
                     } label: { actionIcon("ellipsis") }
                     .accessibilityLabel("More")
                 }
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 15).padding(.bottom, 16)
-        }
-        .accessibilityAction(named: Text(paused ? "Play video" : "Pause video")) { paused.toggle() }
-        .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete", role: .destructive, action: delete)
         }
     }
 
@@ -1527,7 +1618,7 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         func configure(_ c: UICollectionViewCell?, at ip: IndexPath) {
             guard let c, ip.item < parent.videos.count else { return }
             let v = parent.videos[ip.item]
-            c.contentConfiguration = UIHostingConfiguration { parent.cell(v, ip.item == parent.current) }
+            c.contentConfiguration = UIHostingConfiguration { parent.cell(v, ip.item == parent.current).id(v.id) }
                 .margins(.all, 0)
         }
 
@@ -1550,22 +1641,247 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
 
 // MARK: - Looping video
 
+struct FeedPlaybackPosition: Equatable {
+    let duration: Double
+    let seconds: Double
+
+    init?(duration: Double, seconds: Double) {
+        guard duration.isFinite, duration > 0, seconds.isFinite else { return nil }
+        self.duration = duration
+        self.seconds = min(duration, max(0, seconds))
+    }
+
+    // Seeking to the exact end can make AVPlayerLooper jump straight to the next loop.
+    var seekSeconds: Double { min(seconds, max(0, duration - 1.0 / 60)) }
+
+    static func timeLabel(_ seconds: Double) -> String {
+        guard seconds.isFinite else { return "0:00" }
+        let whole = Int(max(0, min(seconds, 86_399)))
+        return "\(whole / 60):\(String(format: "%02d", whole % 60))"
+    }
+}
+
+@MainActor
+private final class FeedPlaybackController: ObservableObject {
+    @Published private(set) var position: FeedPlaybackPosition?
+    private var player: AVQueuePlayer?
+    private var timeObserver: Any?
+    private var isCurrent = false
+    private var wantsPlayback = false
+    private var isTracking = false
+    private var isSeeking = false
+    private var seekID = 0
+    private var durationHint: Double?
+
+    func configure(player newPlayer: AVQueuePlayer, isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?) {
+        if player !== newPlayer {
+            disconnect()
+            player = newPlayer
+        }
+        self.durationHint = durationHint
+        self.wantsPlayback = wantsPlayback
+        if self.isCurrent != isCurrent {
+            self.isCurrent = isCurrent
+            if isCurrent { observe(newPlayer) }
+            else { stopObserving(); cancelSeek() }
+        }
+        syncPlayback()
+    }
+
+    func disconnect(from expectedPlayer: AVQueuePlayer? = nil) {
+        if let expectedPlayer, player !== expectedPlayer { return }
+        stopObserving()
+        cancelSeek()
+        player?.pause()
+        player = nil
+        isCurrent = false
+    }
+
+    func setEditing(_ editing: Bool) {
+        guard isCurrent, editing != isTracking else { return }
+        if editing {
+            cancelSeek()
+            isTracking = true
+            player?.pause()
+        } else {
+            isTracking = false
+            if let position { seek(to: position) }
+            else { syncPlayback() }
+        }
+    }
+
+    func setSeconds(_ seconds: Double) {
+        guard isCurrent, let duration = position?.duration,
+              let next = FeedPlaybackPosition(duration: duration, seconds: seconds) else { return }
+        position = next
+        if !isTracking { seek(to: next) }
+    }
+
+    private func observe(_ owner: AVQueuePlayer) {
+        let interval = CMTime(value: 1, timescale: 5)
+        timeObserver = owner.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self, weak owner] time in
+            MainActor.assumeIsolated {
+                guard let owner, let self else { return }
+                self.sample(owner, time: time)
+            }
+        }
+        Task { @MainActor [weak self, weak owner] in
+            guard let owner else { return }
+            self?.sample(owner, time: owner.currentTime())
+        }
+    }
+
+    private func sample(_ owner: AVQueuePlayer, time: CMTime) {
+        guard isCurrent, !isTracking, !isSeeking, player === owner else { return }
+        let measured = owner.currentItem?.duration.seconds ?? 0
+        let duration = measured.isFinite && measured > 0 ? measured : durationHint ?? 0
+        let next = FeedPlaybackPosition(duration: duration, seconds: time.seconds)
+        if position != next { position = next }
+    }
+
+    private func seek(to position: FeedPlaybackPosition) {
+        guard let player else { return }
+        seekID += 1
+        let id = seekID
+        isSeeking = true
+        player.pause()
+        player.currentItem?.cancelPendingSeeks()
+        let time = CMTime(seconds: position.seekSeconds, preferredTimescale: 600)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self, weak player] _ in
+            Task { @MainActor in
+                guard let self, let player, self.player === player, self.seekID == id else { return }
+                self.isSeeking = false
+                self.sample(player, time: player.currentTime())
+                self.syncPlayback()
+            }
+        }
+    }
+
+    private func cancelSeek() {
+        seekID += 1
+        isTracking = false
+        isSeeking = false
+        player?.currentItem?.cancelPendingSeeks()
+    }
+
+    private func syncPlayback() {
+        guard let player else { return }
+        if isCurrent && wantsPlayback && !isTracking && !isSeeking {
+            if player.timeControlStatus == .paused { player.play() }
+        } else if player.timeControlStatus != .paused {
+            player.pause()
+        }
+    }
+
+    private func stopObserving() {
+        if let timeObserver { player?.removeTimeObserver(timeObserver) }
+        timeObserver = nil
+    }
+}
+
+private struct FeedProgressStrip: View {
+    @Environment(\.studioPalette) private var palette
+    @ObservedObject var playback: FeedPlaybackController
+
+    var body: some View {
+        if let position = playback.position {
+            let elapsed = FeedPlaybackPosition.timeLabel(position.seconds)
+            let duration = FeedPlaybackPosition.timeLabel(position.duration)
+            HStack(spacing: 8) {
+                Slider(value: Binding(get: { position.seconds }, set: playback.setSeconds),
+                       in: 0...position.duration, onEditingChanged: playback.setEditing)
+                    .tint(palette.mediaAccent)
+                    .frame(minHeight: 44)
+                    .accessibilityLabel("Video progress")
+                    .accessibilityValue("\(elapsed) of \(duration)")
+                    .accessibilityIdentifier("feed-video-progress")
+                Text("\(elapsed) / \(duration)")
+                    .font(.caption2.monospacedDigit().weight(.semibold))
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
+@MainActor
+final class FeedClipFailureMonitor {
+    private let player: AVQueuePlayer
+    private var onFailure: (() -> Void)?
+    private var observations: [NSKeyValueObservation] = []
+    private var itemStatus: NSKeyValueObservation?
+    private var itemEndFailure: AnyCancellable?
+
+    init(player: AVQueuePlayer, looper: AVPlayerLooper, onFailure: @escaping () -> Void) {
+        self.player = player
+        self.onFailure = onFailure
+        // The typed KVO payload can omit these Objective-C enum values.
+        observations = [
+            looper.observe(\.status, options: [.initial]) { @Sendable [weak self] looper, _ in
+                if looper.status == .failed { self?.scheduleFailure() }
+            },
+            player.observe(\.status, options: [.initial]) { @Sendable [weak self] player, _ in
+                if player.status == .failed { self?.scheduleFailure() }
+            },
+            player.observe(\.currentItem) { @Sendable [weak self] _, _ in
+                DispatchQueue.main.async { [weak self] in self?.observeCurrentItem() }
+            }
+        ]
+        observeCurrentItem()
+    }
+
+    private func observeCurrentItem() {
+        itemStatus = nil
+        itemEndFailure = nil
+        // The looper plays replicas, not the template item.
+        guard onFailure != nil, let item = player.currentItem else { return }
+        itemStatus = item.observe(\.status, options: [.initial]) { @Sendable [weak self] item, _ in
+            if item.status == .failed { self?.scheduleFailure(for: item) }
+        }
+        itemEndFailure = NotificationCenter.default
+            .publisher(for: AVPlayerItem.failedToPlayToEndTimeNotification, object: item)
+            .sink { @Sendable [weak self, weak item] _ in
+                if let item { self?.scheduleFailure(for: item) }
+            }
+    }
+
+    nonisolated private func scheduleFailure(for item: AVPlayerItem? = nil) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let report = self.onFailure else { return }
+            if let item, self.player.currentItem !== item { return }
+            self.onFailure = nil
+            self.observations.removeAll()
+            self.itemStatus = nil
+            self.itemEndFailure = nil
+            report()
+        }
+    }
+}
+
 private struct LoopingPlayer: UIViewRepresentable {
     let url: URL
     let thumb: URL
+    let playback: FeedPlaybackController
+    let isCurrent: Bool
     let playing: Bool
     let muted: Bool
+    let durationHint: Double?
+    let onFailure: () -> Void
 
     func makeUIView(context: Context) -> PlayerView { PlayerView() }
 
     func updateUIView(_ view: PlayerView, context: Context) {
+        view.onFailure = onFailure
         view.load(url: url, thumb: thumb)
-        view.player?.isMuted = muted
-        if playing { view.player?.play() } else { view.player?.pause() }
+        if view.playback !== playback { view.playback?.disconnect(from: view.player); view.playback = playback }
+        guard let player = view.player else { return }
+        player.isMuted = muted
+        playback.configure(player: player, isCurrent: isCurrent, wantsPlayback: playing, durationHint: durationHint)
     }
 
     static func dismantleUIView(_ view: PlayerView, coordinator: ()) {
-        view.player?.pause()
+        view.playback?.disconnect(from: view.player)
+        view.playback = nil
+        view.stopObservingAndPause()
     }
 
     final class PlayerView: UIView {
@@ -1573,8 +1889,11 @@ private struct LoopingPlayer: UIViewRepresentable {
         private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
         private let thumbView = UIImageView()
         private var looper: AVPlayerLooper?
+        private var failureMonitor: FeedClipFailureMonitor?
         private(set) var player: AVQueuePlayer?
+        var playback: FeedPlaybackController?
         private var loadedURL: URL?
+        var onFailure: (() -> Void)?
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -1592,6 +1911,7 @@ private struct LoopingPlayer: UIViewRepresentable {
 
         func load(url: URL, thumb: URL) {
             guard url != loadedURL else { return }
+            stopObservingAndPause()
             loadedURL = url
             thumbView.image = nil
             thumbView.isHidden = false
@@ -1601,9 +1921,19 @@ private struct LoopingPlayer: UIViewRepresentable {
             }.resume()
             let item = AVPlayerItem(url: url)
             let q = AVQueuePlayer()
-            looper = AVPlayerLooper(player: q, templateItem: item)
+            let looper = AVPlayerLooper(player: q, templateItem: item)
+            self.looper = looper
             player = q
             playerLayer.player = q
+            failureMonitor = FeedClipFailureMonitor(player: q, looper: looper) { [weak self] in
+                self?.player?.pause()
+                self?.onFailure?()
+            }
+        }
+
+        func stopObservingAndPause() {
+            failureMonitor = nil
+            player?.pause()
         }
 
         override func observeValue(forKeyPath keyPath: String?, of object: Any?,

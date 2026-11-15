@@ -1,0 +1,40 @@
+name: Database Tests
+
+on:
+  pull_request:
+    paths:
+      - "supabase/config.toml"
+      - "supabase/migrations/**"
+      - "supabase/tests/database/**"
+      - ".github/workflows/database-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/config.toml"
+      - "supabase/migrations/**"
+      - "supabase/tests/database/**"
+      - ".github/workflows/database-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pgtap:
+    name: Migrations and pgTAP
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
+        with:
+          version: "3.1.0"
+      - name: Apply migrations to a fresh local database
+        run: supabase db start
+      - name: Run database tests against localhost
+        run: supabase test db supabase/tests/database

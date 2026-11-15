@@ -17,11 +17,6 @@
   text-underline-offset: 4px;
 }
 
-.start-watch-link {
-  font-size: 13px;
-  padding: 8px;
-}
-
 * {
   margin: 0;
   padding: 0;
@@ -257,6 +252,57 @@ body {
   letter-spacing: 8px;
   color: var(--bright);
   font-weight: 300;
+}
+
+.start-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  max-width: 100%;
+}
+
+.start-watch-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--left) 35%, var(--border));
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--left);
+  text-decoration: none;
+  line-height: 1.25;
+}
+
+.start-watch-link:hover {
+  background: color-mix(in srgb, var(--left) 9%, var(--panel));
+  border-color: var(--left);
+}
+
+.start-watch-link:focus-visible {
+  outline: 2px solid var(--left);
+  outline-offset: 3px;
+}
+
+.start-watch-link > span {
+  display: grid;
+  gap: 2px;
+}
+
+.start-watch-link strong {
+  font-size: 12px;
+}
+
+.start-watch-link small {
+  color: var(--text);
+  font-size: 10px;
+}
+
+.start-watch-link > svg {
+  flex: none;
 }
 
 #start-btn {
@@ -1249,6 +1295,14 @@ body {
     font-size: 11px;
   }
 
+  .start-options .advanced-toggle {
+    padding-inline: 12px;
+  }
+
+  #start .instrument-row {
+    margin-bottom: 0;
+  }
+
   .preset-btn {
     padding: 8px 14px;
     font-size: 10px;
@@ -1389,6 +1443,10 @@ body {
   #start h1 {
     font-size: 12px;
     letter-spacing: 4px;
+  }
+
+  .start-watch-arrow {
+    display: none;
   }
 }
 
