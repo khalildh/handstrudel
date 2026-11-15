@@ -6,6 +6,17 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    func testFeedProgressBoundsSeekInsideClipAndFormatsDuration() throws {
+        XCTAssertNil(FeedPlaybackPosition(duration: .infinity, seconds: 1))
+        XCTAssertNil(FeedPlaybackPosition(duration: 0, seconds: 1))
+        XCTAssertNil(FeedPlaybackPosition(duration: 4, seconds: .nan))
+        let end = try XCTUnwrap(FeedPlaybackPosition(duration: 4, seconds: 9))
+        XCTAssertEqual(end.seconds, 4)
+        XCTAssertGreaterThan(end.seekSeconds, 3.9)
+        XCTAssertLessThan(end.seekSeconds, 4)
+        XCTAssertEqual(FeedPlaybackPosition(duration: 4, seconds: -3)?.seconds, 0)
+        XCTAssertEqual(FeedPlaybackPosition.timeLabel(61), "1:01")
+    }
     func testStudioPreviewFollowsSelectedKeyScaleAndChord() throws {
         let free = try XCTUnwrap(CHORD_PROGRESSIONS.first { $0.id == "free" })
         let secondDegree = try XCTUnwrap(ChordProgression.parse("2 5 1"))

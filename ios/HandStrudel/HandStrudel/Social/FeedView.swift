@@ -1316,10 +1316,12 @@ private struct FeedCell: View {
     let source: (UUID) -> Void
     @State private var paused = false
     @State private var confirmDelete = false
+    @StateObject private var playback = FeedPlaybackController()
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            LoopingPlayer(url: video.videoURL, thumb: video.thumbURL, playing: isCurrent && !paused, muted: muted)
+            LoopingPlayer(url: video.videoURL, thumb: video.thumbURL, playback: playback,
+                          isCurrent: isCurrent, playing: !paused, muted: muted, durationHint: video.durationS)
                 .allowsHitTesting(false)
             Color.clear.contentShape(Rectangle()).onTapGesture { paused.toggle() }
             LinearGradient(colors: [.clear, .black.opacity(0.88)], startPoint: .center, endPoint: .bottom)
@@ -1331,7 +1333,21 @@ private struct FeedCell: View {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-            HStack(alignment: .bottom, spacing: 12) {
+            VStack(spacing: 0) {
+                postControls
+                if isCurrent { FeedProgressStrip(playback: playback) }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 15).padding(.bottom, isCurrent && playback.position != nil ? 3 : 16)
+        }
+        .accessibilityAction(named: Text(paused ? "Play video" : "Pause video")) { paused.toggle() }
+        .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive, action: delete)
+        }
+    }
+
+    private var postControls: some View {
+        HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) { author; followButton }
@@ -1402,13 +1418,6 @@ private struct FeedCell: View {
                     } label: { actionIcon("ellipsis") }
                     .accessibilityLabel("More")
                 }
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 15).padding(.bottom, 16)
-        }
-        .accessibilityAction(named: Text(paused ? "Play video" : "Pause video")) { paused.toggle() }
-        .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete", role: .destructive, action: delete)
         }
     }
 
@@ -1527,7 +1536,7 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         func configure(_ c: UICollectionViewCell?, at ip: IndexPath) {
             guard let c, ip.item < parent.videos.count else { return }
             let v = parent.videos[ip.item]
-            c.contentConfiguration = UIHostingConfiguration { parent.cell(v, ip.item == parent.current) }
+            c.contentConfiguration = UIHostingConfiguration { parent.cell(v, ip.item == parent.current).id(v.id) }
                 .margins(.all, 0)
         }
 
@@ -1550,22 +1559,190 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
 
 // MARK: - Looping video
 
+struct FeedPlaybackPosition: Equatable {
+    let duration: Double
+    let seconds: Double
+
+    init?(duration: Double, seconds: Double) {
+        guard duration.isFinite, duration > 0, seconds.isFinite else { return nil }
+        self.duration = duration
+        self.seconds = min(duration, max(0, seconds))
+    }
+
+    // Seeking to the exact end can make AVPlayerLooper jump straight to the next loop.
+    var seekSeconds: Double { min(seconds, max(0, duration - 1.0 / 60)) }
+
+    static func timeLabel(_ seconds: Double) -> String {
+        guard seconds.isFinite else { return "0:00" }
+        let whole = Int(max(0, min(seconds, 86_399)))
+        return "\(whole / 60):\(String(format: "%02d", whole % 60))"
+    }
+}
+
+@MainActor
+private final class FeedPlaybackController: ObservableObject {
+    @Published private(set) var position: FeedPlaybackPosition?
+    private var player: AVQueuePlayer?
+    private var timeObserver: Any?
+    private var isCurrent = false
+    private var wantsPlayback = false
+    private var isTracking = false
+    private var isSeeking = false
+    private var seekID = 0
+    private var durationHint: Double?
+
+    func configure(player newPlayer: AVQueuePlayer, isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?) {
+        if player !== newPlayer {
+            disconnect()
+            player = newPlayer
+        }
+        self.durationHint = durationHint
+        self.wantsPlayback = wantsPlayback
+        if self.isCurrent != isCurrent {
+            self.isCurrent = isCurrent
+            if isCurrent { observe(newPlayer) }
+            else { stopObserving(); cancelSeek() }
+        }
+        syncPlayback()
+    }
+
+    func disconnect(from expectedPlayer: AVQueuePlayer? = nil) {
+        if let expectedPlayer, player !== expectedPlayer { return }
+        stopObserving()
+        cancelSeek()
+        player?.pause()
+        player = nil
+        isCurrent = false
+    }
+
+    func setEditing(_ editing: Bool) {
+        guard isCurrent, editing != isTracking else { return }
+        if editing {
+            cancelSeek()
+            isTracking = true
+            player?.pause()
+        } else {
+            isTracking = false
+            if let position { seek(to: position) }
+            else { syncPlayback() }
+        }
+    }
+
+    func setSeconds(_ seconds: Double) {
+        guard isCurrent, let duration = position?.duration,
+              let next = FeedPlaybackPosition(duration: duration, seconds: seconds) else { return }
+        position = next
+        if !isTracking { seek(to: next) }
+    }
+
+    private func observe(_ owner: AVQueuePlayer) {
+        let interval = CMTime(value: 1, timescale: 5)
+        timeObserver = owner.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self, weak owner] time in
+            MainActor.assumeIsolated {
+                guard let owner, let self else { return }
+                self.sample(owner, time: time)
+            }
+        }
+        Task { @MainActor [weak self, weak owner] in
+            guard let owner else { return }
+            self?.sample(owner, time: owner.currentTime())
+        }
+    }
+
+    private func sample(_ owner: AVQueuePlayer, time: CMTime) {
+        guard isCurrent, !isTracking, !isSeeking, player === owner else { return }
+        let measured = owner.currentItem?.duration.seconds ?? 0
+        let duration = measured.isFinite && measured > 0 ? measured : durationHint ?? 0
+        let next = FeedPlaybackPosition(duration: duration, seconds: time.seconds)
+        if position != next { position = next }
+    }
+
+    private func seek(to position: FeedPlaybackPosition) {
+        guard let player else { return }
+        seekID += 1
+        let id = seekID
+        isSeeking = true
+        player.pause()
+        player.currentItem?.cancelPendingSeeks()
+        let time = CMTime(seconds: position.seekSeconds, preferredTimescale: 600)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self, weak player] _ in
+            Task { @MainActor in
+                guard let self, let player, self.player === player, self.seekID == id else { return }
+                self.isSeeking = false
+                self.sample(player, time: player.currentTime())
+                self.syncPlayback()
+            }
+        }
+    }
+
+    private func cancelSeek() {
+        seekID += 1
+        isTracking = false
+        isSeeking = false
+        player?.currentItem?.cancelPendingSeeks()
+    }
+
+    private func syncPlayback() {
+        guard let player else { return }
+        if isCurrent && wantsPlayback && !isTracking && !isSeeking {
+            if player.timeControlStatus == .paused { player.play() }
+        } else if player.timeControlStatus != .paused {
+            player.pause()
+        }
+    }
+
+    private func stopObserving() {
+        if let timeObserver { player?.removeTimeObserver(timeObserver) }
+        timeObserver = nil
+    }
+}
+
+private struct FeedProgressStrip: View {
+    @Environment(\.studioPalette) private var palette
+    @ObservedObject var playback: FeedPlaybackController
+
+    var body: some View {
+        if let position = playback.position {
+            let elapsed = FeedPlaybackPosition.timeLabel(position.seconds)
+            let duration = FeedPlaybackPosition.timeLabel(position.duration)
+            HStack(spacing: 8) {
+                Slider(value: Binding(get: { position.seconds }, set: playback.setSeconds),
+                       in: 0...position.duration, onEditingChanged: playback.setEditing)
+                    .tint(palette.mediaAccent)
+                    .frame(minHeight: 44)
+                    .accessibilityLabel("Video progress")
+                    .accessibilityValue("\(elapsed) of \(duration)")
+                    .accessibilityIdentifier("feed-video-progress")
+                Text("\(elapsed) / \(duration)")
+                    .font(.caption2.monospacedDigit().weight(.semibold))
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
 private struct LoopingPlayer: UIViewRepresentable {
     let url: URL
     let thumb: URL
+    let playback: FeedPlaybackController
+    let isCurrent: Bool
     let playing: Bool
     let muted: Bool
+    let durationHint: Double?
 
     func makeUIView(context: Context) -> PlayerView { PlayerView() }
 
     func updateUIView(_ view: PlayerView, context: Context) {
         view.load(url: url, thumb: thumb)
-        view.player?.isMuted = muted
-        if playing { view.player?.play() } else { view.player?.pause() }
+        if view.playback !== playback { view.playback?.disconnect(from: view.player); view.playback = playback }
+        guard let player = view.player else { return }
+        player.isMuted = muted
+        playback.configure(player: player, isCurrent: isCurrent, wantsPlayback: playing, durationHint: durationHint)
     }
 
     static func dismantleUIView(_ view: PlayerView, coordinator: ()) {
-        view.player?.pause()
+        view.playback?.disconnect(from: view.player)
+        view.playback = nil
     }
 
     final class PlayerView: UIView {
@@ -1574,6 +1751,7 @@ private struct LoopingPlayer: UIViewRepresentable {
         private let thumbView = UIImageView()
         private var looper: AVPlayerLooper?
         private(set) var player: AVQueuePlayer?
+        var playback: FeedPlaybackController?
         private var loadedURL: URL?
 
         override init(frame: CGRect) {

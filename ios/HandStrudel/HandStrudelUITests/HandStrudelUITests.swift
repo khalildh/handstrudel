@@ -218,6 +218,33 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(timeout: 5))
     }
 
+    func testFeedProgressScrubsARealVideoWithoutPaging() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_FEED_MEDIA_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with a real MP4 served from FIXTURE_CLIP.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let first = app.staticTexts["Evening loop"].firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        let slider = app.sliders["feed-video-progress"].firstMatch
+        XCTAssertTrue(slider.waitForExistence(timeout: 8))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.43)).tap()
+        slider.adjust(toNormalizedSliderPosition: 0.82)
+        XCTAssertTrue((slider.value as? String)?.contains("0:03") == true, "Expected seek near three seconds: \(slider.value ?? "none")")
+        XCTAssertTrue(first.isHittable)
+        let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.31))
+        let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.72))
+        lower.press(forDuration: 0.05, thenDragTo: upper)
+        let second = app.staticTexts["Second performance"].firstMatch
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
+    }
+
     func testFeedSwipesBetweenTwoPerformances() throws {
         guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"] else {
             throw XCTSkip("Requires the feed API fixture.")
