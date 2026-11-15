@@ -44,6 +44,7 @@ final class SoundFontEngine {
     private var activeNotes: [String: (midi: UInt8, channel: UInt8)] = [:]
     private var voiceVelocity: [String: UInt8] = [:]
     private let oneShotChannel: UInt8 = 8
+    private var accentReleases = SamplerAccentReleases()
 
     // GM "melodic" bank selectors used by loadSoundBankInstrument.
     private let bankMSB = UInt8(kAUSampler_DefaultMelodicBankMSB) // 0x79
@@ -204,16 +205,19 @@ final class SoundFontEngine {
         guard isAvailable else { return }
         let note = clampMidi(midi)
         let vel = clampVelocity(velocity)
+        let strike = accentReleases.strike(note)
+        if strike.replacesEarlierStrike { sampler.stopNote(note, onChannel: oneShotChannel) }
         sampler.startNote(note, withVelocity: vel, onChannel: oneShotChannel)
-        let channel = oneShotChannel
-        let s = sampler
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(0.05, duration)) {
-            s.stopNote(note, onChannel: channel)
+        let delay = duration.isFinite ? min(60, max(0.05, duration)) : 0.05
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, accentReleases.shouldRelease(note, token: strike.token) else { return }
+            sampler.stopNote(note, onChannel: oneShotChannel)
         }
     }
 
     /// Silence everything — sustained voices and any lingering one-shots.
     func allNotesOff() {
+        accentReleases.clear()
         guard isAvailable else { return }
         for (_, active) in activeNotes {
             sampler.stopNote(active.midi, onChannel: active.channel)
@@ -275,6 +279,24 @@ final class SoundFontEngine {
         print("[soundfont] \(msg)")
         #endif
     }
+}
+
+/// Only the timer for the latest strike of a pitch may release it.
+struct SamplerAccentReleases {
+    private var tokens: [UInt8: UUID] = [:]
+
+    mutating func strike(_ note: UInt8) -> (token: UUID, replacesEarlierStrike: Bool) {
+        let token = UUID()
+        return (token, tokens.updateValue(token, forKey: note) != nil)
+    }
+
+    mutating func shouldRelease(_ note: UInt8, token: UUID) -> Bool {
+        guard tokens[note] == token else { return false }
+        tokens[note] = nil
+        return true
+    }
+
+    mutating func clear() { tokens.removeAll() }
 }
 
 #if DEBUG

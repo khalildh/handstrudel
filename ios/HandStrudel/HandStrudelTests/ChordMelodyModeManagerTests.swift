@@ -276,6 +276,31 @@ final class ChordMelodyModeManagerTests: XCTestCase {
         XCTAssertTrue((0..<6).flatMap { _ in tick() }.contains(where: isPadOn))
     }
 
+    func testAccentRetriggerOnlyLetsNewestTimerReleaseThatPitch() {
+        var releases = SamplerAccentReleases()
+        let first = releases.strike(60)
+        let other = releases.strike(67)
+        let second = releases.strike(60)
+
+        XCTAssertFalse(first.replacesEarlierStrike)
+        XCTAssertTrue(second.replacesEarlierStrike)
+        XCTAssertFalse(releases.shouldRelease(60, token: first.token))
+        XCTAssertTrue(releases.shouldRelease(67, token: other.token))
+        XCTAssertTrue(releases.shouldRelease(60, token: second.token))
+        XCTAssertFalse(releases.shouldRelease(60, token: second.token))
+    }
+
+    func testAccentTimerBeforeSilenceCannotReleaseNotesAfterResume() {
+        var releases = SamplerAccentReleases()
+        let beforePause = releases.strike(60)
+        releases.clear()
+        let afterResume = releases.strike(60)
+
+        XCTAssertFalse(afterResume.replacesEarlierStrike)
+        XCTAssertFalse(releases.shouldRelease(60, token: beforePause.token))
+        XCTAssertTrue(releases.shouldRelease(60, token: afterResume.token))
+    }
+
     @MainActor
     func testSamplerDoesNotReuseBusyChannelForOverlappingPitch() {
         let touching: [(midi: UInt8, channel: UInt8)] = [(60, 0), (64, 1), (67, 2), (71, 3)]
