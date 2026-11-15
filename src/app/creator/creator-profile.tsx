@@ -72,6 +72,7 @@ function CreatorView({ handle }: { handle: string }) {
               <p className="watch-eyebrow"><span /> ARTIST PROFILE</p>
               <h1>{state.creator.display_name || `@${state.creator.username}`}</h1>
               {state.creator.display_name && <p className="watch-intro">@{state.creator.username}</p>}
+              <CreatorLikes count={state.creator.likes_received} />
             </div>
           </div>
           <section className="creator-performances" aria-labelledby="creator-performances-title">
@@ -107,6 +108,11 @@ function CreatorView({ handle }: { handle: string }) {
       <WatchFooter />
     </main>
   );
+}
+
+function CreatorLikes({ count }: { count?: number | null }) {
+  if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) return null;
+  return <p className="creator-likes"><strong>{count.toLocaleString()}</strong> likes received</p>;
 }
 
 function CreatorAvatar({ creator }: { creator: PublicCreator }) {

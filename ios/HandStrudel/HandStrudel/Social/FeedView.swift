@@ -753,6 +753,7 @@ private struct PublicCreatorView: View {
                     if let creator {
                         CreatorProfileHeader(username: creator.username, displayName: creator.displayName,
                                              avatarKey: creator.avatarKey ?? videos.first?.avatarKey, counts: counts,
+                                             likesReceived: creator.likesReceived,
                                              isOwner: auth.userId == creatorId) {
                             if auth.userId != creatorId {
                                 Button(action: changeFollow) {

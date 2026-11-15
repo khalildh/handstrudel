@@ -355,6 +355,9 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(author.waitForExistence(timeout: 8))
         author.tap()
         XCTAssertTrue(app.staticTexts["Loop Maker"].waitForExistence(timeout: 5))
+        let likes = element("profile-likes-received")
+        XCTAssertEqual(likes.label, "Likes received")
+        XCTAssertEqual(likes.value as? String, "42")
         XCTAssertTrue(app.buttons["Share profile"].exists)
         let spotlight = app.buttons["profile-latest-performance"]
         XCTAssertTrue(spotlight.waitForExistence(timeout: 5))
@@ -389,6 +392,9 @@ final class HandStrudelUITests: XCTestCase {
         signInToProfile()
         let edit = app.buttons["Edit profile"]
         XCTAssertTrue(edit.waitForExistence(timeout: 12))
+        let likes = element("profile-likes-received")
+        let zero = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "0"), object: likes)
+        XCTAssertEqual(XCTWaiter.wait(for: [zero], timeout: 5), .completed)
         edit.tap()
         let name = app.textFields["Display name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))

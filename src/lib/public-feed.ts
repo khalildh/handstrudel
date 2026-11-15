@@ -51,6 +51,7 @@ export interface PublicCreator {
   username: string;
   display_name: string | null;
   avatar_key?: string | null;
+  likes_received?: number | null;
 }
 
 export const COMMENT_PAGE_SIZE = 20;

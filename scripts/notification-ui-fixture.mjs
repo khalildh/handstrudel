@@ -94,7 +94,12 @@ createServer((request, response) => {
     }
     case "/rest/v1/public_creators": {
       const handle = url.searchParams.get("username")?.slice(3);
-      return send([{ id: creator, username: "loopmaker", display_name: "Loop Maker" }].filter((item) => !handle || item.username === handle));
+      const id = url.searchParams.get("id")?.slice(3).toLowerCase();
+      const profiles = [
+        { id: creator, username: "loopmaker", display_name: "Loop Maker", likes_received: 42 },
+        { id: viewer, username: "viewer", display_name: displayName, likes_received: 0 },
+      ];
+      return send(profiles.filter((item) => (!handle || item.username === handle) && (!id || item.id === id)));
     }
     case "/rest/v1/activity_inbox": return send([{
       id: "50000000-0000-0000-0000-000000000001", video_id: video, comment_id: reply,

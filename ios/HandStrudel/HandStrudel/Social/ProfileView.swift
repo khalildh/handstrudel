@@ -145,7 +145,8 @@ struct ProfileView: View {
             let current = loadedUser == profile.id
             VStack(alignment: .leading, spacing: 20) {
                 CreatorProfileHeader(username: username, displayName: profile.displayName,
-                                     avatarKey: profile.avatarKey, counts: current ? counts : nil, isOwner: true) {
+                                     avatarKey: profile.avatarKey, counts: current ? counts : nil,
+                                     likesReceived: current ? counts?.likesReceived : nil, isOwner: true) {
                     Button("Edit profile", systemImage: "pencil") { showEdit = true }
                         .buttonStyle(ProfileActionStyle())
                 }
@@ -211,6 +212,7 @@ struct CreatorProfileHeader<Actions: View>: View {
     let displayName: String?
     let avatarKey: String?
     let counts: FeedService.ProfileCounts?
+    let likesReceived: Int?
     let isOwner: Bool
     @ViewBuilder var actions: () -> Actions
 
@@ -283,10 +285,12 @@ struct CreatorProfileHeader<Actions: View>: View {
             stat("Posts", counts?.posts)
             stat("Followers", counts?.followers)
             stat("Following", counts?.following)
+            stat("Likes", likesReceived, spokenName: "Likes received")
+                .accessibilityIdentifier("profile-likes-received")
         }
     }
 
-    private func stat(_ name: String, _ count: Int?) -> some View {
+    private func stat(_ name: String, _ count: Int?, spokenName: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(count?.formatted(.number.notation(.compactName)) ?? "–")
                 .font(.system(.title3, design: .monospaced).weight(.semibold))
@@ -294,7 +298,7 @@ struct CreatorProfileHeader<Actions: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(name)
+        .accessibilityLabel(spokenName ?? name)
         .accessibilityValue(count?.formatted() ?? "Unavailable")
     }
 }

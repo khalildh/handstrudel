@@ -281,6 +281,7 @@ enum FeedService {
         let posts: Int?
         let followers: Int?
         let following: Int?
+        let likesReceived: Int?
     }
 
     static func profileCounts(for id: UUID, owner: Bool = false) async -> ProfileCounts {
@@ -290,7 +291,16 @@ enum FeedService {
             .select("follower_id", head: true, count: .exact).eq("followee_id", value: id).execute().count
         async let following = try? supabase.from("follows")
             .select("followee_id", head: true, count: .exact).eq("follower_id", value: id).execute().count
-        return await ProfileCounts(posts: posts, followers: followers, following: following)
+        async let likesReceived = owner ? publicLikesReceived(for: id) : nil
+        return await ProfileCounts(posts: posts, followers: followers, following: following,
+                                   likesReceived: likesReceived)
+    }
+
+    private static func publicLikesReceived(for id: UUID) async -> Int? {
+        struct Total: Decodable { let likes_received: Int? }
+        let rows: [Total]? = try? await supabase.from("public_creators")
+            .select("likes_received").eq("id", value: id).limit(1).execute().value
+        return rows?.first?.likes_received
     }
 
     static func ownerPage(user: UUID, after last: Video? = nil) async throws -> [Video] {

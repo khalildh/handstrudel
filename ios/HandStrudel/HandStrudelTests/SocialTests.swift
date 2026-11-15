@@ -145,6 +145,18 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(size.height / size.width, 2532.0 / 1170.0, accuracy: 0.01)
     }
 
+    func testPublicCreatorDecodesLikesReceivedAndSupportsOldRows() throws {
+        func creator(_ total: String) throws -> PublicCreator {
+            try JSONDecoder().decode(PublicCreator.self, from: Data(
+                """
+                {"id":"71000000-0000-4000-8000-000000000001","username":"keys","display_name":null\(total)}
+                """.utf8))
+        }
+        XCTAssertEqual(try creator(",\"likes_received\":1243").likesReceived, 1243)
+        XCTAssertEqual(try creator(",\"likes_received\":0").likesReceived, 0)
+        XCTAssertNil(try creator("").likesReceived)
+    }
+
     func testFeedVideoDecodes() throws {
         let json = """
         {"id":"11111111-1111-1111-1111-111111111111","user_id":"00000000-0000-0000-0000-00000000000a",
