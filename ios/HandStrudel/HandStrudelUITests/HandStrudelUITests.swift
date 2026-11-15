@@ -146,6 +146,25 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(range.label, original)
     }
 
+    func testMusicCanSavePresetBeforeOpeningTheWheel() {
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        let library = element("music-presets-button")
+        XCTAssertTrue(library.waitForExistence(timeout: 5))
+        if !library.isHittable { app.swipeUp() }
+        library.tap()
+        let field = app.textFields["preset-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let name = "Home check \(UUID().uuidString.prefix(6))"
+        field.tap()
+        field.typeText(name)
+        app.buttons["Save current preset"].tap()
+        XCTAssertTrue(app.staticTexts[name].exists)
+        XCTAssertTrue(app.buttons["preset-import"].exists)
+        XCTAssertTrue(app.buttons["preset-export"].isEnabled)
+        XCTAssertFalse(element("close-button").exists)
+    }
+
     func testMusic_privateDraftsOpensWithoutAccount() {
         app.launchArguments.append("--uitesting")
         app.launch()
