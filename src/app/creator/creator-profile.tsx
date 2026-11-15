@@ -44,6 +44,7 @@ function CreatorView({ handle }: { handle: string }) {
               <p className="watch-eyebrow"><span /> ARTIST PROFILE</p>
               <h1>{state.creator.display_name || `@${state.creator.username}`}</h1>
               {state.creator.display_name && <p className="watch-intro">@{state.creator.username}</p>}
+              <CreatorLikes count={state.creator.likes_received} />
               <CreatorShare title={state.creator.display_name || `@${state.creator.username}`} getURL={() => {
                 const url = new URL(window.location.href);
                 url.search = new URLSearchParams({ u: state.creator.username }).toString();
@@ -252,6 +253,11 @@ function CreatorShare({ compact = false, title, getURL }: {
         onFocus={(event) => event.currentTarget.select()} />}
     </div>
   );
+}
+
+function CreatorLikes({ count }: { count?: number | null }) {
+  if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) return null;
+  return <p className="creator-likes"><strong>{count.toLocaleString()}</strong> likes received</p>;
 }
 
 function CreatorAvatar({ creator }: { creator: PublicCreator }) {

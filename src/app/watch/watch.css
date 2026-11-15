@@ -233,6 +233,8 @@
 .creator-back { font-size: 13px; margin: 6px 0 13px; }
 .creator-heading { gap: clamp(13px, 4vw, 35px); }
 .creator-heading h1 { font-size: clamp(2.1rem, 5vw, 4.7rem); }
+.creator-likes { margin: 12px 0 0; font-size: 13px; color: var(--watch-muted); }
+.creator-likes strong { color: var(--watch-ink); font-variant-numeric: tabular-nums; }
 .creator-monogram {
   display: grid; place-items: center; flex: 0 0 clamp(65px, 12vw, 128px); aspect-ratio: 1;
   position: relative; overflow: hidden; border: 3px solid #fff; border-radius: 50%; color: var(--watch-blue);
