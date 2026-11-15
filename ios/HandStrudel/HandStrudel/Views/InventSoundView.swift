@@ -14,7 +14,6 @@ struct InventSoundView: View {
     @State private var sampler = SoundFontEngine()
     @State private var preview: Task<Void, Never>?
     @State private var preparation: Task<Void, Never>?
-    @State private var busy = false
     @State private var auditioning: UUID?
     @State private var importWAV = false
     @State private var error: String?
@@ -30,6 +29,7 @@ struct InventSoundView: View {
         }
     }
     private var cleaned: String { prompt.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var busy: Bool { preparation != nil }
 
     var body: some View {
         NavigationStack {
@@ -81,7 +81,15 @@ struct InventSoundView: View {
                             Text("The synth works offline and doesn't use AI.")
                                 .font(.footnote).foregroundStyle(palette.muted)
                         }
-                        if busy { ProgressView("Preparing sound…").font(.footnote) }
+                        if busy {
+                            HStack {
+                                ProgressView("Preparing sound…").font(.footnote)
+                                Spacer()
+                                Button("Cancel", action: cancelPreparation)
+                                    .buttonStyle(.bordered)
+                                    .accessibilityIdentifier("invent-cancel")
+                            }
+                        }
                     }
                     .padding(16)
                     .background(palette.surface, in: RoundedRectangle(cornerRadius: 18))
@@ -128,7 +136,7 @@ struct InventSoundView: View {
         #if targetEnvironment(simulator)
         .task { if aiEnabled { provider = await InventedSound.AudioProvider.available() } }
         #endif
-        .onDisappear { preparation?.cancel(); stopPreview() }
+        .onDisappear { cancelPreparation(); stopPreview() }
         .onChange(of: scenePhase) { if $0 != .active { stopPreview() } }
     }
 
@@ -190,12 +198,17 @@ struct InventSoundView: View {
     }
 
     private func prepare(_ work: @escaping @Sendable () async throws -> [InventedSound]) {
-        preparation?.cancel()
+        cancelPreparation()
         stopPreview()
-        busy = true
         error = nil
+        let delayForUITest = ProcessInfo.processInfo.arguments.contains("--uitesting")
+            && ProcessInfo.processInfo.environment["HANDSTRUDEL_UI_DELAY_SOUND_PROMPT"] == cleaned
         preparation = Task {
-            let worker = Task.detached(priority: .userInitiated) { try await work() }
+            defer { if !Task.isCancelled { preparation = nil } }
+            let worker = Task.detached(priority: .userInitiated) {
+                if delayForUITest { try await Task.sleep(for: .seconds(10)) }
+                return try await work()
+            }
             do {
                 let sounds = try await withTaskCancellationHandler {
                     try await worker.value
@@ -206,8 +219,12 @@ struct InventSoundView: View {
                 guard !Task.isCancelled else { return }
                 self.error = error.localizedDescription
             }
-            busy = false
         }
+    }
+
+    private func cancelPreparation() {
+        preparation?.cancel()
+        preparation = nil
     }
 
     private func hear(_ sound: InventedSound) {

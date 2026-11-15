@@ -90,3 +90,38 @@ test("invalid response never becomes an importable sample", async () => {
       : new Response("not wave"),
   }), /did not return a WAV/);
 });
+
+test("canceling an in-flight generation stops the worker and frees its slot", { timeout: 5000 }, async (t) => {
+  let didStart, didAbort;
+  const started = new Promise((resolve) => { didStart = resolve; });
+  const aborted = new Promise((resolve) => { didAbort = resolve; });
+  const server = soundLabServer("stable-audio-local", (prompt, _, signal) => {
+    if (prompt !== "slow") return Promise.resolve(sample);
+    return new Promise((_, reject) => {
+      signal.addEventListener("abort", () => {
+        reject(signal.reason);
+        didAbort();
+      }, { once: true });
+      didStart();
+    });
+  }, 4000);
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const endpoint = `http://127.0.0.1:${server.address().port}/generate`;
+  const generate = (prompt, signal) => fetch(endpoint, {
+    method: "POST", signal,
+    headers: { "Content-Type": "application/json", "X-HandStrudel-Audio-Provider": "stable-audio-local" },
+    body: JSON.stringify({ prompt, kind: "effect" }),
+  });
+  const controller = new AbortController();
+  const inFlight = generate("slow", controller.signal);
+  await started;
+  const busy = await generate("next");
+  assert.equal(busy.status, 429);
+  await busy.text();
+  controller.abort();
+  await assert.rejects(inFlight, { name: "AbortError" });
+  await aborted;
+  const next = await generate("next");
+  assert.deepEqual(Buffer.from(await next.arrayBuffer()), sample);
+});

@@ -28,6 +28,8 @@ Set `HANDSTRUDEL_LOCAL_AUDIO_LAB=1` in the Xcode Debug Run environment (or `SIMC
 
 Each sound is a short one-shot, not a multisampled or sustained instrument. Pitched import prefers a stable attack but can trim an unstable attack when the sound settles into one clear note. It is tuned for notes around C4; harmonically ambiguous samples can still need a retry. Do not publish or redistribute generated WAVs without checking the provider's terms for isolated samples.
 
+Cancel stops waiting for a new sound without discarding existing candidates or saved sounds. The local bridge stops its worker when the request disconnects. Canceling a cloud request does not undo a remote job that was already submitted.
+
 ## Checks
 
 `node --test scripts/sound-lab.test.mjs` tests the bridge without credentials or charges. The iOS tests cover pitch correction, a stereo pitch sweep that still plays as an untuned effect, offline renders of a note and four chord tones, and prompt/save/play UI. With the local MLX bridge running, the live integration tests make actual requests for an instrument and an effect and open both in the wheel. They skip if the local bridge is unavailable and cannot select the paid backend.

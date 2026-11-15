@@ -419,6 +419,37 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("invent-session").waitForExistence(timeout: 10))
     }
 
+    func testInventASoundCancelsPreparationWithoutLosingEarlierSounds() {
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["HANDSTRUDEL_UI_DELAY_SOUND_PROMPT"] = "Soft wooden mallet"
+        app.launch()
+        let entry = app.buttons["invent-open"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        if !entry.isHittable { app.swipeUp() }
+        entry.tap()
+        let generate = app.buttons["invent-generate"]
+        let first = app.buttons["Glass kalimba"]
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        first.tap()
+        generate.tap()
+        let original = app.staticTexts["Glass kalimba I"]
+        XCTAssertTrue(original.waitForExistence(timeout: 8))
+
+        let slower = app.buttons["Soft wooden mallet"]
+        if !slower.isHittable { app.swipeDown() }
+        slower.tap()
+        generate.tap()
+        let cancel = app.buttons["invent-cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertFalse(generate.isEnabled)
+        if !cancel.isHittable { app.swipeUp() }
+        cancel.tap()
+        XCTAssertFalse(cancel.exists)
+        XCTAssertTrue(generate.isEnabled)
+        XCTAssertTrue(original.exists)
+        XCTAssertFalse(app.staticTexts["Soft wooden mallet I"].exists)
+    }
+
     func testInventASoundGeneratesSavesAndOpensPrivateWheel() {
         app.launchArguments.append("--uitesting")
         app.launch()
