@@ -117,6 +117,23 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["theme-volt"].isSelected)
     }
 
+    func testNativeWheelOpensWhileWebAudioIsDelayedAndStaysClosedAfterExit() {
+        app.launchArguments = ["--uitesting", "--uitest-delayed-web-audio"]
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        let close = element("close-button")
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "Native wheel should open before the 8-second WebAudio fixture")
+        let onboarding = element("onboarding-got-it")
+        if onboarding.exists { onboarding.tap() }
+        close.tap()
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        let revived = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"), object: close)
+        revived.isInverted = true
+        XCTAssertEqual(XCTWaiter.wait(for: [revived], timeout: 8.5), .completed)
+    }
+
     func testMusic_privateDraftsOpensWithoutAccount() {
         app.launchArguments.append("--uitesting")
         app.launch()
