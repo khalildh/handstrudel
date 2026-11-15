@@ -13,7 +13,7 @@ import {
 } from "@strudel/webaudio";
 import { registerSoundfonts } from "@strudel/soundfonts";
 
-declare const Hydra: new (opts: Record<string, unknown>) => { synth: unknown; hush: () => void };
+declare const Hydra: new (opts: Record<string, unknown>) => { synth: { hush?: () => void } };
 
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -21,12 +21,15 @@ function loadScript(src: string): Promise<void> {
     const s = document.createElement("script");
     s.src = src;
     s.onload = () => resolve();
-    s.onerror = reject;
+    s.onerror = (error) => {
+      s.remove();
+      reject(error);
+    };
     document.head.appendChild(s);
   });
 }
 
-export async function initializeStrudel() {
+export async function initializeStrudel(surface: HTMLElement) {
   registerSynthSounds();
   // Registers thousands of General MIDI instruments into the `s()` namespace
   // (e.g. s("gm_acoustic_piano")). Sample data is lazy-loaded from a CDN the
@@ -45,24 +48,20 @@ export async function initializeStrudel() {
   // waits for a future mousedown and would hang since we're already in one)
   await initAudio();
   const audioCtx = getAudioContext();
+  await loadScript("https://unpkg.com/hydra-synth");
 
   // Audio tap for video recording: intercept all connections to audioCtx.destination
   // and mirror them to a MediaStreamAudioDestinationNode so we can capture audio.
   const recordingDest = audioCtx.createMediaStreamDestination();
-  const origConnect = AudioNode.prototype.connect as (
-    this: AudioNode,
-    destinationNode: AudioNode,
-    output?: number,
-    input?: number,
-  ) => AudioNode;
-  AudioNode.prototype.connect = function (
+  const origConnect = AudioNode.prototype.connect;
+  const connectRecording = function (
     this: AudioNode,
     ...connectArgs: [AudioNode, number?, number?] | [AudioParam, number?]
   ): AudioNode | void {
-    const result = origConnect.apply(this, connectArgs as [AudioNode, number?, number?]);
+    const result = Reflect.apply(origConnect, this, connectArgs) as AudioNode | void;
     if (connectArgs[0] === audioCtx.destination) {
       try {
-        origConnect.call(this, recordingDest);
+        Reflect.apply(origConnect, this, [recordingDest]);
       } catch {
         /* already connected or incompatible — ignore */
       }
@@ -71,31 +70,29 @@ export async function initializeStrudel() {
   } as typeof AudioNode.prototype.connect;
 
   // Initialize Hydra visual synthesis via CDN (avoids SSR/build issues)
-  await loadScript("https://unpkg.com/hydra-synth");
-  const sidebarW = 310;
-  const headerH = 36;
   const canvas = document.createElement("canvas");
   canvas.id = "hydra-canvas";
-  canvas.width = window.innerWidth - sidebarW;
-  canvas.height = window.innerHeight - headerH;
+  const resizeCanvas = () => {
+    if (canvas.width !== surface.clientWidth) canvas.width = surface.clientWidth;
+    if (canvas.height !== surface.clientHeight) canvas.height = surface.clientHeight;
+  };
+  resizeCanvas();
   canvas.style.display = "none"; // hidden until user enables
-  document.body.prepend(canvas);
-  new Hydra({
+  const hydra = new Hydra({
     canvas,
     detectAudio: false,
     makeGlobal: true,
     autoLoop: true,
   });
+  surface.append(canvas);
+  const resizeObserver = new ResizeObserver(resizeCanvas);
+  resizeObserver.observe(surface);
+  AudioNode.prototype.connect = connectRecording;
 
   // Register H() — bridges Strudel patterns to Hydra parameter functions
   // H("1 2 3") returns a function that queries the pattern at the current time
   (globalThis as Record<string, unknown>).H = (pat: string) =>
     () => reify(pat).queryArc(getTime(), getTime())[0]?.value ?? 0;
-
-  window.addEventListener("resize", () => {
-    canvas.width = window.innerWidth - sidebarW;
-    canvas.height = window.innerHeight - headerH;
-  });
 
   const { evaluate, start, stop } = repl({
     defaultOutput: webaudioOutput,
@@ -118,5 +115,12 @@ export async function initializeStrudel() {
   // Global object for signal-based parameter updates (mutated at 60fps, read by Strudel scheduler)
   (globalThis as Record<string, unknown>).__hp = {};
 
-  return { evaluate, evalHydra, start, stop, audioCtx, recordingDest };
+  const dispose = () => {
+    stop();
+    resizeObserver.disconnect();
+    canvas.remove();
+    if (AudioNode.prototype.connect === connectRecording) AudioNode.prototype.connect = origConnect;
+    hydra.synth?.hush?.();
+  };
+  return { evaluate, evalHydra, start, dispose, audioCtx, recordingDest };
 }

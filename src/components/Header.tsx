@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { WatchIcon } from "../app/watch/watch-design";
 import { AspectRatio } from "../lib/recorder";
 
 interface HeaderProps {
@@ -12,6 +13,7 @@ interface HeaderProps {
   onToggleRecording: () => void;
   onAspectChange: (aspect: AspectRatio) => void;
   sidebarOpen?: boolean;
+  studioLive: boolean;
   onToggleSidebar?: () => void;
 }
 
@@ -36,14 +38,19 @@ export default function Header({
   onToggleRecording,
   onAspectChange,
   sidebarOpen,
+  studioLive,
   onToggleSidebar,
 }: HeaderProps) {
   return (
-    <div id="header">
-      <span className="logo">HANDSTRUDEL</span>
-      <span className="sep">|</span>
-      <span id="status">{status}</span>
-      <Link className="watch-site-link" href="/watch">Watch videos</Link>
+    <header id="header">
+      <Link className="watch-wordmark" href="/" aria-label="HandStrudel home">
+        <span className="watch-brand-mark"><WatchIcon name="wave" /></span>handstrudel
+      </Link>
+      <span className="studio-header-tag">WEB STUDIO</span>
+      {studioLive && <span id="status"><span className="studio-live-dot" />{status}</span>}
+      <nav className="studio-nav" aria-label="Main navigation">
+        <Link href="/watch">Watch</Link>
+      </nav>
 
       {canRecord && (
         <div id="rec-controls">
@@ -52,7 +59,7 @@ export default function Header({
               className="rec-aspect"
               value={recordingAspect}
               onChange={(e) => onAspectChange(e.target.value as AspectRatio)}
-              title="Video aspect ratio"
+              aria-label="Video aspect ratio"
             >
               {(Object.keys(ASPECT_LABELS) as AspectRatio[]).map((a) => (
                 <option key={a} value={a}>
@@ -72,12 +79,12 @@ export default function Header({
         </div>
       )}
 
-      <div id="beat-row">
+      {studioLive && <div id="beat-row" aria-hidden="true">
         <div className="bd" id="bd0" />
         <div className="bd" id="bd1" />
         <div className="bd" id="bd2" />
         <div className="bd" id="bd3" />
-      </div>
+      </div>}
 
       {onToggleSidebar && (
         <button
@@ -86,9 +93,9 @@ export default function Header({
           aria-label={sidebarOpen ? "Hide panel" : "Show panel"}
           aria-expanded={sidebarOpen}
         >
-          {sidebarOpen ? "×" : "≡"}
+          <span aria-hidden="true">{sidebarOpen ? "Close" : "Panel"}</span>
         </button>
       )}
-    </div>
+    </header>
   );
 }
