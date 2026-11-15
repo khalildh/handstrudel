@@ -3,6 +3,8 @@ import Photos
 import SwiftUI
 
 struct RecordingDraft: Codable, Identifiable, Equatable {
+    static let titleLimit = 60
+
     let id: UUID
     let createdAt: Date
     let instrument: String?
@@ -12,8 +14,18 @@ struct RecordingDraft: Codable, Identifiable, Equatable {
     var recordedAtHalfSpeed: Bool? = nil
     var trimStart: Double?
     var trimEnd: Double?
+    var title: String? = nil
 
+    var displayTitle: String { title ?? instrument ?? "Performance" }
     var outputScale: Double { recordedAtHalfSpeed == true ? 0.5 : 1 }
+
+    static func normalizedTitle(_ input: String) -> String? {
+        let singleLine = input.split { character in
+            character.isWhitespace || character.unicodeScalars.allSatisfy { $0.properties.generalCategory == .control }
+        }.joined(separator: " ")
+        let title = String(singleLine.prefix(titleLimit)).trimmingCharacters(in: .whitespaces)
+        return title.isEmpty ? nil : title
+    }
 }
 
 @MainActor
@@ -77,9 +89,25 @@ final class RecordingDrafts: ObservableObject {
         if !drafts.contains(where: { $0.id == draft.id }) { drafts.insert(draft, at: 0) }
     }
 
-    func saveTrim(_ draft: RecordingDraft) throws {
-        try writeMetadata(draft)
-        if let index = drafts.firstIndex(where: { $0.id == draft.id }) { drafts[index] = draft }
+    @discardableResult
+    func saveTrim(_ draft: RecordingDraft) throws -> RecordingDraft {
+        try updateDraft(draft.id) {
+            $0.trimStart = draft.trimStart
+            $0.trimEnd = draft.trimEnd
+        }
+    }
+
+    func rename(_ id: UUID, to title: String) throws -> RecordingDraft {
+        try updateDraft(id) { $0.title = RecordingDraft.normalizedTitle(title) }
+    }
+
+    private func updateDraft(_ id: UUID, _ update: (inout RecordingDraft) -> Void) throws -> RecordingDraft {
+        guard let index = drafts.firstIndex(where: { $0.id == id }) else { throw DraftError.missingDraft }
+        var updated = drafts[index]
+        update(&updated)
+        try writeMetadata(updated)
+        drafts[index] = updated
+        return updated
     }
 
     func delete(_ draft: RecordingDraft) throws {
@@ -168,13 +196,14 @@ final class RecordingDrafts: ObservableObject {
 }
 
 private enum DraftError: LocalizedError {
-    case unreadable, photosDenied, noAudio
+    case unreadable, photosDenied, noAudio, missingDraft
 
     var errorDescription: String? {
         switch self {
         case .unreadable: return "This video could not be read or exported."
         case .noAudio: return "This take doesn't have an audio track to export."
         case .photosDenied: return "Allow HandStrudel to add photos in Settings, or use Share to save the video to Files."
+        case .missingDraft: return "This draft is no longer in Private drafts."
         }
     }
 }
@@ -209,7 +238,10 @@ struct RecordingDraftsView: View {
                             editor(draft)
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(draft.instrument ?? "Performance").font(.headline)
+                                Text(draft.displayTitle).font(.headline).lineLimit(2)
+                                if draft.title != nil, let instrument = draft.instrument {
+                                    Text(instrument).font(.subheadline).foregroundStyle(.secondary)
+                                }
                                 Text(draft.createdAt.formatted(date: .abbreviated, time: .shortened))
                                     .font(.subheadline).foregroundStyle(.secondary)
                             }
@@ -245,6 +277,7 @@ private struct RecordingDraftEditor: View {
     @State private var duration = 0.0
     @State private var busy = false
     @State private var message: String?
+    @State private var showNameEditor = false
     @State private var confirmDelete = false
     @State private var sharing: URL?
     @State private var posting: URL?
@@ -254,6 +287,21 @@ private struct RecordingDraftEditor: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 17) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(draft.displayTitle)
+                        .font(.title2.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                    Button {
+                        player?.pause()
+                        showNameEditor = true
+                    } label: {
+                        Label(draft.title == nil ? "Name private draft" : "Rename private draft", systemImage: "pencil")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityIdentifier("rename-private-draft")
+                }
                 VideoPlayer(player: player)
                     .frame(height: 330)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -318,6 +366,11 @@ private struct RecordingDraftEditor: View {
         }
         .onDisappear { player?.pause() }
         .interactiveDismissDisabled(busy)
+        .sheet(isPresented: $showNameEditor) {
+            PrivateDraftNameEditor(name: draft.title ?? "") { name in
+                draft = try store.rename(draft.id, to: name)
+            }
+        }
         .sheet(item: $sharing) { url in
             ShareSheet(activityItems: [url])
                 .onDisappear { removeExport(url) }
@@ -379,7 +432,7 @@ private struct RecordingDraftEditor: View {
         var updated = draft
         updated.trimStart = start
         updated.trimEnd = end
-        do { try store.saveTrim(updated); draft = updated; seek(to: seekTo) }
+        do { draft = try store.saveTrim(updated); seek(to: seekTo) }
         catch { message = error.localizedDescription }
     }
 
@@ -414,5 +467,45 @@ private struct RecordingDraftEditor: View {
 
     private func removeExport(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
+    }
+}
+
+private struct PrivateDraftNameEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @State var name: String
+    @State private var error: String?
+    let onSave: (String) throws -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Draft name", text: $name)
+                        .accessibilityIdentifier("private-draft-name")
+                        .submitLabel(.done)
+                        .onSubmit(save)
+                    if let error {
+                        Text(error).foregroundStyle(.red)
+                    }
+                } footer: {
+                    Text("This name stays on this device and isn't shared or posted. Leave it blank to remove it. Only the first \(RecordingDraft.titleLimit) characters are saved.")
+                }
+            }
+            .navigationTitle("Private draft name")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save", action: save) }
+            }
+        }
+    }
+
+    private func save() {
+        do {
+            try onSave(name)
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }
