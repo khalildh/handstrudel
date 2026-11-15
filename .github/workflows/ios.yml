@@ -23,6 +23,7 @@ jobs:
     env:
       SCHEME: HandStrudel
       PROJECT: HandStrudel.xcodeproj
+      TEST_RUNNER_HANDSTRUDEL_OFFLINE_SMOKE: "1"
       # Bump these if the runner image moves to a newer Xcode / device set.
       SIMULATOR: platform=iOS Simulator,name=iPhone 16,OS=latest
     steps:
