@@ -744,15 +744,15 @@ final class SocialTests: XCTestCase {
         try drafts.complete(draft)
         XCTAssertEqual(RecordingDrafts(directory: directory).drafts.first?.recordedAtHalfSpeed, true)
         let full = try await drafts.makeExport(for: draft)
-        defer { try? FileManager.default.removeItem(at: full) }
-        let fullDuration = try await AVURLAsset(url: full).load(.duration).seconds
+        defer { full.remove() }
+        let fullDuration = try await AVURLAsset(url: full.url).load(.duration).seconds
         XCTAssertEqual(fullDuration, 2, accuracy: 0.08)
         draft.trimStart = 1
         draft.trimEnd = 3
         try drafts.saveTrim(draft)
         let trimmed = try await drafts.makeExport(for: draft)
-        defer { try? FileManager.default.removeItem(at: trimmed) }
-        let trimmedDuration = try await AVURLAsset(url: trimmed).load(.duration).seconds
+        defer { trimmed.remove() }
+        let trimmedDuration = try await AVURLAsset(url: trimmed.url).load(.duration).seconds
         let originalDuration = try await AVURLAsset(url: raw).load(.duration).seconds
         XCTAssertEqual(trimmedDuration, 1, accuracy: 0.08)
         XCTAssertEqual(originalDuration, 4, accuracy: 0.08)
@@ -808,14 +808,13 @@ final class SocialTests: XCTestCase {
         let reopened = RecordingDrafts(directory: dir)
         XCTAssertEqual(reopened.drafts, [draft])
         let export = try await reopened.makeExport(for: draft)
-        defer { try? FileManager.default.removeItem(at: export) }
-        let trimmed = try await AVURLAsset(url: export).load(.duration).seconds
+        defer { export.remove() }
+        let trimmed = try await AVURLAsset(url: export.url).load(.duration).seconds
         let original = try await AVURLAsset(url: source).load(.duration).seconds
         XCTAssertEqual(trimmed, 1, accuracy: 0.1)
         XCTAssertEqual(original, 2, accuracy: 0.1)
         do {
-            let unexpectedAudio = try await reopened.makeExport(for: draft, audioOnly: true)
-            try? FileManager.default.removeItem(at: unexpectedAudio)
+            _ = try await reopened.makeExport(for: draft, audioOnly: true)
             XCTFail("An audio export needs a recorded audio track")
         } catch {
             XCTAssertEqual(error.localizedDescription, "This take doesn't have an audio track to export.")
@@ -824,13 +823,67 @@ final class SocialTests: XCTestCase {
         broken.trimEnd = 99
         do {
             let unexpected = try await reopened.makeExport(for: broken)
-            try? FileManager.default.removeItem(at: unexpected)
+            unexpected.remove()
             XCTFail("Invalid saved trim must never export the entire original")
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("trim no longer fits"))
         }
+        XCTAssertEqual(RecordingDrafts(directory: dir).drafts, [draft])
         try reopened.delete(draft)
         XCTAssertTrue(RecordingDrafts(directory: dir).drafts.isEmpty)
+    }
+
+    @MainActor
+    func testDraftExportDiscardsCopyWhenWriterFinishesAfterCancellation() async throws {
+        let files = FileManager.default
+        let dir = files.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try files.createDirectory(at: dir, withIntermediateDirectories: false)
+        defer { try? files.removeItem(at: dir) }
+
+        let task = Task {
+            try await RecordingDraftExport.prepare(in: dir, audioOnly: false) { output in
+                withUnsafeCurrentTask { $0?.cancel() }
+                // Simulate a writer that doesn't observe the cancellation.
+                try Data([1, 2, 3]).write(to: output)
+            }
+        }
+        do {
+            _ = try await task.value
+            XCTFail("A cancelled export should not hand a copy to its consumer")
+        } catch is CancellationError {
+            XCTAssertEqual(try files.contentsOfDirectory(atPath: dir.path), [])
+        }
+    }
+
+    @MainActor
+    func testDraftExportCleansPartialOutputAndRetainsRetryCopyUntilReleased() async throws {
+        struct WriteFailed: Error {}
+        let files = FileManager.default
+        let dir = files.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try files.createDirectory(at: dir, withIntermediateDirectories: false)
+        defer { try? files.removeItem(at: dir) }
+        let data = Data([1, 2, 3])
+
+        do {
+            _ = try await RecordingDraftExport.prepare(in: dir, audioOnly: true) { output in
+                try data.write(to: output)
+                throw WriteFailed()
+            }
+            XCTFail("Expected the export to fail")
+        } catch is WriteFailed {
+            XCTAssertEqual(try files.contentsOfDirectory(atPath: dir.path), [])
+        }
+
+        var copy: RecordingDraftExport? = try await RecordingDraftExport.prepare(in: dir, audioOnly: true) { output in
+            try data.write(to: output)
+        }
+        let url = try XCTUnwrap(copy?.url)
+        withExtendedLifetime(copy) {
+            XCTAssertEqual(url.pathExtension, "m4a")
+            XCTAssertEqual(try? Data(contentsOf: url), data)
+        }
+        copy = nil
+        XCTAssertEqual(try files.contentsOfDirectory(atPath: dir.path), [])
     }
 
     @MainActor
