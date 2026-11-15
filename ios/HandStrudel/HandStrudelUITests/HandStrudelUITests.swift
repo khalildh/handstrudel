@@ -6,6 +6,11 @@ final class HandStrudelUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
+        if ProcessInfo.processInfo.environment["HANDSTRUDEL_OFFLINE_SMOKE"] == "1" {
+            app.launchEnvironment["SUPABASE_URL"] = "http://127.0.0.1:1"
+            app.launchEnvironment["SUPABASE_ANON_KEY"] = "offline-ui-smoke"
+            app.launchEnvironment["MEDIA_BASE_URL"] = "http://127.0.0.1:1"
+        }
     }
 
     // MARK: - Helpers
