@@ -183,6 +183,40 @@ final class SocialTests: XCTestCase {
         XCTAssertFalse(peer.accept(JamHeldState(sequence: 3, voices: ["invalid voice": initial]), now: 4))
     }
 
+    func testJamNativeLongHoldRecoversAfterHeartbeatBlackout() {
+        let chord = JamHeldVoice(pitches: [60, 64, 67, 71], program: 40, waveform: "triangle", velocity: 0.6)
+        let voices = ["pad": chord]
+        var peer = JamPeerState()
+        XCTAssertTrue(peer.accept(JamHeldState(sequence: 1, voices: voices), now: 0))
+
+        // Deliver only every fourth 0.5 s heartbeat for a 12 s native hold.
+        for tick in 1...24 {
+            let now = Double(tick) * 0.5
+            XCTAssertFalse(peer.expire(now: now), "Hold expired at \(now) s")
+            if tick.isMultiple(of: 4) {
+                XCTAssertFalse(peer.accept(JamHeldState(sequence: UInt64(tick + 1), voices: voices), now: now),
+                               "Heartbeat retriggered audio at \(now) s")
+            }
+            XCTAssertEqual(peer.voices, voices)
+        }
+
+        // Lose every heartbeat after 12 s. A duplicate must not renew the watchdog.
+        XCTAssertFalse(peer.accept(JamHeldState(sequence: 25, voices: voices), now: 14))
+        XCTAssertFalse(peer.expire(now: 14.25))
+        XCTAssertTrue(peer.expire(now: 14.5))
+        XCTAssertFalse(peer.accept(JamHeldState(sequence: 25, voices: voices), now: 14.75))
+        XCTAssertTrue(peer.voices.isEmpty)
+
+        // The next fresh snapshot restores the same attack; a heartbeat delayed
+        // until after the release must not bring the chord back.
+        XCTAssertTrue(peer.accept(JamHeldState(sequence: 31, voices: voices), now: 15))
+        XCTAssertEqual(peer.voices, voices)
+        let delayedHeartbeat = JamHeldState(sequence: 32, voices: voices)
+        XCTAssertTrue(peer.accept(JamHeldState(sequence: 33, voices: [:]), now: 16))
+        XCTAssertFalse(peer.accept(delayedHeartbeat, now: 16.5))
+        XCTAssertTrue(peer.voices.isEmpty)
+    }
+
     func testJamCarriesScaleChordAndInstrument() throws {
         let event = JamEvent.notes(pitches: [60, 64, 67, 71], program: 40,
                                    waveform: "triangle", velocity: 0.6, duration: 0.45)
