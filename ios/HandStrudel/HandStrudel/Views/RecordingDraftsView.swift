@@ -16,6 +16,42 @@ struct RecordingDraft: Codable, Identifiable, Equatable {
     var outputScale: Double { recordedAtHalfSpeed == true ? 0.5 : 1 }
 }
 
+struct DraftTrimSelection: Equatable {
+    enum Edge { case start, end }
+
+    let duration: Double
+    let start: Double
+    let end: Double
+
+    var minimumLength: Double { min(0.25, duration) }
+    var isFullLength: Bool { start == 0 && end == duration }
+
+    init?(duration: Double, start: Double? = nil, end: Double? = nil) {
+        let first = start ?? 0
+        let last = end ?? duration
+        guard duration.isFinite, first.isFinite, last.isFinite,
+              first >= 0, first < last, last <= duration else { return nil }
+        self.duration = duration
+        self.start = first
+        self.end = last
+    }
+
+    func moving(_ edge: Edge, to capturedTime: Double) -> Self {
+        guard capturedTime.isFinite else { return self }
+        switch edge {
+        case .start:
+            return Self(duration: duration, start: min(max(0, end - minimumLength), max(0, capturedTime)), end: end) ?? self
+        case .end:
+            return Self(duration: duration, start: start, end: max(min(duration, start + minimumLength), min(duration, capturedTime))) ?? self
+        }
+    }
+
+    var range: CMTimeRange {
+        CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 600),
+                    end: CMTime(seconds: end, preferredTimescale: 600))
+    }
+}
+
 @MainActor
 final class RecordingDrafts: ObservableObject {
     static let recordingLimit = 60
@@ -111,21 +147,19 @@ final class RecordingDrafts: ObservableObject {
         let source = videoURL(for: draft.id)
         let asset = AVURLAsset(url: source)
         let duration = try await asset.load(.duration).seconds
-        guard duration.isFinite, duration > 0 else { throw DraftError.unreadable }
-        let start = draft.trimStart ?? 0
-        let end = draft.trimEnd ?? duration
+        guard let trim = DraftTrimSelection(duration: duration, start: draft.trimStart, end: draft.trimEnd)
+        else { throw DraftError.invalidTrim }
         let suffix = audioOnly ? "m4a" : "mp4"
         let output = files.temporaryDirectory.appending(path: "HandStrudel-\(UUID()).\(suffix)")
         if audioOnly, try await asset.loadTracks(withMediaType: .audio).isEmpty {
             throw DraftError.noAudio
         }
-        if !audioOnly, draft.outputScale == 1, start == 0, end == duration {
+        if !audioOnly, draft.outputScale == 1, trim.isFullLength {
             try files.copyItem(at: source, to: output)
             return output
         }
-        guard start.isFinite, end.isFinite, start >= 0, end <= duration, end > start else { throw DraftError.unreadable }
-        let range = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 600),
-                                end: CMTime(seconds: end, preferredTimescale: 600))
+        let range = trim.range
+        guard range.duration > .zero else { throw DraftError.invalidTrim }
         let exportAsset: AVAsset
         if draft.outputScale < 1 {
             exportAsset = try await Self.scaledAsset(asset, range: range, scale: draft.outputScale)
@@ -168,11 +202,12 @@ final class RecordingDrafts: ObservableObject {
 }
 
 private enum DraftError: LocalizedError {
-    case unreadable, photosDenied, noAudio
+    case unreadable, invalidTrim, photosDenied, noAudio
 
     var errorDescription: String? {
         switch self {
         case .unreadable: return "This video could not be read or exported."
+        case .invalidTrim: return "This trim no longer fits the video. Reset it or choose a new range before exporting."
         case .noAudio: return "This take doesn't have an audio track to export."
         case .photosDenied: return "Allow HandStrudel to add photos in Settings, or use Share to save the video to Files."
         }
@@ -243,6 +278,11 @@ private struct RecordingDraftEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer?
     @State private var duration = 0.0
+    @State private var frames: [Int: CGImage] = [:]
+    @State private var pendingTrim: DraftTrimSelection?
+    @State private var scrubPosition: Double?
+    @State private var previewVersion = 0
+    @State private var fineTrimExpanded = false
     @State private var busy = false
     @State private var message: String?
     @State private var confirmDelete = false
@@ -250,6 +290,10 @@ private struct RecordingDraftEditor: View {
     @State private var posting: URL?
     @State private var pendingPost: URL?
     @State private var signIn = false
+
+    private var savedTrim: DraftTrimSelection? {
+        DraftTrimSelection(duration: duration, start: draft.trimStart, end: draft.trimEnd)
+    }
 
     var body: some View {
         ScrollView {
@@ -261,7 +305,7 @@ private struct RecordingDraftEditor: View {
                     Label("Recorded at half tempo. Preview and exports play at normal tempo.", systemImage: "tortoise")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
-                if duration > 0 { trimControls }
+                if let trim = pendingTrim ?? savedTrim ?? DraftTrimSelection(duration: duration) { trimControls(trim) }
                 if let message {
                     Text(message).font(.footnote).foregroundStyle(.secondary)
                         .accessibilityIdentifier("draft-message")
@@ -271,11 +315,13 @@ private struct RecordingDraftEditor: View {
                     Label("Save to Photos", systemImage: "photo.badge.plus")
                 }
                 .buttonStyle(StudioActionStyle())
+                .disabled(savedTrim == nil || pendingTrim != nil)
                 HStack(spacing: 18) {
                     Menu("Share") {
                         Button("Share video", systemImage: "film") { export { sharing = $0 } }
                         Button("Share audio (M4A)", systemImage: "waveform") { export(audioOnly: true) { sharing = $0 } }
                     }
+                    .disabled(savedTrim == nil || pendingTrim != nil)
                     if SocialConfig.isConfigured {
                         Button("Post") {
                             export { url in
@@ -283,6 +329,7 @@ private struct RecordingDraftEditor: View {
                                 else { pendingPost = url; signIn = true }
                             }
                         }
+                        .disabled(savedTrim == nil || pendingTrim != nil)
                     }
                     Spacer()
                     if let onRetake { Button("Retake", action: onRetake) }
@@ -313,10 +360,16 @@ private struct RecordingDraftEditor: View {
                 guard !Task.isCancelled else { return }
                 player = AVPlayer(playerItem: item)
                 duration = seconds
-                seek(to: draft.trimStart ?? 0)
+                if let savedTrim { seek(to: savedTrim.start) }
+                else { message = DraftError.invalidTrim.localizedDescription; seek(to: 0) }
+                await loadFilmstrip(for: asset, duration: seconds)
             } catch { message = error.localizedDescription }
         }
-        .onDisappear { player?.pause() }
+        .onDisappear {
+            previewVersion += 1
+            player?.currentItem?.cancelPendingSeeks()
+            player?.pause()
+        }
         .interactiveDismissDisabled(busy)
         .sheet(item: $sharing) { url in
             ShareSheet(activityItems: [url])
@@ -346,51 +399,135 @@ private struct RecordingDraftEditor: View {
         }
     }
 
-    private var trimControls: some View {
-        let start = draft.trimStart ?? 0
-        let end = draft.trimEnd ?? duration
-        let minimumLength = min(0.25, duration)
-        return VStack(alignment: .leading, spacing: 7) {
+    private func trimControls(_ trim: DraftTrimSelection) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Trim").font(.headline)
                 Spacer()
-                Button("Reset") { updateTrim(start: 0, end: duration, seekTo: 0) }
+                Button("Reset") {
+                    if let full = DraftTrimSelection(duration: duration) { editTrim(full, seekTo: 0, commit: true) }
+                }
+                .disabled(trim.isFullLength && savedTrim != nil)
+                .accessibilityIdentifier("draft-trim-reset")
             }
-            Text("Start · \((start * draft.outputScale).formatted(.number.precision(.fractionLength(1)))) s").font(.caption)
-            Slider(value: Binding(get: { start }, set: { updateTrim(start: $0, end: end, seekTo: $0) }),
-                   in: 0...max(0.001, end - minimumLength))
-                .accessibilityLabel("Trim start")
-                .disabled(end <= minimumLength)
-            Text("End · \((end * draft.outputScale).formatted(.number.precision(.fractionLength(1)))) s").font(.caption)
-            Slider(value: Binding(get: { end }, set: { updateTrim(start: start, end: $0, seekTo: $0) }),
-                   in: max(0, min(duration - 0.001, start + minimumLength))...duration)
-                .accessibilityLabel("Trim end")
-                .disabled(duration <= start + minimumLength)
-            Button("Play selection", systemImage: "play.fill") {
-                player?.currentItem?.forwardPlaybackEndTime = CMTime(seconds: end * draft.outputScale, preferredTimescale: 600)
-                player?.seek(to: CMTime(seconds: start * draft.outputScale, preferredTimescale: 600)) { finished in
-                    if finished { Task { @MainActor in player?.play() } }
+            Text("Drag the handles to trim. Tap a frame to preview it.")
+                .font(.caption).foregroundStyle(palette.muted)
+            DraftTrimFilmstrip(trim: trim, frames: frames, scrubPosition: scrubPosition, outputScale: draft.outputScale,
+                               onScrub: { if !busy { seek(to: $0) } }, onEdit: editTrim)
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(timeLabel(trim.start)) to \(timeLabel(trim.end))")
+                    .foregroundStyle(palette.muted)
+                    .accessibilityIdentifier("draft-trim-range")
+                Spacer()
+                Text("\(timeLabel(trim.end - trim.start)) selected")
+                    .fontWeight(.semibold)
+            }
+            .font(.caption.monospacedDigit())
+            Button("Play selection", systemImage: "play.fill") { playSelection(trim) }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("draft-play-selection")
+            DisclosureGroup("Fine trim", isExpanded: $fineTrimExpanded) {
+                VStack(spacing: 5) {
+                    trimNudges(trim, edge: .start)
+                    trimNudges(trim, edge: .end)
+                }
+                .padding(.top, 6)
+            }
+            .font(.subheadline)
+            .accessibilityIdentifier("draft-fine-trim")
+        }
+    }
+
+    private func trimNudges(_ trim: DraftTrimSelection, edge: DraftTrimSelection.Edge) -> some View {
+        let name = edge == .start ? "Start" : "End"
+        let position = edge == .start ? trim.start : trim.end
+        let step = 0.1 / draft.outputScale
+        return HStack {
+            Text(name).font(.subheadline.weight(.semibold))
+            Spacer()
+            ForEach([-1, 1], id: \.self) { direction in
+                let next = trim.moving(edge, to: position + Double(direction) * step)
+                Button {
+                    editTrim(next, seekTo: edge == .start ? next.start : next.end, commit: true)
+                } label: {
+                    Image(systemName: direction < 0 ? "minus" : "plus").frame(minWidth: 28, minHeight: 32)
+                }
+                .buttonStyle(.bordered)
+                .disabled(next == trim)
+                .accessibilityLabel("\(name) 0.1 seconds \(direction < 0 ? "earlier" : "later")")
+            }
+        }
+    }
+
+    private func editTrim(_ trim: DraftTrimSelection, seekTo time: Double, commit: Bool) {
+        guard !busy else { return }
+        seek(to: time)
+        if !commit { pendingTrim = trim; return }
+        pendingTrim = nil
+        var updated = draft
+        updated.trimStart = trim.isFullLength ? nil : trim.start
+        updated.trimEnd = trim.isFullLength ? nil : trim.end
+        if updated == draft { return }
+        do {
+            try store.saveTrim(updated)
+            draft = updated
+            message = nil
+        }
+        catch { message = error.localizedDescription }
+    }
+
+    private func loadFilmstrip(for asset: AVAsset, duration: Double) async {
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 152, height: 152)
+        generator.requestedTimeToleranceBefore = CMTime(seconds: 0.1, preferredTimescale: 600)
+        generator.requestedTimeToleranceAfter = generator.requestedTimeToleranceBefore
+        let count = DraftTrimFilmstrip.frameCount
+        let times = (0..<count).map { CMTime(seconds: duration * (Double($0) + 0.5) / Double(count), preferredTimescale: 600) }
+        for await result in generator.images(for: times) {
+            guard !Task.isCancelled else { generator.cancelAllCGImageGeneration(); return }
+            if case .success(let time, let image, _) = result, let index = times.firstIndex(of: time) {
+                frames[index] = image
+            }
+        }
+    }
+
+    private func timeLabel(_ captured: Double) -> String {
+        "\((captured * draft.outputScale).formatted(.number.precision(.fractionLength(2)))) s"
+    }
+
+    private func playSelection(_ trim: DraftTrimSelection) {
+        guard let player else { return }
+        seek(to: trim.start)
+        let version = previewVersion
+        player.currentItem?.forwardPlaybackEndTime = playbackTime(trim.end)
+        player.seek(to: playbackTime(trim.start), toleranceBefore: .zero, toleranceAfter: .zero) { finished in
+            if finished {
+                Task { @MainActor in
+                    guard version == previewVersion else { return }
+                    player.play()
                 }
             }
         }
     }
 
-    private func updateTrim(start: Double, end: Double, seekTo: Double) {
-        var updated = draft
-        updated.trimStart = start
-        updated.trimEnd = end
-        do { try store.saveTrim(updated); draft = updated; seek(to: seekTo) }
-        catch { message = error.localizedDescription }
+    private func playbackTime(_ captured: Double) -> CMTime {
+        CMTime(seconds: captured * draft.outputScale, preferredTimescale: 600)
     }
 
     private func seek(to time: Double) {
+        previewVersion += 1
+        scrubPosition = time
         player?.pause()
+        player?.currentItem?.cancelPendingSeeks()
         player?.currentItem?.forwardPlaybackEndTime = .invalid
-        player?.seek(to: CMTime(seconds: time * draft.outputScale, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        player?.seek(to: playbackTime(time), toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
     private func export(audioOnly: Bool = false, _ use: @escaping (URL) async throws -> Void) {
-        guard !busy else { return }
+        guard !busy, savedTrim != nil, pendingTrim == nil else { return }
+        previewVersion += 1
+        player?.currentItem?.cancelPendingSeeks()
         player?.pause()
         busy = true
         message = nil
@@ -414,5 +551,131 @@ private struct RecordingDraftEditor: View {
 
     private func removeExport(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
+    }
+}
+
+private struct DraftTrimFilmstrip: View {
+    static let frameCount = 7
+    private static let space = "draft-timeline"
+    private static let gutter: CGFloat = 22
+    private static let height: CGFloat = 65
+
+    @Environment(\.studioPalette) private var palette
+    let trim: DraftTrimSelection
+    let frames: [Int: CGImage]
+    let scrubPosition: Double?
+    let outputScale: Double
+    let onScrub: (Double) -> Void
+    let onEdit: (DraftTrimSelection, Double, Bool) -> Void
+    @State private var dragOrigin: DraftTrimSelection?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let gutter = min(Self.gutter, geometry.size.width / 4)
+            let width = max(1, geometry.size.width - 2 * gutter)
+            let startX = gutter + width * trim.start / trim.duration
+            let endX = gutter + width * trim.end / trim.duration
+            ZStack(alignment: .topLeading) {
+                filmFrames(width: width)
+                    .position(x: gutter + width / 2, y: Self.height / 2)
+                    .accessibilityHidden(true)
+                    .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.space))
+                        .onChanged { value in onScrub(trim.duration * min(1, max(0, (value.location.x - gutter) / width))) })
+                selectionOverlay(gutter: gutter, width: width, startX: startX, endX: endX)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                handle(.start, center: startX - 9, width: width)
+                handle(.end, center: endX + 9, width: width)
+            }
+        }
+        .coordinateSpace(name: Self.space)
+        .frame(height: Self.height)
+        .accessibilityIdentifier("draft-filmstrip")
+    }
+
+    private func filmFrames(width: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            ForEach(0..<Self.frameCount, id: \.self) { index in
+                Rectangle()
+                    .fill(palette.muted.opacity(0.19))
+                    .overlay {
+                        if let image = frames[index] {
+                            Image(decorative: image, scale: 1).resizable().scaledToFill()
+                        } else {
+                            Image(systemName: "film").font(.caption).foregroundStyle(palette.muted)
+                        }
+                    }
+                    .frame(width: width / CGFloat(Self.frameCount), height: Self.height)
+                    .clipped()
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
+    }
+
+    private func selectionOverlay(gutter: CGFloat, width: CGFloat, startX: CGFloat, endX: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            Rectangle().fill(.black.opacity(0.63))
+                .frame(width: max(0, startX - gutter), height: Self.height)
+                .offset(x: gutter)
+            Rectangle().fill(.black.opacity(0.63))
+                .frame(width: max(0, gutter + width - endX), height: Self.height)
+                .offset(x: endX)
+            RoundedRectangle(cornerRadius: 5).strokeBorder(palette.accent, lineWidth: 2.5)
+                .frame(width: max(1, endX - startX), height: Self.height)
+                .offset(x: startX)
+            if let scrubPosition {
+                Rectangle().fill(.white)
+                    .frame(width: 2, height: Self.height - 8)
+                    .shadow(color: .black.opacity(0.8), radius: 2)
+                    .offset(x: gutter + min(1, max(0, scrubPosition / trim.duration)) * width - 1, y: 4)
+            }
+        }
+    }
+
+    private func handle(_ edge: DraftTrimSelection.Edge, center: CGFloat, width: CGFloat) -> some View {
+        let isStart = edge == .start
+        let value = isStart ? trim.start : trim.end
+        return RoundedRectangle(cornerRadius: 6)
+            .fill(palette.accent)
+            .overlay {
+                Image(systemName: isStart ? "chevron.compact.left" : "chevron.compact.right")
+                    .font(.caption.weight(.black)).foregroundStyle(palette.onAccent)
+            }
+            .frame(width: 18, height: Self.height)
+            .frame(width: 44, height: Self.height, alignment: isStart ? .trailing : .leading)
+            .contentShape(Rectangle())
+            .position(x: center + (isStart ? -13 : 13), y: Self.height / 2)
+            .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.space))
+                .onChanged { gesture in
+                    if dragOrigin == nil { dragOrigin = trim }
+                    applyDrag(edge, translation: gesture.translation.width, width: width, commit: false)
+                }
+                .onEnded { gesture in
+                    applyDrag(edge, translation: gesture.translation.width, width: width, commit: true)
+                    dragOrigin = nil
+                })
+            .accessibilityLabel(isStart ? "Trim start" : "Trim end")
+            .accessibilityValue("\((value * outputScale).formatted(.number.precision(.fractionLength(2)))) seconds")
+            .accessibilityIdentifier(isStart ? "draft-trim-start" : "draft-trim-end")
+            .accessibilityAdjustableAction { direction in
+                let step = 0.1 / outputScale
+                switch direction {
+                case .increment: update(edge, trim: trim, to: value + step, commit: true)
+                case .decrement: update(edge, trim: trim, to: value - step, commit: true)
+                @unknown default: break
+                }
+            }
+    }
+
+    private func applyDrag(_ edge: DraftTrimSelection.Edge, translation: CGFloat, width: CGFloat, commit: Bool) {
+        let origin = dragOrigin ?? trim
+        let start = edge == .start ? origin.start : origin.end
+        update(edge, trim: origin, to: start + origin.duration * translation / width, commit: commit)
+    }
+
+    private func update(_ edge: DraftTrimSelection.Edge, trim: DraftTrimSelection, to value: Double, commit: Bool) {
+        let next = trim.moving(edge, to: value)
+        onEdit(next, edge == .start ? next.start : next.end, commit)
     }
 }

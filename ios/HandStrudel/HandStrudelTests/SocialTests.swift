@@ -595,6 +595,23 @@ final class SocialTests: XCTestCase {
     }
 
     @MainActor
+    func testDraftTrimClampsBothHandlesAndRejectsInvalidSavedRanges() throws {
+        let trim = try XCTUnwrap(DraftTrimSelection(duration: 4, start: 1, end: 3))
+        XCTAssertEqual(trim.moving(.start, to: -1).start, 0)
+        XCTAssertEqual(trim.moving(.start, to: 4).start, 2.75)
+        XCTAssertEqual(trim.moving(.end, to: -1).end, 1.25)
+        XCTAssertEqual(trim.moving(.end, to: 5).end, 4)
+        XCTAssertEqual(trim.moving(.start, to: .nan), trim)
+        XCTAssertEqual(trim.range.duration.seconds, 2, accuracy: 0.001)
+        XCTAssertNil(DraftTrimSelection(duration: 4, start: 1, end: 5))
+        XCTAssertNil(DraftTrimSelection(duration: 4, start: 3, end: 1))
+        XCTAssertNil(DraftTrimSelection(duration: Double.infinity))
+        let short = try XCTUnwrap(DraftTrimSelection(duration: 0.1))
+        XCTAssertEqual(short.moving(.start, to: 0.09), short)
+        XCTAssertEqual(short.moving(.end, to: 0.01), short)
+    }
+
+    @MainActor
     func testDraftPersistsTrimAndExportsWithoutChangingSource() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -622,6 +639,15 @@ final class SocialTests: XCTestCase {
             XCTFail("An audio export needs a recorded audio track")
         } catch {
             XCTAssertEqual(error.localizedDescription, "This take doesn't have an audio track to export.")
+        }
+        var broken = draft
+        broken.trimEnd = 99
+        do {
+            let unexpected = try await reopened.makeExport(for: broken)
+            try? FileManager.default.removeItem(at: unexpected)
+            XCTFail("Invalid saved trim must never export the entire original")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("trim no longer fits"))
         }
         try reopened.delete(draft)
         XCTAssertTrue(RecordingDrafts(directory: dir).drafts.isEmpty)

@@ -117,6 +117,35 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["theme-volt"].isSelected)
     }
 
+    func testDraftFilmstripAdjustsAndResetsARealClip() throws {
+        guard let file = ProcessInfo.processInfo.environment["HANDSTRUDEL_DRAFT_TEST_CLIP"] else {
+            throw XCTSkip("Set TEST_RUNNER_HANDSTRUDEL_DRAFT_TEST_CLIP to a simulator-readable MP4 to test the editor.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["HANDSTRUDEL_TEST_CLIP"] = file
+        app.launch()
+        let timeline = element("draft-filmstrip")
+        XCTAssertTrue(timeline.waitForExistence(timeout: 12))
+        let range = element("draft-trim-range")
+        XCTAssertTrue(range.exists)
+        let original = range.label
+        let fine = element("draft-fine-trim")
+        if !fine.isHittable { app.swipeUp() }
+        fine.tap()
+        let nudge = app.buttons["Start 0.1 seconds later"]
+        XCTAssertTrue(nudge.waitForExistence(timeout: 5))
+        if !nudge.isHittable { app.swipeUp() }
+        nudge.tap()
+        XCTAssertNotEqual(range.label, original)
+        let play = element("draft-play-selection")
+        if !play.isHittable { app.swipeDown() }
+        play.tap()
+        let reset = app.buttons["draft-trim-reset"]
+        if !reset.isHittable { app.swipeDown() }
+        reset.tap()
+        XCTAssertEqual(range.label, original)
+    }
+
     func testMusic_privateDraftsOpensWithoutAccount() {
         app.launchArguments.append("--uitesting")
         app.launch()
