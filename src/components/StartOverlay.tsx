@@ -122,12 +122,24 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
     <div id="start" style={fading ? { opacity: 0 } : undefined}>
       <h1>HANDSTRUDEL</h1>
 
-      <button
-        className="advanced-toggle"
-        onClick={toggleAdvanced}
-      >
-        {advanced ? "ADVANCED" : "SIMPLE"}
-      </button>
+      <div className="start-options">
+        <Link className="start-watch-link" href="/watch" prefetch={false}>
+          <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+            <circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" />
+            <path d="m8 6 6 4-6 4z" fill="currentColor" />
+          </svg>
+          <span>
+            <strong>Watch performances</strong>
+            <small>No camera needed</small>
+          </span>
+          <svg className="start-watch-arrow" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path d="M3 8h9M8 4l4 4-4 4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+        <button className="advanced-toggle" onClick={toggleAdvanced}>
+          {advanced ? "ADVANCED" : "SIMPLE"}
+        </button>
+      </div>
 
       <div className={`config-grid ${advanced ? "config-grid-advanced" : ""}`}>
         {(["left", "right"] as const).map((hand) => (
@@ -208,7 +220,6 @@ export default function StartOverlay({ onStart, fading }: StartOverlayProps) {
         <br />
         hands generate &amp; re-evaluate real Strudel code
       </div>
-      <Link className="watch-site-link start-watch-link" href="/watch">Watch community videos</Link>
     </div>
   );
 }
