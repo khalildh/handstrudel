@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isVideoID, loadPublicVideos, mediaURL, type PublicVideo } from "../../lib/public-feed";
 import { clipTitle, WatchIcon } from "../watch/watch-design";
 
@@ -21,22 +21,50 @@ export default function EmbeddedPerformance() {
     return () => request.abort();
   }, [id, valid]);
 
+  if (video) return <EmbeddedClip key={video.id} video={video} />;
+
   return (
     <main className="embed-page">
-      {video ? (
-        <>
-          <video key={video.id} controls playsInline preload="none" aria-label={clipTitle(video)}
-            poster={mediaURL(video.thumb_key)} src={mediaURL(video.video_key)} />
-          <a href={`https://handstrudel.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
-            <WatchIcon name="wave" />
-            <span><strong>{clipTitle(video)}</strong><small>@{video.username} · HandStrudel</small></span>
-            <WatchIcon name="arrow" />
-          </a>
-        </>
-      ) : (
-        <p role="status">{!valid ? "This performance is unavailable." : result?.id !== id
-          ? "Loading performance…" : result.failed ? "Couldn’t load this performance." : "This performance is unavailable."}</p>
+      <p role="status">{!valid ? "This performance is unavailable." : result?.id !== id
+        ? "Loading performance…" : result.failed ? "Couldn’t load this performance." : "This performance is unavailable."}</p>
+    </main>
+  );
+}
+
+function EmbeddedClip({ video }: { video: PublicVideo }) {
+  const [playbackFailed, setPlaybackFailed] = useState(false);
+  const hadPlayerFocus = useRef(false);
+  const watchLink = useRef<HTMLAnchorElement>(null);
+  const src = mediaURL(video.video_key);
+  const unavailable = playbackFailed || !src;
+  const title = clipTitle(video);
+
+  useEffect(() => {
+    if (playbackFailed && hadPlayerFocus.current) watchLink.current?.focus();
+  }, [playbackFailed]);
+
+  return (
+    <main className={unavailable ? "embed-page embed-page-recovery" : "embed-page"}>
+      {!unavailable && (
+        <video controls playsInline preload="none" aria-label={title}
+          poster={mediaURL(video.thumb_key)} src={src} onError={({ currentTarget }) => {
+            if (!currentTarget.error || currentTarget.error.code === MediaError.MEDIA_ERR_ABORTED) return;
+            hadPlayerFocus.current = document.activeElement === currentTarget;
+            setPlaybackFailed(true);
+          }} />
       )}
+      <p className="embed-playback-status" role="status">{unavailable ? "This performance can't play here." : ""}</p>
+      <a ref={watchLink} href={`https://handstrudel.com/watch?v=${encodeURIComponent(video.id)}`}
+        className={unavailable ? "watch-action watch-primary embed-recovery-link" : undefined}
+        target="_blank" rel="noopener noreferrer">
+        {unavailable ? "Open on HandStrudel" : (
+          <>
+            <WatchIcon name="wave" />
+            <span><strong>{title}</strong><small>@{video.username} · HandStrudel</small></span>
+          </>
+        )}
+        <WatchIcon name="arrow" />
+      </a>
     </main>
   );
 }

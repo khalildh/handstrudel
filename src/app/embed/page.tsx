@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import EmbeddedPerformance from "./player";
+import "./embed.css";
 
 export const metadata: Metadata = {
   title: "HandStrudel performance",
