@@ -1,4 +1,5 @@
 import AVFoundation
+import os
 import OSLog
 import Vision
 import UIKit
@@ -60,6 +61,31 @@ struct HandsState {
     var right: HandData?
 }
 
+enum CameraImageRotation: Int, CaseIterable {
+    case upright, clockwise, inverted, counterclockwise
+
+    var visionOrientation: CGImagePropertyOrientation {
+        switch self {
+        case .upright: return .up
+        case .clockwise: return .right
+        case .inverted: return .down
+        case .counterclockwise: return .left
+        }
+    }
+
+    var transform: CGAffineTransform {
+        CGAffineTransform(rotationAngle: CGFloat(rawValue) * .pi / 2)
+    }
+
+    func orientedSize(_ size: CGSize) -> CGSize {
+        rawValue.isMultiple(of: 2) ? size : CGSize(width: size.height, height: size.width)
+    }
+
+    var next: Self {
+        Self(rawValue: (rawValue + 1) % Self.allCases.count) ?? .upright
+    }
+}
+
 final class HandTrackingManager: NSObject, ObservableObject {
     enum CameraIssue {
         case permissionDenied, restricted, unavailable, interrupted
@@ -80,11 +106,14 @@ final class HandTrackingManager: NSObject, ObservableObject {
     private let processingQueue = DispatchQueue(label: "hand-tracking", qos: .userInteractive)
     private let logger = Logger(subsystem: "com.handstrudel.app", category: "HandTracking")
     private var reportedVisionError = false
+    private let frameRotation = OSAllocatedUnfairLock(initialState: CameraImageRotation.upright)
+    private var rotationPreferenceKey: String?
 
     var previewLayer: AVCaptureVideoPreviewLayer?
     var onHandsUpdate: ((HandsState) -> Void)?
     var onCameraAccessBlocked: (() -> Void)?
     @Published private(set) var cameraIssue: CameraIssue?
+    @Published private(set) var cameraRotation: CameraImageRotation = .upright
     private var requestingCamera = false
     private var wantsCamera = false
     private var captureGeneration = 0
@@ -168,6 +197,13 @@ final class HandTrackingManager: NSObject, ObservableObject {
             cameraIssue = .unavailable
             return
         }
+        if runsOnMac {
+            let key = "mac.camera.rotation.\(device.uniqueID)"
+            rotationPreferenceKey = key
+            let fallback: CameraImageRotation = device.deviceType == .builtInWideAngleCamera ? .counterclockwise : .upright
+            let stored = (UserDefaults.standard.object(forKey: key) as? Int).flatMap(CameraImageRotation.init(rawValue:))
+            applyRotation(stored ?? fallback)
+        }
 
         captureSession.beginConfiguration()
         captureSession.sessionPreset = .medium
@@ -200,13 +236,18 @@ final class HandTrackingManager: NSObject, ObservableObject {
         }
         videoOutput.setSampleBufferDelegate(self, queue: processingQueue)
 
-        configureVideoConnection(outputConnection, usePortrait: !runsOnMac, mirrored: true)
+        var horizonAngle: CGFloat?
+        if runsOnMac, #available(iOS 17.0, *) {
+            let rotation = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
+            horizonAngle = rotation.videoRotationAngleForHorizonLevelCapture
+        }
+        configureVideoConnection(outputConnection, runsOnMac: runsOnMac, horizonAngle: horizonAngle, mirrored: true)
         captureSession.commitConfiguration()
 
         let layer = AVCaptureVideoPreviewLayer(session: captureSession)
         layer.videoGravity = .resizeAspectFill
         if let connection = layer.connection {
-            configureVideoConnection(connection, usePortrait: !runsOnMac,
+            configureVideoConnection(connection, runsOnMac: runsOnMac, horizonAngle: horizonAngle,
                                      mirrored: outputConnection.isVideoMirrored)
         }
         self.previewLayer = layer
@@ -214,15 +255,34 @@ final class HandTrackingManager: NSObject, ObservableObject {
         runCapture()
     }
 
-    private func configureVideoConnection(_ connection: AVCaptureConnection, usePortrait: Bool, mirrored: Bool) {
-        // The Mac camera is already upright in its native landscape orientation.
-        if usePortrait, connection.isVideoOrientationSupported {
-            connection.videoOrientation = .portrait
+    private func configureVideoConnection(
+        _ connection: AVCaptureConnection, runsOnMac: Bool, horizonAngle: CGFloat?, mirrored: Bool
+    ) {
+        // The iOS compatibility layer can apply a phone-oriented default even
+        // to a Mac webcam. Make the same upright orientation explicit for
+        // both captured pixels and the preview rather than inheriting it.
+        if let horizonAngle, #available(iOS 17.0, *), connection.isVideoRotationAngleSupported(horizonAngle) {
+            connection.videoRotationAngle = horizonAngle
+        } else if connection.isVideoOrientationSupported {
+            connection.videoOrientation = runsOnMac ? .landscapeRight : .portrait
         }
         if connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
             connection.isVideoMirrored = mirrored
         }
+    }
+
+    func rotateMacCamera() {
+        guard isRunning, let key = rotationPreferenceKey else { return }
+        let next = cameraRotation.next
+        UserDefaults.standard.set(next.rawValue, forKey: key)
+        applyRotation(next)
+    }
+
+    private func applyRotation(_ rotation: CameraImageRotation) {
+        frameRotation.withLock { $0 = rotation }
+        cameraRotation = rotation
+        onHandsUpdate?(HandsState())
     }
 
     private func runCapture() {
@@ -354,16 +414,16 @@ extension HandTrackingManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        // Capture actual video dimensions (after rotation to portrait)
-        let w = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
-        let h = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
-        if w > 0 && h > 0 {
-            videoWidth = w
-            videoHeight = h
+        let rotation = frameRotation.withLock { $0 }
+        let size = rotation.orientedSize(CGSize(width: CVPixelBufferGetWidth(pixelBuffer),
+                                               height: CVPixelBufferGetHeight(pixelBuffer)))
+        if size.width > 0 && size.height > 0 {
+            videoWidth = size.width
+            videoHeight = size.height
         }
 
-        // Frames arrive upright and use the same orientation as the preview.
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up)
+        // Apply the same correction as the preview without copying the pixels.
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: rotation.visionOrientation)
         do {
             try handler.perform([handPoseRequest])
             reportedVisionError = false

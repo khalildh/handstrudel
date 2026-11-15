@@ -2347,6 +2347,17 @@ private struct CameraRecoveryBanner: View {
             .padding(10)
             .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 20)
+        } else if tracker.isRunning && ProcessInfo.processInfo.isiOSAppOnMac {
+            Button(action: tracker.rotateMacCamera) {
+                Label("Rotate camera", systemImage: "rotate.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.6), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Turns the preview and hand tracking together")
         }
     }
 }
