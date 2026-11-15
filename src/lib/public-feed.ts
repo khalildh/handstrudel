@@ -1,7 +1,6 @@
 import { CHORD_PROGRESSIONS, IOS_KEY_SEMITONES, IOS_NOTE_NAMES, IOS_SCALE_INTERVALS } from "./music-data.generated";
+import { publicSupabaseUrl as feedBase, publicSupabaseKey as publicKey } from "./public-supabase";
 
-const feedBase = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://eygrtqbtbhktptphqdnn.supabase.co";
-const publicKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_V6B0E_NNyf0ClZ13WpHegQ_W-wXH_im";
 const mediaBase = process.env.NEXT_PUBLIC_MEDIA_BASE_URL || "https://media.handstrudel.com";
 
 export const PAGE_SIZE = 12;
