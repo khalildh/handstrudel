@@ -171,26 +171,75 @@ struct InventedSound: Identifiable {
         guard source.allSatisfy(\.isFinite), let peak = source.map({ abs($0) }).max(), peak > 0.015,
               let onset = source.firstIndex(where: { abs($0) > peak * 0.04 }) else { throw SampleError.silent }
         let start = max(0, onset - Int(rate * 0.002))
-        let samples = Array(source[start...])
+        var samples = Array(source[start...])
         let pitchRatio: Double
+        var fadeIn: Double = 48
         if kind == .pitched {
-            guard let pitch = detectedPitch(samples, rate: rate, offset: 0.06),
-                  let laterPitch = detectedPitch(samples, rate: rate, offset: 0.15),
-                  abs(log2(laterPitch / pitch) * 1200) < 45 else { throw SampleError.pitch }
-            pitchRatio = frequency(midi: 60) / pitch
+            if let pitch = detectedPitch(samples, rate: rate, offset: 0.06),
+               let later = detectedPitch(samples, rate: rate, offset: 0.15), closePitch(pitch, later) {
+                pitchRatio = frequency(midi: 60) / pitch
+            } else {
+                // Breath, bow, and vocal-style attacks can settle later than a pluck.
+                // Start at the voiced sustain rather than tuning an unstable attack.
+                guard let sustain = findSustain(samples, rate: rate, peak: peak) else { throw SampleError.pitch }
+                samples = Array(samples[sustain.range])
+                pitchRatio = frequency(midi: 60) / sustain.pitch
+                fadeIn = 192
+            }
         } else {
             pitchRatio = 1
         }
         let step = rate / sampleRate * pitchRatio
         let count = min(Int(Double(samples.count - 1) / step), Int(sampleRate * (kind == .effect ? 4 : 2)))
         guard count >= Int(sampleRate * 0.02) else { throw SampleError.silent }
+        let processedPeak = max(0.015, samples.lazy.map(abs).max() ?? 0)
         return (0..<count).map { index in
             let position = Double(index) * step
             let frame = Int(position)
             let ratio = Float(position - Double(frame))
-            let fade = Float(min(1, Double(index) / 48, Double(count - index - 1) / 480))
-            return (samples[frame] * (1 - ratio) + samples[frame + 1] * ratio) * (0.63 / peak) * fade
+            let fade = Float(min(1, Double(index) / fadeIn, Double(count - index - 1) / 480))
+            return (samples[frame] * (1 - ratio) + samples[frame + 1] * ratio) * (0.63 / processedPeak) * fade
         }
+    }
+
+    private static func closePitch(_ first: Double, _ second: Double, tolerance: Double = 45) -> Bool {
+        abs(log2(second / first) * 1200) < tolerance
+    }
+
+    private static func findSustain(_ samples: [Float], rate: Double, peak: Float) -> (range: Range<Int>, pitch: Double)? {
+        let offsets = (0..<10).map { 0.12 + Double($0) * 0.08 }
+        let pitches = offsets.map { offset -> Double? in
+            audiblePitch(samples, rate: rate, offset: offset, peak: peak)
+        }
+        for index in 0..<(pitches.count - 2) {
+            guard let first = pitches[index], let second = pitches[index + 1], let third = pitches[index + 2],
+                  closePitch(first, second), closePitch(first, third), closePitch(second, third) else { continue }
+            let reference = [first, second, third].sorted()[1]
+            let start = Int(offsets[index] * rate)
+            var end = samples.count
+            var firstChangedWindow: Double?
+            var next = offsets[index + 2] + 0.08
+            while next + 0.09 < Double(samples.count) / rate {
+                if let pitch = audiblePitch(samples, rate: rate, offset: next, peak: peak),
+                   !closePitch(reference, pitch, tolerance: 120) {
+                    if let changed = firstChangedWindow { end = Int(changed * rate); break }
+                    firstChangedWindow = next
+                } else {
+                    firstChangedWindow = nil
+                }
+                next += 0.08
+            }
+            return (start..<end, reference)
+        }
+        return nil
+    }
+
+    private static func audiblePitch(_ samples: [Float], rate: Double, offset: Double, peak: Float) -> Double? {
+        let first = Int(offset * rate)
+        let last = first + Int(rate * 0.09)
+        guard samples.indices.contains(first), last < samples.count,
+              (samples[first..<last].lazy.map(abs).max() ?? 0) >= 0.12 * peak else { return nil }
+        return detectedPitch(samples, rate: rate, offset: offset)
     }
 
     static func detectedPitch(_ samples: [Float], rate: Double, offset: Double = 0) -> Double? {

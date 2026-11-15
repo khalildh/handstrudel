@@ -33,6 +33,21 @@ final class SocialTests: XCTestCase {
     }
 
     @MainActor
+    func testInventedInstrumentCanFindAStableSustainAfterAWanderingAttack() throws {
+        let rate = InventedSound.sampleRate
+        let source = (0..<Int(rate)).map { frame -> Float in
+            let t = Double(frame) / rate
+            let attackLength = 0.28
+            let cycles = t < attackLength ? t * 188 + t * t * 235 : attackLength * 188 + attackLength * attackLength * 235 + (t - attackLength) * 279
+            return Float(sin(2 * .pi * cycles) * 0.34)
+        }
+        let tuned = try InventedSound.tuned(source, rate: rate)
+        XCTAssertLessThan(tuned.count, Int(rate * 0.9))
+        let root = try XCTUnwrap(InventedSound.detectedPitch(tuned, rate: rate, offset: 0.05))
+        XCTAssertEqual(root, InventedSound.frequency(midi: 60), accuracy: 1)
+    }
+
+    @MainActor
     func testInventedEffectPreservesSweepRejectedByPitchModeAndRendersThroughNativeSampler() throws {
         let rate = InventedSound.sampleRate
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).wav")

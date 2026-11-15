@@ -26,7 +26,7 @@ Set `HANDSTRUDEL_LOCAL_AUDIO_LAB=1` in the Xcode Debug Run environment (or `SIMC
 - **Optional cloud bridge:** start `node scripts/sound-lab.mjs` with `STABILITY_API_KEY` set only in the bridge shell and `HANDSTRUDEL_AUDIO_MLX_DIR` unset. Generate with AI identifies this backend before sending anything. It makes one paid request to the [Stable Audio API](https://platform.stability.ai/docs/api-reference/) without automatic retries. This is a simulator experiment, not a production API.
 - **Physical iPhone Debug build:** choose a sound type and **Import a WAV** to load a 0.25 to 4 second WAV (at most 4 MB) from Files. For pitched mode, use a dry single note around C4. For one-shot effects, any short isolated sound with enough audible content can work. The Mac loopback generator is not reachable from an iPhone.
 
-Each sound is a short one-shot, not a multisampled or sustained instrument. Import is tuned for notes around C4; harmonically ambiguous samples can still need a retry. Do not publish or redistribute generated WAVs without checking the provider's terms for isolated samples.
+Each sound is a short one-shot, not a multisampled or sustained instrument. Pitched import prefers a stable attack but can trim an unstable attack when the sound settles into one clear note. It is tuned for notes around C4; harmonically ambiguous samples can still need a retry. Do not publish or redistribute generated WAVs without checking the provider's terms for isolated samples.
 
 ## Checks
 
