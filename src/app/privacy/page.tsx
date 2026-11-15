@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
+import { infoViewport, SiteInfoPage } from "../site-info-page";
+
+export const metadata: Metadata = { title: "Privacy Policy | HandStrudel" };
+export const viewport = infoViewport;
+
 export default function Privacy() {
-  const link = { color: '#00ff9d' } as const;
   return (
-    <div style={{ maxWidth: 700, margin: '0 auto', padding: '40px 20px', fontFamily: 'system-ui', color: '#fff', background: '#000', minHeight: '100vh', lineHeight: 1.55 }}>
-      <h1 style={{ color: '#00ff9d' }}>Privacy Policy</h1>
+    <SiteInfoPage title="Privacy Policy" path="/privacy">
       <p><strong>Last updated:</strong> November 2026</p>
 
       <h2>Overview</h2>
@@ -28,6 +32,9 @@ export default function Privacy() {
         <li><strong>Activity:</strong> likes, follows, blocks, reports, and the performances you save. Your saved list is private to your account.</li>
       </ul>
       <p>We use this only to run HandStrudel: to sign you in, show your posts, power the feed, keep the community safe, and contact you about your account. We don&apos;t sell your data, show ads, or track you across other apps or websites.</p>
+
+      <h2>Website download metrics</h2>
+      <p>We count homepage App Store button clicks by day and button location. These counts don&apos;t include an account ID and don&apos;t use a tracking cookie. The buttons carry a shared campaign label so Apple can report aggregate App Store downloads from the homepage. We don&apos;t match individual clicks to downloads.</p>
 
       <h2>Service providers</h2>
       <p>We use a small number of providers to run the service, who process data only on our behalf:</p>
@@ -58,7 +65,7 @@ export default function Privacy() {
       <p>We may update this policy. Changes will be posted on this page, and significant changes will be announced in the app.</p>
 
       <h2>Contact</h2>
-      <p>Questions or requests: <a href="mailto:hello@handstrudel.com" style={link}>hello@handstrudel.com</a></p>
-    </div>
+      <p>Questions or requests: <a href="mailto:hello@handstrudel.com">hello@handstrudel.com</a></p>
+    </SiteInfoPage>
   );
 }

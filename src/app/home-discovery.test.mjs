@@ -12,7 +12,7 @@ const prefix = base.pathname.replace(/\/$/, "");
 const watchPath = `${prefix}/watch`;
 const playPath = `${prefix}/play`;
 const homeUrl = new URL(`${prefix}/`, base).href;
-const appStore = "https://apps.apple.com/app/id6764415289";
+const appStore = "https://apps.apple.com/app/apple-store/id6764415289?pt=127873492&ct=website&mt=8";
 const video = {
   id: "30000000-0000-0000-0000-000000000301",
   username: "fixture_artist", caption: "Local community performance",

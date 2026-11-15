@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { appStoreId, homepageAppStoreUrl } from "@/lib/app-store";
+import { HomeDownloadAnchor } from "./home-download-link";
 import { HomePreview } from "./home-preview";
+import { SiteInfoLinks } from "./site-info-links";
 import { WatchArtwork, WatchIcon } from "./watch/watch-design";
 import "./home.css";
 
-const appStore = "https://apps.apple.com/app/id6764415289";
 const piano = "/watch?v=41ba66c5-6f0a-4697-99e8-5261f7cb6240";
 const kalimba = "/watch?v=385e21ab-7160-4378-b897-c602de952140";
 const media = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/home`;
@@ -12,14 +14,15 @@ const media = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/home`;
 export const metadata: Metadata = {
   title: "HandStrudel for iPhone | Make music with your hands",
   description: "Turn gestures and taps into melodies and chords. Download HandStrudel for iPhone, watch a performance, or try the browser instrument.",
-  itunes: { appId: "6764415289" },
+  itunes: { appId: appStoreId },
 };
 
 export const viewport = { themeColor: "#f7f6f1" };
 
-function DownloadLink({ compact = false }: { compact?: boolean }) {
+function DownloadLink({ placement }: { placement: "header" | "hero" | "footer" }) {
+  const compact = placement === "header";
   return (
-    <a className={`home-download${compact ? " home-download-compact" : ""}`} href={appStore}>
+    <HomeDownloadAnchor placement={placement} className={`home-download${compact ? " home-download-compact" : ""}`} href={homepageAppStoreUrl()}>
       {!compact && (
         <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <rect x="5.5" y="2.5" width="13" height="19" rx="3" />
@@ -28,7 +31,7 @@ function DownloadLink({ compact = false }: { compact?: boolean }) {
       )}
       <span>{compact ? "Get the app" : "Download for iPhone"}</span>
       <WatchIcon name="arrow" />
-    </a>
+    </HomeDownloadAnchor>
   );
 }
 
@@ -55,7 +58,7 @@ export default function Home() {
           <nav aria-label="Main navigation">
             <Link href="/watch">Watch</Link>
             <Link className="home-nav-studio" href="/play" prefetch={false}>Web studio</Link>
-            <DownloadLink compact />
+            <DownloadLink placement="header" />
           </nav>
         </div>
       </header>
@@ -67,7 +70,7 @@ export default function Home() {
             <h1 id="home-title">The air is<br /><em>your instrument.</em></h1>
             <p className="home-lede">Pinch a note out of thin air, or tap the wheel. HandStrudel turns the way you move into music.</p>
             <div className="home-hero-actions">
-              <DownloadLink />
+              <DownloadLink placement="hero" />
               <Link className="home-text-link" href="/play" prefetch={false}>Try in browser <WatchIcon name="next" /></Link>
             </div>
             <p className="home-download-note">Free to download <span aria-hidden="true">·</span> Made for iPhone</p>
@@ -123,17 +126,13 @@ export default function Home() {
             <p className="home-kicker"><span /> HANDSTRUDEL FOR iPHONE</p>
             <h2 id="home-get-title">Play your first note.</h2>
           </div>
-          <div><DownloadLink /><p className="home-download-note">Available on the App Store</p></div>
+          <div><DownloadLink placement="footer" /><p className="home-download-note">Available on the App Store</p></div>
         </section>
       </main>
 
       <footer className="home-shell home-footer">
         <Brand />
-        <nav aria-label="Site information">
-          <Link href="/support">Support</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </nav>
+        <SiteInfoLinks />
       </footer>
     </div>
   );

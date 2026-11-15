@@ -1,4 +1,5 @@
 import AVFoundation
+import OSLog
 import Vision
 import UIKit
 
@@ -77,6 +78,8 @@ final class HandTrackingManager: NSObject, ObservableObject {
     private let videoOutput = AVCaptureVideoDataOutput()
     private let handPoseRequest = VNDetectHumanHandPoseRequest()
     private let processingQueue = DispatchQueue(label: "hand-tracking", qos: .userInteractive)
+    private let logger = Logger(subsystem: "com.handstrudel.app", category: "HandTracking")
+    private var reportedVisionError = false
 
     var previewLayer: AVCaptureVideoPreviewLayer?
     var onHandsUpdate: ((HandsState) -> Void)?
@@ -155,7 +158,12 @@ final class HandTrackingManager: NSObject, ObservableObject {
         guard !isRunning else { return }
 
         if previewLayer != nil { runCapture(); return }
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
+        let runsOnMac = ProcessInfo.processInfo.isiOSAppOnMac
+        // Mac cameras need not advertise a front-facing iPhone camera type.
+        let device = runsOnMac
+            ? AVCaptureDevice.default(for: .video)
+            : AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+        guard let device,
               let input = try? AVCaptureDeviceInput(device: device) else {
             cameraIssue = .unavailable
             return
@@ -167,36 +175,54 @@ final class HandTrackingManager: NSObject, ObservableObject {
             captureSession.isMultitaskingCameraAccessEnabled = true
         }
 
-        if captureSession.canAddInput(input) {
-            captureSession.addInput(input)
+        guard captureSession.canAddInput(input) else {
+            captureSession.commitConfiguration()
+            cameraIssue = .unavailable
+            return
         }
+        captureSession.addInput(input)
 
-        videoOutput.setSampleBufferDelegate(self, queue: processingQueue)
         videoOutput.alwaysDiscardsLateVideoFrames = true
-        if captureSession.canAddOutput(videoOutput) {
-            captureSession.addOutput(videoOutput)
+        guard captureSession.canAddOutput(videoOutput) else {
+            captureSession.removeInput(input)
+            captureSession.commitConfiguration()
+            cameraIssue = .unavailable
+            return
         }
+        captureSession.addOutput(videoOutput)
 
-        // Set video orientation to portrait and mirror for front camera
-        if let connection = videoOutput.connection(with: .video) {
-            if connection.isVideoOrientationSupported {
-                connection.videoOrientation = .portrait
-            }
-            if connection.isVideoMirroringSupported {
-                connection.isVideoMirrored = true
-            }
+        guard let outputConnection = videoOutput.connection(with: .video) else {
+            captureSession.removeOutput(videoOutput)
+            captureSession.removeInput(input)
+            captureSession.commitConfiguration()
+            cameraIssue = .unavailable
+            return
         }
+        videoOutput.setSampleBufferDelegate(self, queue: processingQueue)
 
+        configureVideoConnection(outputConnection, usePortrait: !runsOnMac, mirrored: true)
         captureSession.commitConfiguration()
 
         let layer = AVCaptureVideoPreviewLayer(session: captureSession)
         layer.videoGravity = .resizeAspectFill
         if let connection = layer.connection {
-            connection.videoOrientation = .portrait
+            configureVideoConnection(connection, usePortrait: !runsOnMac,
+                                     mirrored: outputConnection.isVideoMirrored)
         }
         self.previewLayer = layer
 
         runCapture()
+    }
+
+    private func configureVideoConnection(_ connection: AVCaptureConnection, usePortrait: Bool, mirrored: Bool) {
+        // The Mac camera is already upright in its native landscape orientation.
+        if usePortrait, connection.isVideoOrientationSupported {
+            connection.videoOrientation = .portrait
+        }
+        if connection.isVideoMirroringSupported {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = mirrored
+        }
     }
 
     private func runCapture() {
@@ -270,7 +296,7 @@ final class HandTrackingManager: NSObject, ObservableObject {
                 return nil
             }
             // Vision: origin bottom-left, y up. Flip y so top=0.
-            // x stays as-is since video output is already mirrored to match preview.
+            // x stays as-is: the output and preview share the same mirroring.
             landmarks.append(HandLandmark(x: point.location.x, y: 1 - point.location.y, z: 0))
         }
 
@@ -336,9 +362,19 @@ extension HandTrackingManager: AVCaptureVideoDataOutputSampleBufferDelegate {
             videoHeight = h
         }
 
-        // Video output is set to .portrait + mirrored, so frames arrive correctly oriented
+        // Frames arrive upright and use the same orientation as the preview.
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up)
-        try? handler.perform([handPoseRequest])
+        do {
+            try handler.perform([handPoseRequest])
+            reportedVisionError = false
+        } catch {
+            if !reportedVisionError {
+                logger.error("Hand pose request failed: \(error.localizedDescription, privacy: .public)")
+                reportedVisionError = true
+            }
+            onHandsUpdate?(HandsState())
+            return
+        }
 
         var state = HandsState()
 
@@ -350,13 +386,16 @@ extension HandTrackingManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         for observation in results {
             guard let handData = processObservation(observation) else { continue }
 
-            // Video output is mirrored, so Vision's chirality is flipped:
-            // Vision .left in mirrored frame = user's right hand, and vice versa.
+            // Some Mac cameras do not support mirroring at the connection.
             switch observation.chirality {
             case .left:
-                state.right = handData
+                if connection.isVideoMirrored { state.right = handData }
+                else { state.left = handData }
             case .right:
-                state.left = handData
+                if connection.isVideoMirrored { state.left = handData }
+                else { state.right = handData }
+            case .unknown:
+                break
             @unknown default:
                 break
             }

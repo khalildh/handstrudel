@@ -1,17 +1,16 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { infoViewport, SiteInfoPage } from '../site-info-page';
 
 export const metadata: Metadata = { title: 'Terms of Use · HandStrudel' };
-
-const page = { maxWidth: 700, margin: '0 auto', padding: '40px 20px', fontFamily: 'system-ui', color: '#fff', background: '#000', minHeight: '100vh', lineHeight: 1.55 } as const;
-const link = { color: '#00ff9d' } as const;
+export const viewport = infoViewport;
 
 export default function Terms() {
   return (
-    <div style={page}>
-      <h1 style={{ color: '#00ff9d' }}>Terms of Use</h1>
+    <SiteInfoPage title="Terms of Use" path="/terms">
       <p><strong>Last updated:</strong> November 2026</p>
 
-      <p>These terms apply when you use the HandStrudel app and website (&ldquo;HandStrudel&rdquo;, &ldquo;we&rdquo;). By creating an account or posting a video you agree to them, and to our <a href="/community" style={link}>Community Guidelines</a> and <a href="/privacy" style={link}>Privacy Policy</a>.</p>
+      <p>These terms apply when you use the HandStrudel app and website (&ldquo;HandStrudel&rdquo;, &ldquo;we&rdquo;). By creating an account or posting a video you agree to them, and to our <Link href="/community">Community Guidelines</Link> and <Link href="/privacy">Privacy Policy</Link>.</p>
 
       <h2>Who can use HandStrudel</h2>
       <p>You must be at least 13 years old to create an account. If you are under the age of majority where you live, a parent or guardian must agree to these terms on your behalf.</p>
@@ -25,7 +24,7 @@ export default function Terms() {
       <p>If you enable play-along on a video, you give other HandStrudel users permission to use its audio as backing in credited videos they make with HandStrudel. Only enable this if you have permission to share all of the audio for that use. You can turn off new play-along posts later; it does not remove takes that were already published.</p>
 
       <h2>No objectionable content or abusive behavior</h2>
-      <p>There is <strong>zero tolerance</strong> for objectionable content or abusive users. Don&apos;t post anything that breaks the <a href="/community" style={link}>Community Guidelines</a>: no nudity or sexual content, no hate, harassment, threats, or bullying, no violence or self-harm, no illegal activity, no spam, and nothing that infringes someone else&apos;s rights.</p>
+      <p>There is <strong>zero tolerance</strong> for objectionable content or abusive users. Don&apos;t post anything that breaks the <Link href="/community">Community Guidelines</Link>: no nudity or sexual content, no hate, harassment, threats, or bullying, no violence or self-harm, no illegal activity, no spam, and nothing that infringes someone else&apos;s rights.</p>
 
       <h2>Reporting, blocking, and moderation</h2>
       <p>Posts and comments can be reported and users can be blocked from inside the app. Posts and comments are hidden automatically once several people report them, and we review reports within 24 hours. We may remove any content and suspend or terminate any account that breaks these terms, without notice.</p>
@@ -40,7 +39,7 @@ export default function Terms() {
       <p>We may update these terms. If the changes are significant we&apos;ll let you know in the app. Continuing to use HandStrudel after a change means you accept the updated terms.</p>
 
       <h2>Contact</h2>
-      <p>Questions or reports: <a href="mailto:hello@handstrudel.com" style={link}>hello@handstrudel.com</a></p>
-    </div>
+      <p>Questions or reports: <a href="mailto:hello@handstrudel.com">hello@handstrudel.com</a></p>
+    </SiteInfoPage>
   );
 }
