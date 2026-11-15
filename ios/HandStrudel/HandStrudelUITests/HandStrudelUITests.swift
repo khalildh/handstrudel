@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 final class HandStrudelUITests: XCTestCase {
@@ -87,6 +88,31 @@ final class HandStrudelUITests: XCTestCase {
     func testStartOverlay_showsSubtitle() {
         launchToStart()
         XCTAssertTrue(app.staticTexts["Move your hands to make music."].waitForExistence(timeout: 5))
+    }
+
+    func testStartPlayingStaysReachableAtLargestDynamicType() {
+        app.launchArguments += [
+            "--uitesting", "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+        ]
+        app.launch()
+
+        let start = app.buttons["start-button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        XCTAssertTrue(start.isHittable)
+        let startY = start.frame.minY
+
+        let brand = app.staticTexts["handstrudel"]
+        XCTAssertTrue(brand.isHittable)
+        XCTAssertGreaterThan(brand.frame.height, 28, "Expected accessibility-size text")
+
+        app.scrollViews.firstMatch.swipeUp()
+        XCTAssertFalse(brand.isHittable, "The Studio content should have scrolled")
+        XCTAssertTrue(start.isHittable)
+        XCTAssertEqual(start.frame.minY, startY, accuracy: 1)
+
+        start.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
     }
 
     func testAppearanceSwitchesAndPersistsAfterRelaunch() {
