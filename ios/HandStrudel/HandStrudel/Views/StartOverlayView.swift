@@ -22,6 +22,7 @@ struct StartOverlayView: View {
     let starting: Bool
     let onStart: () -> Void
     let onDrafts: () -> Void
+    let onLoops: () -> Void
     let onSetups: () -> Void
 
     @State private var showSounds = false
@@ -53,6 +54,11 @@ struct StartOverlayView: View {
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
                         .accessibilityIdentifier("music-presets-button")
+                        Button(action: onLoops) {
+                            Label("Loops", systemImage: "repeat")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .accessibilityIdentifier("music-loop-shelf")
                     }
                     .font(.subheadline.weight(.semibold))
                     .buttonStyle(.plain)

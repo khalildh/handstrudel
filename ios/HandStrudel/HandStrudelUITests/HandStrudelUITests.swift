@@ -117,6 +117,20 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["theme-volt"].isSelected)
     }
 
+    func testLoopShelfOpensBeforeStartingTheWheel() {
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        let shelf = app.buttons["music-loop-shelf"]
+        XCTAssertTrue(shelf.waitForExistence(timeout: 5))
+        if !shelf.isHittable { app.swipeUp() }
+        shelf.tap()
+        XCTAssertTrue(app.staticTexts["Loop shelf"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("loop-recording-length").exists)
+        XCTAssertFalse(element("close-button").exists)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(shelf.waitForExistence(timeout: 5))
+    }
+
     func testMusic_privateDraftsOpensWithoutAccount() {
         app.launchArguments.append("--uitesting")
         app.launch()

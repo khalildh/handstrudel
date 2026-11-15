@@ -150,6 +150,7 @@ final class EngineController: ObservableObject {
     @Published var loopRecordingProgress: Double = 0
     @Published var savedLoops = [RecordedLoop]()
     @Published var playingLoopIds = Set<UUID>()
+    @Published private(set) var loopRecordingBars = 4
     private var audioLoopPlayers: [UUID: AVAudioPlayer] = [:]
 
     // Learn mode (Guitar Hero-style guided play)
@@ -335,6 +336,8 @@ final class EngineController: ObservableObject {
 
         // Restore saved data
         savedLoops = pm.loadLoops()
+        loopRecordingBars = pm.lastLoopBars
+        loopRecorder.selectedBars = loopRecordingBars
         savedSnippets = pm.loadSnippets()
 
         // Recompute cached scale notes for restored key/scale
@@ -910,30 +913,70 @@ final class EngineController: ObservableObject {
         return false
     }
 
-    func toggleLoopPlayback(_ loopId: UUID) {
+    @discardableResult
+    func toggleLoopPlayback(_ loopId: UUID) -> Bool {
         if playingLoopIds.contains(loopId) {
             audioLoopPlayers.removeValue(forKey: loopId)?.stop()
             loopRecorder.removeLoop(loopId)
             playingLoopIds.remove(loopId)
+            return true
         } else if let loop = savedLoops.first(where: { $0.id == loopId }) {
             if loop.hasCapturedAudio == true {
                 if let player = try? AVAudioPlayer(contentsOf: AudioExporter.capturedURL(loop.id)) {
                     player.numberOfLoops = -1
                     player.enableRate = true
                     player.rate = Float(recordingTempoScale)
+                    player.volume = Float(loop.effectiveGain)
                     audioLoopPlayers[loop.id] = player
                     if (!isPaused || player.prepareToPlay()) && (isPaused || player.play()) {
                         playingLoopIds.insert(loop.id)
+                        return true
                     } else {
                         audioLoopPlayers[loop.id] = nil
                     }
                 }
-                return
+                return false
             }
+            guard isRunning else { return false }
             let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
             loopRecorder.addLoop(loop, startTime: elapsed)
             playingLoopIds.insert(loopId)
+            return true
         }
+        return false
+    }
+
+    func setLoopRecordingBars(_ value: Int) {
+        guard LoopRecorder.barOptions.contains(value) else { return }
+        loopRecordingBars = value
+        loopRecorder.selectedBars = value
+        PersistenceManager.shared.lastLoopBars = value
+    }
+
+    @discardableResult
+    func renameLoop(_ id: UUID, to proposedName: String) -> Bool {
+        let name = RecordedLoop.cleanName(proposedName)
+        guard !name.isEmpty, let index = savedLoops.firstIndex(where: { $0.id == id }) else { return false }
+        savedLoops[index].name = name
+        persistLoops()
+        return true
+    }
+
+    func setLoopGain(_ gain: Double, for id: UUID) {
+        guard let index = savedLoops.firstIndex(where: { $0.id == id }), savedLoops[index].hasCapturedAudio == true else { return }
+        savedLoops[index].gain = RecordedLoop.clampedGain(gain)
+        audioLoopPlayers[id]?.volume = Float(savedLoops[index].effectiveGain)
+    }
+
+    func toggleLoopMute(_ id: UUID) {
+        guard let index = savedLoops.firstIndex(where: { $0.id == id }), savedLoops[index].hasCapturedAudio == true else { return }
+        savedLoops[index].muted = savedLoops[index].muted != true
+        audioLoopPlayers[id]?.volume = Float(savedLoops[index].effectiveGain)
+        persistLoops()
+    }
+
+    func persistLoops() {
+        PersistenceManager.shared.saveLoops(savedLoops)
     }
 
     func deleteLoop(_ loopId: UUID) {

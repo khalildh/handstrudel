@@ -15,6 +15,9 @@ final class AudioExporter {
     static func exportLoop(_ loop: RecordedLoop, waveform: String = "sawtooth") async throws -> URL {
         let sampleRate: Double = 44100
         let duration = loop.duration
+        guard duration.isFinite, duration > 0, duration <= 120 else {
+            throw SocialError.message("This older loop has an unsupported duration.")
+        }
         let frameCount = AVAudioFrameCount(duration * sampleRate)
 
         let settings: [String: Any] = [
@@ -25,7 +28,7 @@ final class AudioExporter {
         ]
 
         let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(loop.name)_\(Int(Date().timeIntervalSince1970)).m4a")
+            .appendingPathComponent("HandStrudel-\(UUID()).m4a")
 
         // Create a buffer for the entire loop
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!

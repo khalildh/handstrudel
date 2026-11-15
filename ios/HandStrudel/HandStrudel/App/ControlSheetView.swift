@@ -1313,14 +1313,14 @@ struct ControlSheet: View {
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundColor(.secondary)
                 ForEach(LoopRecorder.barOptions, id: \.self) { bars in
-                    Button(action: { engine.loopRecorder.selectedBars = bars }) {
+                    Button(action: { engine.setLoopRecordingBars(bars) }) {
                         Text("\(bars) bars")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(engine.loopRecorder.selectedBars == bars ? palette.accent : .secondary)
+                            .foregroundColor(engine.loopRecordingBars == bars ? palette.accent : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(
-                                Capsule().fill(engine.loopRecorder.selectedBars == bars ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
+                                Capsule().fill(engine.loopRecordingBars == bars ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
                             )
                     }
                 }
@@ -1472,6 +1472,148 @@ struct ControlSheet: View {
                     }
                 }
             }
+        }
+    }
+}
+
+struct LoopShelfView: View {
+    @Environment(\.studioPalette) private var palette
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var engine: EngineController
+    @State private var renameTarget: RecordedLoop?
+    @State private var nextName = ""
+    @State private var deleteTarget: RecordedLoop?
+    @State private var exportURL: URL?
+    @State private var isExporting = false
+    @State private var message: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    Label("PRIVATE AUDIO LIBRARY", systemImage: "waveform")
+                        .font(.caption.monospaced().weight(.semibold)).foregroundStyle(palette.accent)
+                    Text("Loop shelf").font(.system(.largeTitle, design: .serif)).accessibilityAddTraits(.isHeader)
+                    Text(engine.isRunning ? "Layer loops with the live instrument." : "Preview captured audio without opening the wheel.")
+                        .font(.subheadline).foregroundStyle(palette.muted)
+                    Picker("New recording length", selection: Binding(get: { engine.loopRecordingBars }, set: engine.setLoopRecordingBars)) {
+                        ForEach(LoopRecorder.barOptions, id: \.self) { bars in
+                            Text(bars == 1 ? "1 bar" : "\(bars) bars").tag(bars)
+                        }
+                    }
+                    .accessibilityIdentifier("loop-recording-length")
+                    if engine.savedLoops.isEmpty {
+                        Label("No loops yet", systemImage: "repeat").font(.headline)
+                        Text("Tap the repeat button on the wheel to capture app audio.")
+                            .font(.subheadline).foregroundStyle(palette.muted)
+                    }
+                    ForEach(engine.savedLoops) { loop in loopRow(loop) }
+                    if isExporting { ProgressView("Preparing audio") }
+                }
+                .padding(20)
+                .frame(maxWidth: 540)
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .background(palette.background.ignoresSafeArea())
+            .foregroundStyle(palette.ink)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        .tint(palette.accent)
+        .onDisappear {
+            engine.persistLoops()
+            if !engine.isRunning { engine.stopAllLoops() }
+        }
+        .sheet(item: $exportURL) { url in
+            ShareSheet(activityItems: [url])
+                .onDisappear { try? FileManager.default.removeItem(at: url) }
+        }
+        .alert("Rename loop", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
+            TextField("Loop name", text: $nextName)
+            Button("Save") { if let id = renameTarget?.id { _ = engine.renameLoop(id, to: nextName) }; renameTarget = nil }
+                .disabled(RecordedLoop.cleanName(nextName).isEmpty)
+            Button("Cancel", role: .cancel) { renameTarget = nil }
+        }
+        .confirmationDialog("Delete this loop?", isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), titleVisibility: .visible) {
+            Button("Delete loop", role: .destructive) {
+                if let id = deleteTarget?.id { engine.deleteLoop(id) }
+                deleteTarget = nil
+            }
+            Button("Cancel", role: .cancel) { deleteTarget = nil }
+        } message: { Text("Any WAV copies you've shared will stay where you saved them.") }
+        .alert("Loops", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(message ?? "") }
+    }
+
+    private func loopRow(_ loop: RecordedLoop) -> some View {
+        let playing = engine.playingLoopIds.contains(loop.id)
+        let captured = loop.hasCapturedAudio == true
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Button {
+                    if !engine.toggleLoopPlayback(loop.id) { message = "This loop couldn't play. Its audio file may be unavailable." }
+                } label: {
+                    Image(systemName: playing ? "stop.fill" : "play.fill")
+                        .foregroundStyle(palette.onAccent)
+                        .frame(width: 44, height: 44)
+                        .background(palette.accent, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!captured && !engine.isRunning)
+                .accessibilityLabel("\(playing ? "Stop" : "Play") \(loop.name)")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(loop.name).font(.headline)
+                    Text(captured ? "WAV · \(loop.duration.formatted(.number.precision(.fractionLength(1)))) s" : "Older note-event loop")
+                        .font(.caption.monospacedDigit()).foregroundStyle(palette.muted)
+                }
+                Spacer(minLength: 3)
+                Menu {
+                    Button("Rename", systemImage: "pencil") { nextName = loop.name; renameTarget = loop }
+                    Button(captured ? "Export original WAV" : "Export approximate M4A", systemImage: "square.and.arrow.up") { export(loop) }
+                        .disabled(isExporting)
+                    Button("Delete", systemImage: "trash", role: .destructive) { deleteTarget = loop }
+                } label: {
+                    Image(systemName: "ellipsis.circle").frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Actions for \(loop.name)")
+            }
+            if captured {
+                HStack(spacing: 10) {
+                    Button {
+                        engine.toggleLoopMute(loop.id)
+                    } label: {
+                        Image(systemName: loop.muted == true ? "speaker.slash.fill" : "speaker.wave.2")
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(palette.accent)
+                    .accessibilityLabel(loop.muted == true ? "Unmute \(loop.name)" : "Mute \(loop.name)")
+                    Slider(value: Binding(get: { loop.playbackGain }, set: { engine.setLoopGain($0, for: loop.id) }),
+                           in: 0...1, step: 0.05, onEditingChanged: { if !$0 { engine.persistLoops() } })
+                        .accessibilityLabel("Volume for \(loop.name)")
+                    Text(loop.playbackGain, format: .percent.precision(.fractionLength(0)))
+                        .font(.caption.monospacedDigit()).foregroundStyle(palette.muted)
+                        .accessibilityHidden(true)
+                }
+            } else if !engine.isRunning {
+                Text("Open the wheel to play this older loop.").font(.caption).foregroundStyle(palette.muted)
+            }
+        }
+        .padding(12)
+        .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border).allowsHitTesting(false) }
+    }
+
+    private func export(_ loop: RecordedLoop) {
+        guard !isExporting else { return }
+        isExporting = true
+        Task {
+            defer { isExporting = false }
+            do {
+                if loop.hasCapturedAudio == true { exportURL = try AudioExporter.shareCaptured(loop) }
+                else { exportURL = try await AudioExporter.exportLoop(loop) }
+            } catch { message = "Couldn't export this loop. The original is still saved." }
         }
     }
 }

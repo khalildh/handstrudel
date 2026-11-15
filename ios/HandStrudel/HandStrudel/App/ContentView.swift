@@ -65,6 +65,7 @@ struct ContentView: View {
     @State private var hasOpenedFeed = false
     @State private var startingSession = false
     @State private var showDrafts = false
+    @State private var showLoops = false
     @State private var showSetups = false
     @State private var soundError: String?
     @State private var sharedSoundLoad: Task<Void, Never>?
@@ -116,7 +117,7 @@ struct ContentView: View {
 
     private var canShowReview: Bool {
         reviewReadyThisSession && scenePhase == .active && destination == .music
-            && !engine.isRunning && !startingSession && !showDrafts && !showSetups && reviewingDraft == nil
+            && !engine.isRunning && !startingSession && !showDrafts && !showLoops && !showSetups && reviewingDraft == nil
             && linkedComments == nil && linkedPerformance == nil && soundError == nil && recordingError == nil
             && jamInvitation == nil && jamError == nil
     }
@@ -185,6 +186,11 @@ struct ContentView: View {
         .sheet(isPresented: $showDrafts) {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil,
                                 onSuccessfulTake: recordReviewMilestone)
+        }
+        .sheet(isPresented: $showLoops) {
+            LoopShelfView(engine: engine)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showSetups, onDismiss: {
             if engine.isRunning { engine.resume() }
@@ -357,6 +363,7 @@ struct ContentView: View {
                         starting: startingSession,
                         onStart: { startSession() },
                         onDrafts: { showDrafts = true },
+                        onLoops: { showLoops = true },
                         onSetups: { showSetups = true }
                     )
                 case .account:
@@ -1658,7 +1665,16 @@ struct ContentView: View {
     private var bottomControls: some View {
         HStack(spacing: 16) {
             // Loop record button
-            loopRecordButton
+            VStack(spacing: 2) {
+                loopRecordButton
+                Button("Loops") { showLoops = true }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 44, minHeight: 28)
+                    .background(.black.opacity(0.64), in: Capsule())
+                    .accessibilityIdentifier("stage-loop-shelf")
+                    .disabled(activeAudioLoop != nil || isRecording || recorderBusy || recordCountdown > 0)
+            }
 
             Spacer()
 

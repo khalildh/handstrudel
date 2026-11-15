@@ -6,6 +6,32 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    func testCapturedLoopMixPersistsAndOlderLoopsKeepUnityGain() throws {
+        let suite = "loop-mix-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PersistenceManager(defaults: defaults)
+        var loop = RecordedLoop(events: [], duration: 2, bpm: 120, name: "Test", mode: "scale")
+        let legacy = try JSONDecoder().decode(RecordedLoop.self, from: JSONEncoder().encode(loop))
+        XCTAssertEqual(legacy.effectiveGain, 1)
+        XCTAssertEqual(RecordedLoop.cleanName("  Evening\nLoop  "), "EveningLoop")
+        XCTAssertEqual(RecordedLoop.clampedGain(.nan), 1)
+        XCTAssertEqual(RecordedLoop.clampedGain(-2), 0)
+        loop.name = "Evening Loop"
+        loop.hasCapturedAudio = true
+        loop.gain = 0.35
+        loop.muted = true
+        store.saveLoops([loop])
+        let restored = try XCTUnwrap(store.loadLoops().first)
+        XCTAssertEqual(restored.name, "Evening Loop")
+        XCTAssertEqual(restored.id, loop.id)
+        XCTAssertEqual(restored.playbackGain, 0.35)
+        XCTAssertEqual(restored.effectiveGain, 0)
+        XCTAssertEqual(store.lastLoopBars, 4)
+        store.lastLoopBars = 1
+        store.lastLoopBars = 17
+        XCTAssertEqual(PersistenceManager(defaults: defaults).lastLoopBars, 1)
+    }
     func testStudioPreviewFollowsSelectedKeyScaleAndChord() throws {
         let free = try XCTUnwrap(CHORD_PROGRESSIONS.first { $0.id == "free" })
         let secondDegree = try XCTUnwrap(ChordProgression.parse("2 5 1"))
