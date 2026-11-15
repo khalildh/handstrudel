@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ControlSheet: View {
     @Environment(\.studioPalette) private var palette
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
     @Binding var hideSkeletonWhenRecording: Bool
@@ -17,32 +18,12 @@ struct ControlSheet: View {
     @State private var soundFontCategory: GMCategory = DEFAULT_SOUNDFONT_INSTRUMENT.category
     @State private var customProgressionText = ""
     @State private var progressionCategory: ProgressionCategory = .essentials
-    /// "Other modes" disclosure — collapsed by default so the mode picker
-    /// surfaces only Split. Auto-expands on appear when the active mode is one
-    /// of the buried ones, so returning users don't have to dig for their mode.
+    /// Keep secondary modes out of the way until the player requests them.
     @State private var showOtherModes = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                // Header with store button
-                HStack {
-                    Spacer()
-                    Button(action: { showStore = true }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "bag.fill")
-                                .font(.system(size: 12, weight: .medium))
-                            Text("Store")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        }
-                        .foregroundColor(palette.ink.opacity(0.7))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(palette.ink.opacity(0.08)))
-                        .overlay(Capsule().stroke(palette.ink.opacity(0.12), lineWidth: 0.5))
-                    }
-                }
-
                 if hasModeContextControls {
                     modeSection
                     sectionDivider
@@ -50,6 +31,8 @@ struct ControlSheet: View {
                 harmonySection
                 Button { showSetups = true } label: { Label("Presets", systemImage: "square.stack") }
                     .buttonStyle(.bordered)
+                sectionDivider
+                otherModesPickerSection
 
                 // The Strudel waveform / sampled-instrument picker only has
                 // an audible effect when the active mode is voiced through the
@@ -116,12 +99,11 @@ struct ControlSheet: View {
                     trackSection
                 }
 
-                sectionDivider
-                otherModesPickerSection
-
             }
             .padding(20)
         }
+        .accessibilityIdentifier("music-settings-scroll")
+        .safeAreaInset(edge: .top, spacing: 0) { settingsHeader }
         .background(palette.background.ignoresSafeArea())
         .sheet(isPresented: $showStore) {
             StoreView(storeManager: storeManager)
@@ -161,6 +143,47 @@ struct ControlSheet: View {
     }
 
     // MARK: - Helpers
+
+    private var settingsHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                settingsTitle
+                Spacer(minLength: 4)
+                settingsActions
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                settingsTitle
+                settingsActions
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.background)
+        .overlay(alignment: .bottom) { sectionDivider }
+    }
+
+    private var settingsTitle: some View {
+        Text("Music settings")
+            .font(.system(.title2, design: .serif))
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var settingsActions: some View {
+        HStack(spacing: 10) {
+            Button { showStore = true } label: {
+                Image(systemName: "bag")
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("Store")
+            Button("Done") { dismiss() }
+                .fontWeight(.semibold)
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityIdentifier("music-settings-done")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(palette.accent)
+    }
 
     private var sectionDivider: some View {
         Rectangle()
@@ -580,7 +603,25 @@ struct ControlSheet: View {
     /// every other section to find this.
     private var otherModesPickerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            DisclosureGroup(isExpanded: $showOtherModes) {
+            Button { withAnimation(.easeInOut(duration: 0.18)) { showOtherModes.toggle() } } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "ellipsis.circle").accessibilityHidden(true)
+                    Text("Other modes").font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 8)
+                    Text(currentModeName).font(.caption).foregroundStyle(palette.muted)
+                    Image(systemName: showOtherModes ? "chevron.up" : "chevron.down")
+                        .font(.caption).accessibilityHidden(true)
+                }
+                .frame(minHeight: 44)
+                .foregroundStyle(palette.ink)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Other modes")
+            .accessibilityValue(showOtherModes ? "Expanded, \(currentModeName)" : "Collapsed, \(currentModeName)")
+            .accessibilityIdentifier("music-other-modes")
+
+            if showOtherModes {
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
                         modeButton("Split", icon: "circle.lefthalf.filled", mode: .splitChordMelody)
@@ -603,20 +644,27 @@ struct ControlSheet: View {
                         modeButton("Learn", icon: "music.note.list", mode: .learn)
                     }
                 }
-                .padding(.top, 8)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 11))
-                    Text("Other modes")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                }
-                .foregroundColor(palette.ink.opacity(0.45))
             }
-            .tint(palette.ink.opacity(0.5))
-            .onAppear {
-                if currentMode != .splitChordMelody { showOtherModes = true }
-            }
+        }
+        .onAppear {
+            if currentMode != .splitChordMelody && currentMode != .scaleChordMelody { showOtherModes = true }
+        }
+    }
+
+    private var currentModeName: String {
+        switch currentMode {
+        case .melodic: return "Melodic"
+        case .flow: return "Flow"
+        case .hybrid: return "Hybrid"
+        case .lead: return "Lead"
+        case .grid: return "Grid"
+        case .drums: return "Drums"
+        case .learn: return "Learn"
+        case .chordMelody: return "Chord + Melody"
+        case .radialChordMelody: return "Radial"
+        case .splitChordMelody: return "Split"
+        case .scaleChordMelody: return "Scale"
+        case .soundFont: return "SoundFont"
         }
     }
 
@@ -645,6 +693,7 @@ struct ControlSheet: View {
             )
         }
         .accessibilityIdentifier("mode-\(mode.rawValue)")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
     private func soundFontCategoryChip(_ cat: GMCategory) -> some View {
