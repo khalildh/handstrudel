@@ -2,12 +2,14 @@ import SwiftUI
 
 struct ControlSheet: View {
     @Environment(\.studioPalette) private var palette
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
     @Binding var hideSkeletonWhenRecording: Bool
     @Binding var recordPerformanceMicrophone: Bool
     @State private var showStore = false
     @State private var showLearnPicker = false
+    @State private var startLessonOnDismiss = false
     @State private var paywallPackId: String?
     @State private var showAudioExport = false
     @State private var audioExportError: String?
@@ -132,9 +134,12 @@ struct ControlSheet: View {
                 showSetups = false
             }
         }
-        .sheet(isPresented: $showLearnPicker) {
+        .sheet(isPresented: $showLearnPicker, onDismiss: {
+            if startLessonOnDismiss { startLessonOnDismiss = false; dismiss() }
+        }) {
             LearnSongPicker { song in
                 engine.loadLearnSong(song)
+                startLessonOnDismiss = true
                 showLearnPicker = false
             }
         }

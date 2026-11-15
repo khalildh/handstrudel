@@ -24,6 +24,44 @@ final class LearnModeManagerTests: XCTestCase {
     // With first tick at elapsed=0, songStartTime = 0 + 4 * 0.5 = 2.0
     private let songStart: Double = 2.0
 
+    func testCameraLaneMatchesTheDisplayedRowAfterAspectFill() {
+        for (video, screen) in [(0.75, 0.46), (0.46, 0.75)] {
+            let visible = min(1, video / screen)
+            for row in 0..<7 {
+                let yInView = LearnLaneLayout.top + (Double(row) + 0.5) * (1 - LearnLaneLayout.top - LearnLaneLayout.bottom) / 7
+                let cameraY = (1 - visible) / 2 + yInView * visible
+                XCTAssertEqual(LearnLaneLayout.cameraLane(y: cameraY, noteCount: 7, videoAspect: video, viewportAspect: screen), 6 - row)
+            }
+            XCTAssertNil(LearnLaneLayout.cameraLane(y: 0, noteCount: 7, videoAspect: video, viewportAspect: screen))
+        }
+    }
+
+    func testTouchTapScoresOnceAndUsesTheNearestTimingWindow() {
+        let manager = LearnModeManager()
+        manager.loadSong(makeSimpleSong(), scaleNotes: cMajorScale, bpm: bpm)
+        _ = manager.tick(elapsed: 0, leftLane: nil, rightLane: nil, leftPinching: false, rightPinching: false)
+        XCTAssertNil(manager.tapLane(1, elapsed: songStart))
+        XCTAssertEqual(manager.tapLane(0, elapsed: songStart + 0.01), 60)
+        XCTAssertNil(manager.tapLane(0, elapsed: songStart + 0.02))
+        XCTAssertEqual(manager.tapLane(2, elapsed: songStart + 0.5 + 0.15), 64)
+        XCTAssertEqual(manager.score.perfectHits, 1)
+        XCTAssertEqual(manager.score.goodHits, 1)
+        XCTAssertEqual(manager.score.misses, 0)
+    }
+
+    func testPausingLessonDoesNotBurnCountdownOrMarkMisses() {
+        let manager = LearnModeManager()
+        manager.loadSong(makeSimpleSong(), scaleNotes: cMajorScale, bpm: bpm)
+        _ = manager.tick(elapsed: 0, leftLane: nil, rightLane: nil, leftPinching: false, rightPinching: false)
+        manager.setPaused(true, elapsed: 1)
+        manager.setPaused(true, elapsed: 4)
+        XCTAssertTrue(manager.tick(elapsed: 6, leftLane: 0, rightLane: nil, leftPinching: true, rightPinching: false).isEmpty)
+        XCTAssertNil(manager.tapLane(0, elapsed: 6))
+        manager.setPaused(false, elapsed: 6)
+        XCTAssertEqual(manager.tapLane(0, elapsed: 7), 60)
+        XCTAssertEqual(manager.score.misses, 0)
+    }
+
     // MARK: - 1. loadSong
 
     func testLoadSong_setsSongAndResolvesNotes() {

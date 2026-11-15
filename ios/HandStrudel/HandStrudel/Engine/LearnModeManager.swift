@@ -1,5 +1,20 @@
 import Foundation
 
+enum LearnLaneLayout {
+    static let top = 0.15
+    static let bottom = 0.20
+
+    static func cameraLane(y: Double, noteCount: Int, videoAspect: Double, viewportAspect: Double) -> Int? {
+        guard y.isFinite, noteCount > 0, videoAspect.isFinite, videoAspect > 0,
+              viewportAspect.isFinite, viewportAspect > 0 else { return nil }
+        let visible = min(1, videoAspect / viewportAspect)
+        let screenY = (y - (1 - visible) / 2) / visible
+        guard screenY >= top, screenY <= 1 - bottom else { return nil }
+        let row = min(noteCount - 1, Int((screenY - top) / (1 - top - bottom) * Double(noteCount)))
+        return noteCount - 1 - row
+    }
+}
+
 // MARK: - Learn Mode Manager
 
 final class LearnModeManager {
@@ -26,6 +41,7 @@ final class LearnModeManager {
     // Tracking
     private var consumedNoteIds = Set<UUID>()
     private var firstTick = true
+    private var pausedAt: Double?
 
     // Score
     private(set) var score = LearnScore()
@@ -60,10 +76,11 @@ final class LearnModeManager {
 
     func loadSong(_ song: LearnSong, scaleNotes: [Int], bpm: Double) {
         currentSong = song
-        resolvedNotes = song.resolve(scaleNotes: scaleNotes)
-        songBPM = bpm
+        resolvedNotes = scaleNotes.isEmpty ? [] : song.resolve(scaleNotes: scaleNotes)
+        songBPM = bpm.isFinite ? min(400, max(20, bpm)) : 120
         songStartTime = 0
         firstTick = true
+        pausedAt = nil
         songComplete = false
         isCountingDown = true
         countdownValue = 3
@@ -84,7 +101,7 @@ final class LearnModeManager {
         leftPinching: Bool,
         rightPinching: Bool
     ) -> [(midi: Int, laneIndex: Int)] {
-        guard currentSong != nil, !resolvedNotes.isEmpty else { return [] }
+        guard currentSong != nil, !resolvedNotes.isEmpty, pausedAt == nil else { return [] }
 
         // Set songStartTime on first call (with countdown offset)
         if firstTick {
@@ -155,33 +172,7 @@ final class LearnModeManager {
                 let rightMatch = rightPinching && rightLane == note.laneIndex
 
                 if leftMatch || rightMatch {
-                    consumedNoteIds.insert(note.id)
-
-                    if timeDelta <= hitWindowPerfect {
-                        consumedStates[note.id] = .hitPerfect
-                        score.perfectHits += 1
-                        hitEffects.append(HitEffect(
-                            id: UUID(),
-                            laneIndex: note.laneIndex,
-                            type: .hitPerfect,
-                            timestamp: elapsed
-                        ))
-                    } else {
-                        consumedStates[note.id] = .hitGood
-                        score.goodHits += 1
-                        hitEffects.append(HitEffect(
-                            id: UUID(),
-                            laneIndex: note.laneIndex,
-                            type: .hitGood,
-                            timestamp: elapsed
-                        ))
-                    }
-
-                    score.currentStreak += 1
-                    if score.currentStreak > score.bestStreak {
-                        score.bestStreak = score.currentStreak
-                    }
-
+                    recordHit(note, delta: timeDelta, at: elapsed)
                     justHit.append((midi: note.midi, laneIndex: note.laneIndex))
                 }
             }
@@ -212,6 +203,37 @@ final class LearnModeManager {
         return justHit
     }
 
+    /// One tap resolves one note, even if two nearby beats overlap.
+    func tapLane(_ lane: Int, elapsed: Double) -> Int? {
+        guard !firstTick, !songComplete, pausedAt == nil else { return nil }
+        func distance(_ note: LearnNote) -> Double { abs(elapsed - songStartTime - note.startBeat * (60 / songBPM)) }
+        guard let note = resolvedNotes.lazy.filter({ $0.laneIndex == lane && !self.consumedNoteIds.contains($0.id) })
+            .min(by: { distance($0) < distance($1) }), distance(note) <= hitWindowGood else { return nil }
+        recordHit(note, delta: distance(note), at: elapsed)
+        songComplete = consumedNoteIds.count == resolvedNotes.count
+        return note.midi
+    }
+
+    private func recordHit(_ note: LearnNote, delta: Double, at elapsed: Double) {
+        let perfect = delta <= hitWindowPerfect
+        let state: NoteState = perfect ? .hitPerfect : .hitGood
+        consumedNoteIds.insert(note.id)
+        consumedStates[note.id] = state
+        if perfect { score.perfectHits += 1 } else { score.goodHits += 1 }
+        score.currentStreak += 1
+        score.bestStreak = max(score.bestStreak, score.currentStreak)
+        hitEffects.append(HitEffect(id: UUID(), laneIndex: note.laneIndex, type: state, timestamp: elapsed))
+    }
+
+    func setPaused(_ paused: Bool, elapsed: Double) {
+        if paused {
+            if pausedAt == nil { pausedAt = elapsed }
+        } else if let pausedAt {
+            if !firstTick { songStartTime += max(0, elapsed - pausedAt) }
+            self.pausedAt = nil
+        }
+    }
+
     // MARK: - Reset
 
     func reset() {
@@ -220,6 +242,9 @@ final class LearnModeManager {
         songStartTime = 0
         songBPM = 120
         firstTick = true
+        pausedAt = nil
+        isCountingDown = false
+        countdownValue = 0
         songComplete = false
         consumedNoteIds.removeAll()
         consumedStates.removeAll()

@@ -289,6 +289,7 @@ struct ContentView: View {
             backing?.player.volume = Float(BackingTrackVolume.clamped(volume))
         }
         .onChange(of: scenePhase) { phase in
+            engine.setLearnSceneActive(phase == .active)
             if phase == .background {
                 backing?.player.pause()
                 backingPlaying = false
@@ -955,7 +956,9 @@ struct ContentView: View {
                     onPlayAgain: {
                         if let song = engine.currentLearnSong { engine.loadLearnSong(song) }
                     },
-                    onPickSong: { showLearnPicker = true }
+                    onPickSong: { showLearnPicker = true },
+                    onTapLane: engine.tapLearnLane,
+                    onViewportChange: engine.updateLearnViewport
                 )
                 .ignoresSafeArea()
             }
