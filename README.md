@@ -2,7 +2,7 @@
 
 A hand-tracking musical instrument for web and iOS. Wave your hands to control a live synthesizer in real time.
 
-**[handstrudel.com](https://handstrudel.com)** — try it now in your browser
+**[HandStrudel for iPhone](https://handstrudel.com)** · **[Try the web studio](https://handstrudel.com/play)**
 
 ## Screenshots
 
