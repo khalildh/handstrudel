@@ -880,11 +880,13 @@ private struct PostSearchView: View {
     var body: some View {
         NavigationStack {
             List {
-                if PostSearch(input) == nil {
-                    Text("Search captions, instruments, or creators. Use @ to search by handle.")
+                if let search = PostSearch(input) {
+                    if results.isEmpty && !busy && !failed {
+                        emptyResults(for: search)
+                    }
+                } else {
+                    Text("Enter at least two characters. Use @ to search posts by creator handle.")
                         .foregroundStyle(.secondary)
-                } else if results.isEmpty && !busy && !failed {
-                    Text("No matching posts.").foregroundStyle(.secondary)
                 }
                 ForEach(results) { video in
                     Button { opened = video } label: { PerformanceListRow(video: video) }
@@ -892,7 +894,8 @@ private struct PostSearchView: View {
                 }
                 if busy { ProgressView("Searching posts") }
                 if failed {
-                    Text("Couldn't load search results.").foregroundStyle(.secondary)
+                    Text(cursor == nil ? "Couldn't load search results." : "Couldn't load more results.")
+                        .foregroundStyle(.secondary)
                     Button("Try again") { loadNextPage() }
                 } else if more && !busy {
                     Button("Load more") { loadNextPage() }
@@ -923,6 +926,28 @@ private struct PostSearchView: View {
             }
         }
         .tint(palette.accent)
+    }
+
+    @ViewBuilder
+    private func emptyResults(for search: PostSearch) -> some View {
+        let broaderInput = search.broaderInput
+        VStack(alignment: .leading, spacing: 6) {
+            Text(search.isHandleSearch ? "No posts match that handle" : "No matching posts")
+                .font(.headline)
+            if broaderInput != nil {
+                Text("Check the handle, or also search captions, instruments, and creator names.")
+                    .foregroundStyle(.secondary)
+            } else if search.isHandleSearch {
+                Text("Check the spelling or try a different handle.")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Try a shorter search, a different instrument, or a creator's name.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        if let broaderInput {
+            Button("Broaden search") { input = broaderInput }
+        }
     }
 
     private func reset() {
