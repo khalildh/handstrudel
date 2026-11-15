@@ -8,6 +8,8 @@ const root = "40000000-0000-0000-0000-000000000001";
 const reply = "40000000-0000-0000-0000-000000000002";
 const now = new Date().toISOString();
 const clipBytes = process.env.FIXTURE_CLIP ? readFileSync(process.env.FIXTURE_CLIP) : null;
+const canControlMedia = process.env.FIXTURE_CONTROL_MEDIA === "1";
+let mediaAvailable = !canControlMedia;
 const demoThumb = "thumbs/76c9a372-7439-48dc-94ec-75a06cb6f1d7/385e21ab-7160-4378-b897-c602de952140.jpg";
 const post = {
   id: video, user_id: creator, username: "loopmaker", caption: "Evening loop", comments_enabled: true,
@@ -48,8 +50,12 @@ createServer((request, response) => {
     response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(value));
   };
   switch (url.pathname) {
+    case "/__fixture/feed-media":
+      if (!canControlMedia || request.method !== "POST") return response.writeHead(404).end();
+      mediaAvailable = url.searchParams.get("available") === "1";
+      return response.writeHead(204).end();
     case "/test/clip.mp4": {
-      if (!clipBytes) return response.writeHead(404).end();
+      if (!clipBytes || !mediaAvailable) return response.writeHead(404).end();
       const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range ?? "");
       const start = range ? Number(range[1]) : 0;
       const end = range?.[2] ? Math.min(Number(range[2]), clipBytes.length - 1) : clipBytes.length - 1;

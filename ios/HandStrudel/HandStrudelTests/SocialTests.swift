@@ -258,6 +258,21 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(size.height / size.width, 2532.0 / 1170.0, accuracy: 0.01)
     }
 
+    @MainActor
+    func testFeedClipReportsMissingMediaOnEachPlaybackAttempt() async {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).mp4")
+        for attempt in 1...2 {
+            let failed = expectation(description: "Missing clip reports failure on attempt \(attempt)")
+            let player = AVQueuePlayer()
+            let looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+            let monitor = FeedClipFailureMonitor(player: player, looper: looper) { failed.fulfill() }
+            player.play()
+            await fulfillment(of: [failed], timeout: 5)
+            player.pause()
+            withExtendedLifetime((looper, monitor)) {}
+        }
+    }
+
     func testFeedVideoDecodes() throws {
         let json = """
         {"id":"11111111-1111-1111-1111-111111111111","user_id":"00000000-0000-0000-0000-00000000000a",

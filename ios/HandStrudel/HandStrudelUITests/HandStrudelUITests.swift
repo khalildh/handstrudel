@@ -418,6 +418,45 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(timeout: 5))
     }
 
+    @MainActor
+    func testFeedRetryRecoversTheSameClipAndRestoresSeeking() async throws {
+        guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_FEED_RETRY_FIXTURE_URL"],
+              let endpoint = URL(string: address), endpoint.host == "127.0.0.1" else {
+            throw XCTSkip("Set HANDSTRUDEL_FEED_RETRY_FIXTURE_URL to a loopback media-control fixture.")
+        }
+        func setAvailability(_ available: Bool) async throws {
+            let url = URL(string: "/__fixture/feed-media?available=\(available ? 1 : 0)", relativeTo: endpoint)!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            let (_, response) = try await URLSession.shared.data(for: request)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 204)
+        }
+        try await setAvailability(false)
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = address
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "retry-media-fixture"
+        app.launchEnvironment["MEDIA_BASE_URL"] = address
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let retry = app.buttons["feed-retry-video"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.exists)
+        let slider = app.sliders["feed-video-progress"].firstMatch
+        XCTAssertFalse(slider.exists)
+
+        try await setAvailability(true)
+        retry.tap()
+        XCTAssertTrue(slider.waitForExistence(timeout: 10))
+        XCTAssertFalse(retry.exists)
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.exists)
+        let actualPlayback = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@", "0:01"), object: slider)
+        await fulfillment(of: [actualPlayback], timeout: 9)
+        slider.adjust(toNormalizedSliderPosition: 0.8)
+        XCTAssertTrue((slider.value as? String)?.contains("0:03") == true)
+    }
+
     func testFeedProgressScrubsARealVideoWithoutPaging() throws {
         guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_FEED_MEDIA_FIXTURE_URL"] else {
             throw XCTSkip("Requires the feed fixture with a real MP4 served from FIXTURE_CLIP.")
