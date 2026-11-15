@@ -17,6 +17,29 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(FeedPlaybackPosition(duration: 4, seconds: -3)?.seconds, 0)
         XCTAssertEqual(FeedPlaybackPosition.timeLabel(61), "1:01")
     }
+
+    @MainActor
+    func testAccessibleWheelReusesFocusAndReleasesAnActivatedNote() async throws {
+        let wheel = SplitTouchUIView(frame: CGRect(x: 0, y: 0, width: 390, height: 790))
+        wheel.updateAccessibleNotes(chords: ["Cmaj7", "Fmaj7"], melody: ["C4", "D4", "E4"])
+        let initial = try XCTUnwrap(wheel.accessibilityElements as? [UIAccessibilityElement])
+        XCTAssertEqual(initial.map(\.accessibilityLabel), ["Chord Cmaj7", "Chord Fmaj7", "Note C4", "Note D4", "Note E4"])
+        XCTAssertEqual(initial[0].accessibilityCustomActions?.count, 2)
+        XCTAssertLessThan(initial[0].accessibilityFrameInContainerSpace.midX, 195)
+        XCTAssertGreaterThan(initial[2].accessibilityFrameInContainerSpace.midX, 195)
+        wheel.swapHands = true
+        wheel.updateAccessibleNotes(chords: ["Dmin7", "G7"], melody: ["D4", "E4", "F4"])
+        let updated = try XCTUnwrap(wheel.accessibilityElements as? [UIAccessibilityElement])
+        XCTAssertTrue(initial[2] === updated[2])
+        XCTAssertEqual(updated[2].accessibilityLabel, "Note D4")
+        XCTAssertLessThan(updated[2].accessibilityFrameInContainerSpace.midX, 195)
+        let released = expectation(description: "Preview voice was released")
+        var voiceID: String?
+        wheel.onZoneEnter = { id, zone in voiceID = id; XCTAssertEqual(zone, .melody(0)) }
+        wheel.onZoneExit = { id in XCTAssertEqual(id, voiceID); released.fulfill() }
+        XCTAssertTrue(updated[2].accessibilityActivate())
+        await fulfillment(of: [released], timeout: 1)
+    }
     func testStudioPreviewFollowsSelectedKeyScaleAndChord() throws {
         let free = try XCTUnwrap(CHORD_PROGRESSIONS.first { $0.id == "free" })
         let secondDegree = try XCTUnwrap(ChordProgression.parse("2 5 1"))
