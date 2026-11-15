@@ -11,13 +11,12 @@ on:
       - "ios/**"
       - ".github/workflows/ios.yml"
 
-# The web app already builds in pages.yml; this guards the native iOS app so the
-# ~3,900 lines of Swift unit tests actually run on every change instead of only
-# locally. Runs on a macOS runner because xcodebuild needs Xcode + a simulator.
+# Keep the simulator gate independent of Supabase, a camera, or an Apple ID.
 jobs:
   test:
     name: Build & Test
     runs-on: macos-15
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: ios/HandStrudel
@@ -35,13 +34,22 @@ jobs:
       - name: Resolve Swift Package dependencies
         run: xcodebuild -resolvePackageDependencies -project "$PROJECT" -scheme "$SCHEME"
 
-      - name: Build & run unit tests
+      - name: Run unit tests and Studio smoke tests
         run: |
           xcodebuild test \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -destination "$SIMULATOR" \
             -only-testing:HandStrudelTests \
+            -only-testing:HandStrudelUITests/HandStrudelUITests/testMusic_startsSession \
+            -only-testing:HandStrudelUITests/HandStrudelUITests/testOnboarding_gotItDismisses \
+            -only-testing:HandStrudelUITests/HandStrudelUITests/testSounds_showsMusicSettings \
+            -only-testing:HandStrudelUITests/HandStrudelUITests/testFeedSearchOpensWithoutAccount \
+            -only-testing:HandStrudelUITests/HandStrudelUITests/testMusic_privateDraftsOpensWithoutAccount \
+            -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 90 \
+            -maximum-test-execution-time-allowance 120 \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO
 
