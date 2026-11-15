@@ -359,6 +359,88 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
     }
 
+    @MainActor
+    func testFeedSearchBroadensHandleMiss() async throws {
+        guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_SEARCH_FIXTURE_URL"] else {
+            throw XCTSkip("Start scripts/search-ui-fixture.mjs and set HANDSTRUDEL_SEARCH_FIXTURE_URL.")
+        }
+        let fixture = try XCTUnwrap(URL(string: address))
+        let port = try XCTUnwrap(fixture.port)
+        guard address == "http://127.0.0.1:\(port)", (1...65535).contains(port) else {
+            return XCTFail("Search UI tests require an HTTP fixture on 127.0.0.1.")
+        }
+
+        let key = "search-fixture-\(UUID().uuidString)"
+        struct FixtureStatus: Decodable {
+            let fixture: String
+            let searches: [String]
+        }
+        func fixtureSearches() async throws -> [String] {
+            var request = URLRequest(url: fixture.appendingPathComponent("__search_fixture"),
+                                     cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 5)
+            request.setValue(key, forHTTPHeaderField: "apikey")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+            let status = try JSONDecoder().decode(FixtureStatus.self, from: data)
+            XCTAssertEqual(status.fixture, "handstrudel-search")
+            return status.searches
+        }
+
+        // Validate the fixture before launching an app that would otherwise default to production.
+        let initialSearches = try await fixtureSearches()
+        XCTAssertTrue(initialSearches.isEmpty)
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = address
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launchEnvironment["MEDIA_BASE_URL"] = address
+        app.launch()
+
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let search = app.buttons["search-posts"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+
+        let field = app.searchFields.firstMatch
+        let guidance = app.staticTexts["Enter at least two characters. Use @ to search posts by creator handle."]
+        let broaden = app.buttons["Broaden search"]
+        let clip = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Search fixture piano take")).firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(guidance.exists)
+        let initialValue = field.value as? String ?? ""
+        XCTAssertTrue(initialValue.isEmpty || initialValue == "Caption, instrument, or creator")
+        XCTAssertFalse(broaden.exists)
+        XCTAssertFalse(clip.exists)
+
+        field.tap()
+        field.typeText("@l")
+        XCTAssertEqual(field.value as? String, "@l")
+        let guidanceDisappeared = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+                                                           object: guidance)
+        guidanceDisappeared.isInverted = true
+        await fulfillment(of: [guidanceDisappeared], timeout: 1)
+        let shortSearches = try await fixtureSearches()
+        XCTAssertTrue(shortSearches.isEmpty, "One character after @ must not trigger a search.")
+
+        field.typeText("o")
+        let handleMiss = app.staticTexts["No posts match that handle"]
+        XCTAssertTrue(handleMiss.waitForExistence(timeout: 5))
+        XCTAssertTrue(broaden.exists)
+        XCTAssertFalse(clip.exists)
+        let scopedSearches = try await fixtureSearches()
+        XCTAssertEqual(scopedSearches, ["handle"])
+
+        broaden.tap()
+        XCTAssertTrue(clip.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, "lo")
+        XCTAssertFalse(handleMiss.exists)
+        XCTAssertFalse(broaden.exists)
+        let finalSearches = try await fixtureSearches()
+        XCTAssertEqual(finalSearches, ["handle", "broadened"])
+    }
+
     func testFeedSwipesBetweenTwoPerformances() throws {
         guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"] else {
             throw XCTSkip("Requires the feed API fixture.")
