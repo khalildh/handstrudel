@@ -6,7 +6,8 @@ import { after, before, test } from "node:test";
 // Start Next locally with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_MEDIA_BASE_URL
 // set to http://127.0.0.1:43227 (also set NEXT_PUBLIC_SUPABASE_ANON_KEY=local-fixture).
 // With Playwright installed or on NODE_PATH: node --test src/app/embed/embed-playback.test.mjs
-const { chromium } = createRequire(import.meta.url)("playwright");
+const playwright = createRequire(import.meta.url)("playwright");
+const browserType = process.env.HANDSTRUDEL_TEST_BROWSER === "webkit" ? playwright.webkit : playwright.chromium;
 const app = new URL(process.env.EMBED_TEST_BASE_URL || "http://127.0.0.1:43226");
 const fixture = new URL("http://127.0.0.1:43227");
 const brokenId = "30000000-0000-0000-0000-000000000101";
@@ -49,7 +50,7 @@ const server = createServer((req, res) => {
 let browser;
 before(async () => {
   await new Promise((resolve, reject) => server.once("error", reject).listen(fixture.port, fixture.hostname, resolve));
-  browser = await chromium.launch();
+  browser = await browserType.launch();
 });
 after(async () => {
   await browser?.close();

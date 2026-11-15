@@ -5,7 +5,8 @@ import { test } from "node:test";
 // With npm run dev running: node --test src/app/creator/creator-profile.test.mjs
 // Install playwright locally (npm install --no-save --package-lock=false playwright) or provide it via NODE_PATH.
 // Set CREATOR_TEST_BASE_URL to target a non-default port or a static export.
-const { chromium } = createRequire(import.meta.url)("playwright");
+const playwright = createRequire(import.meta.url)("playwright");
+const browserType = process.env.HANDSTRUDEL_TEST_BROWSER === "webkit" ? playwright.webkit : playwright.chromium;
 const baseURL = new URL(process.env.CREATOR_TEST_BASE_URL || "http://127.0.0.1:3000");
 const basePath = baseURL.pathname.replace(/\/$/, "");
 const profileURL = new URL(`${basePath}/creator`, baseURL).href;
@@ -64,7 +65,7 @@ async function mockFeed(page, { failFirstSearchPage = false, libraryUnavailable 
 }
 
 async function withPage(options, run) {
-  const browser = await chromium.launch();
+  const browser = await browserType.launch();
   try {
     const page = await browser.newPage(options);
     page.setDefaultTimeout(10_000);
