@@ -1,0 +1,325 @@
+#if DEBUG
+import AVFoundation
+import AudioToolbox
+import Foundation
+
+struct InventedSound: Identifiable {
+    enum Kind: String, CaseIterable, Identifiable, Sendable {
+        case pitched, effect
+
+        var id: Self { self }
+        var label: String { self == .pitched ? "Instrument" : "One-shot effect" }
+        var icon: String { self == .pitched ? "pianokeys" : "bolt.fill" }
+    }
+
+    let id: UUID
+    let name: String
+    let caf: Data
+    let kind: Kind
+
+    private static var library: URL {
+        URL.applicationSupportDirectory.appendingPathComponent("InventedSounds", isDirectory: true)
+    }
+
+    static func saved() -> [Self] {
+        let urls = (try? FileManager.default.contentsOfDirectory(at: library, includingPropertiesForKeys: nil)) ?? []
+        return urls.filter { $0.pathExtension == "caf" }.compactMap {
+            let parts = $0.deletingPathExtension().lastPathComponent.split(separator: "_", maxSplits: 2)
+            guard let rawID = parts.first, parts.count >= 2, let id = UUID(uuidString: String(rawID)),
+                  let data = try? Data(contentsOf: $0) else { return nil }
+            if parts.count == 3, let kind = Kind(rawValue: String(parts[1])) {
+                return Self(id: id, name: String(parts[2]), caf: data, kind: kind)
+            }
+            return Self(id: id, name: parts.dropFirst().joined(separator: "_"), caf: data, kind: .pitched)
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private var savedURL: URL {
+        let suffix = kind == .pitched ? name : "\(kind.rawValue)_\(name)"
+        return Self.library.appendingPathComponent("\(id.uuidString)_\(suffix).caf")
+    }
+
+    func save() throws {
+        try FileManager.default.createDirectory(at: Self.library, withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: savedURL.path) { return }
+        guard Self.saved().count < 24 else { throw SampleError.libraryFull }
+        try caf.write(to: savedURL, options: .atomic)
+    }
+
+    func delete() throws { try FileManager.default.removeItem(at: savedURL) }
+
+    static func variants(for prompt: String) throws -> [Self] {
+        let words = Set(prompt.lowercased().split(whereSeparator: { !$0.isLetter }).map(String.init))
+        let bright = !words.isDisjoint(with: ["glass", "bright", "crystal", "sparkly", "metallic"])
+        let bell = !words.isDisjoint(with: ["bell", "bells", "chime", "chimes"])
+        let soft = !words.isDisjoint(with: ["warm", "soft", "wood", "wooden", "mellow"])
+        let short = !words.isDisjoint(with: ["short", "pluck", "plucked", "knock", "mallet", "kalimba"])
+        let color = prompt.lowercased().utf8.reduce(UInt32(2_166_136_261)) { ($0 ^ UInt32($1)) &* 16_777_619 }
+        let name = title(prompt)
+        return try (0..<2).map { variation in
+            let shimmer = (bright ? 0.32 : 0.13) + Double((color >> 8) % 11) / 100 + Double(variation) * 0.12
+            let decay = (short ? 3.9 : 2.6) + Double(color % 11) / 10 + Double(variation) * 0.5
+            let second = bell ? 2.76 : 2.0
+            let count = Int(sampleRate * 1.45)
+            let root = frequency(midi: 60)
+            let samples = (0..<count).map { index -> Float in
+                let t = Double(index) / sampleRate
+                let angle = 2 * Double.pi * t * root
+                let attack = min(1, t / (soft ? 0.022 : 0.005))
+                let fade = min(1, Double(count - index - 1) / (sampleRate * 0.055))
+                let base = sin(angle) * exp(-t * decay)
+                let overtone = sin(angle * second) * shimmer * exp(-t * (decay + 5))
+                let strike = sin(angle * 5) * (soft ? 0.04 : 0.14) * exp(-t * 85)
+                return Float((base + overtone + strike) * attack * fade * 0.56)
+            }
+            return Self(id: UUID(), name: "\(name) \(variation == 0 ? "I" : "II")", caf: try makeCAF(samples), kind: .pitched)
+        }
+    }
+
+    static func imported(from url: URL, kind: Kind = .pitched) throws -> Self {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        return try sample(from: url, name: url.deletingPathExtension().lastPathComponent, kind: kind)
+    }
+
+    #if targetEnvironment(simulator)
+    enum AudioProvider: String, Decodable {
+        case local = "stable-audio-local"
+        case cloud = "stable-audio-cloud"
+
+        static func available() async -> Self? {
+            struct Status: Decodable {
+                let provider: AudioProvider
+                let protocolVersion: Int
+            }
+            let request = URLRequest(url: URL(string: "http://127.0.0.1:54339/status")!, timeoutInterval: 3)
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let status = try? JSONDecoder().decode(Status.self, from: data), status.protocolVersion == 2
+            else { return nil }
+            return status.provider
+        }
+    }
+
+    static func generatedByStability(prompt: String, kind: Kind, provider: AudioProvider) async throws -> Self {
+        do { return try await requestGeneratedSample(prompt: prompt, kind: kind, provider: provider) }
+        catch SampleError.pitch where kind == .pitched && provider == .local {
+            // The model sometimes returns an unpitched or drifting sound.
+            try Task.checkCancellation()
+            return try await requestGeneratedSample(prompt: prompt, kind: kind, provider: provider)
+        }
+    }
+
+    private static func requestGeneratedSample(prompt: String, kind: Kind, provider: AudioProvider) async throws -> Self {
+        let url = URL(string: "http://127.0.0.1:54339/generate")!
+        var request = URLRequest(url: url, timeoutInterval: 95)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(provider.rawValue, forHTTPHeaderField: "X-HandStrudel-Audio-Provider")
+        request.httpBody = try JSONEncoder().encode(["prompt": prompt, "kind": kind.rawValue])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            let reason = String(data: data.prefix(150), encoding: .utf8) ?? ""
+            throw SampleError.provider(reason)
+        }
+        try Task.checkCancellation()
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).wav")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try data.write(to: temporary)
+        return try sample(from: temporary, name: prompt, kind: kind)
+    }
+    #endif
+
+    private static func sample(from url: URL, name: String, kind: Kind) throws -> Self {
+        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard size > 0, size <= 4_000_000 else { throw SampleError.format }
+        let file = try AVAudioFile(forReading: url)
+        let format = file.processingFormat
+        let rate = format.sampleRate
+        guard (16_000...96_000).contains(rate), (1...2).contains(format.channelCount),
+              file.length >= Int64(rate * 0.25), file.length <= Int64(rate * 4),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length))
+        else { throw SampleError.format }
+        try file.read(into: buffer)
+        guard let channels = buffer.floatChannelData else { throw SampleError.format }
+        let frames = Int(buffer.frameLength)
+        let left = UnsafeBufferPointer(start: channels[0], count: frames)
+        let mono: [Float]
+        if format.channelCount == 2 {
+            let right = UnsafeBufferPointer(start: channels[1], count: frames)
+            let sum = zip(left, right).map { ($0 + $1) * 0.5 }
+            // Don't lose an out-of-phase sample to mono cancellation.
+            let leftPeak = left.lazy.map(abs).max() ?? 0
+            let rightPeak = right.lazy.map(abs).max() ?? 0
+            mono = (sum.lazy.map(abs).max() ?? 0) < 0.25 * max(leftPeak, rightPeak)
+                ? Array(leftPeak >= rightPeak ? left : right) : sum
+        } else {
+            mono = Array(left)
+        }
+        let processed = try prepared(mono, rate: rate, kind: kind)
+        return Self(id: UUID(), name: title(name), caf: try makeCAF(processed), kind: kind)
+    }
+
+    static let sampleRate = 24_000.0
+    static func frequency(midi: Int) -> Double { 440 * pow(2, Double(midi - 69) / 12) }
+
+    static func tuned(_ source: [Float], rate: Double) throws -> [Float] {
+        try prepared(source, rate: rate, kind: .pitched)
+    }
+
+    static func prepared(_ source: [Float], rate: Double, kind: Kind) throws -> [Float] {
+        guard source.allSatisfy(\.isFinite), let peak = source.map({ abs($0) }).max(), peak > 0.015,
+              let onset = source.firstIndex(where: { abs($0) > peak * 0.04 }) else { throw SampleError.silent }
+        let start = max(0, onset - Int(rate * 0.002))
+        var samples = Array(source[start...])
+        let pitchRatio: Double
+        var fadeIn: Double = 48
+        if kind == .pitched {
+            if let pitch = detectedPitch(samples, rate: rate, offset: 0.06),
+               let later = detectedPitch(samples, rate: rate, offset: 0.15), closePitch(pitch, later) {
+                pitchRatio = frequency(midi: 60) / pitch
+            } else {
+                // Breath, bow, and vocal-style attacks can settle later than a pluck.
+                // Start at the voiced sustain rather than tuning an unstable attack.
+                guard let sustain = findSustain(samples, rate: rate, peak: peak) else { throw SampleError.pitch }
+                samples = Array(samples[sustain.range])
+                pitchRatio = frequency(midi: 60) / sustain.pitch
+                fadeIn = 192
+            }
+        } else {
+            pitchRatio = 1
+        }
+        let step = rate / sampleRate * pitchRatio
+        let count = min(Int(Double(samples.count - 1) / step), Int(sampleRate * (kind == .effect ? 4 : 2)))
+        guard count >= Int(sampleRate * 0.02) else { throw SampleError.silent }
+        let processedPeak = max(0.015, samples.lazy.map(abs).max() ?? 0)
+        return (0..<count).map { index in
+            let position = Double(index) * step
+            let frame = Int(position)
+            let ratio = Float(position - Double(frame))
+            let fade = Float(min(1, Double(index) / fadeIn, Double(count - index - 1) / 480))
+            return (samples[frame] * (1 - ratio) + samples[frame + 1] * ratio) * (0.63 / processedPeak) * fade
+        }
+    }
+
+    private static func closePitch(_ first: Double, _ second: Double, tolerance: Double = 45) -> Bool {
+        abs(log2(second / first) * 1200) < tolerance
+    }
+
+    private static func findSustain(_ samples: [Float], rate: Double, peak: Float) -> (range: Range<Int>, pitch: Double)? {
+        let offsets = (0..<10).map { 0.12 + Double($0) * 0.08 }
+        let pitches = offsets.map { offset -> Double? in
+            audiblePitch(samples, rate: rate, offset: offset, peak: peak)
+        }
+        for index in 0..<(pitches.count - 2) {
+            guard let first = pitches[index], let second = pitches[index + 1], let third = pitches[index + 2],
+                  closePitch(first, second), closePitch(first, third), closePitch(second, third) else { continue }
+            let reference = [first, second, third].sorted()[1]
+            let start = Int(offsets[index] * rate)
+            var end = samples.count
+            var firstChangedWindow: Double?
+            var next = offsets[index + 2] + 0.08
+            while next + 0.09 < Double(samples.count) / rate {
+                if let pitch = audiblePitch(samples, rate: rate, offset: next, peak: peak),
+                   !closePitch(reference, pitch, tolerance: 120) {
+                    if let changed = firstChangedWindow { end = Int(changed * rate); break }
+                    firstChangedWindow = next
+                } else {
+                    firstChangedWindow = nil
+                }
+                next += 0.08
+            }
+            return (start..<end, reference)
+        }
+        return nil
+    }
+
+    private static func audiblePitch(_ samples: [Float], rate: Double, offset: Double, peak: Float) -> Double? {
+        let first = Int(offset * rate)
+        let last = first + Int(rate * 0.09)
+        guard samples.indices.contains(first), last < samples.count,
+              (samples[first..<last].lazy.map(abs).max() ?? 0) >= 0.12 * peak else { return nil }
+        return detectedPitch(samples, rate: rate, offset: offset)
+    }
+
+    static func detectedPitch(_ samples: [Float], rate: Double, offset: Double = 0) -> Double? {
+        let strideBy = max(1, Int(rate / 12_000))
+        let start = Int(rate * offset)
+        guard samples.count > start + Int(rate * 0.09) else { return nil }
+        let window = stride(from: start, to: start + Int(rate * 0.09), by: strideBy).map { Double(samples[$0]) }
+        let subsampledRate = rate / Double(strideBy)
+        let minLag = Int(subsampledRate / 390)
+        let maxLag = Int(subsampledRate / 170)
+        let count = window.count - maxLag - 1
+        guard count > 0 else { return nil }
+        let mean = window.reduce(0, +) / Double(window.count)
+        let centered = window.map { $0 - mean }
+        var scores = Array(repeating: 0.0, count: maxLag + 2)
+        for lag in (minLag - 1)...(maxLag + 1) {
+            var dot = 0.0, a = 0.0, b = 0.0
+            for i in 0..<count {
+                let x = centered[i], y = centered[i + lag]
+                dot += x * y
+                a += x * x
+                b += y * y
+            }
+            if min(a,b) > 0.0001 { scores[lag] = dot / sqrt(a * b) }
+        }
+        let candidates = (minLag...maxLag).filter { scores[$0] >= scores[$0 - 1] && scores[$0] >= scores[$0 + 1] }
+        guard let best = candidates.map({ scores[$0] }).max(), best >= 0.82,
+              let lag = candidates.first(where: { scores[$0] >= best - 0.025 }) else { return nil }
+        let a = scores[lag - 1], b = scores[lag], c = scores[lag + 1]
+        let correction = a + c == 2 * b ? 0 : 0.5 * (a - c) / (a - 2 * b + c)
+        return subsampledRate / (Double(lag) + correction)
+    }
+
+    private static func title(_ text: String) -> String {
+        let clean = String(text.filter { $0.isLetter || $0.isNumber || $0 == " " }.prefix(42))
+            .trimmingCharacters(in: .whitespaces)
+        return clean.isEmpty ? "Invented sound" : clean
+    }
+
+    private static func makeCAF(_ samples: [Float]) throws -> Data {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).caf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+        let count = AVAudioFrameCount(samples.count)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: count), let channel = buffer.floatChannelData?[0]
+        else { throw SampleError.format }
+        buffer.frameLength = count
+        samples.withUnsafeBufferPointer { source in
+            if let base = source.baseAddress { channel.update(from: base, count: samples.count) }
+        }
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: format.settings)
+            try file.write(from: buffer)
+        }
+        var fileID: AudioFileID?
+        guard AudioFileOpenURL(url as CFURL, .readWritePermission, 0, &fileID) == noErr, let fileID
+        else { throw SampleError.format }
+        // CAF instrument metadata stores the float root note and integers big-endian.
+        var chunk = CAFInstrumentChunk(mBaseNote: Float32(bitPattern: Float32(60).bitPattern.bigEndian),
+                                       mMIDILowNote: 0, mMIDIHighNote: 127, mMIDILowVelocity: 1, mMIDIHighVelocity: 127,
+                                       mdBGain: 0, mStartRegionID: 0, mSustainRegionID: 0, mReleaseRegionID: 0, mInstrumentID: 0)
+        let result = withUnsafeBytes(of: &chunk) {
+            AudioFileSetUserData(fileID, kCAF_InstrumentChunkID, 0, UInt32($0.count), $0.baseAddress!)
+        }
+        AudioFileClose(fileID)
+        guard result == noErr else { throw SampleError.format }
+        return try Data(contentsOf: url)
+    }
+
+    enum SampleError: LocalizedError {
+        case format, pitch, silent, libraryFull, provider(String)
+        var errorDescription: String? {
+            switch self {
+            case .format: return "Use a short WAV (0.25–4 seconds, up to 4 MB)."
+            case .pitch: return "Couldn't find a stable note. Try one note near middle C, or choose One-shot effect to keep its pitch bends and texture."
+            case .silent: return "This sample is too quiet or short to play. Try another sound."
+            case .libraryFull: return "Your sound library is full. Delete a sound to save another."
+            case .provider(let reason): return "Couldn't generate a sample. \(reason)"
+            }
+        }
+    }
+}
+#endif

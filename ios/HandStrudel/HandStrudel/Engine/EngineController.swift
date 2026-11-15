@@ -501,6 +501,8 @@ final class EngineController: ObservableObject {
     private let learnMode = LearnModeController()
     private let soundFontMode = SoundFontModeController()
 
+    var usesScaleSampler: Bool { scaleUseSoundFont || soundFontEngine.isPlayingInventedSound }
+
     private var activeMode: ModeController {
         if learnModeEnabled { return learnMode }
         if soundFontModeEnabled { return soundFontMode }
@@ -510,7 +512,7 @@ final class EngineController: ObservableObject {
         // radial layout flag, so the same controller works for both layouts.
         if radialChordMelodyModeEnabled && radialUseSoundFont { return soundFontMode }
         if splitChordMelodyModeEnabled && splitUseSoundFont { return soundFontMode }
-        if scaleChordMelodyModeEnabled && scaleUseSoundFont { return soundFontMode }
+        if scaleChordMelodyModeEnabled && usesScaleSampler { return soundFontMode }
         if chordMelodyModeEnabled || radialChordMelodyModeEnabled
             || splitChordMelodyModeEnabled || scaleChordMelodyModeEnabled { return chordMelodyMode }
         if gridModeEnabled { return gridMode }
@@ -836,7 +838,7 @@ final class EngineController: ObservableObject {
     static let maxLoops = 20
 
     private func tickSaveGesture() {
-        guard !gridModeEnabled && !drumModeEnabled else { return }
+        guard !soundFontEngine.isPlayingInventedSound, !gridModeEnabled, !drumModeEnabled else { return }
         guard savedSnippets.count < Self.maxSnippets else { return }
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         if saveDetector.check(hands: currentHands, config: config, currentTime: elapsed) {
@@ -1274,6 +1276,9 @@ final class EngineController: ObservableObject {
 
         // Audio/camera — kill all voices immediately
         silenceAll()
+        #if DEBUG
+        if soundFontEngine.isPlayingInventedSound { soundFontEngine.clearInventedSound() }
+        #endif
         strudelBridge.stop()
         stopAllLoops()
         handTracker.stopSession()

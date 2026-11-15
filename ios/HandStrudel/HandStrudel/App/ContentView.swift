@@ -65,6 +65,10 @@ struct ContentView: View {
     @State private var hasOpenedFeed = false
     @State private var startingSession = false
     @State private var showDrafts = false
+    #if DEBUG
+    @State private var showInventSound = false
+    @State private var pendingInventedSound: InventedSound?
+    #endif
     @State private var showSetups = false
     @State private var soundError: String?
     @State private var sharedSoundLoad: Task<Void, Never>?
@@ -115,7 +119,10 @@ struct ContentView: View {
     // Song mode removed
 
     private var canShowReview: Bool {
-        reviewReadyThisSession && scenePhase == .active && destination == .music
+        #if DEBUG
+        if showInventSound { return false }
+        #endif
+        return reviewReadyThisSession && scenePhase == .active && destination == .music
             && !engine.isRunning && !startingSession && !showDrafts && !showSetups && reviewingDraft == nil
             && linkedComments == nil && linkedPerformance == nil && soundError == nil && recordingError == nil
             && jamInvitation == nil && jamError == nil
@@ -182,6 +189,11 @@ struct ContentView: View {
             }
             #endif
         }
+        #if DEBUG
+        .sheet(isPresented: $showInventSound, onDismiss: startInventedSound) {
+            InventSoundView { pendingInventedSound = $0 }
+        }
+        #endif
         .sheet(isPresented: $showDrafts) {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil,
                                 onSuccessfulTake: recordReviewMilestone)
@@ -271,6 +283,10 @@ struct ContentView: View {
         }
         .onReceive(engine.jamSession.$isActive.removeDuplicates()) { active in
             guard active else { return }
+            if engine.soundFontEngine.isPlayingInventedSound {
+                engine.jamSession.leaveSession()
+                return
+            }
             if activeDraft?.recordedAtHalfSpeed == true { stopRecording() }
             jamInvitation = nil
             if !isRecording { restoreInstrumentAudio() }
@@ -327,7 +343,7 @@ struct ContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleLoopRecording)) { _ in
-            guard engine.isRunning else { return }
+            guard engine.isRunning, !engine.soundFontEngine.isPlayingInventedSound else { return }
             toggleAudioLoop()
         }
     }
@@ -357,7 +373,8 @@ struct ContentView: View {
                         starting: startingSession,
                         onStart: { startSession() },
                         onDrafts: { showDrafts = true },
-                        onSetups: { showSetups = true }
+                        onSetups: { showSetups = true },
+                        onInventSound: openInventSound
                     )
                 case .account:
                     if SocialConfig.isConfigured {
@@ -423,6 +440,31 @@ struct ContentView: View {
             Text("This section is unavailable in this build.").foregroundStyle(.secondary)
         }
     }
+
+    private var openInventSound: (() -> Void)? {
+        #if DEBUG
+        return { showInventSound = true }
+        #else
+        return nil
+        #endif
+    }
+
+    #if DEBUG
+    private func startInventedSound() {
+        guard let sound = pendingInventedSound else { return }
+        pendingInventedSound = nil
+        guard !engine.isRunning, !startingSession, !engine.jamSession.isActive else {
+            soundError = "End your current session before playing an invented sound."
+            return
+        }
+        do {
+            try engine.soundFontEngine.loadInventedSound(sound.caf, offline: ProcessInfo.processInfo.arguments.contains("--uitesting"))
+            startSession()
+        } catch {
+            soundError = "Couldn't load this sound in the instrument."
+        }
+    }
+    #endif
 
     private func startSession(setup: SoundSetup? = nil) {
         guard !engine.isRunning, !startingSession else { return }
@@ -676,7 +718,7 @@ struct ContentView: View {
     }
 
     private var splitUsesSoundFont: Bool {
-        engine.scaleChordMelodyModeEnabled ? engine.scaleUseSoundFont : engine.splitUseSoundFont
+        engine.scaleChordMelodyModeEnabled ? engine.usesScaleSampler : engine.splitUseSoundFont
     }
 
     /// Touch entered a Split-mode zone — spawn sustained voices and remember
@@ -1146,10 +1188,10 @@ struct ContentView: View {
             }
             .accessibilityLabel("Presets")
             .accessibilityIdentifier("studio-presets-button")
-            .disabled(isRecording || recorderBusy || recordCountdown > 0 || activeAudioLoop != nil)
+            .disabled(engine.soundFontEngine.isPlayingInventedSound || isRecording || recorderBusy || recordCountdown > 0 || activeAudioLoop != nil)
 
             JamButton(jam: engine.jamSession, action: toggleJam)
-                .disabled(activeDraft?.recordedAtHalfSpeed == true || recordCountdown > 0)
+                .disabled(engine.soundFontEngine.isPlayingInventedSound || activeDraft?.recordedAtHalfSpeed == true || recordCountdown > 0)
 
             // Close button
             Button(action: { cancelCountdown(); stopBacking(); engine.stop() }) {
@@ -1655,7 +1697,20 @@ struct ContentView: View {
 
     // MARK: - Bottom Controls
 
-    private var bottomControls: some View {
+    @ViewBuilder private var bottomControls: some View {
+        if engine.soundFontEngine.isPlayingInventedSound {
+            Label("Invented sound · Private session", systemImage: "waveform")
+                .font(.caption.monospaced().weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(12)
+                .background(.black.opacity(0.6), in: Capsule())
+                .accessibilityIdentifier("invent-session")
+        } else {
+            regularBottomControls
+        }
+    }
+
+    private var regularBottomControls: some View {
         HStack(spacing: 16) {
             // Loop record button
             loopRecordButton

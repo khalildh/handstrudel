@@ -27,6 +27,9 @@ final class SoundFontEngine {
 
     private let engine = AVAudioEngine()
     private let sampler = AVAudioUnitSampler()
+    private var graphIsConnected = false
+    private(set) var isPlayingInventedSound = false
+    private var inventedURL: URL?
 
     /// Whether a `.sf2` was found and the audio graph started successfully.
     private(set) var isAvailable = false
@@ -85,10 +88,7 @@ final class SoundFontEngine {
         }
         #endif
 
-        if !engine.attachedNodes.contains(sampler) {
-            engine.attach(sampler)
-            engine.connect(sampler, to: engine.mainMixerNode, format: nil)
-        }
+        connectGraph()
 
         do {
             if !engine.isRunning { try engine.start() }
@@ -110,10 +110,67 @@ final class SoundFontEngine {
 
     /// Switch the GM instrument. No-op if it's already loaded.
     func setInstrument(program: UInt8) {
+        guard !isPlayingInventedSound else { return }
         guard program != currentProgram || !isAvailable else { return }
         allNotesOff()
         _ = loadProgram(program, force: false)
     }
+
+    private func connectGraph() {
+        guard !graphIsConnected else { return }
+        engine.attach(sampler)
+        engine.connect(sampler, to: engine.mainMixerNode, format: nil)
+        graphIsConnected = true
+    }
+
+    #if DEBUG
+    func loadInventedSound(_ sample: Data, offline: Bool = false) throws {
+        connectGraph()
+        if offline && !engine.isInManualRenderingMode {
+            let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
+            try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 4096)
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("invented-\(UUID()).caf")
+        try sample.write(to: url, options: .atomic)
+        do {
+            allNotesOff()
+            try sampler.loadAudioFiles(at: [url])
+            if !engine.isRunning { try engine.start() }
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            clearInventedSound()
+            throw error
+        }
+        if let inventedURL { try? FileManager.default.removeItem(at: inventedURL) }
+        inventedURL = url
+        isPlayingInventedSound = true
+        isAvailable = true
+    }
+
+    func clearInventedSound() {
+        allNotesOff()
+        for channel in UInt8(0)...UInt8(15) { sampler.sendController(120, withValue: 0, onChannel: channel) }
+        engine.stop()
+        if let inventedURL { try? FileManager.default.removeItem(at: inventedURL) }
+        inventedURL = nil
+        isPlayingInventedSound = false
+        isAvailable = false
+    }
+
+    func renderInventedSound(frames: Int) throws -> [Float] {
+        let buffer = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat, frameCapacity: 4096)!
+        var remaining = frames
+        var result: [Float] = []
+        while remaining > 0 {
+            let count = AVAudioFrameCount(min(4096, remaining))
+            guard try engine.renderOffline(count, to: buffer) == .success, buffer.frameLength == count,
+                  let channel = buffer.floatChannelData?[0] else { throw CocoaError(.fileReadUnknown) }
+            result += UnsafeBufferPointer(start: channel, count: Int(count))
+            remaining -= Int(count)
+        }
+        return result
+    }
+    #endif
 
     @discardableResult
     private func loadProgram(_ program: UInt8, force: Bool) -> Bool {

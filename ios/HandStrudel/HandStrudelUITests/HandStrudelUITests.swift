@@ -384,6 +384,94 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
     }
 
+    func testInventASoundRealLocalAIOnSimulator() throws {
+        try generateAndOpenLocalAI(idea: "Glass kalimba")
+    }
+
+    func testInventASoundRealLocalEffectOnSimulator() throws {
+        try generateAndOpenLocalAI(idea: "Anime power-up scream", effect: true)
+    }
+
+    private func generateAndOpenLocalAI(idea: String, effect: Bool = false) throws {
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["HANDSTRUDEL_LOCAL_AUDIO_LAB"] = "1"
+        app.launch()
+        let entry = app.buttons["invent-open"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        if !entry.isHittable { app.swipeUp() }
+        entry.tap()
+        let generate = app.buttons["invent-ai-local"]
+        try XCTSkipUnless(generate.waitForExistence(timeout: 5), "Start the local Stable Audio MLX bridge to run this integration test.")
+        if effect {
+            app.segmentedControls["invent-kind"].buttons["One-shot effect"].tap()
+            XCTAssertFalse(app.buttons["invent-generate"].exists)
+        }
+        let prompt = app.buttons[idea]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5))
+        prompt.tap()
+        generate.tap()
+        let produced = app.staticTexts["New sounds"]
+        XCTAssertTrue(produced.waitForExistence(timeout: 100), "No playable sample appeared. Labels: \(app.staticTexts.allElementsBoundByIndex.map(\.label))")
+        if !produced.isHittable { app.swipeUp() }
+        let play = app.buttons["invent-play"].firstMatch
+        if !play.isHittable { app.swipeUp() }
+        play.tap()
+        XCTAssertTrue(element("invent-session").waitForExistence(timeout: 10))
+    }
+
+    func testInventASoundCancelsPreparationWithoutLosingEarlierSounds() {
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["HANDSTRUDEL_UI_DELAY_SOUND_PROMPT"] = "Soft wooden mallet"
+        app.launch()
+        let entry = app.buttons["invent-open"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        if !entry.isHittable { app.swipeUp() }
+        entry.tap()
+        let generate = app.buttons["invent-generate"]
+        let first = app.buttons["Glass kalimba"]
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        first.tap()
+        generate.tap()
+        let original = app.staticTexts["Glass kalimba I"]
+        XCTAssertTrue(original.waitForExistence(timeout: 8))
+
+        let slower = app.buttons["Soft wooden mallet"]
+        if !slower.isHittable { app.swipeDown() }
+        slower.tap()
+        generate.tap()
+        let cancel = app.buttons["invent-cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertFalse(generate.isEnabled)
+        if !cancel.isHittable { app.swipeUp() }
+        cancel.tap()
+        XCTAssertFalse(cancel.exists)
+        XCTAssertTrue(generate.isEnabled)
+        XCTAssertTrue(original.exists)
+        XCTAssertFalse(app.staticTexts["Soft wooden mallet I"].exists)
+    }
+
+    func testInventASoundGeneratesSavesAndOpensPrivateWheel() {
+        app.launchArguments.append("--uitesting")
+        app.launch()
+        let entry = app.buttons["invent-open"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        if !entry.isHittable { app.swipeUp() }
+        entry.tap()
+        let idea = app.buttons["Glass kalimba"]
+        XCTAssertTrue(idea.waitForExistence(timeout: 5))
+        idea.tap()
+        app.buttons["invent-generate"].tap()
+        let save = app.buttons.matching(identifier: "invent-save").firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 8))
+        save.tap()
+        XCTAssertTrue(app.staticTexts["Private library"].exists)
+        app.buttons.matching(identifier: "invent-play").firstMatch.tap()
+        XCTAssertTrue(element("invent-session").waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["record-button"].exists)
+        app.buttons["close-button"].tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+    }
+
     func testAccountProfileEditsDisplayNameAndKeepsEmptyState() throws {
         try launchWithProfileFixture()
         signInToProfile()
