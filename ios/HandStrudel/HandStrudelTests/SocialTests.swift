@@ -561,6 +561,36 @@ final class SocialTests: XCTestCase {
         started.continuation.finish()
     }
 
+    @MainActor
+    func testCommentRefreshKeepsReplyTargetOutsideFirstPage() async {
+        let target = commentRoot()
+        let firstPage = (0..<FeedService.commentPageSize).map { index in
+            commentRoot(videoID: target.videoId, createdAt: target.createdAt.addingTimeInterval(Double(index + 1)))
+        }
+
+        let refreshedTarget = CommentsView.replyTargetAfterRefresh(target, firstPage: firstPage)
+
+        XCTAssertEqual(refreshedTarget, target)
+    }
+
+    @MainActor
+    func testCommentRefreshUsesLatestRowForSameReplyTarget() async {
+        let target = commentRoot()
+        var fresh = target
+        fresh.likeCount = 1
+        let firstPage = [commentRoot(videoID: target.videoId), fresh]
+
+        let refreshedTarget = CommentsView.replyTargetAfterRefresh(target, firstPage: firstPage)
+
+        XCTAssertEqual(refreshedTarget, fresh)
+        XCTAssertNil(CommentsView.replyTargetAfterRefresh(nil, firstPage: firstPage))
+    }
+
+    private func commentRoot(videoID: UUID = UUID(), createdAt: Date = Date(timeIntervalSince1970: 1)) -> VideoComment {
+        VideoComment(id: UUID(), videoId: videoID, userId: UUID(), parentId: nil, body: "A comment",
+                     createdAt: createdAt, username: "listener", replyCount: 0)
+    }
+
     func testCommentBodyValidationAndReplyDecoding() throws {
         XCTAssertFalse(VideoComment.isValidBody(" \t\n "))
         XCTAssertTrue(VideoComment.isValidBody(" " + String(repeating: "a", count: 300) + "\n"))
