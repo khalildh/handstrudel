@@ -160,6 +160,8 @@ final class EngineController: ObservableObject {
     @Published var learnHitEffects: [LearnModeManager.HitEffect] = []
     @Published var learnSongComplete = false
     @Published var currentLearnSong: LearnSong? = nil
+    private(set) var learnViewportAspect: Double = 0.5
+    private var learnSceneActive = true
 
     // Grid mode (pinch-to-play)
     @Published var gridModeEnabled = false
@@ -829,7 +831,43 @@ final class EngineController: ObservableObject {
         learnModeManager.loadSong(song, scaleNotes: gridNotes, bpm: song.bpm)
         manualBPM = song.bpm
         currentLearnSong = song
-        learnSongComplete = false
+        updateLearnPause()
+        updateLearnUI()
+    }
+
+    func updateLearnViewport(_ size: CGSize) {
+        guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else { return }
+        learnViewportAspect = size.width / size.height
+    }
+
+    func tapLearnLane(_ lane: Int) {
+        guard learnModeEnabled, !learnSongComplete, !isPaused, learnSceneActive else { return }
+        let notes = scaleNotes(key: selectedKey, scale: selectedScale,
+                               baseOctave: gridBaseOctave, octaveRange: gridOctaveRange)
+        guard notes.indices.contains(lane) else { return }
+        let hit = learnModeManager.tapLane(lane, elapsed: learnElapsed)
+        strudelBridge.playNote(midi: hit ?? notes[lane], waveform: selectedWaveform, velocity: 0.7, duration: 0.3)
+        if hit != nil { haptics.learnPerfectHit() }
+        else { haptics.noteTrigger() }
+        updateLearnUI()
+    }
+
+    func updateLearnUI() {
+        learnScore = learnModeManager.score
+        learnVisibleNotes = learnModeManager.visibleNotes
+        learnHitEffects = learnModeManager.hitEffects
+        learnSongComplete = learnModeManager.songComplete
+    }
+
+    func setLearnSceneActive(_ active: Bool) {
+        learnSceneActive = active
+        updateLearnPause()
+    }
+
+    private var learnElapsed: Double { startTime.map { Date().timeIntervalSince($0) } ?? 0 }
+
+    private func updateLearnPause() {
+        learnModeManager.setPaused(isPaused || !learnSceneActive, elapsed: learnElapsed)
     }
 
     private static let maxSnippets = 50
@@ -1193,6 +1231,7 @@ final class EngineController: ObservableObject {
     /// Pause audio (control sheet open)
     func pause() {
         isPaused = true
+        updateLearnPause()
         audioLoopPlayers.values.forEach { $0.pause() }
         silenceAll()
     }
@@ -1200,6 +1239,7 @@ final class EngineController: ObservableObject {
     /// Resume audio (control sheet closed)
     func resume() {
         isPaused = false
+        updateLearnPause()
         audioLoopPlayers.values.forEach { _ = $0.play() }
         jamSession.replayRemoteVoices()
     }

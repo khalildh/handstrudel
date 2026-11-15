@@ -5,7 +5,6 @@ import Foundation
 @MainActor
 final class LearnModeController: ModeController {
     func tick(_ engine: EngineController) {
-        let gridModeManager = engine.gridModeManager
         let learnModeManager = engine.learnModeManager
         let strudelBridge = engine.strudelBridge
         let haptics = engine.haptics
@@ -20,8 +19,14 @@ final class LearnModeController: ModeController {
         // Get current pinch/lane state from grid manager
         let leftHand = engine.currentHands.left
         let rightHand = engine.currentHands.right
-        let leftLane = leftHand.map { gridModeManager.yToNoteIndex(y: $0.pinchY, noteCount: gridNotes.count) }
-        let rightLane = rightHand.map { gridModeManager.yToNoteIndex(y: $0.pinchY, noteCount: gridNotes.count) }
+        let videoAspect = engine.handTracker.videoWidth / max(1, engine.handTracker.videoHeight)
+        func cameraLane(_ hand: HandData?) -> Int? {
+            guard let hand else { return nil }
+            return LearnLaneLayout.cameraLane(y: hand.pinchY, noteCount: gridNotes.count,
+                                              videoAspect: videoAspect, viewportAspect: engine.learnViewportAspect)
+        }
+        let leftLane = cameraLane(leftHand)
+        let rightLane = cameraLane(rightHand)
         let leftPinching = (leftHand?.pinch ?? 0) > 0.8
         let rightPinching = (rightHand?.pinch ?? 0) > 0.8
 
@@ -43,9 +48,6 @@ final class LearnModeController: ModeController {
         }
 
         // Sync visual state to published properties (at UI timer rate)
-        engine.learnScore = learnModeManager.score
-        engine.learnVisibleNotes = learnModeManager.visibleNotes
-        engine.learnHitEffects = learnModeManager.hitEffects
-        engine.learnSongComplete = learnModeManager.songComplete
+        engine.updateLearnUI()
     }
 }

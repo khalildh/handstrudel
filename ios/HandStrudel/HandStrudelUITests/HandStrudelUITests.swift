@@ -827,6 +827,28 @@ final class HandStrudelUITests: XCTestCase {
 
     // MARK: - Learn Song Picker Tests
 
+    func testLearnSongStartsWithTouchableLanes() {
+        launchToSession()
+        element("settings-button").tap()
+        let learn = element("mode-learn")
+        let scroll = app.scrollViews.firstMatch
+        for _ in 0..<8 {
+            if learn.isHittable { break }
+            let other = app.staticTexts["Other modes"].firstMatch
+            if !learn.exists, other.isHittable { other.tap() }
+            scroll.swipeUp()
+        }
+        XCTAssertTrue(learn.isHittable)
+        learn.tap()
+        let song = element("song-Twinkle Twinkle")
+        XCTAssertTrue(song.waitForExistence(timeout: 5))
+        song.tap()
+        let lane = app.buttons["learn-lane-0"]
+        XCTAssertTrue(lane.waitForExistence(timeout: 8))
+        XCTAssertTrue(element("learn-touch-hint").exists)
+        lane.tap()
+    }
+
     func testLearnSongPicker_showsMelodies() {
         launchToSession()
         element("settings-button").tap()
