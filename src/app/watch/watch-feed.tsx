@@ -293,6 +293,9 @@ export default function WatchFeed() {
                       <p className="watch-preset watch-preset-chords">
                         <span className="watch-preset-label">{chords.label}:</span>
                         <span>{chords.name}{chords.degrees && ` (${chords.degrees.join("–")})`}</span>
+                        {chords.names && <span className="watch-preset-chord-names">
+                          <span className="watch-preset-label">Chords in this setup: </span>{chords.names.join(" · ")}
+                        </span>}
                       </p>
                     )}
                   </div>

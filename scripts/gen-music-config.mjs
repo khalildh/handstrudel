@@ -7,10 +7,10 @@
 //        └─► ios/HandStrudel/HandStrudel/Models/MusicConfig.generated.swift  (iOS)
 //
 // The generated files contain ONLY data (notes, structs, parameter specs, and
-// the web copy of the iOS chord catalog). The
+// the web copy of the iOS chord catalog and music theory tables). The
 // format()/toCode() closures stay in each platform's hand-written code, keyed by
 // the spec's `format` name. Run via `npm run gen:config`; CI runs
-// `npm run verify:config` to fail if the generated files drift from the JSON.
+// `npm run verify:config` to fail if the generated files drift from their sources.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -29,13 +29,38 @@ if (chordProgressions.length !== (chordCatalog.match(/\.init\(/g)?.length ?? 0) 
   throw new Error("Couldn't read the full Swift chord progression catalog");
 }
 
+const theorySource = readFileSync(join(root, "ios/HandStrudel/HandStrudel/Models/MusicTheory.swift"), "utf8");
+const swiftEnum = (name) => theorySource.match(new RegExp(`^enum ${name}:[^{]+\\{([\\s\\S]*?)^\\}`, "m"))?.[1] ?? "";
+const keySource = swiftEnum("MusicKey");
+const scaleSource = swiftEnum("Scale");
+const keyCases = Array.from(keySource.matchAll(/^    case ([^\r\n]+)$/gm), ([, list]) => list.split(/,\s*/)).flat();
+const keySemitones = new Map(Array.from(keySource.matchAll(/^ +case \.(\w+): +return (\d+)$/gm),
+  ([, key, semitone]) => [key, Number(semitone)]));
+const scaleNames = new Map(Array.from(scaleSource.matchAll(/^    case (\w+) = ("[^"]+")$/gm),
+  ([, id, name]) => [id, JSON.parse(name)]));
+const intervals = new Map(Array.from(scaleSource.matchAll(/^ +case \.(\w+): +return (\[[^\r\n]+\])$/gm),
+  ([, id, list]) => [id, JSON.parse(list)]));
+const noteNames = JSON.parse(theorySource.match(/^private let NOTE_NAMES = (\[[^\r\n]+\])$/m)?.[1] ?? "null");
+if (!Array.isArray(noteNames) || noteNames.length !== 12 || noteNames.some(name => typeof name !== "string" || !name)
+    || keyCases.length !== 12 || new Set(keyCases).size !== 12 || keySemitones.size !== 12
+    || new Set(keySemitones.values()).size !== 12 || keyCases.some(key => !keySemitones.has(key) || keySemitones.get(key) >= 12)
+    || !scaleNames.size || scaleNames.size !== (scaleSource.match(/^    case /gm)?.length ?? 0)
+    || scaleNames.size !== intervals.size || new Set(scaleNames.values()).size !== scaleNames.size
+    || [...scaleNames.keys()].some(id => {
+      const scale = intervals.get(id);
+      return !Array.isArray(scale) || scale[0] !== 0 ||
+        scale.some((n, i) => !Number.isInteger(n) || n >= 12 || (i > 0 && n <= scale[i - 1]));
+    })) {
+  throw new Error("Couldn't read the full Swift key, scale, and note name tables");
+}
+
 // noteIdx's range is always "every note index", so derive its max from the notes
 // array rather than trusting a hand-maintained number in the JSON.
 const params = config.params.map((p) =>
   p.id === "noteIdx" ? { ...p, max: notes.length - 1 } : p,
 );
 
-const BANNER_TS = `// AUTO-GENERATED from shared/music-config.json and the iOS chord catalog by scripts/gen-music-config.mjs.
+const BANNER_TS = `// AUTO-GENERATED from shared/music-config.json and iOS music sources by scripts/gen-music-config.mjs.
 // Do not edit by hand — run \`npm run gen:config\`.\n`;
 
 const tsArray = (arr) => "[" + arr.map((v) => JSON.stringify(v)).join(", ") + "]";
@@ -51,6 +76,15 @@ export const STRUCTS: string[] = ${tsArray(structs)};
 export const CHORD_PROGRESSIONS = new Map<string, { name: string; degrees: number[] }>([
 ${chordProgressions.map(({ id, name, degrees }) =>
   `  [${JSON.stringify(id)}, { name: ${JSON.stringify(name)}, degrees: ${tsArray(degrees)} }],`).join("\n")}
+]);
+
+// Codable keys and scales, and iOS pitch-class spellings from MusicTheory.swift.
+export const IOS_NOTE_NAMES = ${tsArray(noteNames)};
+export const IOS_KEY_SEMITONES = new Map<string, number>([
+${keyCases.map(key => `  [${JSON.stringify(key)}, ${keySemitones.get(key)}],`).join("\n")}
+]);
+export const IOS_SCALE_INTERVALS = new Map<string, number[]>([
+${Array.from(scaleNames, ([id, name]) => `  [${JSON.stringify(name)}, ${tsArray(intervals.get(id))}],`).join("\n")}
 ]);
 
 export interface ParamSpec {

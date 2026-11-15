@@ -130,6 +130,7 @@
   padding: 5px 10px; border-radius: 8px; background: var(--watch-blue-soft); color: var(--watch-blue); font-weight: 750;
 }
 .watch-preset-chords { flex-wrap: wrap; max-width: 100%; column-gap: 5px; }
+.watch-preset-chord-names { flex-basis: 100%; min-width: 0; }
 .watch-preset-label { font-weight: 600; }
 .watch-sound-actions { column-gap: 12px; }
 .watch-share-actions { gap: 6px; }
