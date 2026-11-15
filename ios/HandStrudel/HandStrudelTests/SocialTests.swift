@@ -421,6 +421,36 @@ final class SocialTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
     }
 
+    func testCapturedLoopExportRejectsTruncatedWAV() throws {
+        let manager = FileManager.default
+        let directory = manager.temporaryDirectory.appending(path: UUID().uuidString)
+        let exports = directory.appending(path: "Exports")
+        try manager.createDirectory(at: exports, withIntermediateDirectories: true)
+        defer { try? manager.removeItem(at: directory) }
+
+        let source = directory.appending(path: "Capture.wav")
+        let capture = CapturedLoopFile(url: source)
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 480))
+        buffer.frameLength = 480
+        let samples = try XCTUnwrap(buffer.floatChannelData)
+        for channel in 0..<2 {
+            samples[channel].initialize(repeating: 0.25, count: 480)
+        }
+        capture.appendPCM(buffer)
+        let duration = try capture.finish()
+        let original = try Data(contentsOf: source)
+        let shared = try AudioExporter.shareCaptured(at: source, duration: duration, into: exports)
+        XCTAssertEqual(try Data(contentsOf: shared), original)
+
+        // Remove half the 24-bit stereo sample data without changing the header.
+        let truncated = original.dropLast(240 * 2 * 3)
+        try truncated.write(to: source)
+        XCTAssertThrowsError(try AudioExporter.shareCaptured(at: source, duration: duration, into: exports))
+        XCTAssertEqual(try manager.contentsOfDirectory(atPath: exports.path), [shared.lastPathComponent])
+        XCTAssertEqual(try Data(contentsOf: source), truncated)
+    }
+
     func testReplayKitSamplePathPreservesGapsAndSkipsOverlaps() throws {
         let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID()).wav")
         let capture = CapturedLoopFile(url: url)

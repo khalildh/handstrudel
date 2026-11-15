@@ -7,8 +7,18 @@ final class AudioExporter {
     }
 
     static func shareCaptured(_ loop: RecordedLoop) throws -> URL {
-        let output = FileManager.default.temporaryDirectory.appending(path: "HandStrudel-\(UUID()).wav")
-        try FileManager.default.copyItem(at: capturedURL(loop.id), to: output)
+        try shareCaptured(at: capturedURL(loop.id), duration: loop.duration, into: FileManager.default.temporaryDirectory)
+    }
+
+    static func shareCaptured(at source: URL, duration: Double, into directory: URL) throws -> URL {
+        let audio = try AVAudioFile(forReading: source)
+        let frames = audio.length
+        // Capture saves duration from the number of frames written. A truncated WAV can still open.
+        guard frames > 0, (duration * audio.fileFormat.sampleRate).rounded() == Double(frames) else {
+            throw SocialError.message("The captured audio file is incomplete.")
+        }
+        let output = directory.appending(path: "HandStrudel-\(UUID()).wav")
+        try FileManager.default.copyItem(at: source, to: output)
         return output
     }
     /// Render a loop to an M4A file and return the URL
