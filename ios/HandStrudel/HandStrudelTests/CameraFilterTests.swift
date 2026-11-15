@@ -2,6 +2,21 @@ import XCTest
 @testable import HandStrudel
 
 final class CameraFilterTests: XCTestCase {
+    func testMacQuarterTurnMovesTheRightEdgeToTheTopAndSwapsDimensions() {
+        let rotation = CameraImageRotation.counterclockwise
+        let towardRight = CGPoint(x: 1, y: 0).applying(rotation.transform)
+        XCTAssertEqual(towardRight.x, 0, accuracy: 0.0001)
+        XCTAssertEqual(towardRight.y, -1, accuracy: 0.0001)
+        XCTAssertEqual(rotation.visionOrientation, .left)
+        XCTAssertEqual(rotation.orientedSize(CGSize(width: 640, height: 480)), CGSize(width: 480, height: 640))
+    }
+
+    func testCameraRotationCyclesAndKeepsBothUprightDimensions() {
+        let size = CGSize(width: 640, height: 480)
+        XCTAssertEqual(CameraImageRotation.upright.next.next.next.next, .upright)
+        XCTAssertEqual(CameraImageRotation.upright.orientedSize(size), size)
+        XCTAssertEqual(CameraImageRotation.inverted.orientedSize(size), size)
+    }
 
     // MARK: - Unique IDs
 

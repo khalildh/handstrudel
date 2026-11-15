@@ -23,7 +23,8 @@ struct CameraView: UIViewRepresentable {
         if uiView.previewLayer == nil {
             attachPreviewLayer(to: uiView)
         }
-        uiView.previewLayer?.frame = uiView.bounds
+        uiView.rotation = handTracker.cameraRotation
+        uiView.layoutPreview()
     }
 
     private func attachPreviewLayer(to view: CameraPreviewView) {
@@ -36,9 +37,21 @@ struct CameraView: UIViewRepresentable {
 
 class CameraPreviewView: UIView {
     var previewLayer: AVCaptureVideoPreviewLayer?
+    var rotation: CameraImageRotation = .upright
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        previewLayer?.frame = bounds
+        layoutPreview()
+    }
+
+    func layoutPreview() {
+        guard let previewLayer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        // Aspect-fill the visible rectangle after the layer is rotated.
+        previewLayer.bounds = CGRect(origin: .zero, size: rotation.orientedSize(bounds.size))
+        previewLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        previewLayer.setAffineTransform(rotation.transform)
+        CATransaction.commit()
     }
 }
