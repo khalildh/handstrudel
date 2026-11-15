@@ -780,6 +780,31 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
     }
 
+    func testCreatorLikesReachableAtLargestDynamicType() throws {
+        app.launchArguments += [
+            "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+        ]
+        try launchWithProfileFixture()
+        element("tab-feed").tap()
+        let author = app.buttons["@loopmaker"].firstMatch
+        XCTAssertTrue(author.waitForExistence(timeout: 8))
+        author.tap()
+
+        let title = app.staticTexts["Loop Maker"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(title.frame.height, 45, "Expected the accessibility-size profile header")
+
+        let likes = element("profile-likes-received")
+        for _ in 0..<2 where !likes.isHittable {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(likes.isHittable)
+        XCTAssertEqual(likes.label, "Likes received")
+        XCTAssertEqual(likes.value as? String, "42")
+        captureIfRequested("Artist-Profile-Largest-Text")
+    }
+
     func testPlayThisSoundFromFeedOpensMusicSession() throws {
         try launchWithProfileFixture()
         element("tab-feed").tap()
