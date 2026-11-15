@@ -6,10 +6,11 @@ const video = "30000000-0000-0000-0000-000000000001";
 const root = "40000000-0000-0000-0000-000000000001";
 const reply = "40000000-0000-0000-0000-000000000002";
 const now = new Date().toISOString();
+const demoLikes = 42;
 const demoThumb = "thumbs/76c9a372-7439-48dc-94ec-75a06cb6f1d7/385e21ab-7160-4378-b897-c602de952140.jpg";
 const post = {
   id: video, user_id: creator, username: "loopmaker", caption: "Evening loop", comments_enabled: true,
-  video_key: "test/clip.mp4", thumb_key: demoThumb, like_count: 0, created_at: now,
+  video_key: "test/clip.mp4", thumb_key: demoThumb, like_count: demoLikes, created_at: now,
   instrument: "Grand Piano",
   sound_setup: {
     version: 1, instrument: "grand_piano", waveform: "sine", key: "D", scale: "Minor", progression: "free",
@@ -18,7 +19,7 @@ const post = {
 };
 const secondPost = {
   ...post, id: "30000000-0000-0000-0000-000000000002", username: "secondartist",
-  user_id: "20000000-0000-0000-0000-000000000003", caption: "Second performance",
+  user_id: "20000000-0000-0000-0000-000000000003", caption: "Second performance", like_count: 0,
 };
 const initial = {
   id: root, video_id: video, user_id: viewer, username: "viewer", parent_id: null,
@@ -96,7 +97,7 @@ createServer((request, response) => {
       const handle = url.searchParams.get("username")?.slice(3);
       const id = url.searchParams.get("id")?.slice(3).toLowerCase();
       const profiles = [
-        { id: creator, username: "loopmaker", display_name: "Loop Maker", likes_received: 42 },
+        { id: creator, username: "loopmaker", display_name: "Loop Maker", likes_received: demoLikes },
         { id: viewer, username: "viewer", display_name: displayName, likes_received: 0 },
       ];
       return send(profiles.filter((item) => (!handle || item.username === handle) && (!id || item.id === id)));
