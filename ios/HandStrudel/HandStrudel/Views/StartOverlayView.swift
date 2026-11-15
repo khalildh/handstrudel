@@ -97,17 +97,6 @@ struct StartOverlayView: View {
                 title
                 StudioInputPicker(selection: $preferredInput).disabled(starting)
                 heroCard
-                if let onInventSound {
-                    Button {
-                        stopPreview()
-                        onInventSound()
-                    } label: {
-                        Label("Invent a sound", systemImage: "waveform.badge.plus")
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("invent-open")
-                }
                 libraryShortcuts
             }
             .padding(.horizontal, 22)
