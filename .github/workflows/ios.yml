@@ -24,8 +24,8 @@ jobs:
       SCHEME: HandStrudel
       PROJECT: HandStrudel.xcodeproj
       TEST_RUNNER_HANDSTRUDEL_OFFLINE_SMOKE: "1"
-      # Bump these if the runner image moves to a newer Xcode / device set.
-      SIMULATOR: platform=iOS Simulator,name=iPhone 16,OS=latest
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      SIMULATOR_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-26-2
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +34,11 @@ jobs:
 
       - name: Resolve Swift Package dependencies
         run: xcodebuild -resolvePackageDependencies -project "$PROJECT" -scheme "$SCHEME"
+
+      - name: Create a simulator for the pinned Xcode runtime
+        run: |
+          device_id="$(xcrun simctl create HandStrudelCI com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$SIMULATOR_RUNTIME")"
+          printf 'SIMULATOR=platform=iOS Simulator,id=%s\n' "$device_id" >> "$GITHUB_ENV"
 
       - name: Run unit tests and Studio smoke tests
         run: |
