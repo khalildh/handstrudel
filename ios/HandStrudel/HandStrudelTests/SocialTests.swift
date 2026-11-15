@@ -298,6 +298,26 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(search.filter(after: "cursor"), "and(or(\(search.filter)),or(cursor))")
     }
 
+    func testSearchCanBroadenAHandleMissWithoutChangingTheTerm() throws {
+        let handle = try XCTUnwrap(PostSearch(" @Cloud_Music "))
+        XCTAssertTrue(handle.isHandleSearch)
+        let input = try XCTUnwrap(handle.broaderInput)
+        XCTAssertEqual(input, "Cloud_Music")
+
+        let broader = try XCTUnwrap(PostSearch(input))
+        XCTAssertFalse(broader.isHandleSearch)
+        XCTAssertEqual(broader.text, handle.text)
+        XCTAssertTrue(broader.filter.contains(handle.filter))
+        XCTAssertTrue(broader.filter.contains("display_name.imatch"))
+        XCTAssertNil(broader.broaderInput)
+    }
+
+    func testSearchCannotBroadenToAnotherHandleSearch() throws {
+        let handle = try XCTUnwrap(PostSearch("@ @cloud_music"))
+        XCTAssertTrue(handle.isHandleSearch)
+        XCTAssertNil(handle.broaderInput)
+    }
+
     func testCreatorLoadsFromVisibleFeedWhenCreatorViewIsMissing() async throws {
         let client = discoveryClient { request in
             if request.path == "/public_creators" { return Self.missingView }

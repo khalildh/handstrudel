@@ -296,6 +296,13 @@ struct PublicCreator: Decodable, Identifiable {
 struct PostSearch: Equatable {
     let text: String
     let filter: String
+    let isHandleSearch: Bool
+
+    var broaderInput: String? {
+        // Removing one @ must not leave another handle-scoped query.
+        guard isHandleSearch, !text.hasPrefix("@") else { return nil }
+        return text
+    }
 
     init?(_ input: String) {
         let cleaned = input.replacingOccurrences(of: "\0", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -304,6 +311,7 @@ struct PostSearch: Equatable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.count >= 2 else { return nil }
         self.text = text
+        isHandleSearch = byHandle
 
         // Escape the literal pattern first, then quote it for PostgREST's logic grammar.
         let metacharacters = "\\.^$|?*+()[]{}"
