@@ -220,6 +220,66 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(shelf.waitForExistence(timeout: 5))
     }
 
+    func testLoopShelfPlaysRenamesAndRemovesCapturedWAV() throws {
+        guard let file = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOOP_TEST_CLIP"] else {
+            throw XCTSkip("Set TEST_RUNNER_HANDSTRUDEL_LOOP_TEST_CLIP to a simulator-readable WAV.")
+        }
+        let id = UUID()
+        let name = "Studio fixture \(id.uuidString.prefix(6))"
+        let renamed = "Night loop \(id.uuidString.prefix(6))"
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["HANDSTRUDEL_TEST_LOOP_CLIP"] = file
+        app.launchEnvironment["HANDSTRUDEL_TEST_LOOP_ID"] = id.uuidString
+        app.launch()
+
+        func openShelf() {
+            let shelf = app.buttons["music-loop-shelf"]
+            XCTAssertTrue(shelf.waitForExistence(timeout: 5))
+            if !shelf.isHittable { app.swipeUp() }
+            shelf.tap()
+            XCTAssertTrue(app.staticTexts["Loop shelf"].waitForExistence(timeout: 5))
+        }
+
+        openShelf()
+        let play = app.buttons["Play \(name)"]
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        play.tap()
+        let stop = app.buttons["Stop \(name)"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        stop.tap()
+        let gain = app.sliders["Volume for \(name)"]
+        XCTAssertTrue(gain.exists)
+        gain.adjust(toNormalizedSliderPosition: 0.4)
+        XCTAssertNotEqual(gain.value as? String, "100%")
+        app.buttons["Mute \(name)"].tap()
+        XCTAssertTrue(app.buttons["Unmute \(name)"].exists)
+        app.buttons["Actions for \(name)"].tap()
+        app.buttons["Rename"].tap()
+        let rename = app.alerts["Rename loop"]
+        let field = rename.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: name.count) + renamed)
+        XCTAssertEqual(field.value as? String, renamed)
+        rename.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts[renamed].waitForExistence(timeout: 5))
+
+        app.buttons["Done"].tap()
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "HANDSTRUDEL_TEST_LOOP_CLIP")
+        app.launchEnvironment.removeValue(forKey: "HANDSTRUDEL_TEST_LOOP_ID")
+        app.launch()
+        openShelf()
+        XCTAssertTrue(app.buttons["Unmute \(renamed)"].exists)
+        XCTAssertNotEqual(app.sliders["Volume for \(renamed)"].value as? String, "100%")
+        app.buttons["Actions for \(renamed)"].tap()
+        app.buttons["Delete"].tap()
+        let confirm = app.buttons["Delete loop"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertFalse(app.staticTexts[renamed].exists)
+    }
+
     func testMusic_privateDraftsOpensWithoutAccount() {
         app.launchArguments.append("--uitesting")
         app.launch()

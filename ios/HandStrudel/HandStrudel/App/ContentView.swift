@@ -180,6 +180,7 @@ struct ContentView: View {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--reset-studio-input") { preferredInput = .air }
             startDemoIfRequested()
+            engine.importLoopFixtureIfRequested()
             // Open a sample take in the simulator, which cannot record with ReplayKit.
             if let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
                 DispatchQueue.main.async { openSampleDraft(at: URL(fileURLWithPath: path)) }
