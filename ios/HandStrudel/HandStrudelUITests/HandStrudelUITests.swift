@@ -119,6 +119,7 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertFalse(brand.isHittable, "The Studio content should have scrolled")
         XCTAssertTrue(start.isHittable)
         XCTAssertEqual(start.frame.minY, startY, accuracy: 1)
+        captureIfRequested("Studio-Pinned-Start")
 
         start.tap()
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
@@ -150,6 +151,29 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(paper.isSelected)
         app.buttons["theme-volt"].tap()
         XCTAssertTrue(app.buttons["theme-volt"].isSelected)
+    }
+
+    func testNamingPrivateDraftKeepsTheTrimInTheEditor() throws {
+        guard let file = ProcessInfo.processInfo.environment["HANDSTRUDEL_DRAFT_TEST_CLIP"] else {
+            throw XCTSkip("Set TEST_RUNNER_HANDSTRUDEL_DRAFT_TEST_CLIP to a simulator-readable MP4.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["HANDSTRUDEL_TEST_CLIP"] = file
+        app.launch()
+        let selection = element("draft-trim-range")
+        XCTAssertTrue(selection.waitForExistence(timeout: 8))
+        let before = selection.label
+        let rename = app.buttons["rename-private-draft"]
+        if !rename.isHittable { app.swipeDown() }
+        rename.tap()
+        let field = app.textFields["private-draft-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let name = "Warmup \(UUID().uuidString.prefix(6))"
+        field.tap()
+        field.typeText(name)
+        app.navigationBars["Private draft name"].buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
+        XCTAssertEqual(selection.label, before)
     }
 
     func testDraftFilmstripAdjustsAndResetsARealClip() throws {
