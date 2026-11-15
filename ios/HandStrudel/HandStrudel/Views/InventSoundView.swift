@@ -7,6 +7,7 @@ struct InventSoundView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     let onPlay: (InventedSound) -> Void
+    @State private var kind: InventedSound.Kind = .pitched
     @State private var prompt = ""
     @State private var candidates: [InventedSound] = []
     @State private var saved: [InventedSound] = []
@@ -22,7 +23,12 @@ struct InventSoundView: View {
     private var aiEnabled: Bool { ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_AUDIO_LAB"] == "1" }
     #endif
 
-    private let suggestions = ["Glass kalimba", "Soft wooden mallet", "Bright metallic bell"]
+    private var suggestions: [String] {
+        switch kind {
+        case .pitched: return ["Glass kalimba", "Soft wooden mallet", "Bright metallic bell"]
+        case .effect: return ["Anime power-up scream", "Robot sneeze", "Cartoon laser zap"]
+        }
+    }
     private var cleaned: String { prompt.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
@@ -35,7 +41,15 @@ struct InventSoundView: View {
                         Text("Invent a sound").font(.system(.largeTitle, design: .serif))
                         Text("Describe a tone, hear it, then play it on the wheel.")
                             .font(.subheadline).foregroundStyle(palette.muted)
-                        TextField("A glass kalimba with a soft knock", text: $prompt)
+                        Picker("Sound type", selection: $kind) {
+                            ForEach(InventedSound.Kind.allCases) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .disabled(busy)
+                        .accessibilityIdentifier("invent-kind")
+                        Text(kind == .pitched ? "Tunes a steady note for melodies and chords." : "Keeps swoops and noise. The wheel shifts its playback speed.")
+                            .font(.footnote).foregroundStyle(palette.muted)
+                        TextField(kind == .pitched ? "A glass kalimba with a soft knock" : "A cartoon battle yell", text: $prompt)
                             .padding(12)
                             .background(palette.background, in: RoundedRectangle(cornerRadius: 10))
                             .accessibilityIdentifier("invent-prompt")
@@ -53,25 +67,27 @@ struct InventSoundView: View {
                         #if targetEnvironment(simulator)
                         if aiEnabled { aiControls }
                         #endif
-                        Button {
-                            let text = cleaned
-                            prepare { try InventedSound.variants(for: text) }
-                        } label: {
-                            Text("Generate two synth variations")
+                        if kind == .pitched {
+                            Button {
+                                let text = cleaned
+                                prepare { try InventedSound.variants(for: text) }
+                            } label: {
+                                Text("Generate two synth variations")
+                            }
+                            .buttonStyle(StudioActionStyle())
+                            .disabled(cleaned.isEmpty || busy)
+                            .opacity(cleaned.isEmpty ? 0.55 : 1)
+                            .accessibilityIdentifier("invent-generate")
+                            Text("The synth works offline and doesn't use AI.")
+                                .font(.footnote).foregroundStyle(palette.muted)
                         }
-                        .buttonStyle(StudioActionStyle())
-                        .disabled(cleaned.isEmpty || busy)
-                        .opacity(cleaned.isEmpty ? 0.55 : 1)
-                        .accessibilityIdentifier("invent-generate")
-                        Text("The synth works offline and doesn't use AI.")
-                            .font(.footnote).foregroundStyle(palette.muted)
                         if busy { ProgressView("Preparing sound…").font(.footnote) }
                     }
                     .padding(16)
                     .background(palette.surface, in: RoundedRectangle(cornerRadius: 18))
-                    Button("Import a generated WAV", systemImage: "waveform.badge.plus") { importWAV = true }
+                    Button("Import a WAV", systemImage: "waveform.badge.plus") { importWAV = true }
                         .disabled(busy)
-                    Text("Import a short, dry single note near middle C. We'll check its pitch and tune it for the wheel.")
+                    Text(kind == .pitched ? "Import one dry note near middle C." : "Import a short clip as an effect without tuning it.")
                         .font(.footnote).foregroundStyle(palette.muted)
                     if let error { Label(error, systemImage: "exclamationmark.circle").font(.footnote) }
                     if !candidates.isEmpty {
@@ -102,7 +118,9 @@ struct InventSoundView: View {
         .tint(palette.accent)
         .fileImporter(isPresented: $importWAV, allowedContentTypes: [.wav]) { result in
             switch result {
-            case .success(let url): prepare { [try InventedSound.imported(from: url)] }
+            case .success(let url):
+                let selection = kind
+                prepare { [try InventedSound.imported(from: url, kind: selection)] }
             case .failure(let error): self.error = error.localizedDescription
             }
         }
@@ -119,7 +137,8 @@ struct InventSoundView: View {
         if let provider {
             Button("Generate with AI", systemImage: "sparkles") {
                 let text = cleaned
-                prepare { [try await InventedSound.generatedByStability(prompt: text, provider: provider)] }
+                let selection = kind
+                prepare { [try await InventedSound.generatedByStability(prompt: text, kind: selection, provider: provider)] }
             }
             .buttonStyle(StudioActionStyle())
             .disabled(busy || cleaned.isEmpty)
@@ -132,7 +151,7 @@ struct InventSoundView: View {
             Button("Reconnect AI bridge", systemImage: "arrow.clockwise") {
                 Task { provider = await InventedSound.AudioProvider.available() }
             }
-            Text("Start the Sound Lab bridge on this Mac, then reconnect.")
+            Text("Start or update the Sound Lab bridge on this Mac, then reconnect.")
                 .font(.footnote).foregroundStyle(palette.muted)
         }
     }
@@ -140,13 +159,14 @@ struct InventSoundView: View {
 
     private func soundRow(_ sound: InventedSound, isSaved: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(sound.name, systemImage: "waveform").font(.headline)
+            Label(sound.name, systemImage: sound.kind.icon).font(.headline)
+            Text(sound.kind.label).font(.caption).foregroundStyle(palette.muted)
             HStack {
                 Button(auditioning == sound.id ? "Stop" : "Hear", systemImage: "speaker.wave.2") {
                     if auditioning == sound.id { stopPreview() } else { hear(sound) }
                 }
                 .accessibilityIdentifier("invent-audition")
-                Button("Play with hands", systemImage: "hand.raised") {
+                Button("Play on wheel", systemImage: "hand.raised") {
                     stopPreview()
                     onPlay(sound)
                     dismiss()
@@ -198,6 +218,11 @@ struct InventSoundView: View {
             preview = Task {
                 sampler.noteOn(voice: "preview", midi: 60, velocity: 0.85)
                 do {
+                    if sound.kind == .effect {
+                        try await Task.sleep(for: .seconds(4))
+                        stopPreview()
+                        return
+                    }
                     try await Task.sleep(for: .milliseconds(430))
                     sampler.releaseTemporaryVoice("preview")
                     for (index, midi) in [60, 64, 67, 71].enumerated() {

@@ -385,6 +385,14 @@ final class HandStrudelUITests: XCTestCase {
     }
 
     func testInventASoundRealLocalAIOnSimulator() throws {
+        try generateAndOpenLocalAI(idea: "Glass kalimba")
+    }
+
+    func testInventASoundRealLocalEffectOnSimulator() throws {
+        try generateAndOpenLocalAI(idea: "Anime power-up scream", effect: true)
+    }
+
+    private func generateAndOpenLocalAI(idea: String, effect: Bool = false) throws {
         app.launchArguments.append("--uitesting")
         app.launchEnvironment["HANDSTRUDEL_LOCAL_AUDIO_LAB"] = "1"
         app.launch()
@@ -394,7 +402,13 @@ final class HandStrudelUITests: XCTestCase {
         entry.tap()
         let generate = app.buttons["invent-ai-local"]
         try XCTSkipUnless(generate.waitForExistence(timeout: 5), "Start the local Stable Audio MLX bridge to run this integration test.")
-        app.buttons["Glass kalimba"].tap()
+        if effect {
+            app.segmentedControls["invent-kind"].buttons["One-shot effect"].tap()
+            XCTAssertFalse(app.buttons["invent-generate"].exists)
+        }
+        let prompt = app.buttons[idea]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5))
+        prompt.tap()
         generate.tap()
         let produced = app.staticTexts["New sounds"]
         XCTAssertTrue(produced.waitForExistence(timeout: 100), "No playable sample appeared. Labels: \(app.staticTexts.allElementsBoundByIndex.map(\.label))")

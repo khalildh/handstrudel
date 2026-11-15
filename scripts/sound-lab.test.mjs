@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import test from "node:test";
-import { generateLocalNote, generateNote, soundLabServer } from "./sound-lab.mjs";
+import { generateLocalSound, generateCloudSound, soundLabServer } from "./sound-lab.mjs";
 
 const sample = Buffer.from("RIFF0000WAVEfixture");
 
 test("submits one isolated-note generation and polls pending result to WAV", async () => {
   const id = "a".repeat(64);
   let calls = 0;
-  const result = await generateNote("glass bell", "fixture", {
+  const result = await generateCloudSound("glass bell", "fixture", {
     wait: async () => {},
     request: async (url, options) => {
       calls++;
@@ -29,7 +29,7 @@ test("submits one isolated-note generation and polls pending result to WAV", asy
 
 test("local runtime gets one literal prompt argument and its WAV is read before cleanup", async () => {
   let scratch;
-  const wav = await generateLocalNote('glass bell; $(echo "hello")', "/model runtime", {
+  const wav = await generateLocalSound('glass bell; $(echo "hello")', "/model runtime", {
     run: async (file, args, options) => {
       assert.equal(file, "/model runtime/.venv/bin/python");
       assert.equal(options.cwd, "/model runtime");
@@ -43,21 +43,40 @@ test("local runtime gets one literal prompt argument and its WAV is read before 
   await assert.rejects(stat(scratch), { code: "ENOENT" });
 });
 
+test("effect generation does not ask the model for a pitch or suppress vocals", async () => {
+  await generateLocalSound("anime power-up scream", "/model runtime", {
+    kind: "effect",
+    run: async (_, args) => {
+      const prompt = args[args.indexOf("--prompt") + 1];
+      assert.match(prompt, /one-shot.*anime power-up scream/);
+      assert.doesNotMatch(prompt, /C4|middle C/);
+      assert.doesNotMatch(args[args.indexOf("--negative-prompt") + 1], /vocals/);
+      await writeFile(args.at(-1), sample);
+    },
+  });
+});
+
 test("bridge reports which provider is selected and rejects mismatched and browser requests", async (t) => {
   let calls = 0;
-  const server = soundLabServer("stable-audio-local", async () => { calls++; return sample; }, 5000);
+  const server = soundLabServer("stable-audio-local", async (prompt, kind) => {
+    assert.equal(prompt, "glass bell");
+    assert.equal(kind, "effect");
+    calls++;
+    return sample;
+  }, 5000);
   t.after(() => server.close());
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const url = `http://127.0.0.1:${server.address().port}`;
   const status = await fetch(`${url}/status`);
-  assert.deepEqual(await status.json(), { provider: "stable-audio-local" });
-  const post = (provider, headers = {}) => fetch(`${url}/generate`, {
+  assert.deepEqual(await status.json(), { provider: "stable-audio-local", protocolVersion: 2 });
+  const post = (provider, headers = {}, kind = "effect") => fetch(`${url}/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-HandStrudel-Audio-Provider": provider, ...headers },
-    body: JSON.stringify({ prompt: "glass bell" }),
+    body: JSON.stringify({ prompt: "glass bell", kind }),
   });
   assert.equal((await post("stable-audio-local", { Origin: "https://example.com" })).status, 404);
   assert.equal((await post("stable-audio-cloud")).status, 409);
+  assert.equal((await post("stable-audio-local", {}, "unsupported")).status, 400);
   assert.equal(calls, 0);
   const output = await post("stable-audio-local");
   assert.deepEqual(Buffer.from(await output.arrayBuffer()), sample);
@@ -65,7 +84,7 @@ test("bridge reports which provider is selected and rejects mismatched and brows
 });
 
 test("invalid response never becomes an importable sample", async () => {
-  await assert.rejects(() => generateNote("bell", "fixture", {
+  await assert.rejects(() => generateCloudSound("bell", "fixture", {
     request: async (_, { method }) => method === "POST"
       ? Response.json({ id: "b".repeat(64) })
       : new Response("not wave"),

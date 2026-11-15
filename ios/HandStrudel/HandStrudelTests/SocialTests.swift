@@ -33,6 +33,40 @@ final class SocialTests: XCTestCase {
     }
 
     @MainActor
+    func testInventedEffectPreservesSweepRejectedByPitchModeAndRendersThroughNativeSampler() throws {
+        let rate = InventedSound.sampleRate
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(rate * 0.5)))
+        buffer.frameLength = buffer.frameCapacity
+        let channels = try XCTUnwrap(buffer.floatChannelData)
+        for index in 0..<Int(buffer.frameLength) {
+            let t = Double(index) / rate
+            channels[0][index] = 0
+            channels[1][index] = Float(0.4 * sin(2 * .pi * (210 * t + 130 * t * t)))
+        }
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: format.settings)
+            try file.write(from: buffer)
+        }
+        XCTAssertThrowsError(try InventedSound.imported(from: url)) { error in
+            guard case InventedSound.SampleError.pitch = error else { return XCTFail("Unexpected error \(error)") }
+        }
+        let effect = try InventedSound.imported(from: url, kind: .effect)
+        XCTAssertEqual(effect.kind, .effect)
+        let engine = SoundFontEngine()
+        try engine.loadInventedSound(effect.caf, offline: true)
+        defer { engine.clearInventedSound() }
+        engine.noteOn(voice: "sweep", midi: 60, velocity: 0.8)
+        let samples = try engine.renderInventedSound(frames: 20_000)
+        let early = try XCTUnwrap(InventedSound.detectedPitch(samples, rate: 48_000, offset: 0.05))
+        let late = try XCTUnwrap(InventedSound.detectedPitch(samples, rate: 48_000, offset: 0.2))
+        XCTAssertGreaterThan(late - early, 30)
+        XCTAssertThrowsError(try InventedSound.prepared(Array(repeating: 0, count: 12_000), rate: rate, kind: .effect))
+    }
+
+    @MainActor
     func testInventedSoundRendersOneNoteAndFourChordPitchesThroughNativeSampler() throws {
         let variants = try InventedSound.variants(for: "glass kalimba with a soft knock")
         XCTAssertEqual(variants.count, 2)

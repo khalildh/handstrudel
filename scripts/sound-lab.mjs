@@ -9,7 +9,16 @@ import { promisify } from "node:util";
 
 const service = "https://api.stability.ai/v2beta/audio";
 const maxWAVBytes = 4_000_000;
-const modelPrompt = (text) => `Isolated musical instrument sample: ${text.trim()}. One sustained middle C (C4, 261.63 Hz), exactly one strike with a clean decay. Dry close-miked studio recording of the solo instrument. No other notes, no backing music.`;
+const soundDesign = {
+  pitched: {
+    prompt: (text) => `Isolated musical instrument sample: ${text.trim()}. One sustained middle C (C4, 261.63 Hz), exactly one strike with a clean decay. Dry close-miked studio recording of the solo instrument. No other notes, no backing music.`,
+    negative: "chords, multiple notes, arpeggio, melody, vocals, percussion, reverb",
+  },
+  effect: {
+    prompt: (text) => `A single isolated one-shot sound effect: ${text.trim()}. Sharp clear onset, expressive movement and natural decay. Dry and close, no background music or ambience, no repetition.`,
+    negative: "background score, drums, accompaniment, ambience, long reverb, repeated sound",
+  },
+};
 
 function validateWAV(wav) {
   if (wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") {
@@ -18,14 +27,14 @@ function validateWAV(wav) {
   return wav;
 }
 
-export async function generateLocalNote(prompt, directory, { run = promisify(execFile), signal = AbortSignal.timeout(45_000) } = {}) {
+export async function generateLocalSound(prompt, directory, { kind = "pitched", run = promisify(execFile), signal = AbortSignal.timeout(45_000) } = {}) {
+  const design = soundDesign[kind];
   const scratch = await mkdtemp(join(tmpdir(), "handstrudel-note-"));
   try {
     const output = join(scratch, "note.wav");
     // Never interpolate user input into a shell command.
     await run(join(directory, ".venv/bin/python"), [
-      "scripts/sa3_mlx.py", "--prompt", modelPrompt(prompt),
-      "--negative-prompt", "chords, multiple notes, arpeggio, melody, vocals, percussion, reverb",
+      "scripts/sa3_mlx.py", "--prompt", design.prompt(prompt), "--negative-prompt", design.negative,
       "--dit", "sm-music", "--decoder", "same-s", "--seconds", "2", "--cfg", "2.5", "--out", output,
     ], {
       cwd: directory, signal, maxBuffer: 256_000,
@@ -38,14 +47,14 @@ export async function generateLocalNote(prompt, directory, { run = promisify(exe
   }
 }
 
-export async function generateNote(prompt, key, { request = fetch, wait = sleep, signal = AbortSignal.timeout(85_000) } = {}) {
+export async function generateCloudSound(prompt, key, { kind = "pitched", request = fetch, wait = sleep, signal = AbortSignal.timeout(85_000) } = {}) {
   if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 400) throw new Error("Invalid sound prompt");
   const headers = { Authorization: `Bearer ${key}` };
   const body = new FormData();
   body.set("model", "stable-audio-3");
   body.set("duration", "2");
   body.set("output_format", "wav");
-  body.set("prompt", modelPrompt(prompt));
+  body.set("prompt", soundDesign[kind].prompt(prompt));
   const start = await request(`${service}/stable-audio/text-to-audio`, {
     method: "POST", headers: { ...headers, Accept: "application/json" }, body, signal, redirect: "error",
   });
@@ -82,7 +91,7 @@ export function soundLabServer(provider, generate, deadlineMs) {
       return reply(404, "Not found");
     }
     if (req.method === "GET" && req.url === "/status") {
-      return res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify({ provider }));
+      return res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify({ provider, protocolVersion: 2 }));
     }
     if (req.method !== "POST" || req.url !== "/generate" || req.headers["content-type"] !== "application/json") {
       return reply(404, "Not found");
@@ -99,12 +108,13 @@ export function soundLabServer(provider, generate, deadlineMs) {
         payload += chunk;
         if (payload.length > 4096) return reply(413, "Prompt too large");
       }
-      let prompt;
-      try { ({ prompt } = JSON.parse(payload)); }
+      let prompt, kind;
+      try { ({ prompt, kind } = JSON.parse(payload)); }
       catch { return reply(400, "Invalid prompt"); }
       if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 400) return reply(400, "Invalid prompt");
+      if (kind !== "pitched" && kind !== "effect") return reply(400, "Choose an instrument or one-shot effect.");
       const signal = AbortSignal.any([AbortSignal.timeout(deadlineMs), cancelled.signal]);
-      const wav = await generate(prompt, signal);
+      const wav = await generate(prompt, kind, signal);
       res.writeHead(200, { "Content-Type": "audio/wav", "Content-Length": wav.length, "Cache-Control": "no-store" }).end(wav);
     } catch {
       if (!cancelled.signal.aborted) reply(502, "The audio model failed to generate a WAV. Check the bridge terminal.");
@@ -117,8 +127,8 @@ export function soundLabServer(provider, generate, deadlineMs) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const directory = process.env.HANDSTRUDEL_AUDIO_MLX_DIR;
   const key = process.env.STABILITY_API_KEY;
-  const listen = (provider, generate, deadline) => soundLabServer(provider, async (prompt, signal) => {
-    try { return await generate(prompt, signal); }
+  const listen = (provider, generate, deadline) => soundLabServer(provider, async (prompt, kind, signal) => {
+    try { return await generate(prompt, kind, signal); }
     catch (error) {
       // execFile's message contains the command line and full prompt.
       console.error(`${provider}: ${error.name} (${error.code ?? "generation failed"})`, error.stderr?.trim().split("\n").at(-1) ?? "");
@@ -132,13 +142,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         "models/mlx/same_s_decoder_f32.npz", "models/mlx/t5gemma_f16.npz"]) {
         await access(join(directory, required));
       }
-      listen("stable-audio-local", (prompt, signal) => generateLocalNote(prompt, directory, { signal }), 45_000);
+      listen("stable-audio-local", (prompt, kind, signal) => generateLocalSound(prompt, directory, { kind, signal }), 45_000);
     } catch {
       console.error("HANDSTRUDEL_AUDIO_MLX_DIR must point to an installed Stable Audio 3 optimized/mlx directory.");
       process.exitCode = 1;
     }
   } else if (key) {
-    listen("stable-audio-cloud", (prompt, signal) => generateNote(prompt, key, { signal }), 85_000);
+    listen("stable-audio-cloud", (prompt, kind, signal) => generateCloudSound(prompt, key, { kind, signal }), 85_000);
   } else {
     console.error("Set HANDSTRUDEL_AUDIO_MLX_DIR for local generation or STABILITY_API_KEY for the paid API.");
     process.exitCode = 1;
