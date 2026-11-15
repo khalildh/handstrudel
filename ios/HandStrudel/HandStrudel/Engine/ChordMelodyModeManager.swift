@@ -115,6 +115,8 @@ final class ChordMelodyModeManager {
     private static let chordAbsentGraceFrames = 12  // ~200ms at 60fps
     private var melodyPinch = PinchDetector(on: 0.8, off: 0.5)
     private var heldMelodyMidi: Int? = nil
+    private var melodyHandMissingSince: TimeInterval?
+    private static let melodyMissingGrace: TimeInterval = 0.075
 
     /// When quantized, a chord-hand pinch is latched here and the strum accent
     /// is struck on the next grid boundary instead of immediately.
@@ -422,7 +424,8 @@ final class ChordMelodyModeManager {
         chordTones: (Int) -> [Int],
         melodyTones: (Int) -> [Int],
         quantize: Bool = false,
-        gridBoundaryCrossed: Bool = false
+        gridBoundaryCrossed: Bool = false,
+        now: TimeInterval = ProcessInfo.processInfo.systemUptime
     ) -> [Action] {
         var actions: [Action] = []
 
@@ -551,6 +554,11 @@ final class ChordMelodyModeManager {
         }
 
         if let h = melodyHand(hands), !melodySnapTargets.isEmpty {
+            if let missing = melodyHandMissingSince, now - missing >= Self.melodyMissingGrace,
+               let release = releaseTrackedMelody() {
+                actions.append(release)
+            }
+            melodyHandMissingSince = nil
             let reading = readMelodyHand(h, noteCount: melodySnapTargets.count)
             let laneIdx = min(melodySnapTargets.count - 1, max(0, reading.lane))
             // Scale mode passes a single octave of scale notes here and uses
@@ -596,12 +604,26 @@ final class ChordMelodyModeManager {
             case .idle:
                 break
             }
-        } else if melodyPinch.release() == .ended {
-            heldMelodyMidi = nil
-            actions.append(.melodyOff(hand: melodyHandName))
+        } else if melodyPinch.isPinching {
+            // Sustain an existing note across short Vision dropouts, but never
+            // create (or keep a pending quantized attack for) an unseen hand.
+            if heldMelodyMidi != nil, !melodySnapTargets.isEmpty {
+                let missing = melodyHandMissingSince ?? now
+                melodyHandMissingSince = missing
+                if now - missing < Self.melodyMissingGrace { return actions }
+            }
+            if let release = releaseTrackedMelody() { actions.append(release) }
         }
 
         return actions
+    }
+
+    private func releaseTrackedMelody() -> Action? {
+        melodyHandMissingSince = nil
+        melodyPinch.release()
+        guard heldMelodyMidi != nil else { return nil }
+        heldMelodyMidi = nil
+        return .melodyOff(hand: melodyHandName)
     }
 
     // Last-known indices, used when the hand briefly leaves the camera frame
