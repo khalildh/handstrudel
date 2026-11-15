@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ControlSheet: View {
     @Environment(\.studioPalette) private var palette
@@ -1484,13 +1485,19 @@ struct SoundSetupsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var setups = PersistenceManager.shared.loadSetups()
     @State private var name = ""
+    @State private var choosingImport = false
+    @State private var showingImportReview = false
+    @State private var pendingImport: SoundPresetPack?
+    @State private var showingExport = false
+    @State private var exportDocument: SoundPresetFile?
+    @State private var message: String?
 
     private var cleanName: String { String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40)) }
 
     var body: some View {
         NavigationStack {
             List {
-                if engine.isRunning, let sound = engine.currentSoundSetup, sound.isValid {
+                if let sound = engine.soundSetupForSaving, sound.isValid {
                     Section("Current sound") {
                         TextField("Preset name", text: $name)
                             .accessibilityIdentifier("preset-name")
@@ -1523,11 +1530,26 @@ struct SoundSetupsView: View {
                             }
                         }
                         .disabled(locked || !setup.sound.isValid)
+                        .contextMenu {
+                            Button("Export this preset", systemImage: "square.and.arrow.up") { export([setup]) }
+                                .disabled(!setup.sound.isValid)
+                        }
                     }
                     .onDelete { indices in
                         setups.remove(atOffsets: indices)
                         PersistenceManager.shared.saveSetups(setups)
                     }
+                }
+                Section {
+                    Button("Import preset file", systemImage: "square.and.arrow.down") { choosingImport = true }
+                        .accessibilityIdentifier("preset-import")
+                    Button("Export all presets", systemImage: "square.and.arrow.up") { export(setups) }
+                        .accessibilityIdentifier("preset-export")
+                        .disabled(setups.isEmpty)
+                } header: {
+                    Text("Move or back up presets")
+                } footer: {
+                    Text("Files carry your sound settings, not recordings or purchased sound packs.")
                 }
             }
             .navigationTitle("Presets")
@@ -1537,5 +1559,64 @@ struct SoundSetupsView: View {
             }
         }
         .tint(palette.accent)
+        .fileImporter(isPresented: $choosingImport, allowedContentTypes: [.json]) { result in
+            switch result {
+            case .success(let url):
+                Task {
+                    do {
+                        pendingImport = try await Task.detached(priority: .userInitiated) { try SoundPresetPack.read(from: url) }.value
+                        showingImportReview = true
+                    } catch { message = error.localizedDescription }
+                }
+            case .failure(let error): message = error.localizedDescription
+            }
+        }
+        .fileExporter(isPresented: $showingExport, document: exportDocument,
+                      contentType: .json, defaultFilename: "HandStrudel Presets") { result in
+            if case .failure(let error) = result { message = error.localizedDescription }
+            exportDocument = nil
+        }
+        .confirmationDialog("Import HandStrudel presets?", isPresented: $showingImportReview, titleVisibility: .visible) {
+            Button("Import presets") {
+                guard let pendingImport else { return }
+                self.pendingImport = nil
+                do {
+                    let count = try PersistenceManager.shared.importPresetPack(pendingImport)
+                    setups = PersistenceManager.shared.loadSetups()
+                    message = count == 0 ? "These presets are already saved on this device." : "Imported \(count) of \(pendingImport.presets.count) presets."
+                } catch { message = error.localizedDescription }
+            }
+            Button("Cancel", role: .cancel) { pendingImport = nil }
+        } message: {
+            if let pendingImport {
+                Text("This file contains \(pendingImport.presets.count) presets. Existing presets won't be replaced.")
+            }
+        }
+        .alert("Presets", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(message ?? "") }
+    }
+
+    private func export(_ setups: [NamedSoundSetup]) {
+        do {
+            exportDocument = SoundPresetFile(data: try SoundPresetPack(setups).encoded())
+            showingExport = true
+        } catch { message = error.localizedDescription }
+    }
+}
+
+private struct SoundPresetFile: FileDocument {
+    static let readableContentTypes: [UTType] = [.json]
+    let data: Data
+
+    init(data: Data) { self.data = data }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else { throw CocoaError(.fileReadCorruptFile) }
+        self.data = data
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
     }
 }

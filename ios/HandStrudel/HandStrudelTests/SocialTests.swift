@@ -497,6 +497,53 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(setups.first?.sound.presetDetails, "D Minor · 100 BPM · 1-4-5")
     }
 
+    @MainActor
+    func testPresetPackRoundTripsWithoutReplacingPresetsOrUnlockingPacks() throws {
+        let suite = "pack-test-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let target = PersistenceManager(defaults: defaults)
+        let premiumInstrument = try XCTUnwrap(SOUNDFONT_INSTRUMENTS.first { $0.packId != nil })
+        let sound = SoundSetup(instrument: premiumInstrument.id, waveform: "sine", key: .D, scale: .minor,
+                               progression: "custom", customDegrees: [0, 3, 4], mode: .scalechordmelody,
+                               bpm: 100, useSoundFont: true, autoStrum: true, padVolume: 0.3, gridOctave: 3, gridRange: 2)
+        XCTAssertTrue(target.addPreset(sound, named: "Existing"))
+        let existingID = target.loadSetups().first?.id
+        let portable = NamedSoundSetup(id: UUID(), name: "Portable", sound: sound)
+        let data = try SoundPresetPack([portable, portable]).encoded()
+        let pack = try SoundPresetPack.decode(data)
+        XCTAssertEqual(try target.importPresetPack(pack), 1)
+        XCTAssertEqual(try target.importPresetPack(pack), 0)
+        let saved = target.loadSetups()
+        XCTAssertEqual(saved.map(\.name), ["Portable", "Existing"])
+        XCTAssertEqual(saved.last?.id, existingID)
+        XCTAssertNotEqual(saved.first?.id, portable.id)
+        XCTAssertEqual(saved.first?.sound.requiredPacks, sound.requiredPacks)
+        XCTAssertFalse(EngineController().applySoundSetup(sound, store: StoreManager()))
+
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        payload["version"] = 2
+        XCTAssertThrowsError(try SoundPresetPack.decode(JSONSerialization.data(withJSONObject: payload)))
+        XCTAssertThrowsError(try SoundPresetPack.decode(Data(repeating: 32, count: SoundPresetPack.byteLimit + 1)))
+        XCTAssertThrowsError(try SoundPresetPack([NamedSoundSetup(id: UUID(), name: " ", sound: sound)]))
+        XCTAssertEqual(target.loadSetups().count, 2)
+    }
+
+    @MainActor
+    func testMusicHomeCanSaveTheSelectedScaleWheelBeforeStarting() throws {
+        let engine = EngineController()
+        engine.selectedKey = .E
+        engine.selectedScale = .major
+        engine.scaleUseSoundFont = true
+        engine.chordMelodyProgression = try XCTUnwrap(ChordProgression.parse("2 5 1"))
+        let sound = try XCTUnwrap(engine.soundSetupForSaving)
+        XCTAssertFalse(engine.isRunning)
+        XCTAssertEqual(sound.mode, .scalechordmelody)
+        XCTAssertEqual(sound.key, .E)
+        XCTAssertEqual(sound.customDegrees, [1, 4, 0])
+        XCTAssertTrue(sound.isValid)
+    }
+
     func testPlayAlongCountInUsesFourBeatsAndScalesForHalfSpeed() throws {
         let regular = RecordingCountIn(sourceBPM: 120, halfSpeed: false)
         let halfSpeed = RecordingCountIn(sourceBPM: 120, halfSpeed: true)
