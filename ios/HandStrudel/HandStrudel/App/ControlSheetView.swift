@@ -29,7 +29,7 @@ struct ControlSheet: View {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
                     sectionHeader("PLAY INPUT", icon: "hand.tap")
-                    StudioInputPicker(selection: $playInput)
+                    StudioInputPicker(selection: $playInput, tracker: engine.handTracker)
                 }
                 sectionDivider
 
