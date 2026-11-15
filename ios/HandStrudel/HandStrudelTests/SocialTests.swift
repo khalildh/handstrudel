@@ -926,6 +926,50 @@ final class SocialTests: XCTestCase {
     }
 
     @MainActor
+    func testHalfSpeedDraftVideoPreservesMusicalPitch() async throws {
+        guard let fixture = ProcessInfo.processInfo.environment["HANDSTRUDEL_HALF_SPEED_AUDIO_FIXTURE"] else {
+            throw XCTSkip("Set TEST_RUNNER_HANDSTRUDEL_HALF_SPEED_AUDIO_FIXTURE to a four-second video with an A440 tone.")
+        }
+        let files = FileManager.default
+        let directory = files.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? files.removeItem(at: directory) }
+        let drafts = RecordingDrafts(directory: directory)
+        let draft = try drafts.begin(instrument: nil, mode: nil, halfSpeed: true)
+        let source = drafts.videoURL(for: draft.id)
+        let original = try Data(contentsOf: URL(fileURLWithPath: fixture))
+        try original.write(to: source)
+        try drafts.complete(draft)
+
+        let video = try await drafts.makeExport(for: draft)
+        defer { video.remove() }
+        let asset = AVURLAsset(url: video.url)
+        let duration = try await asset.load(.duration).seconds
+        XCTAssertEqual(duration, 2, accuracy: 0.1)
+        XCTAssertFalse(try Data(contentsOf: video.url).isEmpty)
+        XCTAssertEqual(try Data(contentsOf: source), original)
+
+        // Decode the audio stream from the finished MP4, not a parallel render.
+        let extractor = try XCTUnwrap(AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A))
+        let audio = directory.appendingPathComponent("decoded-audio.m4a")
+        extractor.outputURL = audio
+        extractor.outputFileType = .m4a
+        await extractor.export()
+        XCTAssertEqual(extractor.status, .completed, extractor.error?.localizedDescription ?? "")
+        let file = try AVAudioFile(forReading: audio)
+        let rate = file.processingFormat.sampleRate
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                                   frameCapacity: AVAudioFrameCount(min(file.length, 192_000))))
+        try file.read(into: buffer)
+        let channel = try XCTUnwrap(buffer.floatChannelData)[0]
+        let range = Int(rate * 0.5)..<Int(rate * 1.5)
+        guard range.upperBound < Int(buffer.frameLength) else { return XCTFail("Missing the center audio") }
+        let crossings = range.filter { channel[$0 - 1] <= 0 && channel[$0] > 0 }.count
+        let peak = range.map { abs(channel[$0]) }.max() ?? 0
+        XCTAssertGreaterThan(peak, 0.01)
+        XCTAssertEqual(Double(crossings) * rate / Double(range.count), 440, accuracy: 15)
+    }
+
+    @MainActor
     func testHalfSpeedTempoUpdatesDrumTracksAndRestoresNormalTempo() {
         let engine = EngineController()
         engine.selectedDrumLoop = DRUM_LOOPS[1]
