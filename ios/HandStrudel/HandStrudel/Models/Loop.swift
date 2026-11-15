@@ -19,10 +19,24 @@ struct RecordedLoop: Identifiable, Codable {
     let events: [LoopEvent]
     let duration: Double     // total loop length in seconds
     let bpm: Double
-    let name: String
+    var name: String
     let mode: String         // "grid", "drum", "melodic"
     let createdAt: Date
     var hasCapturedAudio: Bool? = nil
+    var gain: Double? = nil
+    var muted: Bool? = nil
+
+    var playbackGain: Double { Self.clampedGain(gain ?? 1) }
+    var effectiveGain: Double { muted == true ? 0 : playbackGain }
+
+    static func clampedGain(_ value: Double) -> Double {
+        value.isFinite ? min(1, max(0, value)) : 1
+    }
+
+    static func cleanName(_ value: String) -> String {
+        let singleLine = value.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }
+        return String(String(String.UnicodeScalarView(singleLine)).trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
+    }
 
     init(id: UUID = UUID(), events: [LoopEvent], duration: Double, bpm: Double, name: String, mode: String) {
         self.id = id

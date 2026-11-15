@@ -112,6 +112,14 @@ final class PersistenceManager {
 
     // MARK: - Loops
 
+    var lastLoopBars: Int {
+        get {
+            let stored = defaults.integer(forKey: "loopRecordingBars")
+            return LoopRecorder.barOptions.contains(stored) ? stored : 4
+        }
+        set { if LoopRecorder.barOptions.contains(newValue) { defaults.set(newValue, forKey: "loopRecordingBars") } }
+    }
+
     func saveLoops(_ loops: [RecordedLoop]) {
         if let data = try? JSONEncoder().encode(loops) {
             defaults.set(data, forKey: loopsKey)
