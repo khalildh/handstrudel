@@ -4,6 +4,7 @@ struct ControlSheet: View {
     @Environment(\.studioPalette) private var palette
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
+    @Binding var playInput: StudioPlayInput
     @Binding var hideSkeletonWhenRecording: Bool
     @Binding var recordPerformanceMicrophone: Bool
     @State private var showStore = false
@@ -42,6 +43,12 @@ struct ControlSheet: View {
                         .overlay(Capsule().stroke(palette.ink.opacity(0.12), lineWidth: 0.5))
                     }
                 }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    sectionHeader("PLAY INPUT", icon: "hand.tap")
+                    StudioInputPicker(selection: $playInput)
+                }
+                sectionDivider
 
                 if hasModeContextControls {
                     modeSection

@@ -2,6 +2,13 @@ import SwiftUI
 import QuartzCore
 import AVFAudio
 
+enum StudioPlayInput: String, CaseIterable, Identifiable {
+    case air, touch
+
+    var id: Self { self }
+    var label: String { self == .air ? "Air + touch" : "Touch only" }
+}
+
 struct Waveform: Identifiable {
     let id: String
     let name: String
@@ -378,10 +385,13 @@ final class EngineController: ObservableObject {
     private var structTimer: Timer?
     private(set) var startTime: Date?
 
-    func start(config: MappingConfig, advanced: Bool) {
+    @Published private(set) var playInput: StudioPlayInput = .air
+
+    func start(config: MappingConfig, advanced: Bool, input: StudioPlayInput = .air) {
         debugLog("start() called")
         self.config = config
         self.advanced = advanced
+        playInput = input
 
         // Always start in melodic mode
         learnModeEnabled = false
@@ -391,11 +401,14 @@ final class EngineController: ObservableObject {
         rawParams = defs
         smoothed = defs
 
-        // UITesting bypass: skip audio/camera, just show the UI
+        #if DEBUG
+        // UI tests never invoke AVFoundation's camera permission prompt.
         if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            startCameraIfRequested()
             isRunning = true
             return
         }
+        #endif
 
         status = "initialising strudel..."
         debugLog("status set to initialising")
@@ -419,15 +432,10 @@ final class EngineController: ObservableObject {
                 strudelBridge.evaluate(code)
                 lastStructKey = String(structIdx)
 
-                debugLog("requesting camera...")
-                status = "requesting camera..."
-
-                // Start camera + hand tracking
                 handTracker.onHandsUpdate = { [weak self] hands in
                     self?.handleHandsUpdate(hands)
                 }
-                handTracker.startSession()
-                debugLog("camera started")
+                startCameraIfRequested()
 
                 // Beat callback
                 strudelBridge.onBeat = { [weak self] beat in
@@ -458,7 +466,7 @@ final class EngineController: ObservableObject {
                 startTimers()
 
                 debugLog("all started, setting isRunning=true")
-                status = "running -- wave your hands"
+                status = playInput == .air ? "running -- wave your hands" : "running -- touch the wheel"
                 isRunning = true
                 jamSession.replayRemoteVoices()
             } catch {
@@ -468,10 +476,37 @@ final class EngineController: ObservableObject {
         }
     }
 
+    func setPlayInput(_ input: StudioPlayInput) {
+        guard input != playInput else { return }
+        playInput = input
+        guard isRunning else { return }
+        if input == .air {
+            startCameraIfRequested()
+        } else {
+            handTracker.stopSession()
+            currentHands = HandsState()
+            handsState = HandsState()
+            silenceAll()
+        }
+    }
+
+    func startCameraIfRequested() {
+        guard playInput == .air else { return }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            if ProcessInfo.processInfo.arguments.contains("--uitest-camera-denied") {
+                handTracker.simulatePermissionDeniedForUITest()
+            }
+            return
+        }
+        #endif
+        handTracker.startSession()
+    }
+
     private nonisolated func handleHandsUpdate(_ hands: HandsState) {
         // Called from background processingQueue — dispatch to main for @MainActor state
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
+            guard let self, self.playInput == .air else { return }
             self.currentHands = hands
             // Skip param mapping in grid/drum mode — hands control notes/hits, not synth params
             if !self.gridModeEnabled && !self.drumModeEnabled {
