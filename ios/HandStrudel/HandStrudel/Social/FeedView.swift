@@ -1,5 +1,6 @@
 import AVFoundation
 import AVKit
+import Combine
 import SwiftUI
 import UIKit
 
@@ -1316,15 +1317,43 @@ private struct FeedCell: View {
     let source: (UUID) -> Void
     @State private var paused = false
     @State private var confirmDelete = false
+    @State private var failedClipID: UUID?
+    @State private var playbackAttempt = 0
+
+    private var playbackFailed: Bool { failedClipID == video.id }
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            LoopingPlayer(url: video.videoURL, thumb: video.thumbURL, playing: isCurrent && !paused, muted: muted)
-                .allowsHitTesting(false)
-            Color.clear.contentShape(Rectangle()).onTapGesture { paused.toggle() }
+            LoopingPlayer(url: video.videoURL, thumb: video.thumbURL,
+                          playing: isCurrent && !paused && !playbackFailed, muted: muted) {
+                failedClipID = video.id
+            }
+            .id(playbackAttempt)
+            .allowsHitTesting(false)
+            Color.clear.contentShape(Rectangle()).onTapGesture {
+                if !playbackFailed { paused.toggle() }
+            }
             LinearGradient(colors: [.clear, .black.opacity(0.88)], startPoint: .center, endPoint: .bottom)
                 .allowsHitTesting(false)
-            if paused {
+            if isCurrent && playbackFailed {
+                VStack(spacing: 8) {
+                    Text("Couldn't play this video.")
+                        .font(.subheadline.weight(.semibold))
+                    Button("Retry video") {
+                        failedClipID = nil
+                        paused = false
+                        playbackAttempt += 1
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(palette.mediaAccent)
+                    .foregroundStyle(palette.mediaOnAccent)
+                    .accessibilityIdentifier("feed-retry-video")
+                }
+                .foregroundStyle(.white)
+                .padding(12)
+                .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 12))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if paused && !playbackFailed {
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: 54))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1406,7 +1435,11 @@ private struct FeedCell: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 15).padding(.bottom, 16)
         }
-        .accessibilityAction(named: Text(paused ? "Play video" : "Pause video")) { paused.toggle() }
+        .accessibilityActions {
+            if !playbackFailed {
+                Button(paused ? "Play video" : "Pause video") { paused.toggle() }
+            }
+        }
         .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive, action: delete)
         }
@@ -1550,22 +1583,78 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
 
 // MARK: - Looping video
 
+@MainActor
+final class FeedClipFailureMonitor {
+    private let player: AVQueuePlayer
+    private var onFailure: (() -> Void)?
+    private var observations: [NSKeyValueObservation] = []
+    private var itemStatus: NSKeyValueObservation?
+    private var itemEndFailure: AnyCancellable?
+
+    init(player: AVQueuePlayer, looper: AVPlayerLooper, onFailure: @escaping () -> Void) {
+        self.player = player
+        self.onFailure = onFailure
+        // The typed KVO payload can omit these Objective-C enum values.
+        observations = [
+            looper.observe(\.status, options: [.initial]) { @Sendable [weak self] looper, _ in
+                if looper.status == .failed { self?.scheduleFailure() }
+            },
+            player.observe(\.status, options: [.initial]) { @Sendable [weak self] player, _ in
+                if player.status == .failed { self?.scheduleFailure() }
+            },
+            player.observe(\.currentItem) { @Sendable [weak self] _, _ in
+                DispatchQueue.main.async { [weak self] in self?.observeCurrentItem() }
+            }
+        ]
+        observeCurrentItem()
+    }
+
+    private func observeCurrentItem() {
+        itemStatus = nil
+        itemEndFailure = nil
+        // The looper plays replicas, not the template item.
+        guard onFailure != nil, let item = player.currentItem else { return }
+        itemStatus = item.observe(\.status, options: [.initial]) { @Sendable [weak self] item, _ in
+            if item.status == .failed { self?.scheduleFailure(for: item) }
+        }
+        itemEndFailure = NotificationCenter.default
+            .publisher(for: AVPlayerItem.failedToPlayToEndTimeNotification, object: item)
+            .sink { @Sendable [weak self, weak item] _ in
+                if let item { self?.scheduleFailure(for: item) }
+            }
+    }
+
+    nonisolated private func scheduleFailure(for item: AVPlayerItem? = nil) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let report = self.onFailure else { return }
+            if let item, self.player.currentItem !== item { return }
+            self.onFailure = nil
+            self.observations.removeAll()
+            self.itemStatus = nil
+            self.itemEndFailure = nil
+            report()
+        }
+    }
+}
+
 private struct LoopingPlayer: UIViewRepresentable {
     let url: URL
     let thumb: URL
     let playing: Bool
     let muted: Bool
+    let onFailure: () -> Void
 
     func makeUIView(context: Context) -> PlayerView { PlayerView() }
 
     func updateUIView(_ view: PlayerView, context: Context) {
+        view.onFailure = onFailure
         view.load(url: url, thumb: thumb)
         view.player?.isMuted = muted
         if playing { view.player?.play() } else { view.player?.pause() }
     }
 
     static func dismantleUIView(_ view: PlayerView, coordinator: ()) {
-        view.player?.pause()
+        view.stopObservingAndPause()
     }
 
     final class PlayerView: UIView {
@@ -1573,8 +1662,10 @@ private struct LoopingPlayer: UIViewRepresentable {
         private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
         private let thumbView = UIImageView()
         private var looper: AVPlayerLooper?
+        private var failureMonitor: FeedClipFailureMonitor?
         private(set) var player: AVQueuePlayer?
         private var loadedURL: URL?
+        var onFailure: (() -> Void)?
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -1592,6 +1683,7 @@ private struct LoopingPlayer: UIViewRepresentable {
 
         func load(url: URL, thumb: URL) {
             guard url != loadedURL else { return }
+            stopObservingAndPause()
             loadedURL = url
             thumbView.image = nil
             thumbView.isHidden = false
@@ -1601,9 +1693,19 @@ private struct LoopingPlayer: UIViewRepresentable {
             }.resume()
             let item = AVPlayerItem(url: url)
             let q = AVQueuePlayer()
-            looper = AVPlayerLooper(player: q, templateItem: item)
+            let looper = AVPlayerLooper(player: q, templateItem: item)
+            self.looper = looper
             player = q
             playerLayer.player = q
+            failureMonitor = FeedClipFailureMonitor(player: q, looper: looper) { [weak self] in
+                self?.player?.pause()
+                self?.onFailure?()
+            }
+        }
+
+        func stopObservingAndPause() {
+            failureMonitor = nil
+            player?.pause()
         }
 
         override func observeValue(forKeyPath keyPath: String?, of object: Any?,
