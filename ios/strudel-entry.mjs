@@ -60,24 +60,6 @@ window.initStrudel = async function() {
             checkBeat();
         }
 
-        // Load drum samples via Strudel's evaluate (runs in sandboxed scope where samples() lives)
-        log('loading drum samples...');
-        try {
-            await _evaluate(`samples('github:tidalcycles/Dirt-Samples/master')`);
-            log('drum samples loaded via evaluate');
-        } catch (e) {
-            log('evaluate samples error: ' + e);
-            // Fallback: try globalThis
-            try {
-                if (typeof globalThis.samples === 'function') {
-                    await globalThis.samples('github:tidalcycles/Dirt-Samples/master');
-                    log('drum samples loaded via globalThis');
-                }
-            } catch (e2) {
-                log('globalThis samples also failed: ' + e2);
-            }
-        }
-
         // Load pitched-instrument samples that ship in the app bundle. The
         // manifest + audio live under Resources/instrument-samples and are
         // served to JS via the app-samples:// URL scheme handler in Swift.
@@ -90,12 +72,23 @@ window.initStrudel = async function() {
 
         _ready = true;
         log('strudel ready');
+        void loadRemoteDrumCatalog();
         return 'ok';
     } catch (e) {
         log('initStrudel FAILED: ' + e);
         throw e;
     }
 };
+
+async function loadRemoteDrumCatalog() {
+    // A slow catalog must not block the local synths or replace the current pattern.
+    try {
+        await strudelWebaudio.samples('github:tidalcycles/Dirt-Samples/master');
+        log('drum samples loaded');
+    } catch (error) {
+        log('remote drum catalog unavailable: ' + error);
+    }
+}
 
 window.strudelEval = async function(code) {
     if (_evaluate) {
