@@ -1436,6 +1436,9 @@ struct ContentView: View {
                             Circle().fill(engine.gridOctaveRange == range ? Color.green : Color.white.opacity(0.1))
                         )
                 }
+                .accessibilityLabel(range == 1 ? "One octave" : "\(range) octaves")
+                .accessibilityIdentifier("grid-range-\(range)")
+                .accessibilityAddTraits(engine.gridOctaveRange == range ? .isSelected : [])
             }
         }
         .padding(.horizontal, 8)
