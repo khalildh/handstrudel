@@ -86,7 +86,7 @@ final class HandStrudelUITests: XCTestCase {
 
     func testStartOverlay_showsSubtitle() {
         launchToStart()
-        XCTAssertTrue(app.staticTexts["Move your hands to make music."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Play music with a gesture or a touch."].waitForExistence(timeout: 5))
     }
 
     func testAppearanceSwitchesAndPersistsAfterRelaunch() {
