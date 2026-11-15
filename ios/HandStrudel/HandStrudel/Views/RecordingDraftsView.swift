@@ -107,43 +107,40 @@ final class RecordingDrafts: ObservableObject {
         try JSONEncoder().encode(draft).write(to: metadataURL(for: draft.id), options: .atomic)
     }
 
-    func makeExport(for draft: RecordingDraft, audioOnly: Bool = false) async throws -> URL {
+    func makeExport(for draft: RecordingDraft, audioOnly: Bool = false) async throws -> RecordingDraftExport {
         let source = videoURL(for: draft.id)
         let asset = AVURLAsset(url: source)
         let duration = try await asset.load(.duration).seconds
         guard duration.isFinite, duration > 0 else { throw DraftError.unreadable }
         let start = draft.trimStart ?? 0
         let end = draft.trimEnd ?? duration
-        let suffix = audioOnly ? "m4a" : "mp4"
-        let output = files.temporaryDirectory.appending(path: "HandStrudel-\(UUID()).\(suffix)")
         if audioOnly, try await asset.loadTracks(withMediaType: .audio).isEmpty {
             throw DraftError.noAudio
         }
-        if !audioOnly, draft.outputScale == 1, start == 0, end == duration {
-            try files.copyItem(at: source, to: output)
-            return output
-        }
         guard start.isFinite, end.isFinite, start >= 0, end <= duration, end > start else { throw DraftError.unreadable }
-        let range = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 600),
-                                end: CMTime(seconds: end, preferredTimescale: 600))
-        let exportAsset: AVAsset
-        if draft.outputScale < 1 {
-            exportAsset = try await Self.scaledAsset(asset, range: range, scale: draft.outputScale)
-        } else {
-            exportAsset = asset
+        return try await RecordingDraftExport.prepare(audioOnly: audioOnly) { output in
+            if !audioOnly, draft.outputScale == 1, start == 0, end == duration {
+                try files.copyItem(at: source, to: output)
+                return
+            }
+            let range = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 600),
+                                    end: CMTime(seconds: end, preferredTimescale: 600))
+            let exportAsset: AVAsset
+            if draft.outputScale < 1 {
+                exportAsset = try await Self.scaledAsset(asset, range: range, scale: draft.outputScale)
+            } else {
+                exportAsset = asset
+            }
+            let preset = audioOnly ? AVAssetExportPresetAppleM4A : AVAssetExportPresetHighestQuality
+            guard let exporter = AVAssetExportSession(asset: exportAsset, presetName: preset) else { throw DraftError.unreadable }
+            exporter.outputURL = output
+            exporter.outputFileType = audioOnly ? .m4a : .mp4
+            if draft.outputScale == 1 { exporter.timeRange = range }
+            else { exporter.audioTimePitchAlgorithm = .spectral }
+            try Task.checkCancellation()
+            await exporter.export()
+            guard exporter.status == .completed else { throw exporter.error ?? DraftError.unreadable }
         }
-        let preset = audioOnly ? AVAssetExportPresetAppleM4A : AVAssetExportPresetHighestQuality
-        guard let exporter = AVAssetExportSession(asset: exportAsset, presetName: preset) else { throw DraftError.unreadable }
-        exporter.outputURL = output
-        exporter.outputFileType = audioOnly ? .m4a : .mp4
-        if draft.outputScale == 1 { exporter.timeRange = range }
-        else { exporter.audioTimePitchAlgorithm = .spectral }
-        await exporter.export()
-        guard exporter.status == .completed else {
-            try? files.removeItem(at: output)
-            throw exporter.error ?? DraftError.unreadable
-        }
-        return output
     }
 
     static func scaledAsset(_ asset: AVAsset, range: CMTimeRange, scale: Double) async throws -> AVComposition {
@@ -165,6 +162,30 @@ final class RecordingDrafts: ObservableObject {
                                    toDuration: CMTimeMultiplyByFloat64(composition.duration, multiplier: scale))
         return composition
     }
+}
+
+// Owns only a temporary copy, never the draft's source file.
+final class RecordingDraftExport: Identifiable {
+    let url: URL
+    var id: URL { url }
+
+    private init(url: URL) { self.url = url }
+
+    @MainActor
+    static func prepare(in directory: URL = FileManager.default.temporaryDirectory, audioOnly: Bool,
+                        write: @MainActor (URL) async throws -> Void) async throws -> RecordingDraftExport {
+        try Task.checkCancellation()
+        let suffix = audioOnly ? "m4a" : "mp4"
+        let export = RecordingDraftExport(url: directory.appending(path: "HandStrudel-\(UUID()).\(suffix)"))
+        try await write(export.url)
+        // A writer may finish even after the editor goes away.
+        try Task.checkCancellation()
+        return export
+    }
+
+    func remove() { try? FileManager.default.removeItem(at: url) }
+
+    deinit { remove() }
 }
 
 private enum DraftError: LocalizedError {
@@ -243,13 +264,14 @@ private struct RecordingDraftEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer?
     @State private var duration = 0.0
-    @State private var busy = false
+    @State private var exportTask: Task<Void, Never>?
     @State private var message: String?
     @State private var confirmDelete = false
-    @State private var sharing: URL?
-    @State private var posting: URL?
-    @State private var pendingPost: URL?
+    @State private var sharing: RecordingDraftExport?
+    @State private var posting: RecordingDraftExport?
+    @State private var pendingPost: RecordingDraftExport?
     @State private var signIn = false
+    private var busy: Bool { exportTask != nil }
 
     var body: some View {
         ScrollView {
@@ -278,9 +300,9 @@ private struct RecordingDraftEditor: View {
                     }
                     if SocialConfig.isConfigured {
                         Button("Post") {
-                            export { url in
-                                if auth.isSignedIn && !auth.needsProfileSetup { posting = url }
-                                else { pendingPost = url; signIn = true }
+                            export { copy in
+                                if auth.isSignedIn && !auth.needsProfileSetup { posting = copy }
+                                else { pendingPost = copy; signIn = true }
                             }
                         }
                     }
@@ -316,25 +338,27 @@ private struct RecordingDraftEditor: View {
                 seek(to: draft.trimStart ?? 0)
             } catch { message = error.localizedDescription }
         }
-        .onDisappear { player?.pause() }
-        .interactiveDismissDisabled(busy)
-        .sheet(item: $sharing) { url in
-            ShareSheet(activityItems: [url])
-                .onDisappear { removeExport(url) }
+        .onDisappear {
+            player?.pause()
+            exportTask?.cancel()
         }
-        .sheet(item: $posting) { url in
-            PostComposerView(clip: url, instrument: draft.instrument, mode: draft.mode, soundSetup: draft.soundSetup,
+        .interactiveDismissDisabled(busy)
+        .sheet(item: $sharing) { copy in
+            ShareSheet(activityItems: [copy.url])
+                .onDisappear(perform: copy.remove)
+        }
+        .sheet(item: $posting) { copy in
+            PostComposerView(clip: copy.url, instrument: draft.instrument, mode: draft.mode, soundSetup: draft.soundSetup,
                              backingCredit: draft.backingCredit, auth: auth) {
                 message = "Posted. The original is still in Private drafts."
                 onSuccessfulTake(draft.id)
             }
-            .onDisappear { removeExport(url) }
+            .onDisappear(perform: copy.remove)
         }
         .sheet(isPresented: $signIn, onDismiss: {
-            guard let url = pendingPost else { return }
+            guard let copy = pendingPost else { return }
             pendingPost = nil
-            if auth.isSignedIn && !auth.needsProfileSetup { posting = url }
-            else { removeExport(url) }
+            if auth.isSignedIn && !auth.needsProfileSetup { posting = copy }
         }) { SignInView(auth: auth) }
         .confirmationDialog("Delete this private draft?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete draft", role: .destructive) {
@@ -389,30 +413,34 @@ private struct RecordingDraftEditor: View {
         player?.seek(to: CMTime(seconds: time * draft.outputScale, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
-    private func export(audioOnly: Bool = false, _ use: @escaping (URL) async throws -> Void) {
+    private func export(audioOnly: Bool = false, _ use: @escaping @MainActor (RecordingDraftExport) async throws -> Void) {
         guard !busy else { return }
         player?.pause()
-        busy = true
         message = nil
-        Task {
-            defer { busy = false }
-            do { try await use(store.makeExport(for: draft, audioOnly: audioOnly)) }
-            catch { message = error.localizedDescription }
+        exportTask = Task {
+            defer { exportTask = nil }
+            do {
+                try Task.checkCancellation()
+                let copy = try await store.makeExport(for: draft, audioOnly: audioOnly)
+                try Task.checkCancellation()
+                try await use(copy)
+            } catch {
+                if !Task.isCancelled { message = error.localizedDescription }
+            }
         }
     }
 
-    private func saveToPhotos(_ url: URL) async throws {
-        defer { removeExport(url) }
+    private func saveToPhotos(_ copy: RecordingDraftExport) async throws {
+        defer { copy.remove() }
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        try Task.checkCancellation()
         guard status == .authorized || status == .limited else { throw DraftError.photosDenied }
+        let url = copy.url
         try await PHPhotoLibrary.shared().performChanges {
             PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: url, options: nil)
         }
+        try Task.checkCancellation()
         message = "Saved to Photos."
         onSuccessfulTake(draft.id)
-    }
-
-    private func removeExport(_ url: URL) {
-        try? FileManager.default.removeItem(at: url)
     }
 }
