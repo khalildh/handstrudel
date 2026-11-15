@@ -1,0 +1,48 @@
+name: Web checks
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "public/**"
+      - "tests/web/**"
+      - "ios/*strudel*.mjs"
+      - "ios/HandStrudel/HandStrudel/Resources/strudel-*"
+      - "package*.json"
+      - "next.config.*"
+      - "playwright.config.*"
+      - "tsconfig.json"
+      - ".github/workflows/web-checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build the static site
+        run: npm run build
+      - name: Verify the committed iOS Web Audio bundle
+        run: |
+          npm run bundle:ios-audio --if-present
+          git diff --exit-code -- ios/HandStrudel/HandStrudel/Resources/strudel-bundle.js
+      - name: Install Chromium and run available browser suites
+        shell: bash
+        run: |
+          if node -e 'const s = require("./package.json").scripts; process.exit(s["test:web"] || s["test:ios-web-audio"] ? 0 : 1)'; then
+            npx --no-install playwright install --with-deps --only-shell chromium
+            npm run test:web --if-present
+            npm run test:ios-web-audio --if-present
+          fi
