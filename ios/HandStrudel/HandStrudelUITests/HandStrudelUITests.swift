@@ -815,6 +815,20 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
     }
 
+    func testFollowingWithNoFollowsIsNotAConnectionError() throws {
+        try launchWithProfileFixture()
+        signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 12))
+        element("tab-feed").tap()
+        let following = app.segmentedControls.buttons["Following"].firstMatch
+        XCTAssertTrue(following.waitForExistence(timeout: 8))
+        following.tap()
+        XCTAssertTrue(app.staticTexts["You aren't following any creators yet"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["Try again"].exists)
+        app.buttons["Browse latest"].tap()
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 8))
+    }
+
     func testProfileCanRemoveExistingPhoto() throws {
         try launchWithProfileFixture()
         signInToProfile()

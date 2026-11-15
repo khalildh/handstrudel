@@ -95,6 +95,12 @@ createServer((request, response) => {
       }
       return response.writeHead(415).end();
     case "/rest/v1/videos": return send([]);
+    case "/rest/v1/following_videos":
+      if (process.env.FIXTURE_MISSING_FOLLOWING_VIEW === "1") {
+        return response.writeHead(404, { "Content-Type": "application/json" })
+          .end(JSON.stringify({ code: "PGRST205", message: "Missing joined view in this fixture." }));
+      }
+      return send(following ? [post] : []);
     case "/rest/v1/follows": {
       if (request.method === "POST" || request.method === "DELETE") {
         following = request.method === "POST";
