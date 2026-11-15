@@ -186,6 +186,21 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [revived], timeout: 8.5), .completed)
     }
 
+    func testWebOnlyStudioOpensThroughWKWebViewWhileDrumCatalogIsStalled() {
+        app.launchArguments = ["--uitesting", "--uitest-real-web-audio"]
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        let close = element("close-button")
+        XCTAssertTrue(close.waitForExistence(timeout: 15), "The actual WebAudio bridge should initialize without the drum catalog")
+        let onboarding = element("onboarding-got-it")
+        if onboarding.exists { onboarding.tap() }
+        XCTAssertTrue(element("settings-button").exists)
+        close.tap()
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+    }
+
     func testLoopShelfOpensBeforeStartingTheWheel() {
         app.launchArguments = ["--uitesting"]
         app.launch()
@@ -961,16 +976,7 @@ final class HandStrudelUITests: XCTestCase {
     func testLearnSongStartsWithTouchableLanes() {
         launchToSession()
         element("settings-button").tap()
-        let learn = element("mode-learn")
-        let scroll = app.scrollViews.firstMatch
-        for _ in 0..<8 {
-            if learn.isHittable { break }
-            let other = app.staticTexts["Other modes"].firstMatch
-            if !learn.exists, other.isHittable { other.tap() }
-            scroll.swipeUp()
-        }
-        XCTAssertTrue(learn.isHittable)
-        learn.tap()
+        switchToMode("mode-learn")
         let song = element("song-Twinkle Twinkle")
         XCTAssertTrue(song.waitForExistence(timeout: 5))
         song.tap()

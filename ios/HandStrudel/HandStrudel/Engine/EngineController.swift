@@ -415,7 +415,9 @@ final class EngineController: ObservableObject {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
         delayedWebFixture = arguments.contains("--uitest-delayed-web-audio")
-        if arguments.contains("--uitesting"), !delayedWebFixture {
+        let realWebFixture = arguments.contains("--uitest-real-web-audio")
+        if realWebFixture { switchMode(grid: false, drums: false, learn: false) }
+        if arguments.contains("--uitesting"), !delayedWebFixture, !realWebFixture {
             startCameraIfRequested()
             isRunning = true
             return

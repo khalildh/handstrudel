@@ -89,6 +89,17 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
 
         let contentController = WKUserContentController()
         contentController.add(self, name: "strudelBridge")
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--uitest-real-web-audio") {
+            let holdRemoteDrums = """
+            const fetchResource = window.fetch.bind(window);
+            window.fetch = (input, options) => String(input).includes('raw.githubusercontent.com/tidalcycles/Dirt-Samples/')
+              ? new Promise(() => {}) : fetchResource(input, options);
+            """
+            contentController.addUserScript(WKUserScript(source: holdRemoteDrums, injectionTime: .atDocumentStart,
+                                                         forMainFrameOnly: true))
+        }
+        #endif
         config.userContentController = contentController
 
         webView = WKWebView(frame: .zero, configuration: config)
