@@ -1528,19 +1528,18 @@ struct LoopShelfView: View {
             ShareSheet(activityItems: [url])
                 .onDisappear { try? FileManager.default.removeItem(at: url) }
         }
-        .alert("Rename loop", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
+        .alert("Rename loop", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } }),
+               presenting: renameTarget) { loop in
             TextField("Loop name", text: $nextName)
-            Button("Save") { if let id = renameTarget?.id { _ = engine.renameLoop(id, to: nextName) }; renameTarget = nil }
+            Button("Save") { _ = engine.renameLoop(loop.id, to: nextName) }
                 .disabled(RecordedLoop.cleanName(nextName).isEmpty)
-            Button("Cancel", role: .cancel) { renameTarget = nil }
+            Button("Cancel", role: .cancel) {}
         }
-        .confirmationDialog("Delete this loop?", isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), titleVisibility: .visible) {
-            Button("Delete loop", role: .destructive) {
-                if let id = deleteTarget?.id { engine.deleteLoop(id) }
-                deleteTarget = nil
-            }
-            Button("Cancel", role: .cancel) { deleteTarget = nil }
-        } message: { Text("Any WAV copies you've shared will stay where you saved them.") }
+        .confirmationDialog("Delete this loop?", isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
+                            titleVisibility: .visible, presenting: deleteTarget) { loop in
+            Button("Delete loop", role: .destructive) { engine.deleteLoop(loop.id) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in Text("Any WAV copies you've shared will stay where you saved them.") }
         .alert("Loops", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(message ?? "") }

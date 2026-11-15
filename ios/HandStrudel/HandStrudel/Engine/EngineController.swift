@@ -979,6 +979,33 @@ final class EngineController: ObservableObject {
         PersistenceManager.shared.saveLoops(savedLoops)
     }
 
+    #if DEBUG
+    func importLoopFixtureIfRequested() {
+        let process = ProcessInfo.processInfo
+        guard process.arguments.contains("--uitesting"),
+              let path = process.environment["HANDSTRUDEL_TEST_LOOP_CLIP"],
+              let token = process.environment["HANDSTRUDEL_TEST_LOOP_ID"],
+              let id = UUID(uuidString: token),
+              !savedLoops.contains(where: { $0.id == id }) else { return }
+        let source = URL(fileURLWithPath: path)
+        let destination = AudioExporter.capturedURL(id)
+        do {
+            let audio = try AVAudioFile(forReading: source)
+            let duration = Double(audio.length) / audio.fileFormat.sampleRate
+            guard duration.isFinite, duration > 0 else { return }
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: source, to: destination)
+            var loop = RecordedLoop(id: id, events: [], duration: duration, bpm: 120,
+                                    name: "Studio fixture \(id.uuidString.prefix(6))", mode: "scalechordmelody")
+            loop.hasCapturedAudio = true
+            savedLoops.insert(loop, at: 0)
+            persistLoops()
+        } catch {
+            debugLog("Loop fixture failed: \(error.localizedDescription)")
+        }
+    }
+    #endif
+
     func deleteLoop(_ loopId: UUID) {
         audioLoopPlayers.removeValue(forKey: loopId)?.stop()
         loopRecorder.removeLoop(loopId)
