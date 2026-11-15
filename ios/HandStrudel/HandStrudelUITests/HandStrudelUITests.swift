@@ -41,7 +41,7 @@ final class HandStrudelUITests: XCTestCase {
 
     /// Launch app with onboarding reset and start session
     private func launchToSessionWithOnboarding() {
-        app.launchArguments.append(contentsOf: ["--uitesting", "--reset-onboarding"])
+        app.launchArguments.append(contentsOf: ["--uitesting", "--reset-onboarding", "--reset-studio-input"])
         app.launch()
         let start = element("start-button")
         XCTAssertTrue(start.waitForExistence(timeout: 5))
@@ -670,6 +670,56 @@ final class HandStrudelUITests: XCTestCase {
         note.tap()
         XCTAssertTrue(app.staticTexts["Now try a pinch"].waitForExistence(timeout: 5))
         XCTAssertFalse(note.exists)
+    }
+
+    func testTouchOnlyStartsWithoutCameraAndRemembersChoice() {
+        app.launchArguments = ["--uitesting", "--reset-onboarding", "--reset-studio-input", "--uitest-camera-denied"]
+        app.launch()
+        let input = app.segmentedControls["studio-play-input"]
+        let touch = input.buttons["Touch only"]
+        XCTAssertTrue(touch.waitForExistence(timeout: 5))
+        if !touch.isHittable { app.swipeUp() }
+        touch.tap()
+        element("start-button").tap()
+        let note = element("onboarding-first-note")
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        note.tap()
+        XCTAssertTrue(app.staticTexts["Tap or slide to play"].exists)
+        element("onboarding-got-it").tap()
+        XCTAssertTrue(element("touch-camera-off").waitForExistence(timeout: 5))
+        XCTAssertFalse(element("camera-recovery-touch").exists)
+
+        app.terminate()
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        XCTAssertTrue(touch.waitForExistence(timeout: 5))
+        XCTAssertTrue(touch.isSelected)
+        if !touch.isHittable { app.swipeUp() }
+        input.buttons["Air + touch"].tap()
+    }
+
+    func testDeniedCameraCanSwitchToTouchWithoutLeavingSession() {
+        app.launchArguments = ["--uitesting", "--reset-onboarding", "--reset-studio-input", "--uitest-camera-denied"]
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        if !start.isHittable { app.swipeUp() }
+        start.tap()
+        let onboarding = element("onboarding-got-it")
+        XCTAssertTrue(onboarding.waitForExistence(timeout: 5))
+        onboarding.tap()
+        let fallback = app.buttons["camera-recovery-touch"]
+        XCTAssertTrue(fallback.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Open Settings"].exists)
+        fallback.tap()
+        XCTAssertTrue(element("touch-camera-off").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("close-button").exists)
+        XCTAssertFalse(fallback.exists)
+        element("close-button").tap()
+        let air = app.segmentedControls["studio-play-input"].buttons["Air + touch"]
+        XCTAssertTrue(air.waitForExistence(timeout: 5))
+        if !air.isHittable { app.swipeUp() }
+        air.tap()
     }
 
     func testOnboarding_gotItDismisses() {

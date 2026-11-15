@@ -13,6 +13,26 @@ struct StudioActionStyle: ButtonStyle {
     }
 }
 
+struct StudioInputPicker: View {
+    @Environment(\.studioPalette) private var palette
+    @Binding var selection: StudioPlayInput
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Picker("Play input", selection: $selection) {
+                ForEach(StudioPlayInput.allCases) { input in
+                    Text(input.label).tag(input)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("studio-play-input")
+            Text(selection == .air ? "Use gestures or tap. Gestures use the front camera." : "Play the wheel by touch. The camera stays off.")
+                .font(.caption)
+                .foregroundStyle(palette.muted)
+        }
+    }
+}
+
 struct StartOverlayView: View {
     @Environment(\.studioPalette) private var palette
     @Environment(\.scenePhase) private var scenePhase
@@ -20,6 +40,7 @@ struct StartOverlayView: View {
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
     let starting: Bool
+    @Binding var preferredInput: StudioPlayInput
     let onStart: () -> Void
     let onDrafts: () -> Void
     let onSetups: () -> Void
@@ -41,7 +62,10 @@ struct StartOverlayView: View {
                     title
                     heroCard
                     Spacer(minLength: 0)
-                    startButton
+                    VStack(alignment: .leading, spacing: 11) {
+                        StudioInputPicker(selection: $preferredInput).disabled(starting)
+                        startButton
+                    }
                     HStack {
                         Button(action: onDrafts) {
                             Label("Private drafts", systemImage: "film.stack")
@@ -164,7 +188,7 @@ struct StartOverlayView: View {
                     .font(.system(size: headlineSize, weight: .regular, design: .serif))
                     .tracking(-2)
                     .accessibilityAddTraits(.isHeader)
-                Text("Move your hands to make music.")
+                Text("Play music with a gesture or a touch.")
                     .font(.subheadline)
                     .foregroundStyle(palette.muted)
             }
