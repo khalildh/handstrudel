@@ -6,6 +6,30 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    @MainActor
+    func testAccountDeletionFailureIsUnconfirmedAndDoesNotSignOut() async {
+        var signOutCount = 0
+        let result = await AuthManager.performAccountDeletion(
+            request: { throw URLError(.timedOut) },
+            signOut: { signOutCount += 1 }
+        )
+
+        XCTAssertEqual(result, .unconfirmed)
+        XCTAssertEqual(signOutCount, 0)
+    }
+
+    @MainActor
+    func testAccountDeletionSignsOutAfterSuccessfulRequest() async {
+        var calls: [String] = []
+        let result = await AuthManager.performAccountDeletion(
+            request: { calls.append("delete") },
+            signOut: { calls.append("sign out") }
+        )
+
+        XCTAssertEqual(result, .deleted)
+        XCTAssertEqual(calls, ["delete", "sign out"])
+    }
+
     func testStudioPreviewFollowsSelectedKeyScaleAndChord() throws {
         let free = try XCTUnwrap(CHORD_PROGRESSIONS.first { $0.id == "free" })
         let secondDegree = try XCTUnwrap(ChordProgression.parse("2 5 1"))

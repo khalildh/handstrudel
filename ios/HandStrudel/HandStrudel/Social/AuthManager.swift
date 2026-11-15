@@ -178,16 +178,31 @@ final class AuthManager: NSObject, ObservableObject {
         _ = try? await Purchases.shared.logOut()
     }
 
+    enum AccountDeletionResult: Equatable {
+        case deleted
+        case unconfirmed
+    }
+
     /// Permanently deletes the account, its videos and files (App Store 5.1.1(v)).
-    func deleteAccount() async -> Bool {
+    func deleteAccount() async -> AccountDeletionResult {
+        await Self.performAccountDeletion(
+            request: { try await supabase.functions.invoke("delete-account") },
+            signOut: { await signOut() }
+        )
+    }
+
+    static func performAccountDeletion(
+        request: () async throws -> Void,
+        signOut: () async -> Void
+    ) async -> AccountDeletionResult {
         do {
-            try await supabase.functions.invoke("delete-account")
-            await signOut()
-            return true
+            try await request()
         } catch {
-            errorMessage = error.localizedDescription
-            return false
+            // A lost response doesn't establish whether the server completed deletion.
+            return .unconfirmed
         }
+        await signOut()
+        return .deleted
     }
 
     // MARK: Nonce helpers

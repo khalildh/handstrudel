@@ -18,6 +18,7 @@ struct ProfileView: View {
     @State private var pendingAction: (() -> Void)?
     @State private var confirmDeleteVideo: Video?
     @State private var confirmDeleteAccount = false
+    @State private var showAccountDeletionFailure = false
     @State private var showSignIn = false
     @State private var showBlocked = false
     @State private var showAppearance = false
@@ -33,6 +34,11 @@ struct ProfileView: View {
             header
                 .padding(.horizontal, 21)
                 .padding(.top, 9)
+                .alert("Couldn't confirm account deletion", isPresented: $showAccountDeletionFailure) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("Check your connection and try again. If the problem continues, choose Get help in Account settings.")
+                }
             if let profile = auth.profile, let username = profile.username, !auth.needsProfileSetup {
                 content(profile, username: username)
                     .id(profile.id)
@@ -70,7 +76,13 @@ struct ProfileView: View {
             }
         }
         .alert("Delete your account?", isPresented: $confirmDeleteAccount) {
-            Button("Delete forever", role: .destructive) { Task { _ = await auth.deleteAccount() } }
+            Button("Delete forever", role: .destructive) {
+                Task {
+                    if await auth.deleteAccount() == .unconfirmed {
+                        showAccountDeletionFailure = true
+                    }
+                }
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This permanently removes your profile, videos, and comments. It can't be undone.")
