@@ -53,20 +53,15 @@ export async function initializeStrudel(surface: HTMLElement) {
   // Audio tap for video recording: intercept all connections to audioCtx.destination
   // and mirror them to a MediaStreamAudioDestinationNode so we can capture audio.
   const recordingDest = audioCtx.createMediaStreamDestination();
-  const origConnect = AudioNode.prototype.connect as (
-    this: AudioNode,
-    destinationNode: AudioNode,
-    output?: number,
-    input?: number,
-  ) => AudioNode;
+  const origConnect = AudioNode.prototype.connect;
   const connectRecording = function (
     this: AudioNode,
     ...connectArgs: [AudioNode, number?, number?] | [AudioParam, number?]
   ): AudioNode | void {
-    const result = origConnect.apply(this, connectArgs as [AudioNode, number?, number?]);
+    const result = Reflect.apply(origConnect, this, connectArgs) as AudioNode | void;
     if (connectArgs[0] === audioCtx.destination) {
       try {
-        origConnect.call(this, recordingDest);
+        Reflect.apply(origConnect, this, [recordingDest]);
       } catch {
         /* already connected or incompatible — ignore */
       }
