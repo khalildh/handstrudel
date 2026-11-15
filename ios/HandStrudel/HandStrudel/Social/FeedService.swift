@@ -205,30 +205,47 @@ enum FeedService {
         )
     }
 
+    struct FollowingPage {
+        let videos: [Video]
+        var confirmedNoFollows = false
+    }
+
     static func followingPage(user: UUID, after last: Video? = nil,
-                              from: (String) -> PostgrestQueryBuilder = supabase.from) async throws -> [Video] {
+                              from: (String) -> PostgrestQueryBuilder = supabase.from) async throws -> FollowingPage {
+        struct Follow: Decodable { let followee_id: UUID }
+        func followsQuery() -> PostgrestFilterBuilder {
+            from("follows").select("followee_id").eq("follower_id", value: user.uuidString.lowercased())
+        }
+
+        let page: [Video]
         do {
-            return try await orderedPage(from("following_videos").select(), after: last)
+            page = try await orderedPage(from("following_videos").select(), after: last)
         } catch let error as PostgrestError where isMissingView(error) {
             // Query visible feed rows in bounded batches on deployments without the joined view.
-            struct Follow: Decodable { let followee_id: UUID }
             let batchSize = 100
             var afterAuthor: UUID?
             var newest: [Video] = []
+            var hasFollows = false
             repeat {
                 try Task.checkCancellation()
-                var query = from("follows").select("followee_id").eq("follower_id", value: user.uuidString.lowercased())
+                var query = followsQuery()
                 if let afterAuthor { query = query.gt("followee_id", value: afterAuthor.uuidString.lowercased()) }
                 let follows: [Follow] = try await query.order("followee_id", ascending: true)
                     .limit(batchSize).execute().value
                 guard !follows.isEmpty else { break }
+                hasFollows = true
                 let videos = from("feed_videos").select()
                     .in("user_id", values: follows.map { $0.followee_id.uuidString.lowercased() })
                 newest = newestFollowedPosts(newest, try await orderedPage(videos, after: last))
                 afterAuthor = follows.count == batchSize ? follows.last?.followee_id : nil
             } while afterAuthor != nil
-            return newest
+            return FollowingPage(videos: newest, confirmedNoFollows: last == nil && !hasFollows)
         }
+        guard last == nil, page.isEmpty else { return FollowingPage(videos: page) }
+        // An empty view can also mean followed creators have no visible posts.
+        // A failed metadata lookup doesn't turn a successful feed into an error.
+        let follows: [Follow]? = try? await followsQuery().limit(1).execute().value
+        return FollowingPage(videos: page, confirmedNoFollows: follows?.isEmpty == true)
     }
 
     private static func newestFollowedPosts(_ first: [Video], _ second: [Video]) -> [Video] {
