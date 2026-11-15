@@ -235,6 +235,46 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(studioPresets.waitForExistence(timeout: 5))
     }
 
+    func testSavedPresetStartsNativeWheelWithCameraOffWhileWebAudioIsDelayed() {
+        app.launchArguments = ["--uitesting", "--uitest-delayed-web-audio", "--reset-studio-input", "--uitest-camera-denied"]
+        app.launch()
+        let inputs = app.segmentedControls["studio-play-input"]
+        let touch = inputs.buttons["Touch only"]
+        XCTAssertTrue(touch.waitForExistence(timeout: 5))
+        if !touch.isHittable { app.swipeUp() }
+        touch.tap()
+        defer {
+            app.terminate()
+            app.launchArguments = ["--uitesting", "--reset-studio-input"]
+            app.launch()
+        }
+
+        let library = element("music-presets-button")
+        XCTAssertTrue(library.waitForExistence(timeout: 5))
+        if !library.isHittable { app.swipeUp() }
+        library.tap()
+        let name = "Touch preset \(UUID().uuidString.prefix(6))"
+        let field = app.textFields["preset-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(name)
+        app.buttons["Save current preset"].tap()
+        let preset = app.staticTexts[name]
+        XCTAssertTrue(preset.waitForExistence(timeout: 5))
+        preset.tap()
+
+        let close = element("close-button")
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        let onboarding = element("onboarding-got-it")
+        if onboarding.exists { onboarding.tap() }
+        XCTAssertTrue(element("touch-camera-off").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["wheel-chord-0"].exists)
+        XCTAssertFalse(element("camera-recovery-touch").exists)
+        close.tap()
+        XCTAssertTrue(touch.waitForExistence(timeout: 5))
+        XCTAssertTrue(touch.isSelected)
+    }
+
     func testFeed_commentsSheetOpensWithoutAccount() throws {
         guard let key = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCAL_COMMENTS_KEY"] else {
             throw XCTSkip("Requires the local Supabase comments fixture.")
