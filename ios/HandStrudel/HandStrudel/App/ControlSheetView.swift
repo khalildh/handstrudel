@@ -1540,22 +1540,24 @@ struct SoundSetupsView: View {
                         PersistenceManager.shared.saveSetups(setups)
                     }
                 }
-                Section {
-                    Button("Import preset file", systemImage: "square.and.arrow.down") { choosingImport = true }
-                        .accessibilityIdentifier("preset-import")
-                    Button("Export all presets", systemImage: "square.and.arrow.up") { export(setups) }
-                        .accessibilityIdentifier("preset-export")
-                        .disabled(setups.isEmpty)
-                } header: {
-                    Text("Move or back up presets")
-                } footer: {
-                    Text("Files carry your sound settings, not recordings or purchased sound packs.")
-                }
             }
             .navigationTitle("Presets")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button("Import preset file", systemImage: "square.and.arrow.down") { choosingImport = true }
+                            .accessibilityIdentifier("preset-import")
+                        Button("Export all presets", systemImage: "square.and.arrow.up") { export(setups) }
+                            .accessibilityIdentifier("preset-export")
+                            .disabled(setups.isEmpty)
+                    } label: {
+                        Label("Move or back up presets", systemImage: "arrow.up.arrow.down")
+                    }
+                    .accessibilityIdentifier("preset-transfer")
+                    .accessibilityHint("Preset files carry settings, not recordings or purchased sound packs.")
+                }
             }
         }
         .tint(palette.accent)

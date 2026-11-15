@@ -131,8 +131,11 @@ final class HandStrudelUITests: XCTestCase {
         field.typeText(name)
         app.buttons["Save current preset"].tap()
         XCTAssertTrue(app.staticTexts[name].exists)
-        XCTAssertTrue(app.buttons["preset-import"].exists)
-        XCTAssertTrue(app.buttons["preset-export"].isEnabled)
+        let transfer = app.buttons["preset-transfer"]
+        XCTAssertTrue(transfer.isHittable)
+        transfer.tap()
+        XCTAssertTrue(app.buttons["Import preset file"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Export all presets"].isEnabled)
         XCTAssertFalse(element("close-button").exists)
     }
 
