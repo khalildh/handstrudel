@@ -19957,8 +19957,13 @@ registerProcessor('${n2}', MyProcessor);
     voice.midi = midi2;
   };
   window.playNote = function(midi2, waveform, vel, duration) {
-    window.noteOn("oneshot", midi2, waveform, vel);
-    setTimeout(() => window.noteOff("oneshot"), (duration || 0.3) * 1e3);
+    const id2 = `oneshot-${midi2}`;
+    window.noteOn(id2, midi2, waveform, vel);
+    const voice = window._voices[id2];
+    if (!voice) return;
+    setTimeout(() => {
+      if (window._voices[id2] === voice) window.noteOff(id2);
+    }, (duration || 0.3) * 1e3);
   };
   window._moduleReady = true;
   log("module ready");
