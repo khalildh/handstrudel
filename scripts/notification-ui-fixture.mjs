@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
 
 const viewer = "20000000-0000-0000-0000-000000000001";
 const creator = "20000000-0000-0000-0000-000000000002";
@@ -6,11 +7,12 @@ const video = "30000000-0000-0000-0000-000000000001";
 const root = "40000000-0000-0000-0000-000000000001";
 const reply = "40000000-0000-0000-0000-000000000002";
 const now = new Date().toISOString();
+const clipBytes = process.env.FIXTURE_CLIP ? readFileSync(process.env.FIXTURE_CLIP) : null;
 const demoThumb = "thumbs/76c9a372-7439-48dc-94ec-75a06cb6f1d7/385e21ab-7160-4378-b897-c602de952140.jpg";
 const post = {
   id: video, user_id: creator, username: "loopmaker", caption: "Evening loop", comments_enabled: true,
   video_key: "test/clip.mp4", thumb_key: demoThumb, like_count: 0, created_at: now,
-  instrument: "Grand Piano",
+  instrument: "Grand Piano", duration_s: clipBytes ? 4 : undefined,
   sound_setup: {
     version: 1, instrument: "grand_piano", waveform: "sine", key: "D", scale: "Minor", progression: "free",
     mode: "soundfont", bpm: 96, useSoundFont: true, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
@@ -46,6 +48,17 @@ createServer((request, response) => {
     response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(value));
   };
   switch (url.pathname) {
+    case "/test/clip.mp4": {
+      if (!clipBytes) return response.writeHead(404).end();
+      const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range ?? "");
+      const start = range ? Number(range[1]) : 0;
+      const end = range?.[2] ? Math.min(Number(range[2]), clipBytes.length - 1) : clipBytes.length - 1;
+      if (start > end) return response.writeHead(416, { "Content-Range": `bytes */${clipBytes.length}` }).end();
+      const headers = { "Content-Type": "video/mp4", "Accept-Ranges": "bytes", "Content-Length": end - start + 1 };
+      if (range) headers["Content-Range"] = `bytes ${start}-${end}/${clipBytes.length}`;
+      response.writeHead(range ? 206 : 200, headers);
+      return response.end(request.method === "HEAD" ? undefined : clipBytes.subarray(start, end + 1));
+    }
     case "/auth/v1/otp": return send({});
     case "/auth/v1/verify": return send({
       access_token: "fixture-token", token_type: "bearer", expires_in: 3600,
