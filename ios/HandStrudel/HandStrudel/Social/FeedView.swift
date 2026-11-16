@@ -15,6 +15,7 @@ struct FeedView: View {
     @Environment(\.studioPalette) private var palette
     @ObservedObject var auth: AuthManager
     let isActive: Bool
+    @Binding var isFullscreen: Bool
     let onMakeMusic: () -> Void
     let onTrySound: (SoundSetup) -> Void
     let onPlayAlong: (Video) -> Void
@@ -30,6 +31,7 @@ struct FeedView: View {
     @State private var unreadActivity = false
     @State private var creatorVideo: Video?
     @State private var sourceVideo: Video?
+    @State private var soundVideo: Video?
     @State private var showSaved = false
     @State private var showSearch = false
     @State private var challenge: WeeklyChallenge?
@@ -40,13 +42,13 @@ struct FeedView: View {
 
     private var allowsFeedPlayback: Bool {
         isActive && scenePhase == .active && commenting == nil && !showActivity && creatorVideo == nil
-            && sourceVideo == nil && !showSaved && !showSearch && openChallenge == nil && !showSignIn
+            && sourceVideo == nil && soundVideo == nil && !showSaved && !showSearch && openChallenge == nil && !showSignIn
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            topBar
-            if let challenge, !model.followingOnly {
+        VStack(alignment: .leading, spacing: isFullscreen ? 0 : 12) {
+            if !isFullscreen { topBar }
+            if !isFullscreen, let challenge, !model.followingOnly {
                 Button { openChallenge = challenge } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "waveform").foregroundStyle(palette.accent)
@@ -71,7 +73,7 @@ struct FeedView: View {
                     PagedFeed(videos: model.videos, current: $model.current, allowsPlayback: allowsFeedPlayback, refresh: {
                         await model.refresh(user: auth.userId)
                     }) { video, isCurrent, playbackGate in
-                        FeedCell(video: video, isCurrent: isCurrent, playbackGate: playbackGate,
+                        FeedCell(video: video, isCurrent: isCurrent, isFullscreen: isFullscreen, playbackGate: playbackGate,
                                  isMine: video.userId == auth.userId,
                                  isFollowing: model.following.contains(video.userId),
                                  isSaved: model.savedIDs.contains(video.id),
@@ -82,7 +84,7 @@ struct FeedView: View {
                                  follow: { act { try await model.toggleFollow(video.userId, user: $0) } },
                                  report: { requireSignIn { _ in reporting = video } },
                                  block: { act { try await model.block(video.userId, user: $0); show("Blocked @\(video.username ?? "user")") } },
-                                 delete: { Task { try? await model.delete(video) } }, onTrySound: onTrySound,
+                                 delete: { Task { try? await model.delete(video) } },
                                  comments: { openComments(video) },
                                  creator: { creatorVideo = video },
                                  bookmark: {
@@ -98,7 +100,7 @@ struct FeedView: View {
                                      }
                                  },
                                  advance: { advanceAfterClip(video.id) },
-                                 playAlong: { onPlayAlong(video) },
+                                 showSound: { soundVideo = video },
                                  revokeBacking: {
                                      act { _ in
                                          try await FeedService.stopAllowingBacking(video: video.id)
@@ -110,8 +112,12 @@ struct FeedView: View {
                             .environment(\.studioPalette, palette)
                             .environment(\.colorScheme, .dark)
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(palette.border).allowsHitTesting(false) }
+                    .clipShape(RoundedRectangle(cornerRadius: isFullscreen ? 0 : 20))
+                    .overlay {
+                        if !isFullscreen {
+                            RoundedRectangle(cornerRadius: 20).strokeBorder(palette.border).allowsHitTesting(false)
+                        }
+                    }
                     .onChange(of: model.current) { _ in Task { await model.loadMore() } }
                     .accessibilityScrollAction { edge in
                         if edge == .bottom { movePage(by: 1) }
@@ -128,12 +134,24 @@ struct FeedView: View {
                         .transition(.opacity)
                 }
             }
+            .overlay(alignment: .topTrailing) {
+                if !model.videos.isEmpty || isFullscreen {
+                    Button { isFullscreen.toggle() } label: {
+                        FeedVideoIcon(symbol: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isFullscreen ? "Exit full screen" : "Full screen")
+                    .accessibilityIdentifier("feed-fullscreen")
+                    .padding(isFullscreen ? 18 : 12)
+                }
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 9)
-        .padding(.bottom, 10)
-        .background(palette.background.ignoresSafeArea())
+        .padding(.horizontal, isFullscreen ? 0 : 12)
+        .padding(.top, isFullscreen ? 0 : 9)
+        .padding(.bottom, isFullscreen ? 0 : 10)
+        .background((isFullscreen ? Color.black : palette.background).ignoresSafeArea())
         .foregroundStyle(palette.ink)
+        .accessibilityAction(.escape) { if isFullscreen { isFullscreen = false } }
         .task(id: FeedRefresh(user: auth.userId, mode: model.mode)) {
             await model.refresh(user: auth.userId)
             await refreshBadge()
@@ -214,6 +232,12 @@ struct FeedView: View {
                 pendingStart = .preset(sound)
                 sourceVideo = nil
             })
+        }
+        .sheet(item: $soundVideo, onDismiss: resumePerformance) { video in
+            FeedSoundSheet(video: video) { start in
+                pendingStart = start
+                soundVideo = nil
+            }
         }
         .confirmationDialog("Report this post", isPresented: Binding(
             get: { reporting != nil }, set: { if !$0 { reporting = nil } }), titleVisibility: .visible) {
@@ -1484,6 +1508,7 @@ private struct FeedCell: View {
     @Environment(\.studioPalette) private var palette
     let video: Video
     let isCurrent: Bool
+    let isFullscreen: Bool
     let playbackGate: FeedPlaybackGate
     let isMine: Bool
     let isFollowing: Bool
@@ -1497,14 +1522,13 @@ private struct FeedCell: View {
     let report: () -> Void
     let block: () -> Void
     let delete: () -> Void
-    let onTrySound: (SoundSetup) -> Void
     let comments: () -> Void
     let creator: () -> Void
     let bookmark: () -> Void
     let downloadAudio: () -> Void
     let changeAudioPermission: () -> Void
     let advance: () -> Bool
-    let playAlong: () -> Void
+    let showSound: () -> Void
     let revokeBacking: () -> Void
     let source: (UUID) -> Void
     @State private var paused = false
@@ -1521,7 +1545,7 @@ private struct FeedCell: View {
             FeedPlayer(videoID: video.id, url: video.videoURL, thumb: video.thumbURL, playback: playback,
                           playbackGate: playbackGate,
                           isCurrent: isCurrent, playing: !paused && !playbackFailed,
-                          muted: muted, durationHint: video.durationS, onEnd: advance) {
+                          muted: muted, aspectFit: isFullscreen, durationHint: video.durationS, onEnd: advance) {
                 failedClipID = video.id
             }
             .id(playbackAttempt)
@@ -1529,7 +1553,8 @@ private struct FeedCell: View {
             Color.clear.contentShape(Rectangle()).onTapGesture {
                 if !playbackFailed { paused.toggle() }
             }
-            LinearGradient(colors: [.clear, .black.opacity(0.88)], startPoint: .center, endPoint: .bottom)
+            LinearGradient(colors: [.clear, .black.opacity(isFullscreen ? 0.58 : 0.88)],
+                           startPoint: isFullscreen ? UnitPoint(x: 0.5, y: 0.8) : .center, endPoint: .bottom)
                 .allowsHitTesting(false)
             if isCurrent && playbackFailed {
                 VStack(spacing: 8) {
@@ -1557,8 +1582,18 @@ private struct FeedCell: View {
                     .accessibilityHidden(true)
             }
             VStack(spacing: 0) {
-                postControls
-                if isCurrent && !playbackFailed { FeedProgressStrip(playback: playback) }
+                if isFullscreen {
+                    if isCurrent && !playbackFailed {
+                        HStack(spacing: 12) {
+                            FeedProgressStrip(playback: playback)
+                            Spacer(minLength: 0)
+                            muteButton
+                        }
+                    }
+                } else {
+                    postControls
+                    if isCurrent && !playbackFailed { FeedProgressStrip(playback: playback) }
+                }
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 15)
@@ -1585,19 +1620,12 @@ private struct FeedCell: View {
                         VStack(alignment: .leading, spacing: 4) { author; followButton }
                     }
                     if !video.caption.isEmpty { Text(video.caption).font(.subheadline).lineLimit(3) }
-                    if let setup = video.soundSetup {
-                        ClipPresetCard(setup: setup, username: video.username, onPlay: onTrySound)
-                            .id(video.id)
+                    if video.soundSetup != nil || video.backingEnabled == true {
+                        soundButton
                     } else if let instrument = video.instrument {
                         Label(instrument, systemImage: "waveform")
                             .font(.caption.monospaced())
                             .foregroundStyle(palette.mediaAccent)
-                    }
-                    if video.backingEnabled == true {
-                        Button(action: playAlong) { Label("Play along", systemImage: "waveform.badge.plus") }
-                            .font(.caption.weight(.semibold)).buttonStyle(.borderedProminent)
-                            .tint(palette.mediaAccent).foregroundStyle(palette.mediaOnAccent)
-                            .accessibilityIdentifier("play-along")
                     }
                     if let id = video.sourceVideoId, let username = video.sourceUsername {
                         Button("Inspired by @\(username)") { source(id) }
@@ -1624,10 +1652,7 @@ private struct FeedCell: View {
                         .accessibilityLabel(enabled ? "Comments, \(video.commentCount ?? 0)" : "Manage comments")
                         .accessibilityIdentifier("video-comments-button")
                     }
-                    Button(action: toggleMute) {
-                        actionIcon(muted ? "speaker.slash" : "speaker.wave.2")
-                    }
-                    .accessibilityLabel(muted ? "Unmute" : "Mute")
+                    muteButton
                     Button(action: bookmark) {
                         actionIcon(isSaved ? "bookmark.fill" : "bookmark", tint: isSaved ? palette.mediaAccent : .white)
                     }
@@ -1665,6 +1690,36 @@ private struct FeedCell: View {
         }
     }
 
+    private var muteButton: some View {
+        Button(action: toggleMute) {
+            actionIcon(muted ? "speaker.slash" : "speaker.wave.2")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(muted ? "Unmute" : "Mute")
+    }
+
+    private var soundButton: some View {
+        let title = video.soundSetup?.instrumentName ?? video.instrument ?? "Sound"
+        return Button(action: showSound) {
+            HStack(spacing: 6) {
+                Image(systemName: "waveform")
+                Text(title).lineLimit(1)
+                Image(systemName: "chevron.up").font(.system(size: 9, weight: .bold))
+            }
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .foregroundStyle(palette.mediaAccent)
+            .background(.black.opacity(0.66), in: Capsule())
+            .overlay { Capsule().strokeBorder(.white.opacity(0.18)) }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Sound options: \(title)")
+        .accessibilityIdentifier("feed-sound-options")
+    }
+
     private var author: some View {
         Button(action: creator) {
             Text("@\(video.username ?? "user")").font(.headline).lineLimit(1)
@@ -1691,12 +1746,90 @@ private struct FeedCell: View {
     }
 
     private func actionIcon(_ symbol: String, tint: Color = .white) -> some View {
+        FeedVideoIcon(symbol: symbol, tint: tint)
+    }
+}
+
+private struct FeedVideoIcon: View {
+    let symbol: String
+    var tint: Color = .white
+
+    var body: some View {
         Image(systemName: symbol)
             .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(tint)
             .frame(width: 44, height: 44)
             .background(.black.opacity(0.55), in: Circle())
             .overlay { Circle().strokeBorder(.white.opacity(0.18)) }
+    }
+}
+
+private struct FeedSoundSheet: View {
+    @Environment(\.studioPalette) private var palette
+    @Environment(\.dismiss) private var dismiss
+    let video: Video
+    let onStart: (PerformanceStart) -> Void
+    @State private var saved = false
+
+    private var title: String { video.soundSetup?.instrumentName ?? video.instrument ?? "Sound" }
+    private var savedName: String { video.username.map { "\(title) by @\($0)" } ?? title }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label(title, systemImage: "waveform")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(palette.ink)
+                        if let setup = video.soundSetup {
+                            Text(setup.presetDetails)
+                                .font(.subheadline.monospaced())
+                                .foregroundStyle(palette.muted)
+                        }
+                    }
+                    if let setup = video.soundSetup {
+                        Button("Play this sound", systemImage: "play.fill") { onStart(.preset(setup)) }
+                            .buttonStyle(ProfileActionStyle(primary: true))
+                            .accessibilityHint("Opens this setup in the Music tab")
+                            .accessibilityIdentifier("play-clip-preset")
+                    }
+                    if video.backingEnabled == true {
+                        Button("Play along", systemImage: "waveform.badge.plus") { onStart(.backing(video)) }
+                            .buttonStyle(ProfileActionStyle(primary: video.soundSetup == nil))
+                            .accessibilityHint("Uses this clip as a backing track")
+                            .accessibilityIdentifier("play-along")
+                    }
+                    if let setup = video.soundSetup {
+                        Button(saved ? "Preset saved" : "Save preset privately", systemImage: saved ? "checkmark" : "bookmark") {
+                            PersistenceManager.shared.addPreset(setup, named: savedName)
+                            saved = true
+                        }
+                        .buttonStyle(ProfileActionStyle())
+                        .disabled(saved)
+                        .accessibilityIdentifier("save-clip-preset")
+                    }
+                }
+                .frame(maxWidth: 480, alignment: .leading)
+                .padding(22)
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .background(palette.background.ignoresSafeArea())
+            .navigationTitle("Sound options")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+        }
+        .tint(palette.accent)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            guard let setup = video.soundSetup else { return }
+            saved = PersistenceManager.shared.loadSetups().contains {
+                $0.sound == setup && $0.name == String(savedName.prefix(40))
+            }
+        }
     }
 }
 
@@ -2111,6 +2244,7 @@ private struct FeedPlayer: UIViewRepresentable {
     let isCurrent: Bool
     let playing: Bool
     let muted: Bool
+    let aspectFit: Bool
     let durationHint: Double?
     let onEnd: () -> Bool
     let onFailure: () -> Void
@@ -2120,6 +2254,7 @@ private struct FeedPlayer: UIViewRepresentable {
     func updateUIView(_ view: PlayerView, context: Context) {
         view.onFailure = onFailure
         view.onEnd = onEnd
+        view.setAspectFit(aspectFit)
         view.load(url: url, thumb: thumb)
         if view.playback !== playback { view.playback?.disconnect(from: view.player); view.playback = playback }
         guard let player = view.player else { return }
@@ -2159,6 +2294,11 @@ private struct FeedPlayer: UIViewRepresentable {
         required init?(coder: NSCoder) { fatalError() }
 
         override func layoutSubviews() { super.layoutSubviews(); thumbView.frame = bounds }
+
+        func setAspectFit(_ fit: Bool) {
+            playerLayer.videoGravity = fit ? .resizeAspect : .resizeAspectFill
+            thumbView.contentMode = fit ? .scaleAspectFit : .scaleAspectFill
+        }
 
         func load(url: URL, thumb: URL) {
             guard url != loadedURL else { return }

@@ -50,6 +50,7 @@ jobs:
             -only-testing:HandStrudelUITests/HandStrudelUITests/testMusic_startsSession \
             -only-testing:HandStrudelUITests/HandStrudelUITests/testOnboarding_gotItDismisses \
             -only-testing:HandStrudelUITests/HandStrudelUITests/testSounds_showsMusicSettings \
+            -only-testing:HandStrudelUITests/HandStrudelUITests/testMusicSettingsDashboardShowsOnlyTheSelectedControls \
             -only-testing:HandStrudelUITests/HandStrudelUITests/testFeedSearchOpensWithoutAccount \
             -only-testing:HandStrudelUITests/HandStrudelUITests/testMusic_privateDraftsOpensWithoutAccount \
             -parallel-testing-enabled NO \
