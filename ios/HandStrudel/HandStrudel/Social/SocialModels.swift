@@ -113,12 +113,8 @@ struct Video: Codable, Equatable, Identifiable {
     }
 }
 
-/// Row the app inserts after uploading the files.
-struct NewVideo: Encodable {
-    let id: UUID
-    let userId: UUID
-    let videoKey: String
-    let thumbKey: String
+/// Post details sent after the video and thumbnail upload to private storage.
+struct VideoPostFields: Encodable {
     let caption: String
     let instrument: String?
     let mode: String?
@@ -131,10 +127,7 @@ struct NewVideo: Encodable {
     var sourceVideoId: UUID? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, caption, instrument, mode, width, height
-        case userId = "user_id"
-        case videoKey = "video_key"
-        case thumbKey = "thumb_key"
+        case caption, instrument, mode, width, height
         case durationS = "duration_s"
         case soundSetup = "sound_setup"
         case commentsEnabled = "comments_enabled"
@@ -146,6 +139,7 @@ struct NewVideo: Encodable {
 struct SignUploadRequest: Encodable {
     let videoBytes: Int
     let thumbBytes: Int
+    let moderationVersion = 2
 }
 
 struct VideoComment: Codable, Equatable, Identifiable {
@@ -383,8 +377,17 @@ enum PerformanceLink: Equatable {
 
 struct SignUploadResponse: Decodable {
     let id: UUID
-    let videoKey: String
-    let thumbKey: String
     let videoUploadUrl: URL
     let thumbUploadUrl: URL
+}
+
+struct PublishUploadRequest: Encodable {
+    let action: String
+    let id: UUID
+    var fields: VideoPostFields? = nil
+}
+
+struct PublishUploadResponse: Decodable {
+    enum Status: String, Decodable { case reserved, checking, published, held, failed }
+    let status: Status
 }

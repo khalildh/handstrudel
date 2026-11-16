@@ -3,10 +3,10 @@ import Supabase
 import UIKit
 
 /// Turns a ReplayKit clip into a feed post: transcode to 720-wide H.264,
-/// grab a thumbnail, upload both to R2 via presigned URLs, insert the row.
+/// grab a thumbnail, upload both privately, then wait for the server's publication result.
 @MainActor
 final class VideoUploader: ObservableObject {
-    enum Phase: Equatable { case idle, preparing, uploading(Double), done, failed(String) }
+    enum Phase: Equatable { case idle, preparing, uploading(Double), checking, done, failed(String) }
     @Published private(set) var phase: Phase = .idle
 
     struct Prepared {
@@ -21,7 +21,11 @@ final class VideoUploader: ObservableObject {
     nonisolated static let outputWidth = 720
 
     func post(clip: URL, caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?,
-              commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?, userId: UUID) async -> Bool {
+              commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?) async -> Bool {
+        switch phase {
+        case .preparing, .uploading, .checking, .done: return false
+        case .idle, .failed: break
+        }
         do {
             phase = .preparing
             if let backingCredit {
@@ -43,20 +47,46 @@ final class VideoUploader: ObservableObject {
             try await Self.put(fileURL: prepared.videoURL, to: signed.videoUploadUrl, type: "video/mp4")
             phase = .uploading(0.9)
             try await Self.put(data: prepared.thumb, to: signed.thumbUploadUrl, type: "image/jpeg")
-            try await supabase.from("videos").insert(NewVideo(
-                id: signed.id, userId: userId, videoKey: signed.videoKey, thumbKey: signed.thumbKey,
+            let fields = VideoPostFields(
                 caption: String(caption.prefix(150)), instrument: instrument, mode: mode,
                 durationS: prepared.duration, width: prepared.width, height: prepared.height,
                 soundSetup: soundSetup, commentsEnabled: commentsEnabled ? nil : false,
-                backingEnabled: backingEnabled ? true : nil, sourceVideoId: backingCredit?.videoId)).execute()
+                backingEnabled: backingEnabled ? true : nil, sourceVideoId: backingCredit?.videoId)
+            let submitted = try await Self.publish(PublishUploadRequest(action: "submit", id: signed.id, fields: fields))
+            try await waitForPublication(submitted, id: signed.id)
             phase = .done
             return true
-        } catch let error as PostgrestError where error.message == "BACKING_UNAVAILABLE" {
-            phase = .failed("The creator no longer allows new play-along posts. Your private draft is safe.")
+        } catch FunctionsError.httpError(_, let data) {
+            struct ErrorResponse: Decodable { let error: String }
+            let detail = try? JSONDecoder().decode(ErrorResponse.self, from: data).error
+            phase = .failed(detail ?? "Couldn't post this video. Your private draft is safe.")
             return false
         } catch {
             phase = .failed(error.localizedDescription)
             return false
+        }
+    }
+
+    private static func publish(_ request: PublishUploadRequest) async throws -> PublishUploadResponse {
+        try await supabase.functions.invoke("publish-upload", options: FunctionInvokeOptions(body: request))
+    }
+
+    private func waitForPublication(_ submitted: PublishUploadResponse, id: UUID) async throws {
+        var status = submitted.status
+        let deadline = ContinuousClock.now.advanced(by: .seconds(120))
+        while status == .checking, ContinuousClock.now < deadline {
+            phase = .checking
+            try await Task.sleep(for: .seconds(2))
+            status = try await Self.publish(PublishUploadRequest(action: "status", id: id)).status
+        }
+        switch status {
+        case .published: return
+        case .held:
+            throw SocialError.message("This clip didn't pass our public content check. Your private draft is safe.")
+        case .checking:
+            throw SocialError.message("This clip is still being checked. Check your profile before trying again.")
+        case .reserved, .failed:
+            throw SocialError.message("We couldn't finish checking this clip. It wasn't posted. Your private draft is safe.")
         }
     }
 
@@ -223,6 +253,7 @@ final class VideoUploader: ObservableObject {
         r.httpMethod = "PUT"
         r.setValue(type, forHTTPHeaderField: "Content-Type")
         r.setValue(String(length), forHTTPHeaderField: "Content-Length")
+        r.setValue("*", forHTTPHeaderField: "If-None-Match")
         return r
     }
 

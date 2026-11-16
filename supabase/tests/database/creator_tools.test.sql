@@ -12,9 +12,12 @@ where id::text like '30000000-%';
 create function pg_temp.claim(uid uuid) returns text language sql as $$
   select set_config('request.jwt.claims', json_build_object('sub', uid)::text, true)
 $$;
-create function pg_temp.post(id uuid, source uuid, enabled boolean) returns void language sql as $$
-  insert into public.videos (id, user_id, video_key, thumb_key, source_video_id, backing_enabled)
-  values (id, auth.uid(), 'videos/' || auth.uid() || '/v.mp4', 'thumbs/' || auth.uid() || '/t.jpg', source, enabled)
+-- Simulate the server receiving a pass without granting the client publication rights.
+create function pg_temp.post(id uuid, source uuid, enabled boolean) returns void
+language sql security definer set search_path = '' as $$
+  insert into public.pending_video_uploads (id, user_id, video_bytes, thumb_bytes, status)
+  values (id, auth.uid(), 100, 20, 'checking');
+  select public.publish_screened_video(id, jsonb_build_object('source_video_id', source, 'backing_enabled', enabled));
 $$;
 create function pg_temp.comment(body text, parent uuid default null) returns void language sql as $$
   insert into public.comments (video_id, parent_id, body)
@@ -92,8 +95,7 @@ select is((select count(*) from public.public_creators where id = '30000000-0000
           'blocked creator profiles are excluded');
 reset role;
 
-select pg_temp.claim('30000000-0000-0000-0000-000000000001');
-set local role authenticated;
+set local role service_role;
 delete from public.videos where id = '40000000-0000-0000-0000-000000000001';
 reset role;
 select pg_temp.claim('30000000-0000-0000-0000-000000000002');

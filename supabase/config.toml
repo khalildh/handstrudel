@@ -429,6 +429,9 @@ enabled = true
 [functions.sign-upload]
 verify_jwt = false
 
+[functions.publish-upload]
+verify_jwt = false
+
 [functions.delete-video]
 verify_jwt = false
 

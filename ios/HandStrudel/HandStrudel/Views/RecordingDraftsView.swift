@@ -454,7 +454,9 @@ private struct RecordingDraftEditor: View {
         }
         .sheet(item: $posting) { copy in
             PostComposerView(clip: copy.url, instrument: draft.instrument, mode: draft.mode, soundSetup: draft.soundSetup,
-                             backingCredit: draft.backingCredit, auth: auth) {
+                             backingCredit: draft.backingCredit, auth: auth, onLeaveWhileChecking: {
+                message = "Submitted for checking. Your original is still in Private drafts."
+            }) {
                 message = "Posted. The original is still in Private drafts."
                 onSuccessfulTake(draft.id)
             }

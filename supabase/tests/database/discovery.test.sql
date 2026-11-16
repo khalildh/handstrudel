@@ -44,10 +44,9 @@ select throws_ok($$ insert into public.video_bookmarks (user_id, video_id)
 select throws_ok($$ insert into public.weekly_challenges (source_video_id, title, prompt, starts_at, ends_at)
  values ('52000000-0000-0000-0000-000000000002', 'Client', 'Prompt', now(), now() + interval '2 days') $$,
  '42501', null, 'only a curator can schedule challenges');
-select pg_temp.clip('52000000-0000-0000-0000-000000000004', auth.uid(), '52000000-0000-0000-0000-000000000001',
-                    false, now() + interval '10 days');
-select is((select created_at from public.videos where id = '52000000-0000-0000-0000-000000000004'), now(),
-          'client cannot set the publication time for a challenge entry');
+select throws_ok($$ select pg_temp.clip('52000000-0000-0000-0000-000000000004', auth.uid(),
+  '52000000-0000-0000-0000-000000000001', false, now() + interval '10 days') $$,
+  '42501', null, 'client cannot publish an unscreened challenge entry or set its publication time');
 reset role;
 
 select pg_temp.claim('51000000-0000-0000-0000-000000000003');

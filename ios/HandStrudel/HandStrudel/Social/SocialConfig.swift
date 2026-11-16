@@ -12,9 +12,10 @@ enum SocialConfig {
     /// Public base URL of the R2 media bucket: a Cloudflare-cached custom domain
     /// (no egress fees; Cloudflare's CSAM Scanning Tool checks cached images).
     private static let productionMediaBase = "https://media.handstrudel.com"
+    private static let productionClipMediaBase = "https://clips.handstrudel.com"
 
     /// DEBUG builds can point at a local stack: set SUPABASE_URL / SUPABASE_ANON_KEY /
-    /// MEDIA_BASE_URL in the scheme's environment (`supabase start` prints them).
+    /// MEDIA_BASE_URL / CLIP_MEDIA_BASE_URL in the scheme's environment.
     private static func value(_ key: String, _ fallback: String) -> String {
         #if DEBUG
         if let v = ProcessInfo.processInfo.environment[key], !v.isEmpty { return v }
@@ -25,6 +26,7 @@ enum SocialConfig {
     static var supabaseURL: URL { URL(string: value("SUPABASE_URL", productionURL))! }
     static var supabaseAnonKey: String { value("SUPABASE_ANON_KEY", productionAnonKey) }
     static var mediaBaseURL: URL { URL(string: value("MEDIA_BASE_URL", productionMediaBase))! }
+    static var clipMediaBaseURL: URL { URL(string: value("CLIP_MEDIA_BASE_URL", productionClipMediaBase))! }
 
     /// False until real credentials are filled in, so the UI can hide social entry points.
     static var isConfigured: Bool { !supabaseAnonKey.hasPrefix("YOUR-") }
@@ -41,7 +43,11 @@ enum SocialConfig {
     static let reviewURL = URL(string: "https://apps.apple.com/app/id6764415289?action=write-review")!
     static let supportURL = URL(string: "https://handstrudel.com/support")!
 
-    static func mediaURL(_ key: String) -> URL { mediaBaseURL.appendingPathComponent(key) }
+    static func mediaURL(_ key: String) -> URL {
+        let parts = key.split(separator: "/", omittingEmptySubsequences: false)
+        let screened = parts.count == 4 && (parts[0] == "videos" || parts[0] == "thumbs") && parts[2] == "screened"
+        return (screened ? clipMediaBaseURL : mediaBaseURL).appendingPathComponent(key)
+    }
 
     static func creatorURL(_ username: String) -> URL {
         var url = URLComponents()

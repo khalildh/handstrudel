@@ -6,6 +6,7 @@
 /out/
 /test-results/
 /playwright-report/
+.wrangler/
 
 # misc
 .DS_Store

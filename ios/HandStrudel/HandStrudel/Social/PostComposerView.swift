@@ -13,6 +13,7 @@ struct PostComposerView: View {
     let soundSetup: SoundSetup?
     let backingCredit: BackingCredit?
     @ObservedObject var auth: AuthManager
+    var onLeaveWhileChecking: () -> Void = {}
     var onPosted: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
@@ -22,6 +23,7 @@ struct PostComposerView: View {
     @State private var shareSound = false
     @State private var commentsEnabled = true
     @State private var backingEnabled = false
+    @State private var leftWhileChecking = false
 
     var body: some View {
         NavigationStack {
@@ -73,12 +75,26 @@ struct PostComposerView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(isBusy || auth.userId == nil)
+                    Text("We check your video and thumbnail before they appear publicly.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 .padding()
             }
             .navigationTitle("New post")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isBusy) } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(uploader.phase == .checking ? "Done" : "Cancel") {
+                        if uploader.phase == .checking {
+                            leftWhileChecking = true
+                            onLeaveWhileChecking()
+                        }
+                        dismiss()
+                    }
+                    .disabled(isBusy && uploader.phase != .checking)
+                }
+            }
         }
         .onAppear {
             let p = AVPlayer(url: clip)
@@ -91,26 +107,27 @@ struct PostComposerView: View {
     }
 
     private var isBusy: Bool {
-        switch uploader.phase { case .preparing, .uploading: return true; default: return false }
+        switch uploader.phase { case .preparing, .uploading, .checking: return true; default: return false }
     }
 
     @ViewBuilder private var status: some View {
         switch uploader.phase {
         case .preparing: ProgressView("Preparing video…")
         case .uploading(let f): ProgressView(value: f) { Text("Uploading…") }
+        case .checking: ProgressView("Checking video. You can leave this screen.")
         case .failed(let msg): Text(msg).foregroundStyle(.red).font(.footnote)
         default: EmptyView()
         }
     }
 
     private func post() {
-        guard let uid = auth.userId else { return }
+        guard auth.userId != nil else { return }
         Task {
             if await uploader.post(clip: clip, caption: caption, instrument: instrument, mode: mode,
                                    soundSetup: shareSound ? soundSetup : nil, commentsEnabled: commentsEnabled,
-                                   backingEnabled: backingEnabled, backingCredit: backingCredit, userId: uid) {
+                                   backingEnabled: backingEnabled, backingCredit: backingCredit) {
                 onPosted()
-                dismiss()
+                if !leftWhileChecking { dismiss() }
             }
         }
     }

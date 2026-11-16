@@ -1182,13 +1182,23 @@ final class SocialTests: XCTestCase {
         return url
     }
 
-    func testNewVideoEncodesSnakeCase() throws {
-        let row = NewVideo(id: UUID(), userId: UUID(), videoKey: "videos/u/x.mp4", thumbKey: "thumbs/u/x.jpg",
-                           caption: "c", instrument: nil, mode: "scale", durationS: 7, width: 720, height: 1558)
-        let obj = try JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: Any]
-        XCTAssertNotNil(obj?["user_id"])
-        XCTAssertNotNil(obj?["video_key"])
-        XCTAssertNil(obj?["videoKey"])
-        XCTAssertNil(obj?["sound_setup"], "Posting a draft should not opt in by default")
+    func testPublishUploadEncodesMetadataWithoutClientOwnedKeys() throws {
+        let fields = VideoPostFields(caption: "c", instrument: nil, mode: "scale", durationS: 7,
+                                     width: 720, height: 1558, commentsEnabled: false)
+        let request = PublishUploadRequest(action: "submit", id: UUID(), fields: fields)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
+        let metadata = try XCTUnwrap(obj["fields"] as? [String: Any])
+        XCTAssertEqual(obj["action"] as? String, "submit")
+        XCTAssertEqual(metadata["duration_s"] as? Double, 7)
+        XCTAssertEqual(metadata["comments_enabled"] as? Bool, false)
+        XCTAssertNil(metadata["user_id"])
+        XCTAssertNil(metadata["video_key"])
+        XCTAssertNil(metadata["sound_setup"], "Posting a draft should not opt in by default")
+    }
+
+    func testUploadReservationSignalsModeratedClient() throws {
+        let request = SignUploadRequest(videoBytes: 100, thumbBytes: 20)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
+        XCTAssertEqual(obj["moderationVersion"] as? Int, 2)
     }
 }
