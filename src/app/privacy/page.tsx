@@ -17,7 +17,7 @@ export default function Privacy() {
       <p>HandStrudel uses your camera to track hand gestures in real time. Camera frames are processed <strong>entirely on your device</strong> using Apple&apos;s Vision framework and are never sent to us or anyone else. The only video that leaves your device is a recording you explicitly choose to post or share.</p>
 
       <h3>Microphone</h3>
-      <p>When you record a clip, the microphone captures the app&apos;s audio. The recording stays on your device unless you post or share it.</p>
+      <p>Clips include the app&apos;s audio. If you enable the microphone for a solo take, the clip can also include your voice and sounds around you. The recording stays on your device unless you post or share it. Audio in a public clip is public too.</p>
 
       <h3>App settings</h3>
       <p>Your preferences (instrument, key, scale, BPM, and so on) are stored locally on your device.</p>

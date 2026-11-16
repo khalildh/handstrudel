@@ -88,7 +88,7 @@ struct StartOverlayView: View {
         .sheet(isPresented: $showAppearance) { StudioThemePicker() }
         .sheet(isPresented: $showSounds) {
             soundsSheet
-                .presentationDetents([.height(344), .large])
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .task {
@@ -145,23 +145,32 @@ struct StartOverlayView: View {
     private var soundsSheet: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
-                    instrumentChip
-                    rowDivider
-                    progressionChip
-                    rowDivider
-                    keyChip
-                    rowDivider
-                    scaleChip
+                VStack(alignment: .leading, spacing: 18) {
+                    StudioSettingsHero(
+                        title: engine.selectedSoundFontInstrument.name,
+                        key: engine.selectedKey, scale: engine.selectedScale,
+                        progression: engine.chordMelodyProgression,
+                        instrument: engine.selectedSoundFontInstrument
+                    )
+                    StudioSettingsPanel {
+                        VStack(spacing: 0) {
+                            instrumentChip
+                            StudioSettingsDivider()
+                            keyChip
+                            StudioSettingsDivider()
+                            scaleChip
+                            StudioSettingsDivider()
+                            progressionChip
+                        }
+                    }
                 }
-                .background(palette.surface, in: RoundedRectangle(cornerRadius: 18))
-                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(palette.border) }
                 .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 20)
+                .padding(.vertical, 14)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
             }
             .background(palette.background)
-            .navigationTitle("Sounds")
+            .navigationTitle("Sound setup")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -377,7 +386,7 @@ struct StartOverlayView: View {
 
     private var instrumentChip: some View {
         Button(action: { showInstrumentSheet = true }) {
-            soundRow("Instrument", value: engine.selectedSoundFontInstrument.name, icon: "waveform")
+            StudioSettingRow("Instrument", value: engine.selectedSoundFontInstrument.name, icon: "waveform")
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("sounds-instrument")
@@ -385,63 +394,23 @@ struct StartOverlayView: View {
 
     private var progressionChip: some View {
         Button(action: { showProgressionSheet = true }) {
-            soundRow("Chords", value: engine.chordMelodyProgression.name, icon: "music.note.list")
+            StudioSettingRow("Chords", value: engine.chordMelodyProgression.name, icon: "music.note.list")
         }
         .buttonStyle(.plain)
     }
 
     private var keyChip: some View {
-        Menu {
-            ForEach(MusicKey.allCases) { key in
-                Button(action: { engine.selectedKey = key }) {
-                    if engine.selectedKey == key {
-                        Label(key.rawValue, systemImage: "checkmark")
-                    } else {
-                        Text(key.rawValue)
-                    }
-                }
-            }
-        } label: {
-            soundRow("Key", value: engine.selectedKey.rawValue, icon: "music.note", chevron: "chevron.up.chevron.down")
-        }
+        StudioKeyMenu(selection: $engine.selectedKey)
     }
 
     /// Scale chip opens a sheet (not a Menu) because premium scales need a
     /// visible lock badge, which SwiftUI menus can't render.
     private var scaleChip: some View {
         Button(action: { showScaleSheet = true }) {
-            soundRow("Scale", value: engine.selectedScale.displayName, icon: "pianokeys")
+            StudioSettingRow("Scale", value: engine.selectedScale.displayName, icon: "pianokeys")
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("scale-picker")
-    }
-
-    private var rowDivider: some View {
-        Rectangle().fill(palette.border).frame(height: 1).padding(.leading, 53)
-    }
-
-    private func soundRow(_ title: String, value: String, icon: String, chevron: String = "chevron.right") -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.body.weight(.medium))
-                .foregroundStyle(palette.accent)
-                .frame(width: 26)
-                .accessibilityHidden(true)
-            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(palette.ink)
-            Spacer(minLength: 0)
-            Text(value)
-                .font(.subheadline)
-                .foregroundStyle(palette.muted)
-                .multilineTextAlignment(.trailing)
-            Image(systemName: chevron)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(palette.muted)
-                .accessibilityHidden(true)
-        }
-        .padding(.horizontal, 15)
-        .padding(.vertical, 13)
-        .frame(minHeight: 53)
-        .contentShape(Rectangle())
     }
 
     private var startButton: some View {
@@ -476,18 +445,155 @@ struct StartOverlayView: View {
     }
 }
 
+struct StudioSettingsPanel<Content: View>: View {
+    @Environment(\.studioPalette) private var palette
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(palette.surface, in: RoundedRectangle(cornerRadius: 21))
+            .overlay { RoundedRectangle(cornerRadius: 21).strokeBorder(palette.border).allowsHitTesting(false) }
+    }
+}
+
+struct StudioSettingsDivider: View {
+    @Environment(\.studioPalette) private var palette
+
+    var body: some View {
+        Rectangle().fill(palette.border).frame(height: 1).padding(.leading, 58)
+            .accessibilityHidden(true)
+    }
+}
+
+struct StudioSettingRow: View {
+    @Environment(\.studioPalette) private var palette
+    @Environment(\.dynamicTypeSize) private var typeSize
+    let title: String
+    let value: String?
+    let icon: String
+    let chevron: String
+
+    init(_ title: String, value: String? = nil, icon: String, chevron: String = "chevron.right") {
+        self.title = title
+        self.value = value
+        self.icon = icon
+        self.chevron = chevron
+    }
+
+    var body: some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(palette.accent)
+                .frame(width: 32, height: 32)
+                .background(palette.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 9))
+                .accessibilityHidden(true)
+            let layout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
+                : AnyLayout(HStackLayout(spacing: 8))
+            layout {
+                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(palette.ink)
+                    .layoutPriority(1)
+                if !typeSize.isAccessibilitySize { Spacer(minLength: 4) }
+                if let value {
+                    Text(value).font(.subheadline.monospaced())
+                        .foregroundStyle(palette.muted)
+                        .multilineTextAlignment(typeSize.isAccessibilitySize ? .leading : .trailing)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: chevron)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(palette.muted)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 10)
+        .frame(minHeight: 54)
+        .contentShape(Rectangle())
+    }
+}
+
+struct StudioKeyMenu: View {
+    @Binding var selection: MusicKey
+
+    var body: some View {
+        Menu {
+            ForEach(MusicKey.allCases) { key in
+                Button {
+                    selection = key
+                } label: {
+                    if selection == key { Label(key.rawValue, systemImage: "checkmark") }
+                    else { Text(key.rawValue) }
+                }
+            }
+        } label: {
+            StudioSettingRow("Key", value: selection.rawValue, icon: "music.note", chevron: "chevron.up.chevron.down")
+        }
+        .accessibilityIdentifier("studio-key-picker")
+    }
+}
+
+struct StudioSettingsHero: View {
+    @Environment(\.studioPalette) private var palette
+    let title: String
+    let key: MusicKey
+    let scale: Scale
+    let progression: ChordProgression?
+    let instrument: SoundFontInstrument?
+
+    var body: some View {
+        StudioSettingsPanel {
+            VStack(alignment: .leading, spacing: 0) {
+                if let instrument, let progression {
+                    SoundArtwork(instrument: instrument, key: key, scale: scale,
+                                 progression: progression, compact: true)
+                        .frame(height: 74)
+                        .accessibilityHidden(true)
+                }
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("CURRENT SOUND", systemImage: "waveform")
+                        .font(.caption2.monospaced().weight(.semibold))
+                        .tracking(1.6)
+                        .foregroundStyle(palette.accent)
+                    Text(title)
+                        .font(.system(.largeTitle, design: .serif))
+                        .foregroundStyle(palette.ink)
+                        .accessibilityAddTraits(.isHeader)
+                    Text([key.rawValue + " " + scale.displayName, progression?.name].compactMap { $0 }.joined(separator: " / "))
+                        .font(.caption.monospaced())
+                        .foregroundStyle(palette.muted)
+                }
+                .padding(.horizontal, 17)
+                .padding(.vertical, 13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(alignment: .trailing) {
+                    LinearGradient(colors: [palette.surface, palette.glow.opacity(0.24)], startPoint: .leading, endPoint: .trailing)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 21))
+        }
+        .accessibilityIdentifier("studio-current-sound")
+    }
+}
+
 private struct SoundArtwork: View {
     @Environment(\.studioPalette) private var palette
     let instrument: SoundFontInstrument
     let key: MusicKey
     let scale: Scale
     let progression: ChordProgression
+    var compact = false
 
     var body: some View {
         Canvas { context, size in
-            drawBackground(context, size: size)
-            drawWeave(context, size: size)
-            drawScale(context, size: size)
+            var context = context
+            let field = compact ? CGSize(width: size.width, height: 210) : size
+            if compact { context.scaleBy(x: 1, y: size.height / field.height) }
+            drawBackground(context, size: field)
+            drawWeave(context, size: field)
+            drawScale(context, size: field)
         }
     }
 
@@ -650,7 +756,7 @@ private func proPaywall(storeManager: StoreManager) -> some View {
 
 // MARK: - Instrument picker sheet
 
-private struct InstrumentPickerSheet: View {
+struct InstrumentPickerSheet: View {
     @Environment(\.studioPalette) private var palette
     @Binding var selected: SoundFontInstrument
     @ObservedObject var storeManager: StoreManager
@@ -687,6 +793,7 @@ private struct InstrumentPickerSheet: View {
             .background(palette.background)
             .navigationTitle("Instrument")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(isPresented: $showPaywall) {
                 proPaywall(storeManager: storeManager)
                     .presentationDetents([.medium, .large])
@@ -734,7 +841,7 @@ private struct InstrumentPickerSheet: View {
 
 // MARK: - Progression picker sheet
 
-private struct ProgressionPickerSheet: View {
+struct ProgressionPickerSheet: View {
     @Environment(\.studioPalette) private var palette
     @Binding var selected: ChordProgression
     @ObservedObject var storeManager: StoreManager
@@ -772,6 +879,7 @@ private struct ProgressionPickerSheet: View {
             .background(palette.background)
             .navigationTitle("Chord Progression")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(isPresented: $showPaywall) {
                 proPaywall(storeManager: storeManager)
                     .presentationDetents([.medium, .large])

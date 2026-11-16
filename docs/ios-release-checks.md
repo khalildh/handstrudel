@@ -1,9 +1,38 @@
 # iOS release checks
 
-The iOS CI job runs the unit target and five signed-out Studio and Feed
+The iOS CI job runs the unit target and six signed-out Studio and Feed
 journeys on a simulator. The shared `HandStrudel` scheme also includes the
 full UI target. Some UI tests need local fixtures and deliberately skip
 without them; read the `.xcresult` skip messages before calling a run complete.
+
+## App Store Connect handoff
+
+Before uploading, confirm that the version and build number are unused in
+App Store Connect. The local candidate is **1.0.1 (25)**; check it against
+the version train and TestFlight history. Use a Release archive from the
+reviewed commit, not a Debug install.
+
+- **Age rating:** The feed has user-generated content and social-media
+  capabilities (public clips, comments, likes, sharing). Do not claim that
+  social media is disabled for under-13 users through Apple's Declared Age
+  Range API: the app does not implement that check. HandStrudel does not
+  share real-world location or offer dating features. Review all answers,
+  including the [November 16 descriptors](https://developer.apple.com/news/?id=yxkh08us),
+  before submitting.
+- **Privacy:** Check the App Store privacy answers against the archive's
+  privacy manifests and the [live privacy policy](https://handstrudel.com/privacy).
+  Public clips can include account-linked audio. The opt-in usage counter
+  sends product interaction events for analytics without account or device
+  IDs, not for tracking. Review the SDK disclosures too.
+- **App Review access:** Supply working, dedicated reviewer access to all
+  sign-in features. Confirm the reviewer can complete the email-code flow
+  independently and can post, report, block, restore purchases, and delete
+  their account. Include where each of those controls is found. Confirm the
+  support inbox and report queue have an owner before submission.
+- **Release notes:** "Watch performances full screen, open sound options
+  without covering the video, and find music controls faster in redesigned
+  settings. Pro adds new scales, including Minor Pentatonic, and lets you
+  create and save your own scales."
 
 ## On representative iPhones
 

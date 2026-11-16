@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 struct ControlSheet: View {
     @Environment(\.studioPalette) private var palette
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @ObservedObject var engine: EngineController
     @ObservedObject var storeManager: StoreManager
     @Binding var playInput: StudioPlayInput
@@ -18,103 +20,43 @@ struct ControlSheet: View {
     @State private var exportingLoop = false
     @State private var showSetups = false
     @State private var showScalePicker = false
+    @State private var showInstrumentPicker = false
+    @State private var showProgressionPicker = false
     @State private var exportedAudioURL: URL?
-    @State private var soundFontCategory: GMCategory = DEFAULT_SOUNDFONT_INSTRUMENT.category
     @State private var customProgressionText = ""
-    @State private var progressionCategory: ProgressionCategory = .essentials
+    @State private var section: SettingsSection = .sound
     /// Keep secondary modes out of the way until the player requests them.
     @State private var showOtherModes = false
 
+    private enum SettingsSection: String, CaseIterable {
+        case sound, play, mix, capture
+
+        var title: String { rawValue.capitalized }
+        var icon: String {
+            switch self {
+            case .sound: return "waveform"
+            case .play: return "hand.tap"
+            case .mix: return "slider.horizontal.3"
+            case .capture: return "video"
+            }
+        }
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionHeader("PLAY INPUT", icon: "hand.tap")
-                    StudioInputPicker(selection: $playInput, tracker: engine.handTracker)
-                }
-                sectionDivider
-
-                if hasModeContextControls {
-                    modeSection
-                    sectionDivider
-                }
-                harmonySection
-                Button { showSetups = true } label: { Label("Presets", systemImage: "square.stack") }
-                    .buttonStyle(.bordered)
-                sectionDivider
-                otherModesPickerSection
-
-                // The Strudel waveform / sampled-instrument picker only has
-                // an audible effect when the active mode is voiced through the
-                // WebView synth. SoundFont-routed modes have their own
-                // instrument picker tucked inside the chord+melody block.
-                if !activePathUsesSoundFont {
-                    sectionDivider
-                    soundSection
-                }
-
-                // BPM and the parameter strip only matter for modes that play
-                // Strudel patterns or feed the effect chain. Chord-melody
-                // family modes (Split / Radial / Chord+Melody / SoundFont) are
-                // direct noteOn/noteOff against the sampler or synth, so the
-                // smoothed musical params aren't doing anything — hide them.
-                // BPM still feeds drums / quantize / auto-strum but it's noise
-                // for the first-run user; they can dig into Melodic mode if
-                // they actually need tempo control without drums.
-                if !isChordMelodyFamily {
-                    sectionDivider
-                    bpmSection
-
-                    sectionDivider
-                    paramsSection
-                }
-
-                sectionDivider
-                drumTrackSection(
-                    label: "DRUMS 1",
-                    loop: $engine.selectedDrumLoop,
-                    volume: $engine.drumVolume,
-                    bpm: $engine.drumBPM
-                )
-
-                sectionDivider
-                drumTrackSection(
-                    label: "DRUMS 2",
-                    loop: $engine.selectedDrumLoop2,
-                    volume: $engine.drumVolume2,
-                    bpm: $engine.drumBPM2
-                )
-
-                sectionDivider
-                filterSection
-
-                sectionDivider
-                handThemeSection
-
-                if !engine.savedLoops.isEmpty {
-                    sectionDivider
-                    loopsSection
-                }
-
-                sectionDivider
-                recordingSection
-
-                if !engine.savedSnippets.isEmpty {
-                    sectionDivider
-                    snippetsSection
-                }
-
-                if !engine.track.slots.isEmpty {
-                    sectionDivider
-                    trackSection
-                }
-
-            }
-            .padding(20)
+            settingsPage
+                .padding(.horizontal, 18)
+                .padding(.top, 15)
+                .padding(.bottom, 28)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
         }
+        .id(section)
         .accessibilityIdentifier("music-settings-scroll")
         .safeAreaInset(edge: .top, spacing: 0) { settingsHeader }
         .background(palette.background.ignoresSafeArea())
+        .foregroundStyle(palette.ink)
+        .tint(palette.accent)
         .sheet(isPresented: $showStore) {
             StoreView(storeManager: storeManager)
         }
@@ -127,6 +69,16 @@ struct ControlSheet: View {
         .sheet(isPresented: $showScalePicker) {
             ScalePickerSheet(selected: engine.scaleSelection, key: engine.selectedKey, storeManager: storeManager)
                 .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showInstrumentPicker) {
+            InstrumentPickerSheet(selected: $engine.selectedSoundFontInstrument, storeManager: storeManager)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showProgressionPicker) {
+            ProgressionPickerSheet(selected: $engine.chordMelodyProgression, storeManager: storeManager)
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showLearnPicker, onDismiss: {
@@ -162,28 +114,118 @@ struct ControlSheet: View {
 
     // MARK: - Helpers
 
+    private var settingsPage: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            switch section {
+            case .sound:
+                StudioSettingsHero(
+                    title: activePathUsesSoundFont ? engine.selectedSoundFontInstrument.name
+                        : WAVEFORMS.first(where: { $0.id == engine.selectedWaveform })?.name ?? "Synth",
+                    key: engine.selectedKey, scale: engine.selectedScale,
+                    progression: isChordMelodyFamily ? engine.chordMelodyProgression : nil,
+                    instrument: activePathUsesSoundFont ? engine.selectedSoundFontInstrument : nil
+                )
+                harmonySection
+                if !activePathUsesSoundFont { settingsPanel { soundSection } }
+                StudioSettingsPanel {
+                    Button { showSetups = true } label: { StudioSettingRow("Presets", icon: "square.stack") }
+                        .buttonStyle(.plain)
+                }
+            case .play:
+                settingsPanel {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionHeader("PLAY INPUT", icon: "hand.tap")
+                        StudioInputPicker(selection: $playInput, tracker: engine.handTracker)
+                    }
+                }
+                settingsPanel { otherModesPickerSection }
+                if hasModeContextControls {
+                    settingsPanel {
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader("PERFORMANCE", icon: "hand.raised")
+                            modeSection
+                        }
+                    }
+                }
+            case .mix:
+                if !isChordMelodyFamily {
+                    settingsPanel { bpmSection }
+                    settingsPanel { paramsSection }
+                }
+                settingsPanel {
+                    drumTrackSection(label: "DRUMS 1", loop: $engine.selectedDrumLoop,
+                                     volume: $engine.drumVolume, bpm: $engine.drumBPM)
+                }
+                settingsPanel {
+                    drumTrackSection(label: "DRUMS 2", loop: $engine.selectedDrumLoop2,
+                                     volume: $engine.drumVolume2, bpm: $engine.drumBPM2)
+                }
+                if !engine.savedLoops.isEmpty { settingsPanel { loopsSection } }
+                if !engine.savedSnippets.isEmpty { settingsPanel { snippetsSection } }
+                if !engine.track.slots.isEmpty { settingsPanel { trackSection } }
+            case .capture:
+                settingsPanel { recordingSection }
+                settingsPanel { filterSection }
+                settingsPanel { handThemeSection }
+            }
+        }
+    }
+
+    private func settingsPanel<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        StudioSettingsPanel { content().padding(16) }
+    }
+
     private var settingsHeader: some View {
-        ViewThatFits(in: .horizontal) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 settingsTitle
                 Spacer(minLength: 4)
                 settingsActions
             }
-            VStack(alignment: .leading, spacing: 5) {
-                settingsTitle
-                settingsActions
-            }
+            settingsTabs
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 11)
+        .padding(.bottom, 10)
+        .frame(maxWidth: 620)
+        .frame(maxWidth: .infinity)
         .background(palette.background)
         .overlay(alignment: .bottom) { sectionDivider }
     }
 
+    private var settingsTabs: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 3))
+            : AnyLayout(HStackLayout(spacing: 3))
+        return layout {
+            ForEach(SettingsSection.allCases, id: \.self) { tab in
+                let selected = section == tab
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16)) { section = tab }
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: tab.icon).accessibilityHidden(true)
+                        Text(tab.title).font(.caption.weight(.semibold))
+                    }
+                    .foregroundStyle(selected ? palette.onAccent : palette.muted)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(selected ? palette.accent : .clear, in: RoundedRectangle(cornerRadius: 12))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityIdentifier("music-settings-\(tab.rawValue)")
+            }
+        }
+        .padding(4)
+        .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border).allowsHitTesting(false) }
+    }
+
     private var settingsTitle: some View {
         Text("Music settings")
-            .font(.system(.title2, design: .serif))
+            .font(.system(.title, design: .serif))
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -326,81 +368,21 @@ struct ControlSheet: View {
 
     private var modeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // The mode picker lives at the bottom of the sheet now
-            // (`otherModesPickerSection`). This section only carries the
-            // contextual controls for whatever the active mode is.
-
             if currentMode == .chordMelody || currentMode == .radialChordMelody || currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
                 quantizeRow
                 VStack(alignment: .leading, spacing: 10) {
                     Text(currentMode == .radialChordMelody
-                        ? "One wheel shared by both hands: reach toward the outer ring (lettered chords) with the chord hand, the inner ring (lettered notes) with the melody hand. Rest in the center to hold — any chord or note is one move away. Pinch the chord hand for an accent."
+                        ? "Chords are on the outer ring, notes on the inner ring. Rest in the center to hold."
                         : currentMode == .splitChordMelody
-                        ? "Single circle split in half: chord hand fans across the left semicircle (chords top → bottom), melody hand fans across the right semicircle (high pitch at top, low at bottom). Rest in the center to hold. Each hand stays on its own half — straying to the other side just holds the current voice."
+                        ? "One side of the wheel plays chords, the other plays melody. Rest in the center to hold."
                         : currentMode == .scaleChordMelody
-                        ? "Like Split, but the melody half plays the full diatonic scale (7 notes per octave instead of just chord tones) and the chord half voices 7th chords. The outer ring on the melody side shifts the note up or down an octave."
-                        : "Chord hand holds the harmony as a quiet pad. Move up/down to shift the chord octave. Melody hand plays notes snapped to the current chord. Pinch the chord hand for an accent.")
-                        .font(.system(size: 10, design: .rounded))
-                        .foregroundColor(.secondary)
+                        ? "Play the full scale on the melody side. Use the outer ring to shift octaves."
+                        : "Hold a chord with one hand and play its notes with the other. Pinch the chord hand for an accent.")
+                        .font(.footnote)
+                        .foregroundStyle(palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Progression")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(.primary.opacity(0.7))
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(ProgressionCategory.allCases) { cat in
-                                    progressionCategoryChip(cat)
-                                }
-                            }
-                        }
-                        .onAppear { syncProgressionCategoryToSelection() }
-                        .onChange(of: engine.chordMelodyProgression) { _ in
-                            syncProgressionCategoryToSelection()
-                        }
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                if engine.chordMelodyProgression.isCustom {
-                                    progressionChip(engine.chordMelodyProgression)
-                                }
-                                ForEach(CHORD_PROGRESSIONS.filter { $0.category == progressionCategory }) { prog in
-                                    progressionChip(prog)
-                                }
-                            }
-                        }
-
-                        // Manual entry: type any progression in Roman numerals
-                        // ("I V vi IV") or scale-degree numbers ("1 5 6 4").
-                        HStack(spacing: 6) {
-                            TextField("Type a progression…", text: $customProgressionText)
-                                .font(.system(size: 12, design: .rounded))
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled(true)
-                                .submitLabel(.go)
-                                .onSubmit { applyCustomProgression() }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(Capsule().fill(Color.primary.opacity(0.05)))
-                                .overlay(Capsule().stroke(palette.ink.opacity(0.07), lineWidth: 0.5))
-                                .accessibilityIdentifier("progression-input")
-
-                            Button(action: applyCustomProgression) {
-                                Text("Set")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(customProgressionPreview == nil ? .secondary : palette.accent)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        Capsule().fill(customProgressionPreview == nil
-                                            ? Color.primary.opacity(0.04)
-                                            : palette.accent.opacity(0.12))
-                                    )
-                            }
-                            .disabled(customProgressionPreview == nil)
-                            .accessibilityIdentifier("progression-set")
-                        }
-                    }
+                    customProgressionEditor
 
                     Toggle(isOn: $engine.chordMelodySwapHands) {
                         Text("Swap hands (right = chords)")
@@ -441,29 +423,6 @@ struct ControlSheet: View {
                                 .foregroundColor(.primary.opacity(0.8))
                         }
                         .tint(palette.accent)
-
-                        if useSF.wrappedValue {
-                            VStack(alignment: .leading, spacing: 6) {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 6) {
-                                        ForEach(GMCategory.allCases) { cat in
-                                            soundFontCategoryChip(cat)
-                                        }
-                                    }
-                                }
-                                .onAppear { soundFontCategory = engine.selectedSoundFontInstrument.category }
-                                .onChange(of: engine.selectedSoundFontInstrument) { new in
-                                    soundFontCategory = new.category
-                                }
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 6) {
-                                        ForEach(SOUNDFONT_INSTRUMENTS.filter { $0.category == soundFontCategory }) { inst in
-                                            soundFontChip(inst)
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -485,47 +444,9 @@ struct ControlSheet: View {
 
             if currentMode == .soundFont {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Chord+melody played through a real SoundFont instrument. Chord hand holds the harmony; melody hand plays notes snapped to the current chord. Requires a General MIDI .sf2 in the app bundle (see Resources/soundfonts).")
-                        .onAppear { soundFontCategory = engine.selectedSoundFontInstrument.category }
-                        .onChange(of: engine.selectedSoundFontInstrument) { new in
-                            soundFontCategory = new.category
-                        }
-                        .font(.system(size: 10, design: .rounded))
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Instrument")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(.primary.opacity(0.7))
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(GMCategory.allCases) { cat in
-                                    soundFontCategoryChip(cat)
-                                }
-                            }
-                        }
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(SOUNDFONT_INSTRUMENTS.filter { $0.category == soundFontCategory }) { inst in
-                                    soundFontChip(inst)
-                                }
-                            }
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Progression")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(.primary.opacity(0.7))
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(CHORD_PROGRESSIONS) { prog in
-                                    progressionChip(prog)
-                                }
-                            }
-                        }
-                    }
+                    Text("The chord hand holds the harmony. The melody hand plays notes from the current chord.")
+                        .font(.footnote)
+                        .foregroundStyle(palette.muted)
 
                     Toggle(isOn: $engine.chordMelodySwapHands) {
                         Text("Swap hands (right = chords)")
@@ -615,10 +536,7 @@ struct ControlSheet: View {
         }
     }
 
-    /// All modes — including Split — live behind a disclosure at the very
-    /// bottom of the sheet. A first-run user lands in Split by default and
-    /// never has to think about modes. Anyone curious has to scroll past
-    /// every other section to find this.
+    /// Keep optional layouts one tap away without crowding the input controls.
     private var otherModesPickerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button { withAnimation(.easeInOut(duration: 0.18)) { showOtherModes.toggle() } } label: {
@@ -714,46 +632,6 @@ struct ControlSheet: View {
         .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
-    private func soundFontCategoryChip(_ cat: GMCategory) -> some View {
-        let isActive = soundFontCategory == cat
-        return Button(action: { soundFontCategory = cat }) {
-            HStack(spacing: 5) {
-                Text(cat.emoji).font(.system(size: 12))
-                Text(cat.displayName)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .blue : .primary.opacity(0.6))
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(
-                Capsule().fill(isActive ? Color.blue.opacity(0.12) : Color.primary.opacity(0.03))
-            )
-            .overlay(
-                Capsule().stroke(isActive ? Color.blue.opacity(0.5) : palette.ink.opacity(0.05), lineWidth: isActive ? 1 : 0.5)
-            )
-        }
-    }
-
-    private func soundFontChip(_ inst: SoundFontInstrument) -> some View {
-        let isActive = engine.selectedSoundFontInstrument.id == inst.id
-        return Button(action: { engine.selectedSoundFontInstrument = inst }) {
-            HStack(spacing: 6) {
-                Text(inst.emoji).font(.system(size: 14))
-                Text(inst.name)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? palette.accent : .primary.opacity(0.75))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                Capsule().fill(isActive ? palette.accent.opacity(0.12) : Color.primary.opacity(0.04))
-            )
-            .overlay(
-                Capsule().stroke(isActive ? palette.accent.opacity(0.5) : palette.ink.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
-            )
-        }
-    }
-
     /// "Sync to beat" toggle + divisor picker. Reused by Grid and
     /// Chord+Melody / SoundFont modes since the quantize behaviour is
     /// identical — both gate note onsets to the same beat clock.
@@ -789,32 +667,28 @@ struct ControlSheet: View {
         .padding(.top, 2)
     }
 
-    private func progressionCategoryChip(_ cat: ProgressionCategory) -> some View {
-        let isActive = progressionCategory == cat
-        return Button(action: { progressionCategory = cat }) {
-            HStack(spacing: 5) {
-                Text(cat.emoji).font(.system(size: 12))
-                Text(cat.displayName)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? .blue : .primary.opacity(0.6))
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(
-                Capsule().fill(isActive ? Color.blue.opacity(0.12) : Color.primary.opacity(0.03))
-            )
-            .overlay(
-                Capsule().stroke(isActive ? Color.blue.opacity(0.5) : palette.ink.opacity(0.05), lineWidth: isActive ? 1 : 0.5)
-            )
-        }
-    }
+    private var customProgressionEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Custom chord progression").font(.subheadline.weight(.semibold))
+            HStack(spacing: 8) {
+                TextField("I V vi IV", text: $customProgressionText)
+                    .font(.subheadline.monospaced())
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .submitLabel(.go)
+                    .onSubmit { applyCustomProgression() }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 44)
+                    .background(palette.background, in: RoundedRectangle(cornerRadius: 10))
+                    .accessibilityIdentifier("progression-input")
 
-    // Snap the category filter to whichever bucket the active progression
-    // belongs to. Custom progressions stick to the user's current filter so
-    // they can keep browsing while their typed-in one rides at the front.
-    private func syncProgressionCategoryToSelection() {
-        let cat = engine.chordMelodyProgression.category
-        if cat != .custom { progressionCategory = cat }
+                Button("Set", action: applyCustomProgression)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(customProgressionPreview == nil)
+                    .accessibilityIdentifier("progression-set")
+            }
+        }
     }
 
     private var customProgressionPreview: ChordProgression? {
@@ -835,86 +709,51 @@ struct ControlSheet: View {
         return numerals.indices.contains(degree) ? numerals[degree] : "\(degree + 1)"
     }
 
-    private func progressionChip(_ prog: ChordProgression) -> some View {
-        let isActive = engine.chordMelodyProgression.id == prog.id
-        return Button(action: { engine.chordMelodyProgression = prog }) {
-            HStack(spacing: 6) {
-                Text(prog.emoji)
-                    .font(.system(size: 14))
-                Text(prog.name)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isActive ? palette.accent : .primary.opacity(0.75))
-                Text("\(prog.degrees.count)")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(palette.ink.opacity(isActive ? 0.7 : 0.35))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(
-                        Capsule().fill(isActive ? palette.accent.opacity(0.2) : palette.ink.opacity(0.06))
-                    )
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                Capsule().fill(isActive ? palette.accent.opacity(0.12) : Color.primary.opacity(0.04))
-            )
-            .overlay(
-                Capsule().stroke(isActive ? palette.accent.opacity(0.5) : palette.ink.opacity(0.06), lineWidth: isActive ? 1 : 0.5)
-            )
-        }
-    }
-
-
     // MARK: - Harmony
 
     private var harmonySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 9) {
             sectionHeader("HARMONY", icon: "music.note")
-
-            // Key picker
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(MusicKey.allCases) { key in
-                        Button(action: {
-                            engine.selectedKey = key
-                            engine.recomputeScaleNotes()
-                        }) {
-                            Text(key.rawValue)
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundColor(engine.selectedKey == key ? palette.accent : .primary.opacity(0.6))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 9)
-                                .background(
-                                    Capsule()
-                                        .fill(engine.selectedKey == key ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .stroke(engine.selectedKey == key ? palette.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
-                                )
+                .padding(.leading, 3)
+            StudioSettingsPanel {
+                VStack(spacing: 0) {
+                    if activePathUsesSoundFont {
+                        Button { showInstrumentPicker = true } label: {
+                            StudioSettingRow("Instrument", value: engine.selectedSoundFontInstrument.name, icon: "waveform")
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings-instrument-picker")
+                        StudioSettingsDivider()
+                    }
+                    StudioKeyMenu(selection: Binding(get: { engine.selectedKey }, set: {
+                        engine.selectedKey = $0
+                        engine.recomputeScaleNotes()
+                    }))
+                    StudioSettingsDivider()
+                    Button { showScalePicker = true } label: {
+                        StudioSettingRow("Scale", value: engine.selectedScale.displayName, icon: "pianokeys")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("scale-picker")
+                    if isChordMelodyFamily {
+                        StudioSettingsDivider()
+                        Button { showProgressionPicker = true } label: {
+                            StudioSettingRow("Chords", value: engine.chordMelodyProgression.name, icon: "music.note.list")
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
-
-            Button { showScalePicker = true } label: {
-                HStack {
-                    Label("Scale", systemImage: "pianokeys")
-                    Spacer()
-                    Text(engine.selectedScale.displayName).foregroundStyle(palette.accent)
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold))
-                }
-                .frame(minHeight: 36)
-            }
-            .buttonStyle(.bordered)
-            .accessibilityIdentifier("scale-picker")
-
-            // Toggles - pill style
-            HStack(spacing: 12) {
-                pillToggle("Chords", icon: "music.note.list", isOn: $engine.chordMode)
-                pillToggle("Circle of 5ths", icon: "circle.circle", isOn: $engine.circleOfFifthsEnabled)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { harmonyToggles }
+                VStack(alignment: .leading, spacing: 3) { harmonyToggles }
             }
         }
+    }
+
+    @ViewBuilder private var harmonyToggles: some View {
+        pillToggle("Chords", icon: "music.note.list", isOn: $engine.chordMode)
+        pillToggle("Circle of 5ths", icon: "circle.circle", isOn: $engine.circleOfFifthsEnabled)
     }
 
     private func pillToggle(_ label: String, icon: String, isOn: Binding<Bool>) -> some View {
@@ -928,15 +767,15 @@ struct ControlSheet: View {
             .foregroundColor(isOn.wrappedValue ? palette.accent : .primary.opacity(0.5))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(isOn.wrappedValue ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
-            )
+            .background(Capsule().fill(isOn.wrappedValue ? palette.accent.opacity(0.15) : palette.surface))
             .overlay(
                 Capsule()
                     .stroke(isOn.wrappedValue ? palette.accent.opacity(0.4) : palette.ink.opacity(0.06), lineWidth: isOn.wrappedValue ? 1.5 : 0.5)
             )
         }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
     }
 
     // MARK: - Sound
@@ -1427,12 +1266,17 @@ struct ControlSheet: View {
     }
 
     private var recordingSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             sectionHeader("RECORDING", icon: "video")
-
-            pillToggle("Hide hand tracking in recordings", icon: "hand.raised.slash", isOn: $hideSkeletonWhenRecording)
-            pillToggle("Include microphone (solo takes)", icon: "mic", isOn: $recordPerformanceMicrophone)
+            Toggle(isOn: $hideSkeletonWhenRecording) {
+                Label("Hide hand tracking in recordings", systemImage: "hand.raised.slash")
+            }
+            sectionDivider
+            Toggle(isOn: $recordPerformanceMicrophone) {
+                Label("Include microphone (solo takes)", systemImage: "mic")
+            }
         }
+        .font(.subheadline.weight(.medium))
     }
 
     // MARK: - Snippets

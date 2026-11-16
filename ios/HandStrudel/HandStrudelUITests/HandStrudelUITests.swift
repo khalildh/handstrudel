@@ -55,6 +55,7 @@ final class HandStrudelUITests: XCTestCase {
     }
 
     private func expandOtherModes() {
+        selectMusicSettingsSection("play")
         let disclosure = app.buttons["music-other-modes"].firstMatch
         revealInMusicSettings(disclosure)
         if !element("mode-melodic").exists { disclosure.tap() }
@@ -68,6 +69,13 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(mode.waitForExistence(timeout: 3))
         revealInMusicSettings(mode)
         mode.tap()
+    }
+
+    private func selectMusicSettingsSection(_ name: String) {
+        let section = app.buttons["music-settings-\(name)"]
+        XCTAssertTrue(section.waitForExistence(timeout: 5))
+        if !section.isSelected { section.tap() }
+        XCTAssertTrue(section.isSelected)
     }
 
     private func revealInMusicSettings(_ item: XCUIElement) {
@@ -485,8 +493,15 @@ final class HandStrudelUITests: XCTestCase {
         let feed = element("tab-feed")
         XCTAssertTrue(feed.waitForExistence(timeout: 5))
         feed.tap()
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["play-along"].firstMatch.exists, "Play along should not cover the video.")
+        sound.tap()
         let playAlong = app.buttons["play-along"].firstMatch
         XCTAssertTrue(playAlong.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Sound options"].exists)
+        XCTAssertTrue(app.buttons["save-clip-preset"].exists)
+        captureIfRequested("Feed-Sound-Options")
         playAlong.tap()
         let pause = app.buttons["Pause backing track"]
         XCTAssertTrue(pause.waitForExistence(timeout: 12), app.alerts.firstMatch.debugDescription)
@@ -582,6 +597,43 @@ final class HandStrudelUITests: XCTestCase {
         lower.press(forDuration: 0.05, thenDragTo: upper)
         let second = app.staticTexts["Second performance"].firstMatch
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
+    }
+
+    func testFeedFullScreenKeepsPausedPlayhead() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_PLAY_ALONG_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with a real MP4.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        element("tab-feed").tap()
+        let fullscreen = app.buttons["feed-fullscreen"]
+        XCTAssertTrue(fullscreen.waitForExistence(timeout: 5))
+        XCTAssertEqual(fullscreen.label, "Full screen")
+        let slider = app.sliders["feed-video-progress"].firstMatch
+        XCTAssertTrue(slider.waitForExistence(timeout: 8))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.40)).tap()
+        slider.adjust(toNormalizedSliderPosition: 0.65)
+        let pausedPosition = try XCTUnwrap(slider.value as? String)
+        XCTAssertFalse(pausedPosition.hasPrefix("0:00"), pausedPosition)
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.isHittable)
+        captureIfRequested("Feed-Compact")
+
+        fullscreen.tap()
+        XCTAssertEqual(fullscreen.label, "Exit full screen")
+        XCTAssertFalse(element("tab-feed").exists)
+        XCTAssertFalse(sound.exists)
+        XCTAssertEqual(slider.value as? String, pausedPosition)
+        captureIfRequested("Feed-Full-Screen")
+        fullscreen.tap()
+
+        XCTAssertEqual(fullscreen.label, "Full screen")
+        XCTAssertTrue(element("tab-feed").exists)
+        XCTAssertTrue(sound.isHittable)
+        XCTAssertEqual(slider.value as? String, pausedPosition)
     }
 
     @MainActor
@@ -877,6 +929,9 @@ final class HandStrudelUITests: XCTestCase {
     func testPlayThisSoundFromFeedOpensMusicSession() throws {
         try launchWithProfileFixture()
         element("tab-feed").tap()
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 8))
+        sound.tap()
         let preset = app.buttons.matching(identifier: "play-clip-preset").firstMatch
         XCTAssertTrue(preset.waitForExistence(timeout: 8))
         XCTAssertTrue(preset.isHittable)
@@ -1174,6 +1229,7 @@ final class HandStrudelUITests: XCTestCase {
             app.launch()
         }
         element("settings-button").tap()
+        selectMusicSettingsSection("play")
         let touch = app.segmentedControls["studio-play-input"].buttons["Touch only"]
         XCTAssertTrue(touch.waitForExistence(timeout: 5))
         touch.tap()
@@ -1206,6 +1262,7 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["wheel-note-0"].exists)
         XCTAssertTrue(app.buttons["wheel-chord-0"].exists)
         element("settings-button").tap()
+        selectMusicSettingsSection("play")
         let touch = app.segmentedControls["studio-play-input"].buttons["Touch only"]
         XCTAssertTrue(touch.waitForExistence(timeout: 5))
         XCTAssertTrue(touch.isSelected)
@@ -1228,10 +1285,31 @@ final class HandStrudelUITests: XCTestCase {
         let settingsBtn = element("settings-button")
         XCTAssertTrue(settingsBtn.waitForExistence(timeout: 3))
         settingsBtn.tap()
-        // HARMONY is the first section header that's always present (the
-        // top-of-sheet MODE header was removed when the mode picker moved
-        // into the bottom-of-sheet "Other modes" disclosure).
         XCTAssertTrue(app.staticTexts["HARMONY"].waitForExistence(timeout: 5))
+    }
+
+    func testMusicSettingsDashboardShowsOnlyTheSelectedControls() {
+        launchToSession()
+        element("settings-button").tap()
+        selectMusicSettingsSection("sound")
+        XCTAssertTrue(app.staticTexts["CURRENT SOUND"].exists)
+        XCTAssertTrue(app.buttons["scale-picker"].isHittable)
+        XCTAssertFalse(app.segmentedControls["studio-play-input"].exists)
+        captureIfRequested("Music-Settings-Sound")
+
+        selectMusicSettingsSection("play")
+        XCTAssertTrue(app.segmentedControls["studio-play-input"].isHittable)
+        XCTAssertTrue(app.buttons["music-other-modes"].isHittable)
+        XCTAssertFalse(app.buttons["scale-picker"].exists)
+
+        selectMusicSettingsSection("mix")
+        XCTAssertTrue(app.staticTexts["DRUMS 1"].isHittable)
+        XCTAssertFalse(app.segmentedControls["studio-play-input"].exists)
+
+        selectMusicSettingsSection("capture")
+        XCTAssertTrue(app.switches["Include microphone (solo takes)"].isHittable)
+        captureIfRequested("Music-Settings-Capture")
+        closeMusicSettings()
     }
 
     func testControlSheet_showsHarmonySection() {
@@ -1263,6 +1341,7 @@ final class HandStrudelUITests: XCTestCase {
         switchToMode("mode-melodic")
         closeMusicSettings()
         element("settings-button").tap()
+        selectMusicSettingsSection("mix")
         let bpm = app.staticTexts["BPM"]
         if !bpm.exists { app.swipeUp() }
         XCTAssertTrue(bpm.waitForExistence(timeout: 3))
@@ -1363,6 +1442,7 @@ final class HandStrudelUITests: XCTestCase {
         switchToMode("mode-melodic")
         closeMusicSettings()
         element("settings-button").tap()
+        selectMusicSettingsSection("mix")
         let bpm = app.staticTexts["BPM"]
         if !bpm.exists { app.swipeUp() }
         XCTAssertTrue(bpm.waitForExistence(timeout: 3))

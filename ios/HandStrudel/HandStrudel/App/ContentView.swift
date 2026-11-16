@@ -63,6 +63,7 @@ struct ContentView: View {
     @State private var reviewReadyThisSession = false
     @State private var destination: Destination = .music
     @State private var hasOpenedFeed = false
+    @State private var feedFullscreen = false
     @State private var startingSession = false
     @State private var showDrafts = false
     @State private var showLoops = false
@@ -127,7 +128,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            (engine.isRunning ? Color.black : palette.background).ignoresSafeArea()
+            (engine.isRunning || feedFullscreen ? Color.black : palette.background).ignoresSafeArea()
 
             if !engine.isRunning || hasOpenedFeed {
                 destinations
@@ -294,7 +295,7 @@ struct ContentView: View {
             jamError = message
             engine.jamSession.errorMessage = nil
         }
-        .statusBarHidden(engine.isRunning)
+        .statusBarHidden(engine.isRunning || feedFullscreen)
         .onChange(of: engine.isRunning) { running in
             if running {
                 startingSession = false
@@ -332,6 +333,7 @@ struct ContentView: View {
         }
         .onChange(of: destination) { tab in
             if tab == .feed { hasOpenedFeed = true }
+            else { feedFullscreen = false }
         }
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
             guard !engine.isRunning, let presetId = notification.object as? String else { return }
@@ -365,7 +367,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             ZStack {
                 if hasOpenedFeed && SocialConfig.isConfigured {
-                    FeedView(auth: auth, isActive: destination == .feed && !engine.isRunning,
+                    FeedView(auth: auth, isActive: destination == .feed && !engine.isRunning, isFullscreen: $feedFullscreen,
                              onMakeMusic: { destination = .music }, onTrySound: trySharedSound,
                              onPlayAlong: prepareBacking)
                         .opacity(destination == .feed ? 1 : 0)
@@ -401,50 +403,54 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
 
-            HStack(spacing: 0) {
-                ForEach(Destination.allCases, id: \.self) { tab in
-                    let selected = destination == tab
-                    Button {
-                        destination = tab
-                    } label: {
-                        VStack(spacing: 5) {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 19, weight: .semibold))
-                                .frame(width: 56, height: 31)
-                                .background {
-                                    if tab == .music {
-                                        Capsule().fill(selected ? palette.accent : palette.accent.opacity(0.12))
-                                    }
-                                }
-                                .foregroundStyle(tab == .music && selected ? palette.onAccent
-                                                 : selected || tab == .music ? palette.accent : palette.muted)
-                            Text(tab.rawValue)
-                                .font(.caption2.weight(selected ? .semibold : .medium))
-                                .foregroundStyle(selected ? palette.ink : palette.muted)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 54)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                    .accessibilityIdentifier("tab-\(tab.rawValue.lowercased())")
-                }
-            }
-            .frame(maxWidth: 520)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity)
-            .background {
-                palette.background.ignoresSafeArea(edges: .bottom)
-            }
-            .overlay(alignment: .top) { Rectangle().fill(palette.border).frame(height: 1) }
-            .disabled(startingSession)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Main navigation")
+            if !feedFullscreen { destinationTabs }
         }
         .tint(palette.accent)
+    }
+
+    private var destinationTabs: some View {
+        HStack(spacing: 0) {
+            ForEach(Destination.allCases, id: \.self) { tab in
+                let selected = destination == tab
+                Button {
+                    destination = tab
+                } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 19, weight: .semibold))
+                            .frame(width: 56, height: 31)
+                            .background {
+                                if tab == .music {
+                                    Capsule().fill(selected ? palette.accent : palette.accent.opacity(0.12))
+                                }
+                            }
+                            .foregroundStyle(tab == .music && selected ? palette.onAccent
+                                             : selected || tab == .music ? palette.accent : palette.muted)
+                        Text(tab.rawValue)
+                            .font(.caption2.weight(selected ? .semibold : .medium))
+                            .foregroundStyle(selected ? palette.ink : palette.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityIdentifier("tab-\(tab.rawValue.lowercased())")
+            }
+        }
+        .frame(maxWidth: 520)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .background {
+            palette.background.ignoresSafeArea(edges: .bottom)
+        }
+        .overlay(alignment: .top) { Rectangle().fill(palette.border).frame(height: 1) }
+        .disabled(startingSession)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Main navigation")
     }
 
     private func socialUnavailable(_ title: String, icon: String) -> some View {
@@ -1175,7 +1181,7 @@ struct ContentView: View {
                          playInput: Binding(get: { engine.playInput }, set: changePlayInput),
                          hideSkeletonWhenRecording: $hideSkeletonWhenRecording,
                          recordPerformanceMicrophone: $recordPerformanceMicrophone)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .onAppear { engine.pause() }
                 .onDisappear { engine.resume() }
