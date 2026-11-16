@@ -677,12 +677,32 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertFalse(sound.exists)
         XCTAssertEqual(slider.value as? String, pausedPosition)
         captureIfRequested("Feed-Full-Screen")
+        checkPlaybackControlsToggle(at: app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.40)),
+                                    slider: slider, exit: fullscreen, pausedAt: pausedPosition)
         fullscreen.tap()
 
         XCTAssertEqual(fullscreen.label, "Full screen")
         XCTAssertTrue(element("tab-feed").exists)
         XCTAssertTrue(sound.isHittable)
         XCTAssertEqual(slider.value as? String, pausedPosition)
+    }
+
+    private func checkPlaybackControlsToggle(at video: XCUICoordinate, slider: XCUIElement,
+                                             exit: XCUIElement, pausedAt: String) {
+        let mute = app.buttons["video-playback-mute"].firstMatch
+        let play = app.buttons["fullscreen-playback-toggle"].firstMatch
+        XCTAssertTrue(mute.isHittable)
+        XCTAssertEqual(play.label, "Play video")
+        video.tap()
+        XCTAssertFalse(slider.exists)
+        XCTAssertFalse(mute.exists)
+        XCTAssertFalse(play.exists)
+        XCTAssertTrue(exit.isHittable)
+        video.tap()
+        XCTAssertTrue(slider.waitForExistence(timeout: 5))
+        XCTAssertTrue(mute.isHittable)
+        XCTAssertEqual(play.label, "Play video")
+        XCTAssertEqual(slider.value as? String, pausedAt)
     }
 
     func testFeedRepostUpdatesTheCountAndCanBeRemoved() throws {
@@ -844,6 +864,8 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(fullscreen.label, "Exit full screen")
         XCTAssertEqual(slider.value as? String, position)
         XCTAssertFalse(count.isHittable)
+        checkPlaybackControlsToggle(at: element("performance-video").coordinate(withNormalizedOffset: CGVector(dx: 0.48, dy: 0.44)),
+                                    slider: slider, exit: fullscreen, pausedAt: position)
         fullscreen.tap()
         XCTAssertEqual(fullscreen.label, "Full screen")
         XCTAssertEqual(slider.value as? String, position)
