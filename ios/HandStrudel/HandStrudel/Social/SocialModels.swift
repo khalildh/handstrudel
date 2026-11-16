@@ -29,6 +29,13 @@ struct VideoEngagement: Decodable, Equatable {
     let saves: Int
     let shares: Int
     let remixes: Int
+    let reposts: Int?
+    let repostedByMe: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case saves, shares, remixes, reposts
+        case repostedByMe = "reposted_by_me"
+    }
 }
 
 struct Video: Codable, Equatable, Identifiable {
@@ -59,6 +66,9 @@ struct Video: Codable, Equatable, Identifiable {
     var sourceVideoId: UUID?
     var sourceUsername: String?
     var savedAt: Date?
+    var activityAt: String?
+    var repostedBy: String?
+    var repostedByID: UUID?
 
     enum CodingKeys: String, CodingKey {
         case id, caption, instrument, mode, width, height, hidden, username
@@ -79,6 +89,9 @@ struct Video: Codable, Equatable, Identifiable {
         case sourceVideoId = "source_video_id"
         case sourceUsername = "source_username"
         case savedAt = "saved_at"
+        case activityAt = "activity_at"
+        case repostedBy = "reposted_by"
+        case repostedByID = "reposted_by_id"
     }
 
     init(from decoder: Decoder) throws {
@@ -110,6 +123,9 @@ struct Video: Codable, Equatable, Identifiable {
         sourceVideoId = try row.decodeIfPresent(UUID.self, forKey: .sourceVideoId)
         sourceUsername = try row.decodeIfPresent(String.self, forKey: .sourceUsername)
         savedAt = try row.decodeIfPresent(Date.self, forKey: .savedAt)
+        activityAt = try row.decodeIfPresent(String.self, forKey: .activityAt)
+        repostedBy = try row.decodeIfPresent(String.self, forKey: .repostedBy)
+        repostedByID = try row.decodeIfPresent(UUID.self, forKey: .repostedByID)
     }
 
     var videoURL: URL { SocialConfig.mediaURL(videoKey) }

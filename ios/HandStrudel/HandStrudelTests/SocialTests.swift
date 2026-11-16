@@ -690,7 +690,7 @@ final class SocialTests: XCTestCase {
 
     func testFollowingWithNoFollowsReturnsEmptyWhenViewIsMissing() async throws {
         let client = discoveryClient { request in
-            if request.path == "/following_videos" { return Self.missingView }
+            if ["/following_activity_videos", "/following_videos"].contains(request.path) { return Self.missingView }
             XCTAssertEqual(request.path, "/follows")
             XCTAssertEqual(request.queryItems?.first(where: { $0.name == "follower_id" })?.value,
                            "eq.\(Self.discoveryViewer.lowercased())")
@@ -711,7 +711,7 @@ final class SocialTests: XCTestCase {
         ]
         for (status, body, expectedNoFollows) in responses {
             let client = discoveryClient { request in
-                if request.path == "/following_videos" { return (200, "[]") }
+                if request.path == "/following_activity_videos" { return (200, "[]") }
                 XCTAssertEqual(request.path, "/follows")
                 XCTAssertEqual(request.queryItems?.first(where: { $0.name == "follower_id" })?.value,
                                "eq.\(Self.discoveryViewer)")
@@ -726,7 +726,7 @@ final class SocialTests: XCTestCase {
 
     func testFollowingFallsBackToVisiblePostsWithTheFullPaginationTimestamp() async throws {
         let client = discoveryClient { request in
-            if request.path == "/following_videos" { return Self.missingView }
+            if ["/following_activity_videos", "/following_videos"].contains(request.path) { return Self.missingView }
             if request.path == "/follows" { return (200, "[{\"followee_id\":\"\(Self.discoveryUser)\"}]") }
             XCTAssertEqual(request.path, "/feed_videos")
             XCTAssertTrue(request.queryItems?.first(where: { $0.name == "user_id" })?.value?
@@ -748,7 +748,7 @@ final class SocialTests: XCTestCase {
 
     func testFollowingDoesNotHideAnAuthorizationFailure() async throws {
         let client = discoveryClient { request in
-            XCTAssertEqual(request.path, "/following_videos")
+            XCTAssertEqual(request.path, "/following_activity_videos")
             return (403, #"{"code":"42501","message":"permission denied"}"#)
         }
         let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
@@ -760,11 +760,33 @@ final class SocialTests: XCTestCase {
         }
     }
 
+    func testFollowingPaginatesByRepostTimeAndKeepsOriginalAuthor() async throws {
+        let activity = "2026-11-16T12:00:01.123456+00:00"
+        let response = Self.discoveryVideo.replacingOccurrences(of: "\"caption\":",
+            with: "\"activity_at\":\"\(activity)\",\"reposted_by\":\"friend\",\"caption\":")
+        let client = discoveryClient { request in
+            XCTAssertEqual(request.path, "/following_activity_videos")
+            XCTAssertEqual(request.queryItems?.first(where: { $0.name == "order" })?.value, "activity_at.desc.nullslast,id.desc.nullslast")
+            if let cursor = request.queryItems?.first(where: { $0.name == "or" })?.value {
+                XCTAssertTrue(cursor.contains("activity_at.lt.\(activity)"))
+                return (200, "[]")
+            }
+            return (200, response)
+        }
+        let user = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
+        let page = try await FeedService.followingPage(user: user, from: client.from)
+        let post = try XCTUnwrap(page.videos.first)
+        XCTAssertEqual(post.username, "musician")
+        XCTAssertEqual(post.repostedBy, "friend")
+        let next = try await FeedService.followingPage(user: user, after: post, from: client.from)
+        XCTAssertTrue(next.videos.isEmpty)
+    }
+
     @MainActor
     func testFollowingModelSeparatesFallbackErrorFromConfirmedEmptyRetry() async throws {
         let viewer = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
         let denied = discoveryClient { request in
-            if request.path == "/following_videos" { return Self.missingView }
+            if ["/following_activity_videos", "/following_videos"].contains(request.path) { return Self.missingView }
             XCTAssertEqual(request.path, "/follows")
             return (403, #"{"code":"42501","message":"permission denied"}"#)
         }
@@ -778,7 +800,7 @@ final class SocialTests: XCTestCase {
         XCTAssertFalse(model.loading)
 
         let empty = discoveryClient { request in
-            if request.path == "/following_videos" { return Self.missingView }
+            if ["/following_activity_videos", "/following_videos"].contains(request.path) { return Self.missingView }
             XCTAssertEqual(request.path, "/follows")
             return (200, "[]")
         }

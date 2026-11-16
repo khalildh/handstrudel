@@ -11,9 +11,21 @@ enum FeedService {
     private struct VideoTarget: Encodable { let target_video: UUID }
 
     static func engagement(for video: UUID) async throws -> VideoEngagement? {
-        let rows: [VideoEngagement] = try await supabase.rpc("video_engagement", params: VideoTarget(target_video: video))
-            .execute().value
-        return rows.first
+        func load(_ rpc: String) async throws -> VideoEngagement? {
+            let rows: [VideoEngagement] = try await supabase.rpc(rpc, params: VideoTarget(target_video: video)).execute().value
+            return rows.first
+        }
+        do { return try await load("video_engagement_v2") }
+        catch let error as PostgrestError where isMissingFunction(error) { return try await load("video_engagement") }
+    }
+
+    static func setReposted(_ repost: Bool, video: UUID) async throws -> VideoEngagement? {
+        struct Parameters: Encodable { let target_video: UUID; let repost: Bool }
+        do {
+            let rows: [VideoEngagement] = try await supabase.rpc("set_video_repost", params: Parameters(target_video: video, repost: repost))
+                .execute().value
+            return rows.first
+        } catch let error as PostgrestError where isMissingFunction(error) { throw Unavailable.reposts }
     }
 
     static func recordShare(for video: UUID) async throws {
@@ -30,12 +42,13 @@ enum FeedService {
     }
 
     enum Unavailable: LocalizedError {
-        case bookmarks, activity
+        case bookmarks, activity, reposts
 
         var errorDescription: String? {
             switch self {
             case .bookmarks: return "Saving posts isn't available yet."
             case .activity: return "Notifications aren't available yet."
+            case .reposts: return "Reposting isn't available yet."
             }
         }
     }
@@ -264,6 +277,20 @@ enum FeedService {
 
         let page: [Video]
         do {
+            page = try await orderedPage(from("following_activity_videos").select(), after: last, dateColumn: "activity_at")
+        } catch let error as PostgrestError where isMissingView(error) {
+            return try await legacyFollowingPage(after: last, from: from, followsQuery: followsQuery)
+        }
+        guard last == nil, page.isEmpty else { return FollowingPage(videos: page) }
+        let follows: [Follow]? = try? await followsQuery().limit(1).execute().value
+        return FollowingPage(videos: page, confirmedNoFollows: follows?.isEmpty == true)
+    }
+
+    private static func legacyFollowingPage(after last: Video?, from: (String) -> PostgrestQueryBuilder,
+                                            followsQuery: () -> PostgrestFilterBuilder) async throws -> FollowingPage {
+        struct Follow: Decodable { let followee_id: UUID }
+        let page: [Video]
+        do {
             page = try await orderedPage(from("following_videos").select(), after: last)
         } catch let error as PostgrestError where isMissingView(error) {
             // Query visible feed rows in bounded batches on deployments without the joined view.
@@ -303,20 +330,25 @@ enum FeedService {
         error.code == "PGRST205" || error.code == "42P01"
     }
 
+    private static func isMissingFunction(_ error: PostgrestError) -> Bool {
+        error.code == "PGRST202" || error.code == "42883"
+    }
+
     private static func orderedPage(_ base: PostgrestFilterBuilder, after last: Video?, creator: UUID? = nil,
-                                    challenge: UUID? = nil, search: PostSearch? = nil, limit: Int = pageSize) async throws -> [Video] {
+                                    challenge: UUID? = nil, search: PostSearch? = nil, limit: Int = pageSize,
+                                    dateColumn: String = "created_at") async throws -> [Video] {
         var query = base
         if let creator { query = query.eq("user_id", value: creator) }
         if let challenge { query = query.eq("challenge_id", value: challenge) }
         let cursor = last.map { last in
             // Keyset pagination on (created_at, id), matching videos_feed_idx.
-            let ts = last.feedCursorTimestamp
-            return "created_at.lt.\(ts),and(created_at.eq.\(ts),id.lt.\(last.id.uuidString.lowercased()))"
+            let ts = (dateColumn == "activity_at" ? last.activityAt : nil) ?? last.feedCursorTimestamp
+            return "\(dateColumn).lt.\(ts),and(\(dateColumn).eq.\(ts),id.lt.\(last.id.uuidString.lowercased()))"
         }
         if let search { query = query.or(search.filter(after: cursor)) }
         else if let cursor { query = query.or(cursor) }
         return try await query
-            .order("created_at", ascending: false)
+            .order(dateColumn, ascending: false)
             .order("id", ascending: false)
             .limit(limit)
             .execute().value

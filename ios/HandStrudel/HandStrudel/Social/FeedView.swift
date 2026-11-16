@@ -18,6 +18,7 @@ struct FeedView<Navigation: View>: View {
     let onMakeMusic: () -> Void
     let onTrySound: (SoundSetup) -> Void
     let onPlayAlong: (Video) -> Void
+    let onVideoAvailabilityChanged: (Bool) -> Void
     let navigation: (Bool) -> Navigation
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model = FeedModel()
@@ -53,6 +54,14 @@ struct FeedView<Navigation: View>: View {
     private var engagementTarget: UUID? { allowsFeedPlayback && !isFullscreen ? model.currentVideoID : nil }
 
     var body: some View {
+        GeometryReader { bounds in
+            feedCanvas(safeInsets: bounds.safeAreaInsets)
+        }
+        .onChange(of: hasVideos, perform: onVideoAvailabilityChanged)
+        .onAppear { onVideoAvailabilityChanged(hasVideos) }
+    }
+
+    private func feedCanvas(safeInsets: EdgeInsets) -> some View {
         ZStack {
             if hasVideos {
                 PagedFeed(videos: model.videos, current: $model.current, isVisible: isActive, allowsPlayback: allowsFeedPlayback, refresh: {
@@ -60,7 +69,8 @@ struct FeedView<Navigation: View>: View {
                 }) { video, isCurrent, playbackGate in
                     FeedCell(video: video, isCurrent: isCurrent, isFullscreen: isFullscreen, playbackGate: playbackGate,
                              engagement: model.engagement[video.id],
-                             overlayHeights: isFullscreen ? .init() : overlayHeights,
+                             overlayHeights: .init(header: overlayHeights.header + safeInsets.top,
+                                                   navigation: (isFullscreen ? 0 : overlayHeights.navigation) + safeInsets.bottom),
                              isMine: video.userId == auth.userId,
                              isFollowing: model.following.contains(video.userId),
                              isSaved: model.savedIDs.contains(video.id),
@@ -77,6 +87,7 @@ struct FeedView<Navigation: View>: View {
                              bookmark: {
                                  toggleBookmark(video)
                              },
+                             repost: { toggleRepost(video) },
                              share: { sharing = video },
                              downloadAudio: { audioDownload = video },
                              changeAudioPermission: {
@@ -99,6 +110,7 @@ struct FeedView<Navigation: View>: View {
                              source: { id in Task { await openSource(id) } })
                         .environment(\.studioPalette, palette)
                         .environment(\.colorScheme, .dark)
+                        .ignoresSafeArea(.container, edges: [.top, .bottom])
                 }
                 .onChange(of: model.current) { _ in Task { await model.loadMore() } }
                 .accessibilityScrollAction { edge in
@@ -107,6 +119,7 @@ struct FeedView<Navigation: View>: View {
                 }
                 .accessibilityAction(named: Text("Previous video")) { movePage(by: -1) }
                 .accessibilityAction(named: Text("Next video")) { movePage(by: 1) }
+                .ignoresSafeArea(.container, edges: [.top, .bottom])
             } else {
                 emptyState
                     .padding(.top, overlayHeights.header)
@@ -304,6 +317,7 @@ struct FeedView<Navigation: View>: View {
         .background {
             if hasVideos && !isFullscreen {
                 LinearGradient(colors: [.black.opacity(0.8), .black.opacity(0.38), .clear], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea(.container, edges: .top)
                     .allowsHitTesting(false)
             }
         }
@@ -445,6 +459,22 @@ struct FeedView<Navigation: View>: View {
         writeBookmark(video, user: uid)
     }
 
+    private func toggleRepost(_ video: Video) {
+        requireSignIn { uid in
+            Task {
+                do {
+                    if let reposted = try await model.toggleRepost(video, user: uid) {
+                        show(reposted ? "Reposted to your followers." : "Repost removed.")
+                    }
+                } catch let error as FeedService.Unavailable {
+                    show(error.localizedDescription)
+                } catch {
+                    show("Couldn't update your repost. Try again.")
+                }
+            }
+        }
+    }
+
     private func writeBookmark(_ video: Video, user: UUID, explicitlySave: Bool = false) {
         Task {
             do {
@@ -578,6 +608,7 @@ final class FeedModel: ObservableObject {
     private var pendingLikes = Set<UUID>()
     private var pendingFollows = Set<UUID>()
     private var pendingBookmarks = Set<UUID>()
+    private var pendingReposts = Set<UUID>()
     private var bookmarkRevision = 0
     private let writeLike: (Bool, UUID, UUID) async throws -> Void
     private let loadPublicPage: (Video?, Int) async throws -> [Video]
@@ -610,6 +641,18 @@ final class FeedModel: ObservableObject {
         guard let counts = try? await FeedService.engagement(for: id), !Task.isCancelled,
               engagementRequests[id] == request, videos.contains(where: { $0.id == id }) else { return }
         if engagement[id] != counts { engagement[id] = counts }
+    }
+
+    func toggleRepost(_ video: Video, user: UUID) async throws -> Bool? {
+        guard viewer == user, video.userId != user, pendingReposts.insert(video.id).inserted else { return nil }
+        defer { pendingReposts.remove(video.id) }
+        if engagement[video.id]?.repostedByMe == nil { await refreshEngagement(for: video.id) }
+        guard viewer == user, let reposted = engagement[video.id]?.repostedByMe else { throw FeedService.Unavailable.reposts }
+        guard let updated = try await FeedService.setReposted(!reposted, video: video.id) else { return nil }
+        guard viewer == user else { return nil }
+        engagementRequests[video.id] = nil
+        if videos.contains(where: { $0.id == video.id }) { engagement[video.id] = updated }
+        return updated.repostedByMe
     }
 
     func refresh(user: UUID?, loadFollowingPage: (UUID) async throws -> FeedService.FollowingPage = {
@@ -707,7 +750,7 @@ final class FeedModel: ObservableObject {
     private func loadFollowing(in page: [Video], request: Int) async {
         guard let viewer else { return }
         let authors = Set(page.map(\.userId)).subtracting([viewer])
-        let set = followingOnly ? authors : (try? await FeedService.followedAuthors(authors, user: viewer)) ?? []
+        let set = (try? await FeedService.followedAuthors(authors, user: viewer)) ?? []
         if request == generation { following.formUnion(set) }
     }
 
@@ -782,7 +825,14 @@ final class FeedModel: ObservableObject {
         }
         if viewer == user {
             if follow { following.insert(author) } else { following.remove(author) }
-            if followingOnly && !follow { remove { $0.userId == author } }
+            if followingOnly && !follow {
+                remove { ($0.userId == author && $0.repostedByID == nil)
+                    || ($0.repostedByID == author && !following.contains($0.userId)) }
+                for index in videos.indices where videos[index].repostedByID == author {
+                    videos[index].repostedBy = nil
+                    videos[index].repostedByID = nil
+                }
+            }
         }
     }
 
@@ -798,7 +848,7 @@ final class FeedModel: ObservableObject {
 
     func removeBlockedAuthor(_ author: UUID) {
         following.remove(author)
-        remove { $0.userId == author }
+        remove { $0.userId == author || $0.repostedByID == author }
     }
 
     func delete(_ video: Video) async throws {
@@ -1706,6 +1756,7 @@ private struct FeedCell: View {
     let comments: () -> Void
     let creator: () -> Void
     let bookmark: () -> Void
+    let repost: () -> Void
     let share: () -> Void
     let downloadAudio: () -> Void
     let changeAudioPermission: () -> Void
@@ -1737,13 +1788,19 @@ private struct FeedCell: View {
                             }
                         }
                     } else {
-                        postControls(railHeight: max(44, bounds.size.height - overlayHeights.header - overlayHeights.navigation - 56))
-                        if isCurrent { FeedProgressStrip(playback: playback) }
+                        let railHeight = bounds.size.height - overlayHeights.header - overlayHeights.navigation
+                            - FeedProgressStrip.height - 12
+                        postControls(railHeight: max(44, railHeight))
+                        // Reserve the scrubber row even when the player has no duration yet.
+                        ZStack {
+                            if isCurrent { FeedProgressStrip(playback: playback) }
+                        }
+                        .frame(height: FeedProgressStrip.height)
                     }
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 15)
-                .padding(.bottom, overlayHeights.navigation + (isCurrent && playback.position != nil ? 3 : 16))
+                .padding(.bottom, overlayHeights.navigation + 3)
             }
         }
         .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -1757,6 +1814,14 @@ private struct FeedCell: View {
     private func postControls(railHeight: CGFloat) -> some View {
         HStack(alignment: .bottom, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
+                if engagement?.repostedByMe == true {
+                    Label("You reposted", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption.weight(.semibold)).foregroundStyle(palette.mediaAccent)
+                } else if let username = video.repostedBy {
+                    Label("@\(username) reposted", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(1)
+                }
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { author; followButton }
                     VStack(alignment: .leading, spacing: 4) { author; followButton }
@@ -1802,17 +1867,28 @@ private struct FeedCell: View {
             }
 
             if let engagement {
-                railMetric("arrow.triangle.2.circlepath", label: "Remixes", count: engagement.remixes)
+                railMetric("waveform.badge.plus", label: "Remixes", count: engagement.remixes)
                     .accessibilityIdentifier("feed-remix-count")
             }
 
-            Button(action: share) { railGlyph("paperplane", count: engagement?.shares) }
+            if !isMine {
+                let didRepost = engagement?.repostedByMe == true
+                Button(action: repost) {
+                    railGlyph("arrow.triangle.2.circlepath", count: engagement?.reposts,
+                              tint: didRepost ? palette.mediaAccent : .white, reserveCount: true)
+                }
+                .accessibilityLabel(didRepost ? "Remove repost" : "Repost")
+                .accessibilityValue(engagement?.reposts.map { "\($0.formatted()) reposts" } ?? "")
+                .accessibilityIdentifier("feed-repost")
+            }
+
+            Button(action: share) { railGlyph("paperplane", count: engagement?.shares, reserveCount: true) }
                 .accessibilityLabel("Share video")
                 .accessibilityValue(engagement.map { "\($0.shares.formatted()) shares" } ?? "")
 
             Button(action: bookmark) {
                 railGlyph(isSaved ? "bookmark.fill" : "bookmark", count: engagement?.saves,
-                          tint: isSaved ? palette.mediaAccent : .white)
+                          tint: isSaved ? palette.mediaAccent : .white, reserveCount: true)
             }
             .accessibilityLabel(isSaved ? "Remove from Saved" : "Save privately")
             .accessibilityValue(engagement.map { "\($0.saves.formatted()) saves" } ?? "")
@@ -1858,11 +1934,12 @@ private struct FeedCell: View {
             .accessibilityValue(count.formatted())
     }
 
-    private func railGlyph(_ symbol: String, count: Int? = nil, tint: Color = .white) -> some View {
+    private func railGlyph(_ symbol: String, count: Int? = nil, tint: Color = .white, reserveCount: Bool = false) -> some View {
         VStack(spacing: 1) {
             FeedVideoIcon(symbol: symbol, tint: tint, size: 34)
-            if let count {
-                Text(count.formatted(.number.notation(.compactName)))
+            if count != nil || reserveCount {
+                Text((count ?? 0).formatted(.number.notation(.compactName)))
+                    .opacity(count == nil ? 0 : 1)
                     .font(.caption2.monospacedDigit().weight(.bold))
                     .lineLimit(1)
             }
@@ -2497,6 +2574,7 @@ private final class FeedPlaybackController: ObservableObject {
 }
 
 private struct FeedProgressStrip: View {
+    static let height: CGFloat = 44
     @Environment(\.studioPalette) private var palette
     @ObservedObject var playback: FeedPlaybackController
 
@@ -2508,7 +2586,7 @@ private struct FeedProgressStrip: View {
                 Slider(value: Binding(get: { position.seconds }, set: playback.setSeconds),
                        in: 0...position.duration, onEditingChanged: playback.setEditing)
                     .tint(palette.mediaAccent)
-                    .frame(minHeight: 44)
+                    .frame(minHeight: Self.height)
                     .accessibilityLabel("Video progress")
                     .accessibilityValue("\(elapsed) of \(duration)")
                     .accessibilityIdentifier("feed-video-progress")

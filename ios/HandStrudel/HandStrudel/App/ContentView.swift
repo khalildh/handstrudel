@@ -37,6 +37,7 @@ struct CreatorReviewMilestones: Codable {
 }
 
 struct ContentView: View {
+    let theme: StudioTheme
     @Environment(\.studioPalette) private var palette
     private enum Destination: String, CaseIterable {
         case feed = "Feed"
@@ -63,6 +64,7 @@ struct ContentView: View {
     @State private var reviewReadyThisSession = false
     @State private var destination: Destination = .music
     @State private var hasOpenedFeed = false
+    @State private var feedHasVideo = false
     @State private var feedFullscreen = false
     @State private var startingSession = false
     @State private var showDrafts = false
@@ -296,6 +298,7 @@ struct ContentView: View {
             engine.jamSession.errorMessage = nil
         }
         .statusBarHidden(engine.isRunning || feedFullscreen)
+        .preferredColorScheme(destination == .feed && feedHasVideo && !engine.isRunning ? .dark : theme.colorScheme)
         .onChange(of: engine.isRunning) { running in
             if running {
                 startingSession = false
@@ -369,7 +372,8 @@ struct ContentView: View {
                 if hasOpenedFeed && SocialConfig.isConfigured {
                     FeedView(auth: auth, isActive: destination == .feed && !engine.isRunning, isFullscreen: $feedFullscreen,
                              onMakeMusic: { destination = .music }, onTrySound: trySharedSound,
-                             onPlayAlong: prepareBacking, navigation: { destinationTabs(overVideo: $0) })
+                             onPlayAlong: prepareBacking, onVideoAvailabilityChanged: { feedHasVideo = $0 },
+                             navigation: { destinationTabs(overVideo: $0) })
                         .opacity(destination == .feed ? 1 : 0)
                         .allowsHitTesting(destination == .feed)
                         .accessibilityHidden(destination != .feed)
@@ -401,7 +405,6 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
 
             if destination != .feed || !SocialConfig.isConfigured { destinationTabs() }
         }
@@ -451,6 +454,7 @@ struct ContentView: View {
         .background {
             if overVideo {
                 LinearGradient(colors: [.black.opacity(0.35), .black.opacity(0.92)], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea(.container, edges: .bottom)
                     .allowsHitTesting(false)
             } else {
                 palette.background.ignoresSafeArea(edges: .bottom)

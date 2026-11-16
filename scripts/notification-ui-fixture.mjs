@@ -10,8 +10,10 @@ const now = new Date().toISOString();
 const demoLikes = 42;
 const clipBytes = process.env.FIXTURE_CLIP ? readFileSync(process.env.FIXTURE_CLIP) : null;
 const canControlMedia = process.env.FIXTURE_CONTROL_MEDIA === "1";
+const singleClip = process.env.FIXTURE_SINGLE_CLIP === "1";
 const countViews = process.env.FIXTURE_VIEW_COUNTS === "1";
 const showEngagement = process.env.FIXTURE_ENGAGEMENT === "1";
+const showReposts = process.env.FIXTURE_REPOSTS === "1";
 let shareCount = 4;
 const counted = new Set();
 let mediaAvailable = !canControlMedia;
@@ -47,6 +49,11 @@ let following = false;
 let avatarKey = process.env.FIXTURE_AVATAR === "1" ? demoThumb : null;
 const liked = new Set();
 const saved = new Set();
+const reposted = new Set();
+const engagement = (id) => ({
+  saves: 5 + saved.size, shares: shareCount, remixes: 3,
+  ...(showReposts ? { reposts: 2 + Number(reposted.has(id)), reposted_by_me: reposted.has(id) } : {}),
+});
 const withLikes = (comment) => ({ ...comment, like_count: liked.has(comment.id) ? 1 : 0, liked_by_me: liked.has(comment.id) });
 
 createServer((request, response) => {
@@ -105,7 +112,24 @@ createServer((request, response) => {
       return response.writeHead(415).end();
     case "/rest/v1/videos": return send([]);
     case "/rest/v1/rpc/video_engagement":
-      return showEngagement ? send([{ saves: 5 + saved.size, shares: shareCount, remixes: 3 }]) : response.writeHead(404).end();
+      return showEngagement ? send([engagement(video)]) : response.writeHead(404).end();
+    case "/rest/v1/rpc/video_engagement_v2":
+    case "/rest/v1/rpc/set_video_repost": {
+      if (!showEngagement && !showReposts) {
+        return response.writeHead(404, { "Content-Type": "application/json" })
+          .end(JSON.stringify({ code: "PGRST202", message: "Missing repost function" }));
+      }
+      let body = "";
+      request.on("data", (chunk) => { body += chunk; });
+      request.on("end", () => {
+        const { target_video: id, repost } = JSON.parse(body);
+        const key = id.toLowerCase();
+        if (repost === true) reposted.add(key);
+        if (repost === false) reposted.delete(key);
+        send([engagement(key)]);
+      });
+      return;
+    }
     case "/rest/v1/rpc/record_video_share":
       if (!showEngagement) return response.writeHead(404).end();
       shareCount += 1;
@@ -141,6 +165,12 @@ createServer((request, response) => {
     case "/rest/v1/video_bookmarks": return send([...saved].map((video_id) => ({ video_id })));
     case "/rest/v1/saved_videos": return send([post, secondPost].filter(({ id }) => saved.has(id)).map((item) => ({ ...item, saved_at: now })));
     case "/rest/v1/video_audio_downloads": return send(process.env.FIXTURE_AUDIO_DOWNLOAD === "1" ? [{ video_id: video }] : []);
+    case "/rest/v1/following_activity_videos":
+      if (showReposts) return send([{
+        ...post, activity_at: now, reposted_by: secondPost.username, reposted_by_id: secondPost.user_id,
+      }]);
+      return response.writeHead(404, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ code: "PGRST205", message: "Missing following activity view in this fixture." }));
     case "/rest/v1/following_videos":
       if (process.env.FIXTURE_MISSING_FOLLOWING_VIEW === "1") {
         return response.writeHead(404, { "Content-Type": "application/json" })
@@ -161,7 +191,7 @@ createServer((request, response) => {
       const id = url.searchParams.get("id")?.slice(3).toLowerCase();
       const handle = url.searchParams.get("username")?.slice(3);
       const author = url.searchParams.get("user_id")?.slice(3).toLowerCase();
-      return send([post, secondPost].filter((item) => (!id || item.id === id) && (!handle || item.username === handle)
+      return send((singleClip ? [post] : [post, secondPost]).filter((item) => (!id || item.id === id) && (!handle || item.username === handle)
         && (!author || item.user_id === author)));
     }
     case "/rest/v1/public_creators": {

@@ -16,9 +16,8 @@ struct HandStrudelApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(theme: theme)
                 .environment(\.studioPalette, theme.palette)
-                .preferredColorScheme(theme.colorScheme)
                 .tint(theme.palette.accent)
                 .persistentSystemOverlays(.hidden)
                 .onAppear {
