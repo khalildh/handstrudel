@@ -369,7 +369,7 @@ struct ContentView: View {
                 if hasOpenedFeed && SocialConfig.isConfigured {
                     FeedView(auth: auth, isActive: destination == .feed && !engine.isRunning, isFullscreen: $feedFullscreen,
                              onMakeMusic: { destination = .music }, onTrySound: trySharedSound,
-                             onPlayAlong: prepareBacking)
+                             onPlayAlong: prepareBacking, navigation: { destinationTabs(overVideo: $0) })
                         .opacity(destination == .feed ? 1 : 0)
                         .allowsHitTesting(destination == .feed)
                         .accessibilityHidden(destination != .feed)
@@ -403,13 +403,17 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
 
-            if !feedFullscreen { destinationTabs }
+            if destination != .feed || !SocialConfig.isConfigured { destinationTabs() }
         }
         .tint(palette.accent)
     }
 
-    private var destinationTabs: some View {
-        HStack(spacing: 0) {
+    private func destinationTabs(overVideo: Bool = false) -> some View {
+        let ink: Color = overVideo ? .white : palette.ink
+        let muted: Color = overVideo ? .white.opacity(0.78) : palette.muted
+        let accent = overVideo ? palette.mediaAccent : palette.accent
+        let onAccent = overVideo ? palette.mediaOnAccent : palette.onAccent
+        return HStack(spacing: 0) {
             ForEach(Destination.allCases, id: \.self) { tab in
                 let selected = destination == tab
                 Button {
@@ -421,14 +425,14 @@ struct ContentView: View {
                             .frame(width: 56, height: 31)
                             .background {
                                 if tab == .music {
-                                    Capsule().fill(selected ? palette.accent : palette.accent.opacity(0.12))
+                                    Capsule().fill(selected ? accent : accent.opacity(0.16))
                                 }
                             }
-                            .foregroundStyle(tab == .music && selected ? palette.onAccent
-                                             : selected || tab == .music ? palette.accent : palette.muted)
+                            .foregroundStyle(tab == .music && selected ? onAccent
+                                             : selected || tab == .music ? accent : muted)
                         Text(tab.rawValue)
                             .font(.caption2.weight(selected ? .semibold : .medium))
-                            .foregroundStyle(selected ? palette.ink : palette.muted)
+                            .foregroundStyle(selected ? ink : muted)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                     }
@@ -445,9 +449,16 @@ struct ContentView: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity)
         .background {
-            palette.background.ignoresSafeArea(edges: .bottom)
+            if overVideo {
+                LinearGradient(colors: [.black.opacity(0.35), .black.opacity(0.92)], startPoint: .top, endPoint: .bottom)
+                    .allowsHitTesting(false)
+            } else {
+                palette.background.ignoresSafeArea(edges: .bottom)
+            }
         }
-        .overlay(alignment: .top) { Rectangle().fill(palette.border).frame(height: 1) }
+        .overlay(alignment: .top) {
+            if !overVideo { Rectangle().fill(palette.border).frame(height: 1).allowsHitTesting(false) }
+        }
         .disabled(startingSession)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Main navigation")

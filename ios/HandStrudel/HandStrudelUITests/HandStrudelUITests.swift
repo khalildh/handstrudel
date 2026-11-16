@@ -428,6 +428,11 @@ final class HandStrudelUITests: XCTestCase {
 
     func testFeedSearchOpensWithoutAccount() {
         app.launchArguments.append("--uitesting")
+        if let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"] {
+            app.launchEnvironment["SUPABASE_URL"] = endpoint
+            app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+            app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        }
         app.launch()
         let feed = element("tab-feed")
         XCTAssertTrue(feed.waitForExistence(timeout: 5))
@@ -597,6 +602,38 @@ final class HandStrudelUITests: XCTestCase {
         lower.press(forDuration: 0.05, thenDragTo: upper)
         let second = app.staticTexts["Second performance"].firstMatch
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
+    }
+
+    func testFeedVideoFillsScreenBehindNavigationAndUsesOptionsMenu() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_PLAY_ALONG_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with a real MP4.")
+        }
+        app.launchArguments = ["--uitesting", "-studioTheme", "paper"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        let feed = element("tab-feed")
+        feed.tap()
+        let menu = app.buttons["feed-options"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        let viewport = app.collectionViews["feed-video-viewport"]
+        XCTAssertTrue(viewport.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["feed-fullscreen"].isHittable)
+        XCTAssertTrue(app.sliders["feed-video-progress"].firstMatch.isHittable)
+        XCTAssertEqual(viewport.frame.width, app.frame.width, accuracy: 1)
+        XCTAssertLessThan(viewport.frame.minY, menu.frame.midY)
+        XCTAssertGreaterThan(viewport.frame.maxY, feed.frame.midY)
+        XCTAssertFalse(app.segmentedControls["feed-filter"].exists)
+        XCTAssertEqual(menu.value as? String, "Discover")
+        captureIfRequested("Feed-Full-Bleed")
+
+        selectFeedMode("Latest")
+        XCTAssertEqual(menu.value as? String, "Latest")
+        selectFeedMode("Following")
+        XCTAssertTrue(app.buttons["Sign in to follow creators"].waitForExistence(timeout: 5))
+        selectFeedMode("Discover")
+        XCTAssertTrue(viewport.waitForExistence(timeout: 8))
     }
 
     func testFeedFullScreenKeepsPausedPlayhead() throws {
@@ -801,20 +838,42 @@ final class HandStrudelUITests: XCTestCase {
         app.launchArguments.append("--uitesting")
         app.launchEnvironment["SUPABASE_URL"] = endpoint
         app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
         app.launch()
         let feed = element("tab-feed")
         XCTAssertTrue(feed.waitForExistence(timeout: 5))
         feed.tap()
         let first = app.staticTexts["Evening loop"].firstMatch
         XCTAssertTrue(first.waitForExistence(timeout: 5))
-        let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.31))
-        let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.72))
+        let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.35))
+        let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.65))
         lower.press(forDuration: 0.05, thenDragTo: upper)
         let second = app.staticTexts["Second performance"].firstMatch
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
         upper.press(forDuration: 0.05, thenDragTo: lower)
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)], timeout: 5), .completed)
         XCTAssertFalse(app.staticTexts["feed-video-position"].exists)
+    }
+
+    func testInstrumentCarouselWrapsAcrossTheFreeInstruments() {
+        app.launchArguments = ["--uitesting", "--force-locked", "-lastSoundFont", "grand_piano"]
+        app.launch()
+        let artwork = element("sound-artwork")
+        XCTAssertTrue(artwork.waitForExistence(timeout: 5))
+        let changeSound = app.buttons["Change sound"]
+        func expectInstrument(_ name: String) {
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", name), object: changeSound)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
+        }
+        let left = artwork.coordinate(withNormalizedOffset: CGVector(dx: 0.18, dy: 0.55))
+        let right = artwork.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.55))
+        expectInstrument("Grand Piano")
+        left.press(forDuration: 0.05, thenDragTo: right)
+        expectInstrument("Choir Aahs")
+        right.press(forDuration: 0.05, thenDragTo: left)
+        expectInstrument("Grand Piano")
+        right.press(forDuration: 0.05, thenDragTo: left)
+        expectInstrument("Rhodes EP")
     }
 
     func testSoundArtworkReflectsInstrumentPickerSelection() {
@@ -945,7 +1004,7 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Creator"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Performances"].waitForExistence(timeout: 5))
         app.buttons["Done"].tap()
-        app.buttons["Following"].tap()
+        selectFeedMode("Following")
         XCTAssertTrue(app.buttons["Sign in to follow creators"].waitForExistence(timeout: 5))
     }
 
@@ -1048,13 +1107,20 @@ final class HandStrudelUITests: XCTestCase {
         signInToProfile()
         XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 12))
         element("tab-feed").tap()
-        let following = app.segmentedControls.buttons["Following"].firstMatch
-        XCTAssertTrue(following.waitForExistence(timeout: 8))
-        following.tap()
+        selectFeedMode("Following")
         XCTAssertTrue(app.staticTexts["You aren't following any creators yet"].waitForExistence(timeout: 8))
         XCTAssertFalse(app.buttons["Try again"].exists)
-        app.buttons["Browse latest"].tap()
+        app.buttons["Browse Discover"].tap()
         XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 8))
+    }
+
+    private func selectFeedMode(_ title: String) {
+        let menu = app.buttons["feed-options"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        let option = app.buttons[title].firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        option.tap()
     }
 
     func testProfileCanRemoveExistingPhoto() throws {
@@ -1139,7 +1205,7 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertFalse(element("tab-sounds").exists)
         captureIfRequested("01-Music")
         feed.tap()
-        XCTAssertTrue(app.staticTexts["Feed"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["feed-options"].waitForExistence(timeout: 5))
         XCTAssertFalse(element("start-button").exists)
         if ProcessInfo.processInfo.environment["HANDSTRUDEL_CAPTURE_UI"] == "1" {
             _ = app.buttons["Share video"].firstMatch.waitForExistence(timeout: 10)

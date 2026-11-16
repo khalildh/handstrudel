@@ -274,17 +274,33 @@ struct StartOverlayView: View {
         }
     }
 
+    private enum InstrumentPage: Hashable {
+        case instrument(String), wrapToFirst, wrapToLast
+    }
+
     private var instrumentBrowser: some View {
         let instruments = browsableInstruments
         let selected = engine.selectedSoundFontInstrument
         let index = instruments.firstIndex(of: selected) ?? 0
-        return TabView(selection: Binding(get: { selected.id }, set: { id in
-            if let instrument = instruments.first(where: { $0.id == id }) { selectInstrument(instrument) }
+        return TabView(selection: Binding(get: { InstrumentPage.instrument(selected.id) }, set: { page in
+            switch page {
+            case .instrument(let id):
+                if let instrument = instruments.first(where: { $0.id == id }) { selectInstrument(instrument) }
+            case .wrapToFirst, .wrapToLast:
+                // The duplicate page has the same artwork as its destination.
+                if let instrument = page == .wrapToFirst ? instruments.first : instruments.last {
+                    withTransaction(Transaction(animation: nil)) { selectInstrument(instrument) }
+                }
+            }
         })) {
+            if instruments.count > 1, let last = instruments.last {
+                instrumentArtwork(last).tag(InstrumentPage.wrapToLast)
+            }
             ForEach(instruments) { instrument in
-                SoundArtwork(instrument: instrument, key: engine.selectedKey,
-                             scale: engine.selectedScale, progression: engine.chordMelodyProgression)
-                    .tag(instrument.id)
+                instrumentArtwork(instrument).tag(InstrumentPage.instrument(instrument.id))
+            }
+            if instruments.count > 1, let first = instruments.first {
+                instrumentArtwork(first).tag(InstrumentPage.wrapToFirst)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
@@ -294,14 +310,14 @@ struct StartOverlayView: View {
         .accessibilityValue("\(selected.name), \(engine.selectedKey.rawValue) \(engine.selectedScale.displayName), \(engine.chordMelodyProgression.name), \(index + 1) of \(instruments.count)")
         .accessibilityIdentifier("sound-artwork")
         .accessibilityAdjustableAction { direction in
-            let nextIndex: Int
+            guard instruments.count > 1 else { return }
+            let step: Int
             switch direction {
-            case .increment: nextIndex = index + 1
-            case .decrement: nextIndex = index - 1
+            case .increment: step = 1
+            case .decrement: step = -1
             @unknown default: return
             }
-            guard instruments.indices.contains(nextIndex) else { return }
-            selectInstrument(instruments[nextIndex])
+            selectInstrument(instruments[(index + step + instruments.count) % instruments.count])
         }
         .overlay(alignment: .top) {
             HStack {
@@ -331,6 +347,11 @@ struct StartOverlayView: View {
             .padding(.top, 6)
         }
         .disabled(starting)
+    }
+
+    private func instrumentArtwork(_ instrument: SoundFontInstrument) -> some View {
+        SoundArtwork(instrument: instrument, key: engine.selectedKey,
+                     scale: engine.selectedScale, progression: engine.chordMelodyProgression)
     }
 
     private func selectInstrument(_ instrument: SoundFontInstrument) {
