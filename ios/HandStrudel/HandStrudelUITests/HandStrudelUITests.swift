@@ -473,6 +473,65 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue((slider.value as? String)?.contains("0:03") == true)
     }
 
+    func testPlayAlongStartsBackingAudioInStudio() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_PLAY_ALONG_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with a real MP4 with audio and FIXTURE_PLAY_ALONG=1.")
+        }
+        app.launchArguments = ["--uitesting", "-hasSeenOnboarding", "YES"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let playAlong = app.buttons["play-along"].firstMatch
+        XCTAssertTrue(playAlong.waitForExistence(timeout: 5))
+        playAlong.tap()
+        let pause = app.buttons["Pause backing track"]
+        XCTAssertTrue(pause.waitForExistence(timeout: 12), app.alerts.firstMatch.debugDescription)
+        pause.tap()
+        let play = app.buttons["Play backing track"]
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        play.tap()
+        XCTAssertTrue(pause.waitForExistence(timeout: 5))
+    }
+
+    func testFeedAdvancesWhenAClipFinishes() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_PLAY_ALONG_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with a real MP4.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        element("tab-feed").tap()
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 5))
+        let next = app.staticTexts["Second performance"].firstMatch
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: next)], timeout: 10), .completed)
+    }
+
+    func testBookmarkAppearsInPrivateSavedLibrary() throws {
+        try launchWithProfileFixture()
+        signInToProfile()
+        element("tab-feed").tap()
+        let bookmark = app.buttons["save-performance"].firstMatch
+        XCTAssertTrue(bookmark.waitForExistence(timeout: 6))
+        if bookmark.label == "Remove from Saved" {
+            bookmark.tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Save privately"), object: bookmark)], timeout: 5), .completed)
+        }
+        bookmark.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Remove from Saved"), object: bookmark)], timeout: 5), .completed)
+        element("saved-performances").tap()
+        XCTAssertTrue(app.navigationBars["Saved"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+        bookmark.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Save privately"), object: bookmark)], timeout: 5), .completed)
+    }
+
     func testFeedProgressScrubsARealVideoWithoutPaging() throws {
         guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_FEED_MEDIA_FIXTURE_URL"] else {
             throw XCTSkip("Requires the feed fixture with a real MP4 served from FIXTURE_CLIP.")
@@ -602,11 +661,7 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
         upper.press(forDuration: 0.05, thenDragTo: lower)
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)], timeout: 5), .completed)
-        XCTAssertTrue(app.staticTexts["feed-video-position"].exists)
-        app.buttons["Next video"].tap()
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
-        app.buttons["Previous video"].tap()
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)], timeout: 5), .completed)
+        XCTAssertFalse(app.staticTexts["feed-video-position"].exists)
     }
 
     func testSoundArtworkReflectsInstrumentPickerSelection() {

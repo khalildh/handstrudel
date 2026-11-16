@@ -4,6 +4,7 @@ const pages = [
   { href: "/support", label: "Support" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
+  { href: "/community", label: "Community Guidelines" },
 ];
 
 export function SiteInfoLinks({ current }: { current?: string }) {

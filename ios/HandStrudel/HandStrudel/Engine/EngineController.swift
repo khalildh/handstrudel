@@ -1016,13 +1016,15 @@ final class EngineController: ObservableObject {
             return true
         } else if let loop = savedLoops.first(where: { $0.id == loopId }) {
             if loop.hasCapturedAudio == true {
+                if !isRunning { restoreInstrumentAudio() }
                 if let player = try? AVAudioPlayer(contentsOf: AudioExporter.capturedURL(loop.id)) {
                     player.numberOfLoops = -1
                     player.enableRate = true
                     player.rate = Float(recordingTempoScale)
                     player.volume = Float(loop.effectiveGain)
                     audioLoopPlayers[loop.id] = player
-                    if (!isPaused || player.prepareToPlay()) && (isPaused || player.play()) {
+                    let waitForStudio = isRunning && isPaused
+                    if waitForStudio ? player.prepareToPlay() : player.play() {
                         playingLoopIds.insert(loop.id)
                         return true
                     } else {
@@ -1109,13 +1111,14 @@ final class EngineController: ObservableObject {
         PersistenceManager.shared.saveLoops(savedLoops)
     }
 
-    func saveCapturedLoop(id: UUID, duration: Double, bpm: Double, mode: String, autoplay: Bool = true) {
+    @discardableResult
+    func saveCapturedLoop(id: UUID, duration: Double, bpm: Double, mode: String, autoplay: Bool = true) -> Bool {
         var loop = RecordedLoop(id: id, events: [], duration: duration, bpm: bpm,
                                 name: "Loop \(savedLoops.count + 1)", mode: mode)
         loop.hasCapturedAudio = true
         savedLoops.append(loop)
         PersistenceManager.shared.saveLoops(savedLoops)
-        if autoplay { toggleLoopPlayback(id) }
+        return autoplay && toggleLoopPlayback(id)
     }
 
     func stopAllLoops() {
@@ -1473,6 +1476,7 @@ final class EngineController: ObservableObject {
         lastDrumHit = ""
         lastStructKey = ""
 
+        isPaused = false
         isRunning = false
         status = "tap start"
     }

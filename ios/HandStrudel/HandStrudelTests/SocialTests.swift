@@ -6,6 +6,61 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    func testComposerSharesEligibleSoundAndBackingByDefault() {
+        var options = PostSharingOptions()
+        var setup = SoundSetup(instrument: "violin", waveform: "sine", key: .C, scale: .major,
+                               progression: "custom", customDegrees: [0, 3, 4], mode: .scalechordmelody,
+                               bpm: 100, useSoundFont: true, autoStrum: true, padVolume: 0.3, gridOctave: 3, gridRange: 2)
+        XCTAssertEqual(options.sharedPreset(setup), setup)
+        XCTAssertTrue(options.sharesBacking(hasAudio: true, backingCredit: nil))
+        XCTAssertFalse(options.sharesBacking(hasAudio: false, backingCredit: nil))
+        let credit = BackingCredit(videoId: UUID(), username: "creator")
+        XCTAssertFalse(options.sharesBacking(hasAudio: true, backingCredit: credit))
+        setup.version = 99
+        XCTAssertNil(options.sharedPreset(setup))
+        setup.version = 1
+        options.sharePlayablePreset = false
+        options.allowPlayAlong = false
+        XCTAssertNil(options.sharedPreset(setup))
+        XCTAssertFalse(options.sharesBacking(hasAudio: true, backingCredit: nil))
+    }
+
+    @MainActor
+    func testDiscoveryMixesCreatorsAndPagesFromUnrankedCursor() async throws {
+        let firstCreator = UUID()
+        let secondCreator = UUID()
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        func makeVideo(_ author: UUID, likes: Int = 0, secondsAgo: TimeInterval = 0) throws -> Video {
+            let data = try JSONSerialization.data(withJSONObject: [
+                "id": UUID().uuidString, "user_id": author.uuidString, "like_count": likes,
+                "caption": "Take", "video_key": "clip.mp4", "thumb_key": "cover.jpg",
+                "created_at": ISO8601DateFormatter().string(from: Date().addingTimeInterval(-secondsAgo))
+            ])
+            return try decoder.decode(Video.self, from: data)
+        }
+        let firstPage = try (0..<23).map { try makeVideo(firstCreator, secondsAgo: Double($0)) }
+            + [makeVideo(secondCreator, likes: 42, secondsAgo: 24)]
+        let secondPage = try [makeVideo(firstCreator, likes: 100, secondsAgo: 25),
+                              makeVideo(secondCreator, secondsAgo: 26), firstPage[0]]
+        let model = FeedModel(loadPublicPage: { cursor, limit in
+            XCTAssertEqual(limit, 24)
+            if let cursor {
+                XCTAssertEqual(cursor.id, firstPage.last?.id)
+                return secondPage
+            }
+            return firstPage
+        }, loadAudioDownloadIDs: { _ in [] })
+        await model.refresh(user: nil)
+        XCTAssertEqual(model.videos.count, 24)
+        XCTAssertEqual(model.videos.first?.id, firstPage.last?.id)
+        model.current = 23
+        await model.loadMore()
+        XCTAssertEqual(model.videos.count, 26)
+        XCTAssertEqual(model.videos[24].userId, secondCreator)
+        XCTAssertEqual(Set(model.videos.map(\.id)).count, 26)
+    }
+
     func testFeedProgressBoundsSeekInsideClipAndFormatsDuration() throws {
         XCTAssertNil(FeedPlaybackPosition(duration: .infinity, seconds: 1))
         XCTAssertNil(FeedPlaybackPosition(duration: 0, seconds: 1))
@@ -465,7 +520,7 @@ final class SocialTests: XCTestCase {
             return (403, #"{"code":"42501","message":"permission denied"}"#)
         }
         let model = FeedModel()
-        model.followingOnly = true
+        model.mode = .following
         await model.refresh(user: viewer) { user in
             try await FeedService.followingPage(user: user, from: denied.from)
         }
@@ -489,13 +544,16 @@ final class SocialTests: XCTestCase {
 
     func testMissingBookmarkTableAndLibraryReportThatSavingIsUnavailable() async throws {
         let client = discoveryClient { request in
+            if request.path == "/rpc/set_video_bookmark" {
+                return (404, #"{"code":"PGRST202","message":"Missing function"}"#)
+            }
             XCTAssertTrue(["/video_bookmarks", "/saved_videos"].contains(request.path))
             return Self.missingView
         }
         let video = try XCTUnwrap(UUID(uuidString: Self.discoveryUser))
         let viewer = try XCTUnwrap(UUID(uuidString: Self.discoveryViewer))
         do {
-            try await FeedService.setBookmark(true, video: video, user: viewer, from: client.from)
+            try await FeedService.setBookmark(true, video: video, user: viewer, client: client)
             XCTFail("A bookmark that wasn't saved must not look successful")
         } catch FeedService.Unavailable.bookmarks {}
         do {

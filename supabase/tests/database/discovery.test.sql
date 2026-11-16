@@ -1,5 +1,5 @@
 begin;
-select plan(17);
+select plan(25);
 
 insert into auth.users (id, email) values
   ('51000000-0000-0000-0000-000000000001', 'discovery-creator@test.dev'),
@@ -29,14 +29,22 @@ values ('52000000-0000-0000-0000-000000000002', 'Overlap', 'Prompt', now(), now(
 
 set local role anon;
 select throws_ok($$ select * from public.saved_videos $$, '42501', null, 'guests cannot read private bookmarks');
+select throws_ok($$ select public.set_video_bookmark('52000000-0000-0000-0000-000000000001', true) $$,
+ '42501', null, 'guest cannot bookmark');
 select is((select count(*) from public.weekly_challenges), 1::bigint, 'active opted-in challenge is public');
 select is((select count(*) from public.weekly_challenge_entries), 1::bigint, 'only remixes published in the window count');
 reset role;
 
 select pg_temp.claim('51000000-0000-0000-0000-000000000002');
 set local role authenticated;
-select lives_ok($$ insert into public.video_bookmarks (video_id) values ('52000000-0000-0000-0000-000000000001') $$,
+select lives_ok($$ select public.set_video_bookmark('52000000-0000-0000-0000-000000000001', true) $$,
  'member can save a public performance');
+select lives_ok($$ select public.set_video_bookmark('52000000-0000-0000-0000-000000000001', true) $$,
+ 'retrying a bookmark does not duplicate it');
+select throws_ok($$ insert into public.video_audio_downloads values ('52000000-0000-0000-0000-000000000001') $$,
+ '42501', null, 'listeners cannot opt in another creator');
+select throws_ok($$ insert into public.video_audio_downloads values ('52000000-0000-0000-0000-000000000002') $$,
+ '42501', null, 'remixes cannot give permission to download source audio');
 select is((select count(*) from public.saved_videos), 1::bigint, 'member can read their saved library');
 select throws_ok($$ insert into public.video_bookmarks (user_id, video_id)
  values ('51000000-0000-0000-0000-000000000003', '52000000-0000-0000-0000-000000000001') $$,
@@ -62,9 +70,25 @@ insert into public.blocks (blocker_id, blocked_id)
 values (auth.uid(), '51000000-0000-0000-0000-000000000001');
 select is((select count(*) from public.saved_videos), 0::bigint, 'blocked creators disappear from Saved');
 select is((select count(*) from public.weekly_challenges), 0::bigint, 'a blocked source hides the challenge');
-select lives_ok($$ delete from public.video_bookmarks where video_id = '52000000-0000-0000-0000-000000000001' $$,
+select lives_ok($$ select public.set_video_bookmark('52000000-0000-0000-0000-000000000001', false) $$,
  'owner can unsave even if the source is blocked');
 select is((select count(*) from public.video_bookmarks), 0::bigint, 'owner deletion persists');
+reset role;
+
+select pg_temp.claim('51000000-0000-0000-0000-000000000001');
+set local role authenticated;
+select lives_ok($$ insert into public.video_audio_downloads values ('52000000-0000-0000-0000-000000000001') $$,
+ 'creator opts in an original performance');
+reset role;
+select set_config('request.jwt.claims', '{}', true);
+set local role anon;
+select is((select count(*) from public.video_audio_downloads), 1::bigint, 'listener can see opt-in');
+reset role;
+select pg_temp.claim('51000000-0000-0000-0000-000000000001');
+set local role authenticated;
+select lives_ok($$ delete from public.video_audio_downloads where video_id = '52000000-0000-0000-0000-000000000001' $$,
+ 'creator can revoke permission');
+select is((select count(*) from public.video_audio_downloads), 0::bigint, 'revoked permission is no longer present');
 reset role;
 
 update public.videos set backing_enabled = false where id = '52000000-0000-0000-0000-000000000001';
