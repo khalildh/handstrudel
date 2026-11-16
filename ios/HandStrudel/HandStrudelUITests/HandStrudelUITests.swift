@@ -907,6 +907,9 @@ final class HandStrudelUITests: XCTestCase {
         captureIfRequested("Account-Artist")
         app.buttons["Make music"].tap()
         XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
+        element("tab-account").tap()
+        XCTAssertEqual(likes.value as? String, "0", "Reopening Account should have the previously loaded counts.")
+        XCTAssertTrue(app.staticTexts["No performances yet"].exists)
     }
 
     func testFollowingWithNoFollowsIsNotAConnectionError() throws {

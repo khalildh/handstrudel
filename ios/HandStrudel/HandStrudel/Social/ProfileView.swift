@@ -4,16 +4,93 @@ import Supabase
 import SwiftUI
 import UniformTypeIdentifiers
 
+@MainActor
+final class AccountPortfolio: ObservableObject {
+    @Published private(set) var videos: [Video] = []
+    @Published private(set) var counts: FeedService.ProfileCounts?
+    @Published private(set) var more = false
+    @Published private(set) var failed = false
+    @Published private(set) var isLoadingMore = false
+    @Published private(set) var hasLoadedPage = false
+    private var account: UUID?
+    private var requestID = UUID()
+    private var loading = false
+    private let fetchPage: (UUID, Video?) async throws -> [Video]
+    private let fetchCounts: (UUID) async -> FeedService.ProfileCounts
+
+    init(fetchPage: @escaping (UUID, Video?) async throws -> [Video] = FeedService.ownerPage,
+         fetchCounts: @escaping (UUID) async -> FeedService.ProfileCounts = { await FeedService.profileCounts(for: $0, owner: true) }) {
+        self.fetchPage = fetchPage
+        self.fetchCounts = fetchCounts
+    }
+
+    func selectAccount(_ id: UUID?) {
+        guard account != id else { return }
+        account = id
+        requestID = UUID()
+        loading = false
+        videos = []
+        counts = nil
+        more = false
+        failed = false
+        isLoadingMore = false
+        hasLoadedPage = false
+    }
+
+    func load(for id: UUID, append: Bool = false) async {
+        guard id == account, !append || (more && !loading) else { return }
+
+        let request = UUID()
+        requestID = request
+        loading = true
+        isLoadingMore = append
+        failed = false
+        defer {
+            if request == requestID {
+                loading = false
+                isLoadingMore = false
+            }
+        }
+        async let metrics: Void = updateCounts(for: id, request: request, skip: append)
+        do {
+            let page = try await fetchPage(id, append ? videos.last : nil)
+            guard request == requestID, !Task.isCancelled else { return }
+            if append {
+                let ids = Set(videos.map(\.id))
+                videos += page.filter { !ids.contains($0.id) }
+            } else {
+                videos = page
+                hasLoadedPage = true
+            }
+            more = page.count == FeedService.pageSize
+        } catch {
+            if request == requestID && !Task.isCancelled { failed = true }
+        }
+        await metrics
+    }
+
+    private func updateCounts(for id: UUID, request: UUID, skip: Bool) async {
+        guard !skip else { return }
+        let result = await fetchCounts(id)
+        guard request == requestID, !Task.isCancelled else { return }
+        let cached = counts
+        let posts = result.posts ?? cached?.posts
+        let followers = result.followers ?? cached?.followers
+        let following = result.following ?? cached?.following
+        let likes = result.likesReceived ?? cached?.likesReceived
+        counts = FeedService.ProfileCounts(posts: posts, followers: followers, following: following, likesReceived: likes)
+    }
+
+    func remove(_ video: UUID, from id: UUID) {
+        guard id == account else { return }
+        videos.removeAll { $0.id == video }
+    }
+}
+
 struct ProfileView: View {
     @Environment(\.studioPalette) private var palette
     @ObservedObject var auth: AuthManager
-    @State private var videos: [Video] = []
-    @State private var counts: FeedService.ProfileCounts?
-    @State private var loading = true
-    @State private var more = false
-    @State private var failed = false
-    @State private var loadedUser: UUID?
-    @State private var loadID = UUID()
+    @ObservedObject var portfolio: AccountPortfolio
     @State private var playing: Video?
     @State private var pendingAction: (() -> Void)?
     @State private var confirmDeleteVideo: Video?
@@ -39,9 +116,21 @@ struct ProfileView: View {
                 } message: {
                     Text("Check your connection and try again. If the problem continues, choose Get help in Account settings.")
                 }
-            if let profile = auth.profile, let username = profile.username, !auth.needsProfileSetup {
+            if let profile = auth.profile, profile.id == auth.userId, let username = profile.username, !auth.needsProfileSetup {
                 content(profile, username: username)
                     .id(profile.id)
+            } else if auth.isSignedIn && auth.profile == nil {
+                if auth.isLoadingProfile {
+                    ProgressView("Loading profile")
+                        .frame(maxWidth: .infinity)
+                        .padding(24)
+                } else {
+                    VStack(spacing: 12) {
+                        Text("Couldn't load your profile.").foregroundStyle(palette.muted)
+                        Button("Try again") { Task { await auth.refreshProfile() } }.buttonStyle(ProfileActionStyle())
+                    }
+                    .padding(24)
+                }
             } else {
                 signedOut
             }
@@ -154,63 +243,33 @@ struct ProfileView: View {
 
     private func content(_ profile: Profile, username: String) -> some View {
         ScrollView {
-            let current = loadedUser == profile.id
             VStack(alignment: .leading, spacing: 20) {
                 CreatorProfileHeader(username: username, displayName: profile.displayName,
-                                     avatarKey: profile.avatarKey, counts: current ? counts : nil,
-                                     likesReceived: current ? counts?.likesReceived : nil, isOwner: true) {
+                                     avatarKey: profile.avatarKey, counts: portfolio.counts,
+                                     likesReceived: portfolio.counts?.likesReceived, isOwner: true) {
                     Button("Edit profile", systemImage: "pencil") { showEdit = true }
                         .buttonStyle(ProfileActionStyle())
                 }
-                CreatorPortfolio(videos: current ? videos : [], loading: !current || loading, failed: current && failed,
-                                 more: current && more, isOwner: true, open: { playing = $0 },
-                                 trySound: onTrySound, retry: { Task { await load() } },
-                                 loadMore: { Task { await load(append: true) } },
+                CreatorPortfolio(videos: portfolio.videos, loading: !portfolio.hasLoadedPage || portfolio.isLoadingMore,
+                                 failed: portfolio.failed, more: portfolio.more, isOwner: true, open: { playing = $0 },
+                                 trySound: onTrySound, retry: { Task { await portfolio.load(for: profile.id) } },
+                                 loadMore: { Task { await portfolio.load(for: profile.id, append: true) } },
                                  makeMusic: onMakeMusic, delete: { confirmDeleteVideo = $0 })
             }
             .padding(.horizontal, 21)
             .padding(.bottom, 24)
         }
-        .refreshable { await load() }
-        .task(id: profile.id) {
-            loadedUser = profile.id
-            videos = []
-            counts = nil
-            more = false
-            await load()
-        }
-    }
-
-    private func load(append: Bool = false) async {
-        guard let uid = auth.userId, uid == loadedUser, !append || !loading else { return }
-        let request = UUID()
-        loadID = request
-        loading = true
-        failed = false
-        defer { if request == loadID { loading = false } }
-        async let metrics = append ? nil : FeedService.profileCounts(for: uid, owner: true)
-        do {
-            let page = try await FeedService.ownerPage(user: uid, after: append ? videos.last : nil)
-            guard !Task.isCancelled, auth.userId == uid, request == loadID else { return }
-            if append {
-                let ids = Set(videos.map(\.id))
-                videos += page.filter { !ids.contains($0.id) }
-            } else { videos = page }
-            more = page.count == FeedService.pageSize
-        } catch {
-            if !Task.isCancelled && request == loadID { failed = true }
-        }
-        if let result = await metrics, !Task.isCancelled, auth.userId == uid, request == loadID {
-            counts = result
-        }
+        .refreshable { await portfolio.load(for: profile.id) }
+        .task(id: profile.id) { await portfolio.load(for: profile.id) }
     }
 
     private func delete(_ v: Video) async {
+        guard let uid = auth.userId, v.userId == uid else { return }
         do {
             struct Body: Encodable { let videoId: UUID }
             try await supabase.functions.invoke("delete-video", options: FunctionInvokeOptions(body: Body(videoId: v.id)))
-            videos.removeAll { $0.id == v.id }
-            await load()
+            portfolio.remove(v.id, from: uid)
+            await portfolio.load(for: uid)
         } catch {
             deleteError = true
         }

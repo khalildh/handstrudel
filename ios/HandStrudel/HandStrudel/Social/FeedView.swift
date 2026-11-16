@@ -38,6 +38,11 @@ struct FeedView: View {
     @State private var audioDownload: Video?
     @State private var pendingBookmark: Video?
 
+    private var allowsFeedPlayback: Bool {
+        isActive && scenePhase == .active && commenting == nil && !showActivity && creatorVideo == nil
+            && sourceVideo == nil && !showSaved && !showSearch && openChallenge == nil && !showSignIn
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             topBar
@@ -63,12 +68,10 @@ struct FeedView: View {
                 if model.videos.isEmpty {
                     emptyState
                 } else {
-                    PagedFeed(videos: model.videos, current: $model.current, refresh: {
+                    PagedFeed(videos: model.videos, current: $model.current, allowsPlayback: allowsFeedPlayback, refresh: {
                         await model.refresh(user: auth.userId)
-                    }) { video, isCurrent in
-                        FeedCell(video: video, isCurrent: isActive && scenePhase == .active && isCurrent
-                                 && commenting == nil && !showActivity && creatorVideo == nil && sourceVideo == nil
-                                 && !showSaved && !showSearch && openChallenge == nil,
+                    }) { video, isCurrent, playbackGate in
+                        FeedCell(video: video, isCurrent: isCurrent, playbackGate: playbackGate,
                                  isMine: video.userId == auth.userId,
                                  isFollowing: model.following.contains(video.userId),
                                  isSaved: model.savedIDs.contains(video.id),
@@ -1481,6 +1484,7 @@ private struct FeedCell: View {
     @Environment(\.studioPalette) private var palette
     let video: Video
     let isCurrent: Bool
+    let playbackGate: FeedPlaybackGate
     let isMine: Bool
     let isFollowing: Bool
     let isSaved: Bool
@@ -1514,7 +1518,8 @@ private struct FeedCell: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            FeedPlayer(url: video.videoURL, thumb: video.thumbURL, playback: playback,
+            FeedPlayer(videoID: video.id, url: video.videoURL, thumb: video.thumbURL, playback: playback,
+                          playbackGate: playbackGate,
                           isCurrent: isCurrent, playing: !paused && !playbackFailed,
                           muted: muted, durationHint: video.durationS, onEnd: advance) {
                 failedClipID = video.id
@@ -1700,8 +1705,9 @@ private struct FeedCell: View {
 private struct PagedFeed<Cell: View>: UIViewRepresentable {
     let videos: [Video]
     @Binding var current: Int
+    let allowsPlayback: Bool
     let refresh: () async -> Void
-    let cell: (Video, Bool) -> Cell
+    let cell: (Video, Bool, FeedPlaybackGate) -> Cell
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -1730,6 +1736,7 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
     func updateUIView(_ cv: UICollectionView, context: Context) {
         let old = context.coordinator.parent
         context.coordinator.parent = self
+        context.coordinator.selectPage(current)
         let oldIDs = old.videos.map(\.id)
         let newIDs = videos.map(\.id)
         if oldIDs != newIDs {
@@ -1739,6 +1746,10 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
             if !cv.isDragging && !cv.isDecelerating { context.coordinator.align(cv) }
             for case let ip in cv.indexPathsForVisibleItems { context.coordinator.configure(cv.cellForItem(at: ip), at: ip) }
         }
+    }
+
+    static func dismantleUIView(_ view: UICollectionView, coordinator: Coordinator) {
+        coordinator.playbackGate.select(nil)
     }
 
     private final class PageLayout: UICollectionViewFlowLayout {
@@ -1759,7 +1770,13 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
 
     final class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
         var parent: PagedFeed
+        let playbackGate = FeedPlaybackGate()
         init(_ parent: PagedFeed) { self.parent = parent }
+
+        func selectPage(_ page: Int) {
+            let id = parent.allowsPlayback && parent.videos.indices.contains(page) ? parent.videos[page].id : nil
+            playbackGate.select(id)
+        }
 
         @objc func pullToRefresh(_ control: UIRefreshControl) {
             Task {
@@ -1793,7 +1810,9 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         func configure(_ c: UICollectionViewCell?, at ip: IndexPath) {
             guard let c, ip.item < parent.videos.count else { return }
             let v = parent.videos[ip.item]
-            c.contentConfiguration = UIHostingConfiguration { parent.cell(v, ip.item == parent.current).id(v.id) }
+            c.contentConfiguration = UIHostingConfiguration {
+                parent.cell(v, parent.allowsPlayback && ip.item == parent.current, playbackGate).id(v.id)
+            }
                 .margins(.all, 0)
         }
 
@@ -1805,7 +1824,10 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         func scrollViewDidEndDecelerating(_ sv: UIScrollView) {
             guard !parent.videos.isEmpty else { return }
             let page = min(parent.videos.count - 1, max(0, Int((sv.contentOffset.y / max(sv.bounds.height, 1)).rounded())))
-            if page != parent.current { parent.current = page }
+            if page != parent.current {
+                selectPage(page)
+                parent.current = page
+            }
         }
 
         func scrollViewDidEndDragging(_ sv: UIScrollView, willDecelerate decelerate: Bool) {
@@ -1815,6 +1837,31 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
 }
 
 // MARK: - Looping video
+
+@MainActor
+final class FeedPlaybackGate {
+    private var selected: UUID?
+    private weak var owner: AVPlayer?
+
+    func select(_ videoID: UUID?) {
+        guard selected != videoID else { return }
+        owner?.pause()
+        owner = nil
+        selected = videoID
+    }
+
+    func owns(_ player: AVPlayer, videoID: UUID) -> Bool { selected == videoID && owner === player }
+
+    func play(_ player: AVPlayer, videoID: UUID) {
+        guard selected == videoID else { player.pause(); return }
+        // UIKit can keep old cells alive or create two hosts for the same clip during a reload.
+        if owner !== player {
+            owner?.pause()
+            owner = player
+        }
+        if player.timeControlStatus == .paused { player.play() }
+    }
+}
 
 struct FeedPlaybackPosition: Equatable {
     let duration: Double
@@ -1847,12 +1894,17 @@ private final class FeedPlaybackController: ObservableObject {
     private var isSeeking = false
     private var seekID = 0
     private var durationHint: Double?
+    private var playbackGate: FeedPlaybackGate?
+    private var videoID: UUID?
 
-    func configure(player newPlayer: AVPlayer, isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?) {
+    func configure(player newPlayer: AVPlayer, videoID: UUID, gate: FeedPlaybackGate,
+                   isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?) {
         if player !== newPlayer {
             disconnect()
             player = newPlayer
         }
+        self.videoID = videoID
+        playbackGate = gate
         self.durationHint = durationHint
         self.wantsPlayback = wantsPlayback
         if self.isCurrent != isCurrent {
@@ -1869,6 +1921,8 @@ private final class FeedPlaybackController: ObservableObject {
         cancelSeek()
         player?.pause()
         player = nil
+        playbackGate = nil
+        videoID = nil
         isCurrent = false
     }
 
@@ -1893,7 +1947,8 @@ private final class FeedPlaybackController: ObservableObject {
     }
 
     func finished(_ owner: AVPlayer, advance: () -> Bool) {
-        guard player === owner, isCurrent, wantsPlayback, !isTracking, !isSeeking else { return }
+        guard player === owner, let videoID, playbackGate?.owns(owner, videoID: videoID) == true,
+              isCurrent, wantsPlayback, !isTracking, !isSeeking else { return }
         owner.pause()
         if advance() { wantsPlayback = false }
         if let duration = position?.duration, let beginning = FeedPlaybackPosition(duration: duration, seconds: 0) {
@@ -1953,9 +2008,9 @@ private final class FeedPlaybackController: ObservableObject {
     }
 
     private func syncPlayback() {
-        guard let player else { return }
+        guard let player, let videoID, let playbackGate else { return }
         if isCurrent && wantsPlayback && !isTracking && !isSeeking {
-            if player.timeControlStatus == .paused { player.play() }
+            playbackGate.play(player, videoID: videoID)
         } else if player.timeControlStatus != .paused {
             player.pause()
         }
@@ -2048,9 +2103,11 @@ final class FeedClipFailureMonitor {
 }
 
 private struct FeedPlayer: UIViewRepresentable {
+    let videoID: UUID
     let url: URL
     let thumb: URL
     let playback: FeedPlaybackController
+    let playbackGate: FeedPlaybackGate
     let isCurrent: Bool
     let playing: Bool
     let muted: Bool
@@ -2067,7 +2124,8 @@ private struct FeedPlayer: UIViewRepresentable {
         if view.playback !== playback { view.playback?.disconnect(from: view.player); view.playback = playback }
         guard let player = view.player else { return }
         player.isMuted = muted
-        playback.configure(player: player, isCurrent: isCurrent, wantsPlayback: playing, durationHint: durationHint)
+        playback.configure(player: player, videoID: videoID, gate: playbackGate,
+                           isCurrent: isCurrent, wantsPlayback: playing, durationHint: durationHint)
     }
 
     static func dismantleUIView(_ view: PlayerView, coordinator: ()) {
