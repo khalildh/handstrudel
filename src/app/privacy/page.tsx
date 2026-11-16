@@ -35,6 +35,7 @@ export default function Privacy() {
 
       <h2>Website analytics and download metrics</h2>
       <p>We use <a href="https://vercel.com/docs/analytics/privacy-policy">Vercel Web Analytics</a> to count visitors and page views and understand how people find the website. This includes information such as the page path, referrer, general location, and browser or device type. We remove query strings and fragments from reported page URLs. Analytics does not use third-party cookies or link visits to HandStrudel accounts.</p>
+      <p>We use Vercel Speed Insights to measure how quickly pages load and respond. These measurements are not linked to HandStrudel accounts, and we remove query strings and fragments from the page URLs reported with them.</p>
       <p>We count homepage App Store button clicks by day and button location. These counts don&apos;t include an account ID and don&apos;t use a tracking cookie. The buttons carry a shared campaign label so Apple can report aggregate App Store downloads from the homepage. We don&apos;t match individual clicks to downloads.</p>
 
       <h2>Service providers</h2>
