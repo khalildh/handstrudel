@@ -451,7 +451,7 @@ final class HandStrudelUITests: XCTestCase {
     func testFeedRetryRecoversTheSameClipAndRestoresSeeking() async throws {
         guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_FEED_RETRY_FIXTURE_URL"],
               let endpoint = URL(string: address), endpoint.host == "127.0.0.1" else {
-            throw XCTSkip("Set HANDSTRUDEL_FEED_RETRY_FIXTURE_URL to a loopback media-control fixture.")
+            throw XCTSkip("Set HANDSTRUDEL_FEED_RETRY_FIXTURE_URL to a loopback fixture with FIXTURE_CONTROL_MEDIA=1 and FIXTURE_SINGLE_CLIP=1.")
         }
         func setAvailability(_ available: Bool) async throws {
             let url = URL(string: "/__fixture/feed-media?available=\(available ? 1 : 0)", relativeTo: endpoint)!
@@ -471,7 +471,13 @@ final class HandStrudelUITests: XCTestCase {
         feed.tap()
         let retry = app.buttons["feed-retry-video"]
         XCTAssertTrue(retry.waitForExistence(timeout: 20))
-        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.exists)
+        let clip = app.collectionViews["feed-video-viewport"].cells.containing(.staticText, identifier: "Evening loop").firstMatch
+        let caption = clip.staticTexts["Evening loop"]
+        let share = clip.buttons["Share video"]
+        XCTAssertTrue(caption.exists)
+        XCTAssertTrue(share.exists)
+        let captionY = caption.frame.midY
+        let shareY = share.frame.midY
         let slider = app.sliders["feed-video-progress"].firstMatch
         XCTAssertFalse(slider.exists)
 
@@ -479,9 +485,13 @@ final class HandStrudelUITests: XCTestCase {
         retry.tap()
         XCTAssertTrue(slider.waitForExistence(timeout: 10))
         XCTAssertFalse(retry.exists)
-        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.exists)
-        let actualPlayback = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@", "0:01"), object: slider)
+        XCTAssertTrue(caption.exists)
+        XCTAssertEqual(caption.frame.midY, captionY, accuracy: 1, "The scrubber must not move the caption.")
+        XCTAssertEqual(share.frame.midY, shareY, accuracy: 1, "The scrubber must not move the action rail.")
+        let playing = NSPredicate(format: "value MATCHES %@", "0:0[1-3] of 0:04")
+        let actualPlayback = XCTNSPredicateExpectation(predicate: playing, object: slider)
         await fulfillment(of: [actualPlayback], timeout: 9)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.40)).tap()
         slider.adjust(toNormalizedSliderPosition: 0.8)
         XCTAssertTrue((slider.value as? String)?.contains("0:03") == true)
     }
@@ -622,6 +632,8 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["feed-fullscreen"].isHittable)
         XCTAssertTrue(app.sliders["feed-video-progress"].firstMatch.isHittable)
         XCTAssertEqual(viewport.frame.width, app.frame.width, accuracy: 1)
+        XCTAssertEqual(viewport.frame.minY, app.frame.minY, accuracy: 1)
+        XCTAssertEqual(viewport.frame.maxY, app.frame.maxY, accuracy: 1)
         XCTAssertLessThan(viewport.frame.minY, menu.frame.midY)
         XCTAssertGreaterThan(viewport.frame.maxY, feed.frame.midY)
         XCTAssertFalse(app.segmentedControls["feed-filter"].exists)
@@ -673,6 +685,36 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(slider.value as? String, pausedPosition)
     }
 
+    func testFeedRepostUpdatesTheCountAndCanBeRemoved() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_REPOST_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the repost-enabled feed fixture.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "repost-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 10))
+        element("tab-feed").tap()
+        let clip = app.collectionViews["feed-video-viewport"].cells.containing(.staticText, identifier: "Evening loop").firstMatch
+        let repost = clip.buttons["feed-repost"]
+        func expect(_ label: String, value: String) {
+            let state = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@ AND value == %@", label, value), object: repost)
+            XCTAssertEqual(XCTWaiter.wait(for: [state], timeout: 6), .completed)
+        }
+        expect("Repost", value: "2 reposts")
+        repost.tap()
+        expect("Remove repost", value: "3 reposts")
+        XCTAssertTrue(clip.staticTexts["You reposted"].exists)
+        repost.tap()
+        expect("Repost", value: "2 reposts")
+        XCTAssertFalse(clip.staticTexts["You reposted"].exists)
+        selectFeedMode("Following")
+        XCTAssertTrue(app.staticTexts["@secondartist reposted"].firstMatch.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["@loopmaker"].firstMatch.exists)
+    }
+
     func testFeedEngagementRailShowsCountsAndRecordsCompletedShare() throws {
         guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_ENGAGEMENT_FIXTURE_URL"] else {
             throw XCTSkip("Requires the feed fixture with view counts and engagement.")
@@ -690,6 +732,8 @@ final class HandStrudelUITests: XCTestCase {
         let share = app.buttons["Share video"].firstMatch
         let save = app.buttons["save-performance"].firstMatch
         XCTAssertTrue(remixes.waitForExistence(timeout: 5))
+        XCTAssertEqual(remixes.label, "Remixes")
+        XCTAssertFalse(app.buttons["feed-remix-count"].exists)
         XCTAssertEqual(remixes.value as? String, "3")
         XCTAssertTrue(views.isHittable)
         XCTAssertEqual(save.value as? String, "5 saves")
