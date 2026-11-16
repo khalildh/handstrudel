@@ -515,6 +515,7 @@ final class HandStrudelUITests: XCTestCase {
     func testBookmarkAppearsInPrivateSavedLibrary() throws {
         try launchWithProfileFixture()
         signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 12))
         element("tab-feed").tap()
         let bookmark = app.buttons["save-performance"].firstMatch
         XCTAssertTrue(bookmark.waitForExistence(timeout: 6))
@@ -525,11 +526,30 @@ final class HandStrudelUITests: XCTestCase {
         bookmark.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Remove from Saved"), object: bookmark)], timeout: 5), .completed)
         element("saved-performances").tap()
-        XCTAssertTrue(app.navigationBars["Saved"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Saved performances"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 5))
         app.buttons["Done"].tap()
         bookmark.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Save privately"), object: bookmark)], timeout: 5), .completed)
+    }
+
+    func testOptedInClipExportsAudioToTheShareSheet() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_PLAY_ALONG_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the real MP4 fixture with FIXTURE_AUDIO_DOWNLOAD=1.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        element("tab-feed").tap()
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 5))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.39)).tap()
+        app.buttons["More"].firstMatch.tap()
+        let download = app.buttons["Download audio"]
+        XCTAssertTrue(download.waitForExistence(timeout: 5))
+        download.tap()
+        XCTAssertTrue(app.buttons["Save to Files"].waitForExistence(timeout: 10), app.alerts.firstMatch.debugDescription)
     }
 
     func testFeedProgressScrubsARealVideoWithoutPaging() throws {
