@@ -246,6 +246,8 @@ final class StoreManager: ObservableObject {
         if ProcessInfo.processInfo.arguments.contains("--force-locked") {
             return false
         }
+        if packId == "pro", ProcessInfo.processInfo.arguments.contains("--uitesting"),
+           ProcessInfo.processInfo.arguments.contains("--uitest-pro-scales") { return true }
         // Promo-video demo runs show every instrument unlocked.
         if ProcessInfo.processInfo.environment["HANDSTRUDEL_DEMO_SCRIPT"] != nil {
             return true

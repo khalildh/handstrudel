@@ -7,6 +7,8 @@ final class PersistenceManager {
     private let loopsKey = "savedLoops"
     private let snippetsKey = "savedSnippets"
     private let setupsKey = "savedSoundSetups"
+    private let customScalesKey = "savedCustomScales"
+    static let customScaleLimit = 64
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -19,6 +21,29 @@ final class PersistenceManager {
 
     func saveSetups(_ setups: [NamedSoundSetup]) {
         if let data = try? JSONEncoder().encode(setups) { defaults.set(data, forKey: setupsKey) }
+    }
+
+    func loadCustomScales() -> [CustomScale] {
+        guard let data = defaults.data(forKey: customScalesKey) else { return [] }
+        return (try? JSONDecoder().decode([CustomScale].self, from: data)) ?? []
+    }
+
+    @discardableResult
+    func saveCustomScale(_ scale: CustomScale) -> Bool {
+        var scales = loadCustomScales()
+        if let index = scales.firstIndex(where: { $0.id == scale.id }) { scales[index] = scale }
+        else {
+            guard scales.count < Self.customScaleLimit else { return false }
+            scales.insert(scale, at: 0)
+        }
+        guard let data = try? JSONEncoder().encode(scales) else { return false }
+        defaults.set(data, forKey: customScalesKey)
+        return true
+    }
+
+    func removeCustomScale(_ id: UUID) {
+        let scales = loadCustomScales().filter { $0.id != id }
+        if let data = try? JSONEncoder().encode(scales) { defaults.set(data, forKey: customScalesKey) }
     }
 
     @discardableResult
@@ -65,9 +90,20 @@ final class PersistenceManager {
         set { defaults.set(newValue, forKey: "lastKey") }
     }
 
-    var lastScale: String {
-        get { defaults.string(forKey: "lastScale") ?? "Pentatonic" }
-        set { defaults.set(newValue, forKey: "lastScale") }
+    var lastScale: Scale {
+        get {
+            if let data = defaults.data(forKey: "lastCustomScale"),
+               let custom = try? JSONDecoder().decode(CustomScale.self, from: data) { return .custom(custom) }
+            return Scale(rawValue: defaults.string(forKey: "lastScale") ?? "Pentatonic") ?? .pentatonic
+        }
+        set {
+            if let custom = newValue.customScale, let data = try? JSONEncoder().encode(custom) {
+                defaults.set(data, forKey: "lastCustomScale")
+            } else {
+                defaults.removeObject(forKey: "lastCustomScale")
+                defaults.set(newValue.rawValue, forKey: "lastScale")
+            }
+        }
     }
 
     var lastWaveform: String {
@@ -152,7 +188,7 @@ final class PersistenceManager {
 
     // MARK: - Save All State
 
-    func saveEngineState(presetId: String?, mode: String, key: String, scale: String,
+    func saveEngineState(presetId: String?, mode: String, key: String, scale: Scale,
                          waveform: String, bpm: Double, filterId: String,
                          gridBaseOctave: Int, gridOctaveRange: Int,
                          quantizeEnabled: Bool, quantizeDiv: Double) {
@@ -268,7 +304,7 @@ struct SoundSetup: Codable, Equatable {
     var resolvedInstrument: SoundFontInstrument? { SOUNDFONT_INSTRUMENTS.first { $0.id == instrument } }
     var resolvedWaveform: Waveform? { WAVEFORMS.first { $0.id == waveform } }
     var instrumentName: String? { useSoundFont ? resolvedInstrument?.name : resolvedWaveform?.name }
-    var keyAndScale: String { "\(key.rawValue) \(scale.rawValue)" }
+    var keyAndScale: String { "\(key.rawValue) \(scale.displayName)" }
     var presetDetails: String {
         var parts = [keyAndScale]
         if (20...400).contains(bpm) { parts.append("\(Int(bpm.rounded())) BPM") }

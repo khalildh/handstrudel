@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class AccountPortfolio: ObservableObject {
+    let images = ProfileImageStore()
     @Published private(set) var videos: [Video] = []
     @Published private(set) var counts: FeedService.ProfileCounts?
     @Published private(set) var more = false
@@ -27,6 +28,7 @@ final class AccountPortfolio: ObservableObject {
     func selectAccount(_ id: UUID?) {
         guard account != id else { return }
         account = id
+        images.clear()
         requestID = UUID()
         loading = false
         videos = []
@@ -83,6 +85,9 @@ final class AccountPortfolio: ObservableObject {
 
     func remove(_ video: UUID, from id: UUID) {
         guard id == account else { return }
+        if let post = videos.first(where: { $0.id == video }) {
+            images.discard(.init(url: post.thumbURL, kind: .thumbnail))
+        }
         videos.removeAll { $0.id == video }
     }
 }
@@ -99,6 +104,7 @@ struct ProfileView: View {
     @State private var showSignIn = false
     @State private var showBlocked = false
     @State private var showAppearance = false
+    @State private var showUsageAnalytics = false
     @State private var showEdit = false
     @State private var deleteError = false
 
@@ -143,6 +149,7 @@ struct ProfileView: View {
         .sheet(isPresented: $showSignIn) { SignInView(auth: auth) }
         .sheet(isPresented: $showBlocked) { BlockedUsersView(auth: auth) }
         .sheet(isPresented: $showAppearance) { StudioThemePicker() }
+        .sheet(isPresented: $showUsageAnalytics) { UsageAnalyticsSettings() }
         .sheet(isPresented: $showEdit) { EditCreatorProfileView(auth: auth) }
         .sheet(item: $playing, onDismiss: {
             let action = pendingAction
@@ -179,6 +186,7 @@ struct ProfileView: View {
         .alert("Couldn't delete this post", isPresented: $deleteError) {
             Button("OK", role: .cancel) {}
         }
+        .environment(\.profileImageStore, portfolio.images)
     }
 
     private var header: some View {
@@ -189,6 +197,7 @@ struct ProfileView: View {
             Spacer()
             Menu {
                 Button("Appearance", systemImage: "paintpalette") { showAppearance = true }
+                Button("Usage Analytics", systemImage: "chart.bar") { showUsageAnalytics = true }
                 if auth.isSignedIn {
                     Button("Blocked users") { showBlocked = true }
                     Button("Sign out") { Task { await auth.signOut() } }
@@ -337,9 +346,9 @@ struct CreatorProfileHeader<Actions: View>: View {
                 .font(.system(size: 30, weight: .regular, design: .serif))
                 .foregroundStyle(palette.accent)
             if let avatarKey, !avatarKey.isEmpty {
-                AsyncImage(url: SocialConfig.mediaURL(avatarKey)) { image in
+                ProfileImage(resource: .init(url: SocialConfig.mediaURL(avatarKey), kind: .avatar)) { image in
                     image.resizable().scaledToFill()
-                } placeholder: { Color.clear }
+                }
             }
         }
         .frame(width: 62, height: 62)
@@ -636,12 +645,14 @@ private struct ProfileThumbnail: View {
         ProfileArtwork()
             .overlay { Image(systemName: "waveform").foregroundStyle(palette.accent.opacity(0.8)) }
             .overlay {
-                GeometryReader { proxy in
-                    AsyncImage(url: video.thumbURL) { image in
-                        image.resizable().scaledToFill()
-                            .frame(width: proxy.size.width, height: proxy.size.height)
-                            .clipped()
-                    } placeholder: { Color.clear }
+                if video.hidden != true {
+                    GeometryReader { proxy in
+                        ProfileImage(resource: .init(url: video.thumbURL, kind: .thumbnail)) { image in
+                            image.resizable().scaledToFill()
+                                .frame(width: proxy.size.width, height: proxy.size.height)
+                                .clipped()
+                        }
+                    }
                 }
             }
             .clipped()
@@ -777,9 +788,9 @@ private struct EditCreatorProfileView: View {
             if let pendingPhoto, let image = UIImage(data: pendingPhoto) {
                 Image(uiImage: image).resizable().scaledToFill()
             } else if !removePhoto, let key = auth.profile?.avatarKey {
-                AsyncImage(url: SocialConfig.mediaURL(key)) { image in
+                ProfileImage(resource: .init(url: SocialConfig.mediaURL(key), kind: .avatar)) { image in
                     image.resizable().scaledToFill()
-                } placeholder: { Color.clear }
+                }
             }
         }
         .frame(width: 58, height: 58)

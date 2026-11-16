@@ -22,6 +22,7 @@
 		30EEA2665C3FBD9C4CD3A32A /* SpatialAudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D6E49EC2BD40C4448C835E /* SpatialAudioManager.swift */; };
 		31732217DB10380B3787DE51 /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11DB4C253B491BF310A3C6BD /* LiveActivityManager.swift */; };
 		372DDDFE5ECB97237C94192A /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 060174F53A17DCA947630D4A /* ProfileView.swift */; };
+		5BFBC651918642549D3C3FA1 /* ProfileImageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6405E2C577924A99B72D9B6E /* ProfileImageStore.swift */; };
 		375F9115E62B2635FC5E1FA1 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D986625C7BF30952FBAED619 /* OnboardingView.swift */; };
 		380966C71A0162507C985C6C /* StartOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74287CD261130ADF57405FF3 /* StartOverlayView.swift */; };
 		1DD4B16EACBE49959B72A4A0 /* StudioTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DD4B16EACBE49959B72A4A1 /* StudioTheme.swift */; };
@@ -75,6 +76,7 @@
 		B59B82967BBF79A13E8EC3E6 /* DrumModeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */; };
 		B67417F9F167B71B6C70CE24 /* GridTouchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9238181B674B4222B2F52C5A /* GridTouchView.swift */; };
 		B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D77EA18663B3717C68CAAB /* ContentView.swift */; };
+		D6802636D2AE4E728E125B13 /* AppAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6802636D2AE4E728E125B14 /* AppAnalytics.swift */; };
 		B865D46CF40CD2EB491FEB86 /* SocialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FD63E1E2EC2BFA39147EDD /* SocialTests.swift */; };
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
 		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
@@ -130,7 +132,9 @@
 		0566FE6FEDB28D58639FD392 /* strudel-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "strudel-bundle.js"; sourceTree = "<group>"; };
 		05918587EFCB493DEE7360FC /* GridModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridModeManagerTests.swift; sourceTree = "<group>"; };
 		060174F53A17DCA947630D4A /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		6405E2C577924A99B72D9B6E /* ProfileImageStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileImageStore.swift; sourceTree = "<group>"; };
 		09D77EA18663B3717C68CAAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		D6802636D2AE4E728E125B14 /* AppAnalytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAnalytics.swift; sourceTree = "<group>"; };
 		0CB456251F49E8C1FE668CC2 /* LearnSong.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSong.swift; sourceTree = "<group>"; };
 		0F27BAFEE657ED1D0F721C12 /* VideoUploader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoUploader.swift; sourceTree = "<group>"; };
 		10F66A4286F922F3805EADFE /* ParamDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParamDefs.swift; sourceTree = "<group>"; };
@@ -342,6 +346,7 @@
 			isa = PBXGroup;
 			children = (
 				09D77EA18663B3717C68CAAB /* ContentView.swift */,
+				D6802636D2AE4E728E125B14 /* AppAnalytics.swift */,
 				A1B2C3D4E5F600000002B001 /* ControlSheetView.swift */,
 				A1B2C3D4E5F600000002B011 /* UIKitBridges.swift */,
 				7E57457FC4F9482D9D948B41 /* HandStrudelApp.swift */,
@@ -429,6 +434,7 @@
 			children = (
 				7F54EF812D2A064C69B1BDD3 /* AuthManager.swift */,
 				A2002CD71507A5A94C81B174 /* PostComposerView.swift */,
+				6405E2C577924A99B72D9B6E /* ProfileImageStore.swift */,
 				060174F53A17DCA947630D4A /* ProfileView.swift */,
 				7944BC24ED82EBCC08239937 /* SignInView.swift */,
 				8FA2A33806A43063DD48DD26 /* SocialConfig.swift */,
@@ -568,6 +574,7 @@
 				6342A972BB06049F9B3999BC /* CameraFilter.swift in Sources */,
 				043BBAAF12C3D3188CF3823F /* CameraView.swift in Sources */,
 				B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */,
+				D6802636D2AE4E728E125B13 /* AppAnalytics.swift in Sources */,
 				A1B2C3D4E5F600000002B002 /* ControlSheetView.swift in Sources */,
 				A1B2C3D4E5F600000002B012 /* UIKitBridges.swift in Sources */,
 				1F8C5D640CEA8483EAA0487A /* DrumModeManager.swift in Sources */,
@@ -630,6 +637,7 @@
 				B033D247CE64C351B3262535 /* iMessageManager.swift in Sources */,
 				59FEC820DA105A80DD79DC57 /* AuthManager.swift in Sources */,
 				440E40A83FE64DC7EE931389 /* PostComposerView.swift in Sources */,
+				5BFBC651918642549D3C3FA1 /* ProfileImageStore.swift in Sources */,
 				372DDDFE5ECB97237C94192A /* ProfileView.swift in Sources */,
 				F8F0949B1485DEA5CC67EAA8 /* SignInView.swift in Sources */,
 				D429318FDB3402202042EFF1 /* SocialConfig.swift in Sources */,

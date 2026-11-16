@@ -32,7 +32,7 @@ if (chordProgressions.length !== (chordCatalog.match(/\.init\(/g)?.length ?? 0) 
 const theorySource = readFileSync(join(root, "ios/HandStrudel/HandStrudel/Models/MusicTheory.swift"), "utf8");
 const swiftEnum = (name) => theorySource.match(new RegExp(`^enum ${name}:[^{]+\\{([\\s\\S]*?)^\\}`, "m"))?.[1] ?? "";
 const keySource = swiftEnum("MusicKey");
-const scaleSource = swiftEnum("Scale");
+const scaleSource = swiftEnum("BuiltInScale");
 const keyCases = Array.from(keySource.matchAll(/^    case ([^\r\n]+)$/gm), ([, list]) => list.split(/,\s*/)).flat();
 const keySemitones = new Map(Array.from(keySource.matchAll(/^ +case \.(\w+): +return (\d+)$/gm),
   ([, key, semitone]) => [key, Number(semitone)]));

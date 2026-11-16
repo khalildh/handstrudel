@@ -300,6 +300,12 @@ final class EngineController: ObservableObject {
 
     init() {
         loadPersistedState()
+        let firstNote: () -> Void = { [weak self] in
+            guard let self, self.isRunning, !self.isPaused else { return }
+            AppAnalytics.shared.record(.firstNote)
+        }
+        soundFontEngine.onNoteStarted = firstNote
+        strudelBridge.onNoteStarted = firstNote
         handTracker.onCameraAccessBlocked = { [weak self] in self?.fallBackToTouch() }
         jamSession.onRemoteEvent = { [weak self] event in self?.playJamEvent(event) }
         jamSession.onRemoteVoices = { [weak self] peer, voices in self?.playJamVoices(voices, peer: peer) }
@@ -313,9 +319,7 @@ final class EngineController: ObservableObject {
         if let key = MusicKey(rawValue: pm.lastKey) {
             selectedKey = key
         }
-        if let scale = Scale(rawValue: pm.lastScale) {
-            selectedScale = scale
-        }
+        selectedScale = pm.lastScale
         selectedWaveform = pm.lastWaveform
         manualBPM = pm.lastBPM
         gridBaseOctave = pm.lastGridBaseOctave
@@ -356,6 +360,13 @@ final class EngineController: ObservableObject {
 
     func recomputeScaleNotes() {
         cachedScaleNotes = scaleNotes(key: selectedKey, scale: selectedScale)
+    }
+
+    func selectScale(_ scale: Scale) {
+        selectedScale = scale
+        recomputeScaleNotes()
+        lastStructKey = ""
+        PersistenceManager.shared.lastScale = scale
     }
 
     var bpmIsMapped: Bool {
@@ -906,6 +917,7 @@ final class EngineController: ObservableObject {
         guard notes.indices.contains(lane) else { return }
         let hit = learnModeManager.tapLane(lane, elapsed: learnElapsed)
         strudelBridge.playNote(midi: hit ?? notes[lane], waveform: selectedWaveform, velocity: 0.7, duration: 0.3)
+        if strudelBridge.isReady { AppAnalytics.shared.record(.firstNote) }
         if hit != nil { haptics.learnPerfectHit() }
         else { haptics.noteTrigger() }
         updateLearnUI()
@@ -1209,7 +1221,7 @@ final class EngineController: ObservableObject {
                     // Grid mode: show last triggered note
                     self.noteDisplay = self.lastGridNote.isEmpty ? "pinch to play" : self.lastGridNote
                     self.chordDisplay = ""
-                    self.codeDisplay = "grid mode — \(self.selectedKey.rawValue) \(self.selectedScale.rawValue)"
+                    self.codeDisplay = "grid mode — \(self.selectedKey.rawValue) \(self.selectedScale.displayName)"
                 } else if self.chordMode {
                     let noteCount: Int = self.selectedScale.intervals.count
                     let rawIdx: Double = s["noteIdx"] ?? 0
@@ -1426,7 +1438,7 @@ final class EngineController: ObservableObject {
             presetId: nil,
             mode: mode,
             key: selectedKey.rawValue,
-            scale: selectedScale.rawValue,
+            scale: selectedScale,
             waveform: selectedWaveform,
             bpm: manualBPM,
             filterId: selectedFilter.id,

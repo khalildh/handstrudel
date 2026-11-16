@@ -188,6 +188,9 @@ final class AuthManager: NSObject, ObservableObject {
             ?? FunctionInvokeOptions(method: .delete)
         let result: Result = try await supabase.functions.invoke("profile-avatar", options: options)
         guard self.userId == userId, var updated = profile, updated.id == userId else { return }
+        if let oldKey = updated.avatarKey, oldKey != result.avatarKey {
+            accountPortfolio.images.discard(.init(url: SocialConfig.mediaURL(oldKey), kind: .avatar))
+        }
         updated.avatarKey = result.avatarKey
         profile = updated
     }

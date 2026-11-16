@@ -3,6 +3,63 @@ import XCTest
 
 final class MusicTheoryTests: XCTestCase {
 
+    func testNewScalePatternsAndCustomScalesRequirePro() throws {
+        let presets: [(BuiltInScale, [Int])] = [
+            (.minorPentatonic, [0, 3, 5, 7, 10]), (.majorBlues, [0, 2, 3, 4, 7, 9]),
+            (.phrygianDominant, [0, 1, 4, 5, 7, 8, 10]), (.diminished, [0, 1, 3, 4, 6, 7, 9, 10]),
+            (.harmonicMajor, [0, 2, 4, 5, 7, 8, 11]), (.lydianDominant, [0, 2, 4, 6, 7, 9, 10]),
+            (.altered, [0, 1, 3, 4, 6, 8, 10]), (.dominantBebop, [0, 2, 4, 5, 7, 9, 10, 11]),
+        ]
+        for (preset, intervals) in presets {
+            let scale = Scale.builtIn(preset)
+            XCTAssertEqual(scale.intervals, intervals)
+            XCTAssertEqual(scale.packId, "pro")
+            XCTAssertTrue(Scale.allCases.contains(scale))
+        }
+        let custom = try XCTUnwrap(CustomScale(name: "Three notes", intervals: [0, 4, 7]))
+        XCTAssertEqual(Scale.custom(custom).packId, "pro")
+        XCTAssertEqual(scaleNotesOneOctave(key: .A, scale: .minorPentatonic), [69, 72, 74, 76, 79])
+        XCTAssertEqual(chordNotesWithSeventh(key: .C, scale: .custom(custom), degree: 2), [55, 64, 72, 79])
+    }
+
+    func testScaleDecodesLegacyIDsAndRejectsInvalidCustomPatterns() throws {
+        let decoder = JSONDecoder()
+        let encoder = JSONEncoder()
+        let legacy = try decoder.decode(Scale.self, from: Data(#""Pentatonic""#.utf8))
+        XCTAssertEqual(legacy, .pentatonic)
+        XCTAssertEqual(legacy.displayName, "Major Pentatonic")
+        XCTAssertEqual(String(decoding: try encoder.encode(legacy), as: UTF8.self), #""Pentatonic""#)
+        let custom = try XCTUnwrap(CustomScale(name: "Soft Glow", intervals: [0, 4, 9]))
+        XCTAssertEqual(try decoder.decode(Scale.self, from: encoder.encode(Scale.custom(custom))), .custom(custom))
+        for intervals in [[0, 1], [1, 4, 7], [0, 7, 4], [0, 4, 4], [0, 4, 12]] {
+            XCTAssertNil(CustomScale(name: "Invalid", intervals: intervals))
+            let payload = try JSONSerialization.data(withJSONObject: ["id": custom.id.uuidString, "name": "Bad", "intervals": intervals])
+            XCTAssertThrowsError(try decoder.decode(Scale.self, from: payload))
+        }
+    }
+
+    func testCustomScaleLibraryPersistsEditsAndActiveSelection() throws {
+        let suite = "custom-scale-tests-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let persistence = PersistenceManager(defaults: defaults)
+        defaults.set("Blues", forKey: "lastScale")
+        XCTAssertEqual(persistence.lastScale, .blues)
+
+        let original = try XCTUnwrap(CustomScale(name: "Warm", intervals: [0, 3, 7]))
+        XCTAssertTrue(persistence.saveCustomScale(original))
+        let edited = try XCTUnwrap(CustomScale(id: original.id, name: "Warmer", intervals: [0, 3, 5, 7]))
+        XCTAssertTrue(persistence.saveCustomScale(edited))
+        persistence.lastScale = .custom(edited)
+        let reopened = PersistenceManager(defaults: defaults)
+        XCTAssertEqual(reopened.lastScale, .custom(edited))
+        XCTAssertEqual(reopened.loadCustomScales(), [edited])
+        reopened.removeCustomScale(edited.id)
+        XCTAssertTrue(reopened.loadCustomScales().isEmpty)
+        reopened.lastScale = .major
+        XCTAssertEqual(persistence.lastScale, .major)
+    }
+
     // MARK: - Scale Intervals
 
     func testMajorScale_returnsCorrectIntervals() {

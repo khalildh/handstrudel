@@ -33,6 +33,9 @@ export default function Privacy() {
       </ul>
       <p>We use this only to run HandStrudel: to sign you in, show your posts, power the feed, keep the community safe, and contact you about your account. We don&apos;t sell your data, show ads, or track you across other apps or websites.</p>
 
+      <h2>Optional app usage analytics</h2>
+      <p>You can opt in from Account settings in the app. We count days the app is used, use on a later day, first notes played, and recordings started, saved to Private drafts, and posted. We store daily totals, not individual activity histories. The app does not send account or device IDs, played pitches, custom scale names, gestures, audio, or camera imagery with these events. Turn off Usage Analytics in Account settings to stop sending events.</p>
+
       <h2>Website analytics and download metrics</h2>
       <p>We use <a href="https://vercel.com/docs/analytics/privacy-policy">Vercel Web Analytics</a> to count visitors and page views and understand how people find the website. This includes information such as the page path, referrer, general location, and browser or device type. We remove query strings and fragments from reported page URLs. Analytics does not use third-party cookies or link visits to HandStrudel accounts.</p>
       <p>We use Vercel Speed Insights to measure how quickly pages load and respond. These measurements are not linked to HandStrudel accounts, and we remove query strings and fragments from the page URLs reported with them.</p>
