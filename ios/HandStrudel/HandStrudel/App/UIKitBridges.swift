@@ -29,9 +29,16 @@ struct ShakeDetectorView: UIViewControllerRepresentable {
 // Wraps UIActivityViewController for sharing
 struct ShareSheet: UIViewControllerRepresentable {
     let activityItems: [Any]
+    var onCompleted: (() -> Void)? = nil
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        if let onCompleted {
+            controller.completionWithItemsHandler = { _, completed, _, error in
+                if completed, error == nil { onCompleted() }
+            }
+        }
+        return controller
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}

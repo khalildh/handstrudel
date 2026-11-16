@@ -35,6 +35,7 @@ export default function Privacy() {
 
       <h2>Public video views</h2>
       <p>Public videos also show aggregate view counts. We count playback, not just loading the page, and use a random code for each watched clip to avoid counting the same session's replays. The code is not reused across clips and is separate from optional usage analytics.</p>
+      <p>Public performance metrics also include a total of saves and completed in-app shares. Your Saved list stays private. We do not store who received a shared link.</p>
 
       <h2>Optional app usage analytics</h2>
       <p>You can opt in from Account settings in the app. We count days the app is used, use on a later day, first notes played, and recordings started, saved to Private drafts, and posted. We store daily totals, not individual activity histories. The app does not send account or device IDs, played pitches, custom scale names, gestures, audio, or camera imagery with these events. Turn off Usage Analytics in Account settings to stop sending events.</p>

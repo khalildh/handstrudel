@@ -636,6 +636,46 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(slider.value as? String, pausedPosition)
     }
 
+    func testFeedEngagementRailShowsCountsAndRecordsCompletedShare() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_ENGAGEMENT_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with view counts and engagement.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        let feed = element("tab-feed")
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.tap()
+        let views = element("feed-views-count")
+        let remixes = element("feed-remix-count")
+        let share = app.buttons["Share video"].firstMatch
+        let save = app.buttons["save-performance"].firstMatch
+        XCTAssertTrue(remixes.waitForExistence(timeout: 5))
+        XCTAssertEqual(remixes.value as? String, "3")
+        XCTAssertTrue(views.isHittable)
+        XCTAssertEqual(save.value as? String, "5 saves")
+        XCTAssertEqual(share.value as? String, "4 shares")
+        XCTAssertEqual(app.buttons["Like"].firstMatch.value as? String, "42 likes")
+        XCTAssertTrue(app.buttons["video-comments-button"].firstMatch.isHittable)
+        captureIfRequested("Feed-Engagement-Rail")
+
+        share.tap()
+        let close = app.buttons["header.closeButton"].firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+        let cancelled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true AND value == %@", "4 shares"), object: share)
+        XCTAssertEqual(XCTWaiter.wait(for: [cancelled], timeout: 5), .completed)
+
+        share.tap()
+        let copy = app.cells.matching(NSPredicate(format: "label == %@", "Copy")).firstMatch
+        XCTAssertTrue(copy.waitForExistence(timeout: 5))
+        copy.tap()
+        let recorded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "5 shares"), object: share)
+        XCTAssertEqual(XCTWaiter.wait(for: [recorded], timeout: 7), .completed)
+    }
+
     func testCreatorVideoUsesFeedControlsAndCountsPlayback() throws {
         guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_VIDEO_VIEWS_FIXTURE_URL"] else {
             throw XCTSkip("Requires a real MP4 and FIXTURE_VIEW_COUNTS=1.")

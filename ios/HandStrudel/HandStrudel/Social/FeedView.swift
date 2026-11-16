@@ -38,11 +38,15 @@ struct FeedView: View {
     @State private var pendingStart: PerformanceStart?
     @State private var audioDownload: Video?
     @State private var pendingBookmark: Video?
+    @State private var sharing: Video?
 
     private var allowsFeedPlayback: Bool {
         isActive && scenePhase == .active && commenting == nil && !showActivity && creatorVideo == nil
-            && sourceVideo == nil && soundVideo == nil && !showSaved && !showSearch && openChallenge == nil && !showSignIn
+            && sourceVideo == nil && soundVideo == nil && sharing == nil
+            && !showSaved && !showSearch && openChallenge == nil && !showSignIn
     }
+
+    private var engagementTarget: UUID? { allowsFeedPlayback && !isFullscreen ? model.currentVideoID : nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: isFullscreen ? 0 : 12) {
@@ -73,6 +77,7 @@ struct FeedView: View {
                         await model.refresh(user: auth.userId)
                     }) { video, isCurrent, playbackGate in
                         FeedCell(video: video, isCurrent: isCurrent, isFullscreen: isFullscreen, playbackGate: playbackGate,
+                                 engagement: model.engagement[video.id],
                                  isMine: video.userId == auth.userId,
                                  isFollowing: model.following.contains(video.userId),
                                  isSaved: model.savedIDs.contains(video.id),
@@ -89,6 +94,7 @@ struct FeedView: View {
                                  bookmark: {
                                      toggleBookmark(video)
                                  },
+                                 share: { sharing = video },
                                  downloadAudio: { audioDownload = video },
                                  changeAudioPermission: {
                                      Task {
@@ -135,12 +141,20 @@ struct FeedView: View {
             }
             .overlay(alignment: .topTrailing) {
                 if !model.videos.isEmpty || isFullscreen {
-                    Button { isFullscreen.toggle() } label: {
-                        FeedVideoIcon(symbol: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    HStack(spacing: 7) {
+                        if !isFullscreen {
+                            Button { muted.toggle() } label: {
+                                FeedVideoIcon(symbol: muted ? "speaker.slash" : "speaker.wave.2")
+                            }
+                            .accessibilityLabel(muted ? "Unmute" : "Mute")
+                        }
+                        Button { isFullscreen.toggle() } label: {
+                            FeedVideoIcon(symbol: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        }
+                        .accessibilityLabel(isFullscreen ? "Exit full screen" : "Full screen")
+                        .accessibilityIdentifier("feed-fullscreen")
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(isFullscreen ? "Exit full screen" : "Full screen")
-                    .accessibilityIdentifier("feed-fullscreen")
                     .padding(isFullscreen ? 18 : 12)
                 }
             }
@@ -154,6 +168,9 @@ struct FeedView: View {
         .task(id: FeedRefresh(user: auth.userId, mode: model.mode)) {
             await model.refresh(user: auth.userId)
             await refreshBadge()
+        }
+        .task(id: engagementTarget) {
+            if let id = engagementTarget { await model.refreshEngagement(for: id) }
         }
         .task(id: ChallengeRefresh(user: auth.userId, visible: isActive && scenePhase == .active)) {
             challenge = nil
@@ -179,6 +196,9 @@ struct FeedView: View {
             }
         }) { SignInView(auth: auth, reason: "Sign in to save performances and join the community.") }
         .modifier(PerformanceAudioDownload(video: $audioDownload))
+        .sheet(item: $sharing) { video in
+            VideoShareSheet(video: video) { await model.refreshEngagement(for: video.id) }
+        }
         .sheet(isPresented: $showSearch, onDismiss: resumePerformance) {
             PostSearchView(auth: auth) { start in
                 pendingStart = start
@@ -393,6 +413,7 @@ struct FeedView: View {
             do {
                 if let saved = try await model.toggleBookmark(video.id, user: user, explicitlySave: explicitlySave) {
                     show(saved ? "Saved privately." : "Removed from Saved.")
+                    await model.refreshEngagement(for: video.id)
                 }
             } catch let error as FeedService.Unavailable {
                 show(error.localizedDescription)
@@ -488,6 +509,8 @@ final class FeedModel: ObservableObject {
     @Published private(set) var confirmedNoFollows = false
     @Published private(set) var savedIDs = Set<UUID>()
     @Published private(set) var audioDownloadIDs = Set<UUID>()
+    @Published private(set) var engagement: [UUID: VideoEngagement] = [:]
+    private var engagementRequests: [UUID: UUID] = [:]
     private var reachedEnd = false
     private var pageCursor: Video?
     private var seenVideoIDs = Set<UUID>()
@@ -504,6 +527,7 @@ final class FeedModel: ObservableObject {
     private let loadAudioDownloadIDs: ([UUID]) async throws -> Set<UUID>
 
     var followingOnly: Bool { mode == .following }
+    var currentVideoID: UUID? { videos.indices.contains(current) ? videos[current].id : nil }
 
     init(writeLike: @escaping (Bool, UUID, UUID) async throws -> Void = FeedService.setLiked,
          loadPublicPage: @escaping (Video?, Int) async throws -> [Video] = {
@@ -522,6 +546,15 @@ final class FeedModel: ObservableObject {
         videos[index].backingEnabled = fresh.backingEnabled
     }
 
+    func refreshEngagement(for id: UUID) async {
+        let request = UUID()
+        engagementRequests[id] = request
+        defer { if engagementRequests[id] == request { engagementRequests[id] = nil } }
+        guard let counts = try? await FeedService.engagement(for: id), !Task.isCancelled,
+              engagementRequests[id] == request, videos.contains(where: { $0.id == id }) else { return }
+        if engagement[id] != counts { engagement[id] = counts }
+    }
+
     func refresh(user: UUID?, loadFollowingPage: (UUID) async throws -> FeedService.FollowingPage = {
         try await FeedService.followingPage(user: $0)
     }) async {
@@ -538,6 +571,8 @@ final class FeedModel: ObservableObject {
         rankingDate = Date()
         confirmedNoFollows = false
         audioDownloadIDs = []
+        engagement = [:]
+        engagementRequests = [:]
         videos = []; current = 0; following = []
         defer { if request == generation { loading = false } }
         guard !followingOnly || user != nil else { return }
@@ -1239,9 +1274,10 @@ private struct PerformanceDetail: View {
     @State private var showComments = false
     @State private var audioDownload: Video?
     @State private var canDownloadAudio = false
+    @State private var sharing = false
 
     private var isCurrent: Bool {
-        detailIsVisible && playerIsOnScreen && scenePhase == .active && !showComments && audioDownload == nil
+        detailIsVisible && playerIsOnScreen && scenePhase == .active && !showComments && audioDownload == nil && !sharing
     }
 
     var body: some View {
@@ -1280,8 +1316,13 @@ private struct PerformanceDetail: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(isFullscreen ? .hidden : .visible, for: .navigationBar)
         .toolbar {
-            if allowsSharing { ToolbarItem(placement: .primaryAction) { ShareLink(item: video.watchURL) } }
+            if allowsSharing {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Share video", systemImage: "square.and.arrow.up") { sharing = true }
+                }
+            }
         }
+        .sheet(isPresented: $sharing) { VideoShareSheet(video: video) }
         .sheet(isPresented: $showComments) {
             CommentsView(video: video, auth: auth, targetComment: notification?.commentId)
         }
@@ -1385,6 +1426,20 @@ private struct PerformanceDetail: View {
 private struct ClipIsOnScreen: PreferenceKey {
     static let defaultValue = false
     static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
+private struct VideoShareSheet: View {
+    let video: Video
+    var onRecorded: () async -> Void = {}
+
+    var body: some View {
+        ShareSheet(activityItems: [video.watchURL]) {
+            Task {
+                guard (try? await FeedService.recordShare(for: video.id)) != nil else { return }
+                await onRecorded()
+            }
+        }
+    }
 }
 
 private struct PerformanceAudioDownload: ViewModifier {
@@ -1577,6 +1632,7 @@ private struct FeedCell: View {
     let isCurrent: Bool
     let isFullscreen: Bool
     let playbackGate: FeedPlaybackGate
+    let engagement: VideoEngagement?
     let isMine: Bool
     let isFollowing: Bool
     let isSaved: Bool
@@ -1592,6 +1648,7 @@ private struct FeedCell: View {
     let comments: () -> Void
     let creator: () -> Void
     let bookmark: () -> Void
+    let share: () -> Void
     let downloadAudio: () -> Void
     let changeAudioPermission: () -> Void
     let advance: () -> Bool
@@ -1604,30 +1661,32 @@ private struct FeedCell: View {
     @State private var confirmAudioDownloads = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ClipPlaybackSurface(video: video, playback: playback, playbackGate: playbackGate,
-                                isCurrent: isCurrent, paused: $paused, muted: muted,
-                                aspectFit: isFullscreen, advance: advance)
-            LinearGradient(colors: [.clear, .black.opacity(isFullscreen ? 0.58 : 0.88)],
-                           startPoint: isFullscreen ? UnitPoint(x: 0.5, y: 0.8) : .center, endPoint: .bottom)
-                .allowsHitTesting(false)
-            VStack(spacing: 0) {
-                if isFullscreen {
-                    if isCurrent {
-                        HStack(spacing: 12) {
-                            FeedProgressStrip(playback: playback)
-                            Spacer(minLength: 0)
-                            muteButton
+        GeometryReader { bounds in
+            ZStack(alignment: .bottom) {
+                ClipPlaybackSurface(video: video, playback: playback, playbackGate: playbackGate,
+                                    isCurrent: isCurrent, paused: $paused, muted: muted,
+                                    aspectFit: isFullscreen, advance: advance)
+                LinearGradient(colors: [.clear, .black.opacity(isFullscreen ? 0.58 : 0.88)],
+                               startPoint: isFullscreen ? UnitPoint(x: 0.5, y: 0.8) : .center, endPoint: .bottom)
+                    .allowsHitTesting(false)
+                VStack(spacing: 0) {
+                    if isFullscreen {
+                        if isCurrent {
+                            HStack(spacing: 12) {
+                                FeedProgressStrip(playback: playback)
+                                Spacer(minLength: 0)
+                                muteButton
+                            }
                         }
+                    } else {
+                        postControls(railHeight: max(44, bounds.size.height - 106))
+                        if isCurrent { FeedProgressStrip(playback: playback) }
                     }
-                } else {
-                    postControls
-                    if isCurrent { FeedProgressStrip(playback: playback) }
                 }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 15)
+                .padding(.bottom, isCurrent && playback.position != nil ? 3 : 16)
             }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 15)
-            .padding(.bottom, isCurrent && playback.position != nil ? 3 : 16)
         }
         .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive, action: delete)
@@ -1637,83 +1696,121 @@ private struct FeedCell: View {
         } message: { Text("This includes any voice in the clip. Only allow downloads if you have permission to share all of the audio.") }
     }
 
-    private var postControls: some View {
+    private func postControls(railHeight: CGFloat) -> some View {
         HStack(alignment: .bottom, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 8) { author; followButton }
-                        VStack(alignment: .leading, spacing: 4) { author; followButton }
-                    }
-                    if !video.caption.isEmpty { Text(video.caption).font(.subheadline).lineLimit(3) }
-                    VideoViewLabel(count: playback.displayedViewCount(fetched: video.viewCount))
-                    if video.soundSetup != nil || video.backingEnabled == true {
-                        soundButton
-                    } else if let instrument = video.instrument {
-                        Label(instrument, systemImage: "waveform")
-                            .font(.caption.monospaced())
-                            .foregroundStyle(palette.mediaAccent)
-                    }
-                    if let id = video.sourceVideoId, let username = video.sourceUsername {
-                        Button("Inspired by @\(username)") { source(id) }
-                            .font(.caption.weight(.semibold)).foregroundStyle(palette.mediaAccent)
-                    }
+            VStack(alignment: .leading, spacing: 6) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { author; followButton }
+                    VStack(alignment: .leading, spacing: 4) { author; followButton }
                 }
-                Spacer()
-                VStack(spacing: 8) {
-                    Button(action: like) {
-                        VStack(spacing: 4) {
-                            actionIcon(video.likedByMe == true ? "heart.fill" : "heart",
-                                       tint: video.likedByMe == true ? palette.recording : .white)
-                            Text("\(video.likeCount)").font(.caption.bold())
-                        }
-                    }
-                    .accessibilityLabel(video.likedByMe == true ? "Unlike" : "Like")
-                    if let enabled = video.commentsEnabled, enabled || isMine {
-                        Button(action: comments) {
-                            VStack(spacing: 4) {
-                                actionIcon("bubble")
-                                if enabled { Text("\(video.commentCount ?? 0)").font(.caption.bold()) }
-                            }
-                        }
-                        .accessibilityLabel(enabled ? "Comments, \(video.commentCount ?? 0)" : "Manage comments")
-                        .accessibilityIdentifier("video-comments-button")
-                    }
-                    muteButton
-                    Button(action: bookmark) {
-                        actionIcon(isSaved ? "bookmark.fill" : "bookmark", tint: isSaved ? palette.mediaAccent : .white)
-                    }
-                    .accessibilityLabel(isSaved ? "Remove from Saved" : "Save privately")
-                    .accessibilityIdentifier("save-performance")
-                    ShareLink(item: video.watchURL) {
-                        actionIcon("square.and.arrow.up")
-                    }
-                    .accessibilityLabel("Share video")
-                    Menu {
-                        if canDownloadAudio {
-                            Button("Download audio", systemImage: "arrow.down.circle", action: downloadAudio)
-                        }
-                        if canChangeAudioPermission {
-                            Button(canDownloadAudio ? "Turn off audio downloads" : "Allow audio downloads",
-                                   systemImage: "waveform") {
-                                if canDownloadAudio { changeAudioPermission() }
-                                else { confirmAudioDownloads = true }
-                            }
-                        }
-                        if isMine {
-                            if video.backingEnabled == true {
-                                Button("Stop allowing play-along", action: revokeBacking)
-                            }
-                            Button("Delete post", role: .destructive) { confirmDelete = true }
-                        } else {
-                            Button(action: report) { Label("Report", systemImage: "flag") }
-                            Button(role: .destructive, action: block) {
-                                Label("Block @\(video.username ?? "user")", systemImage: "hand.raised")
-                            }
-                        }
-                    } label: { actionIcon("ellipsis") }
-                    .accessibilityLabel("More")
+                if !video.caption.isEmpty { Text(video.caption).font(.subheadline).lineLimit(3) }
+                if video.soundSetup != nil || video.backingEnabled == true {
+                    soundButton
+                } else if let instrument = video.instrument {
+                    Label(instrument, systemImage: "waveform")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(palette.mediaAccent)
                 }
+                if let id = video.sourceVideoId, let username = video.sourceUsername {
+                    Button("Inspired by @\(username)") { source(id) }
+                        .font(.caption.weight(.semibold)).foregroundStyle(palette.mediaAccent)
+                }
+            }
+            Spacer(minLength: 0)
+            ViewThatFits(in: .vertical) {
+                actionRail
+                ScrollView { actionRail }.scrollIndicators(.hidden)
+            }
+            .frame(width: 52)
+            .frame(maxHeight: railHeight, alignment: .bottom)
         }
+    }
+
+    private var actionRail: some View {
+        VStack(spacing: 3) {
+            Button(action: like) {
+                railGlyph(video.likedByMe == true ? "heart.fill" : "heart", count: video.likeCount,
+                          tint: video.likedByMe == true ? palette.recording : .white)
+            }
+            .accessibilityLabel(video.likedByMe == true ? "Unlike" : "Like")
+            .accessibilityValue("\(video.likeCount.formatted()) likes")
+
+            if let enabled = video.commentsEnabled, enabled || isMine {
+                Button(action: comments) {
+                    railGlyph("bubble", count: enabled ? video.commentCount ?? 0 : nil)
+                }
+                .accessibilityLabel(enabled ? "Comments, \(video.commentCount ?? 0)" : "Manage comments")
+                .accessibilityIdentifier("video-comments-button")
+            }
+
+            if let engagement {
+                railMetric("arrow.triangle.2.circlepath", label: "Remixes", count: engagement.remixes)
+                    .accessibilityIdentifier("feed-remix-count")
+            }
+
+            Button(action: share) { railGlyph("paperplane", count: engagement?.shares) }
+                .accessibilityLabel("Share video")
+                .accessibilityValue(engagement.map { "\($0.shares.formatted()) shares" } ?? "")
+
+            Button(action: bookmark) {
+                railGlyph(isSaved ? "bookmark.fill" : "bookmark", count: engagement?.saves,
+                          tint: isSaved ? palette.mediaAccent : .white)
+            }
+            .accessibilityLabel(isSaved ? "Remove from Saved" : "Save privately")
+            .accessibilityValue(engagement.map { "\($0.saves.formatted()) saves" } ?? "")
+            .accessibilityIdentifier("save-performance")
+
+            if let views = playback.displayedViewCount(fetched: video.viewCount) {
+                railMetric("eye", label: "Views", count: views)
+                    .accessibilityIdentifier("feed-views-count")
+            }
+
+            Menu {
+                if canDownloadAudio {
+                    Button("Download audio", systemImage: "arrow.down.circle", action: downloadAudio)
+                }
+                if canChangeAudioPermission {
+                    Button(canDownloadAudio ? "Turn off audio downloads" : "Allow audio downloads",
+                           systemImage: "waveform") {
+                        if canDownloadAudio { changeAudioPermission() }
+                        else { confirmAudioDownloads = true }
+                    }
+                }
+                if isMine {
+                    if video.backingEnabled == true {
+                        Button("Stop allowing play-along", action: revokeBacking)
+                    }
+                    Button("Delete post", role: .destructive) { confirmDelete = true }
+                } else {
+                    Button(action: report) { Label("Report", systemImage: "flag") }
+                    Button(role: .destructive, action: block) {
+                        Label("Block @\(video.username ?? "user")", systemImage: "hand.raised")
+                    }
+                }
+            } label: { railGlyph("ellipsis") }
+            .accessibilityLabel("More")
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func railMetric(_ symbol: String, label: String, count: Int) -> some View {
+        railGlyph(symbol, count: count)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label)
+            .accessibilityValue(count.formatted())
+    }
+
+    private func railGlyph(_ symbol: String, count: Int? = nil, tint: Color = .white) -> some View {
+        VStack(spacing: 1) {
+            FeedVideoIcon(symbol: symbol, tint: tint, size: 34)
+            if let count {
+                Text(count.formatted(.number.notation(.compactName)))
+                    .font(.caption2.monospacedDigit().weight(.bold))
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .contentShape(Rectangle())
     }
 
     private var muteButton: some View {
@@ -1779,12 +1876,13 @@ private struct FeedCell: View {
 private struct FeedVideoIcon: View {
     let symbol: String
     var tint: Color = .white
+    var size: CGFloat = 44
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 18, weight: .semibold))
+            .font(.system(size: size * 0.41, weight: .semibold))
             .foregroundStyle(tint)
-            .frame(width: 44, height: 44)
+            .frame(width: size, height: size)
             .background(.black.opacity(0.55), in: Circle())
             .overlay { Circle().strokeBorder(.white.opacity(0.18)) }
     }
