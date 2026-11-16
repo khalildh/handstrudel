@@ -114,7 +114,7 @@ struct Video: Codable, Equatable, Identifiable {
 }
 
 /// Post details sent after the video and thumbnail upload to private storage.
-struct VideoPostFields: Encodable {
+struct VideoPostFields: Codable, Equatable {
     let caption: String
     let instrument: String?
     let mode: String?
@@ -133,6 +133,16 @@ struct VideoPostFields: Encodable {
         case commentsEnabled = "comments_enabled"
         case backingEnabled = "backing_enabled"
         case sourceVideoId = "source_video_id"
+    }
+}
+
+enum DraftPostSubmission: Codable, Equatable {
+    case pending(id: UUID, fields: VideoPostFields)
+    case published(id: UUID)
+
+    var isPending: Bool {
+        if case .pending = self { return true }
+        return false
     }
 }
 

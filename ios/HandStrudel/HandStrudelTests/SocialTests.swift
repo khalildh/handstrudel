@@ -1201,4 +1201,129 @@ final class SocialTests: XCTestCase {
         let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
         XCTAssertEqual(obj["moderationVersion"] as? Int, 2)
     }
+
+    @MainActor
+    private func makePostDraft(in directory: URL) throws -> (RecordingDrafts, RecordingDraft) {
+        let store = RecordingDrafts(directory: directory)
+        let draft = try store.begin(instrument: "Piano", mode: "Scale")
+        try Data([0]).write(to: store.videoURL(for: draft.id))
+        try store.complete(draft)
+        return (store, draft)
+    }
+
+    private var originalPostFields: VideoPostFields {
+        VideoPostFields(caption: "Original caption", instrument: "Piano", mode: "Scale",
+                        durationS: 7, width: 720, height: 1280, commentsEnabled: false)
+    }
+
+    @MainActor
+    func testTimedOutPostResumesFromDiskWithoutUploadingAgain() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let (store, draft) = try makePostDraft(in: directory)
+        let owner = UUID()
+        let id = UUID()
+        let pending = DraftPostSubmission.pending(id: id, fields: originalPostFields)
+        try store.replacePostSubmission(nil, with: pending, draftID: draft.id, accountID: owner)
+        let waiting = VideoUploader(pollTimeout: .zero) { request, user in
+            XCTAssertEqual(request.id, id)
+            XCTAssertEqual(user, owner)
+            XCTAssertEqual(request.action, "status")
+            return PublishUploadResponse(status: .checking)
+        }
+        let timedOut = await waiting.resume(draftID: draft.id, accountID: owner, store: store)
+        XCTAssertFalse(timedOut)
+        guard case .pending = waiting.phase else { return XCTFail("Timeout must remain pending") }
+
+        let reopened = RecordingDrafts(directory: directory)
+        XCTAssertEqual(reopened.postSubmission(for: draft.id, accountID: owner), pending)
+        var requests: [PublishUploadRequest] = []
+        let resumed = VideoUploader { request, _ in
+            requests.append(request)
+            return PublishUploadResponse(status: .published)
+        }
+        let unavailableClip = directory.appending(path: "no-transcode-or-upload-needed.mp4")
+        let posted = await resumed.post(clip: unavailableClip, draftID: draft.id, accountID: owner, store: reopened,
+                                        caption: "Edited later", instrument: nil, mode: nil, soundSetup: nil,
+                                        commentsEnabled: true, backingEnabled: false, backingCredit: nil)
+        XCTAssertTrue(posted)
+        XCTAssertEqual(requests.map(\.action), ["status"])
+        XCTAssertEqual(requests.map(\.id), [id])
+        let published = RecordingDrafts(directory: directory)
+        XCTAssertEqual(published.postSubmission(for: draft.id, accountID: owner), .published(id: id))
+        _ = await resumed.post(clip: unavailableClip, draftID: draft.id, accountID: owner, store: published,
+                               caption: "", instrument: nil, mode: nil, soundSetup: nil,
+                               commentsEnabled: true, backingEnabled: false, backingCredit: nil)
+        XCTAssertEqual(requests.count, 1, "A known published draft must not start another upload")
+    }
+
+    @MainActor
+    func testLostSubmitResponseResendsOriginalFieldsWithSameReservation() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let (store, draft) = try makePostDraft(in: directory)
+        let owner = UUID()
+        let id = UUID()
+        let fields = originalPostFields
+        let pending = DraftPostSubmission.pending(id: id, fields: fields)
+        try store.replacePostSubmission(nil, with: pending, draftID: draft.id, accountID: owner)
+        var requests: [PublishUploadRequest] = []
+        let uploader = VideoUploader { request, _ in
+            requests.append(request)
+            if request.action == "status" { return PublishUploadResponse(status: .reserved) }
+            throw URLError(.networkConnectionLost)
+        }
+        let posted = await uploader.resume(draftID: draft.id, accountID: owner, store: store)
+        XCTAssertFalse(posted)
+        XCTAssertEqual(requests.map(\.action), ["status", "submit"])
+        XCTAssertEqual(requests.map(\.id), [id, id])
+        XCTAssertEqual(requests.last?.fields, fields)
+        XCTAssertEqual(RecordingDrafts(directory: directory).postSubmission(for: draft.id, accountID: owner), pending)
+    }
+
+    @MainActor
+    func testTerminalStatusClearsOnlyItsOwnReservation() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let (store, draft) = try makePostDraft(in: directory)
+        let owner = UUID()
+        let other = UUID()
+        let first = DraftPostSubmission.pending(id: UUID(), fields: originalPostFields)
+        let second = DraftPostSubmission.pending(id: UUID(), fields: originalPostFields)
+        XCTAssertTrue(try store.replacePostSubmission(nil, with: first, draftID: draft.id, accountID: owner))
+        XCTAssertFalse(try store.replacePostSubmission(nil, with: second, draftID: draft.id, accountID: owner))
+        XCTAssertNil(store.postSubmission(for: draft.id, accountID: other))
+        XCTAssertTrue(try store.replacePostSubmission(nil, with: second, draftID: draft.id, accountID: other))
+
+        let uploader = VideoUploader { _, user in
+            XCTAssertEqual(user, owner)
+            return PublishUploadResponse(status: .failed)
+        }
+        let posted = await uploader.resume(draftID: draft.id, accountID: owner, store: store)
+        XCTAssertFalse(posted)
+        XCTAssertNil(store.postSubmission(for: draft.id, accountID: owner))
+        XCTAssertEqual(store.postSubmission(for: draft.id, accountID: other), second)
+        XCTAssertTrue(try store.replacePostSubmission(nil, with: second, draftID: draft.id, accountID: owner))
+        XCTAssertFalse(try store.replacePostSubmission(first, with: nil, draftID: draft.id, accountID: owner))
+    }
+
+    @MainActor
+    func testGenericNotFoundDoesNotForgetAnUploadButExplicitExpirationDoes() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let (store, draft) = try makePostDraft(in: directory)
+        let owner = UUID()
+        let pending = DraftPostSubmission.pending(id: UUID(), fields: originalPostFields)
+        try store.replacePostSubmission(nil, with: pending, draftID: draft.id, accountID: owner)
+        let unavailable = VideoUploader { _, _ in
+            throw FunctionsError.httpError(code: 404, data: Data(#"{"error":"Function not found"}"#.utf8))
+        }
+        _ = await unavailable.resume(draftID: draft.id, accountID: owner, store: store)
+        XCTAssertEqual(store.postSubmission(for: draft.id, accountID: owner), pending)
+        let expired = VideoUploader { _, _ in
+            throw FunctionsError.httpError(code: 404, data: Data(#"{"error":"Upload not found."}"#.utf8))
+        }
+        _ = await expired.resume(draftID: draft.id, accountID: owner, store: store)
+        XCTAssertNil(store.postSubmission(for: draft.id, accountID: owner))
+    }
 }

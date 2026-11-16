@@ -6,8 +6,23 @@ import UIKit
 /// grab a thumbnail, upload both privately, then wait for the server's publication result.
 @MainActor
 final class VideoUploader: ObservableObject {
-    enum Phase: Equatable { case idle, preparing, uploading(Double), checking, done, failed(String) }
+    enum Phase: Equatable { case idle, preparing, uploading(Double), checking, pending(String), done, failed(String) }
     @Published private(set) var phase: Phase = .idle
+    private let publish: @MainActor (PublishUploadRequest, UUID) async throws -> PublishUploadResponse
+    private let pollTimeout: Duration
+
+    init(pollTimeout: Duration = .seconds(120),
+         publish: (@MainActor (PublishUploadRequest, UUID) async throws -> PublishUploadResponse)? = nil) {
+        self.pollTimeout = pollTimeout
+        self.publish = publish ?? Self.sendPublicationRequest
+    }
+
+    var isBusy: Bool {
+        switch phase {
+        case .preparing, .uploading, .checking: return true
+        default: return false
+        }
+    }
 
     struct Prepared {
         let videoURL: URL
@@ -20,11 +35,12 @@ final class VideoUploader: ObservableObject {
     /// Output width for posted clips; height keeps the recording's aspect.
     nonisolated static let outputWidth = 720
 
-    func post(clip: URL, caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?,
+    func post(clip: URL, draftID: UUID, accountID: UUID, store: RecordingDrafts,
+              caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?,
               commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?) async -> Bool {
-        switch phase {
-        case .preparing, .uploading, .checking, .done: return false
-        case .idle, .failed: break
+        guard !isBusy else { return false }
+        if store.postSubmission(for: draftID, accountID: accountID) != nil {
+            return await resume(draftID: draftID, accountID: accountID, store: store)
         }
         do {
             phase = .preparing
@@ -39,7 +55,8 @@ final class VideoUploader: ObservableObject {
             let prepared = try await Self.prepare(clip)
             defer { try? FileManager.default.removeItem(at: prepared.videoURL) }
             phase = .uploading(0)
-            let signed: SignUploadResponse = try await supabase.functions.invoke(
+            let functions = try await Self.functions(for: accountID)
+            let signed: SignUploadResponse = try await functions.invoke(
                 "sign-upload",
                 options: FunctionInvokeOptions(body: SignUploadRequest(
                     videoBytes: try Self.fileSize(prepared.videoURL),
@@ -52,12 +69,15 @@ final class VideoUploader: ObservableObject {
                 durationS: prepared.duration, width: prepared.width, height: prepared.height,
                 soundSetup: soundSetup, commentsEnabled: commentsEnabled ? nil : false,
                 backingEnabled: backingEnabled ? true : nil, sourceVideoId: backingCredit?.videoId)
-            let submitted = try await Self.publish(PublishUploadRequest(action: "submit", id: signed.id, fields: fields))
-            try await waitForPublication(submitted, id: signed.id)
-            phase = .done
-            return true
+            let pending = DraftPostSubmission.pending(id: signed.id, fields: fields)
+            // Persist before submitting: even a lost HTTP response can mean the server accepted it.
+            guard try store.replacePostSubmission(nil, with: pending, draftID: draftID, accountID: accountID) else {
+                phase = .idle
+                return await resume(draftID: draftID, accountID: accountID, store: store)
+            }
+            return await track(pending, draftID: draftID, accountID: accountID, store: store,
+                               submitImmediately: true, waitForResult: true)
         } catch FunctionsError.httpError(_, let data) {
-            struct ErrorResponse: Decodable { let error: String }
             let detail = try? JSONDecoder().decode(ErrorResponse.self, from: data).error
             phase = .failed(detail ?? "Couldn't post this video. Your private draft is safe.")
             return false
@@ -67,27 +87,79 @@ final class VideoUploader: ObservableObject {
         }
     }
 
-    private static func publish(_ request: PublishUploadRequest) async throws -> PublishUploadResponse {
-        try await supabase.functions.invoke("publish-upload", options: FunctionInvokeOptions(body: request))
+    func resume(draftID: UUID, accountID: UUID, store: RecordingDrafts, waitForResult: Bool = true) async -> Bool {
+        guard !isBusy, let submission = store.postSubmission(for: draftID, accountID: accountID) else { return false }
+        return await track(submission, draftID: draftID, accountID: accountID, store: store,
+                           submitImmediately: false, waitForResult: waitForResult)
     }
 
-    private func waitForPublication(_ submitted: PublishUploadResponse, id: UUID) async throws {
-        var status = submitted.status
-        let deadline = ContinuousClock.now.advanced(by: .seconds(120))
-        while status == .checking, ContinuousClock.now < deadline {
-            phase = .checking
-            try await Task.sleep(for: .seconds(2))
-            status = try await Self.publish(PublishUploadRequest(action: "status", id: id)).status
+    private struct ErrorResponse: Decodable { let error: String }
+
+    private static func functions(for accountID: UUID) async throws -> FunctionsClient {
+        let session = try await supabase.auth.session
+        guard session.user.id == accountID else {
+            throw SocialError.message("Sign back in to the account that started this post.")
         }
-        switch status {
-        case .published: return
-        case .held:
-            throw SocialError.message("This clip didn't pass our public content check. Your private draft is safe.")
-        case .checking:
-            throw SocialError.message("This clip is still being checked. Check your profile before trying again.")
-        case .reserved, .failed:
-            throw SocialError.message("We couldn't finish checking this clip. It wasn't posted. Your private draft is safe.")
+        // The shared client attaches the latest session at send time; pin the owner for draft requests.
+        return FunctionsClient(url: SocialConfig.supabaseURL.appending(path: "functions/v1"), headers: [
+            "apikey": SocialConfig.supabaseAnonKey,
+            "Authorization": "Bearer " + session.accessToken,
+        ])
+    }
+
+    private static func sendPublicationRequest(_ request: PublishUploadRequest,
+                                               accountID: UUID) async throws -> PublishUploadResponse {
+        let functions = try await functions(for: accountID)
+        return try await functions.invoke("publish-upload", options: FunctionInvokeOptions(body: request))
+    }
+
+    private func track(_ submission: DraftPostSubmission, draftID: UUID, accountID: UUID, store: RecordingDrafts,
+                       submitImmediately: Bool, waitForResult: Bool) async -> Bool {
+        guard case .pending(let id, let fields) = submission else {
+            phase = .done
+            return false
         }
+        let statusRequest = PublishUploadRequest(action: "status", id: id)
+        let submitRequest = PublishUploadRequest(action: "submit", id: id, fields: fields)
+        phase = .checking
+        do {
+            var status = try await publish(submitImmediately ? submitRequest : statusRequest, accountID).status
+            if status == .reserved && !submitImmediately {
+                status = try await publish(submitRequest, accountID).status
+            }
+            if waitForResult {
+                let deadline = ContinuousClock.now.advanced(by: pollTimeout)
+                while status == .checking, ContinuousClock.now < deadline {
+                    try await Task.sleep(for: .seconds(2))
+                    status = try await publish(statusRequest, accountID).status
+                }
+            }
+            switch status {
+            case .published:
+                let changed = try store.replacePostSubmission(submission, with: .published(id: id), draftID: draftID, accountID: accountID)
+                phase = .done
+                return changed
+            case .held, .failed:
+                try store.replacePostSubmission(submission, with: nil, draftID: draftID, accountID: accountID)
+                phase = .failed(status == .held
+                    ? "This clip didn't pass our public content check. Your private draft is safe."
+                    : "We couldn't finish checking this clip. It wasn't posted. Your private draft is safe.")
+            case .checking, .reserved:
+                phase = .pending("This clip is still being checked. You can check its status in Private drafts.")
+            }
+        } catch {
+            // Only an explicit missing or expired reservation is safe to forget.
+            if case FunctionsError.httpError(let code, let data) = error,
+               let detail = try? JSONDecoder().decode(ErrorResponse.self, from: data).error,
+               (code == 404 && detail == "Upload not found." ||
+                code == 409 && detail == "This upload expired. Try again from Private drafts."),
+               (try? store.replacePostSubmission(submission, with: nil, draftID: draftID, accountID: accountID)) == true {
+                phase = .failed("This upload expired. It wasn't posted. You can post again from Private drafts.")
+            } else {
+                phase = .pending("We couldn't confirm the post status yet. Check again here or in Private drafts.")
+            }
+        }
+        return false
     }
 
     // MARK: Transcode + thumbnail
