@@ -16,7 +16,9 @@ final class AuthManager: NSObject, ObservableObject {
     @Published private(set) var userId: UUID?
     @Published private(set) var email: String?
     @Published private(set) var profile: Profile?
+    @Published private(set) var isLoadingProfile = false
     @Published var errorMessage: String?
+    let accountPortfolio = AccountPortfolio()
 
     var isSignedIn: Bool { userId != nil }
     /// Signed in, but still needs a username and terms acceptance before posting.
@@ -24,6 +26,7 @@ final class AuthManager: NSObject, ObservableObject {
 
     private var appleNonce: String?
     private var appleContinuation: CheckedContinuation<ASAuthorization, Error>?
+    private var profileRequest = UUID()
 
     override init() {
         super.init()
@@ -37,23 +40,39 @@ final class AuthManager: NSObject, ObservableObject {
 
     private func apply(_ session: Session?) async {
         guard let session, !session.isExpired else {
+            profileRequest = UUID()
             userId = nil; email = nil; profile = nil
+            isLoadingProfile = false
+            accountPortfolio.selectAccount(nil)
             return
         }
         let changed = userId != session.user.id
+        if changed {
+            profileRequest = UUID()
+            profile = nil
+            isLoadingProfile = true
+            accountPortfolio.selectAccount(session.user.id)
+        }
         userId = session.user.id
         email = session.user.email
         if changed {
+            async let profileRefresh: Void = refreshProfile()
             // RevenueCat purchases follow the account across devices.
             _ = try? await Purchases.shared.logIn(session.user.id.uuidString)
-            await refreshProfile()
+            await profileRefresh
         }
     }
 
     func refreshProfile() async {
         guard let userId else { return }
-        profile = try? await supabase.from("profiles").select()
+        let request = UUID()
+        profileRequest = request
+        isLoadingProfile = true
+        let refreshed: Profile? = try? await supabase.from("profiles").select()
             .eq("id", value: userId).single().execute().value
+        guard self.userId == userId, profileRequest == request else { return }
+        isLoadingProfile = false
+        if let refreshed, refreshed.id == userId { profile = refreshed }
     }
 
     // MARK: Sign in with Apple

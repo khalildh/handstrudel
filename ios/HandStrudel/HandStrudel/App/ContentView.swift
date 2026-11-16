@@ -387,7 +387,7 @@ struct ContentView: View {
                     )
                 case .account:
                     if SocialConfig.isConfigured {
-                        ProfileView(auth: auth, onMakeMusic: { destination = .music },
+                        ProfileView(auth: auth, portfolio: auth.accountPortfolio, onMakeMusic: { destination = .music },
                                     onTrySound: trySharedSound, onPlayAlong: prepareBacking)
                     } else {
                         socialUnavailable("Account", icon: "person.crop.circle")

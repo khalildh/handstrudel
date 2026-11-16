@@ -6,6 +6,127 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    @MainActor
+    func testAccountPortfolioKeepsItsSnapshotWhileRefreshingOnReturn() async throws {
+        let owner = try XCTUnwrap(UUID(uuidString: Self.discoveryUser))
+        let client = discoveryClient { _ in (200, Self.discoveryVideo) }
+        let clips: [Video] = try await client.from("videos").select().execute().value
+        let updatedClips = clips.map { clip in
+            var updated = clip
+            updated.caption = "Updated clip"
+            return updated
+        }
+        let requested = expectation(description: "Reopening Account refreshes immediately")
+        let release = AsyncStream<Void>.makeStream()
+        var calls = 0
+        var offline = false
+        let portfolio = AccountPortfolio(fetchPage: { _, _ in
+            calls += 1
+            if offline { throw URLError(.notConnectedToInternet) }
+            if calls == 2 {
+                requested.fulfill()
+                var iterator = release.stream.makeAsyncIterator()
+                _ = await iterator.next()
+                return updatedClips
+            }
+            return clips
+        }, fetchCounts: { _ in
+            offline ? .init(posts: nil, followers: nil, following: nil, likesReceived: nil)
+                : .init(posts: 1, followers: 2, following: 3, likesReceived: 42)
+        })
+
+        portfolio.selectAccount(owner)
+        await portfolio.load(for: owner)
+        let refresh = Task { await portfolio.load(for: owner) }
+        await fulfillment(of: [requested], timeout: 1)
+        XCTAssertEqual(calls, 2)
+        XCTAssertEqual(portfolio.videos, clips)
+        XCTAssertEqual(portfolio.counts?.likesReceived, 42)
+        release.continuation.yield(())
+        release.continuation.finish()
+        await refresh.value
+        XCTAssertEqual(portfolio.videos, updatedClips)
+
+        offline = true
+        await portfolio.load(for: owner)
+        XCTAssertEqual(calls, 3)
+        XCTAssertTrue(portfolio.failed)
+        XCTAssertTrue(portfolio.hasLoadedPage)
+        XCTAssertEqual(portfolio.videos, updatedClips)
+        XCTAssertEqual(portfolio.counts?.likesReceived, 42)
+    }
+
+    @MainActor
+    func testAccountSwitchRejectsAnOlderPortfolioResponse() async throws {
+        let owner = try XCTUnwrap(UUID(uuidString: Self.discoveryUser))
+        let client = discoveryClient { _ in (200, Self.discoveryVideo) }
+        let clips: [Video] = try await client.from("videos").select().execute().value
+        let requested = expectation(description: "Old account started loading")
+        let release = AsyncStream<Void>.makeStream()
+        let portfolio = AccountPortfolio(fetchPage: { _, _ in
+            requested.fulfill()
+            var iterator = release.stream.makeAsyncIterator()
+            _ = await iterator.next()
+            return clips
+        }, fetchCounts: { _ in .init(posts: 1, followers: 0, following: 0, likesReceived: 42) })
+
+        portfolio.selectAccount(owner)
+        let pending = Task { await portfolio.load(for: owner) }
+        await fulfillment(of: [requested], timeout: 1)
+        portfolio.selectAccount(nil)
+        portfolio.selectAccount(UUID())
+        release.continuation.yield(())
+        release.continuation.finish()
+        await pending.value
+
+        XCTAssertTrue(portfolio.videos.isEmpty)
+        XCTAssertNil(portfolio.counts)
+        XCTAssertFalse(portfolio.hasLoadedPage)
+    }
+
+    @MainActor
+    func testFeedPlaybackHandoffPausesRetainedPlayersAndRejectsStaleRequests() {
+        let gate = FeedPlaybackGate()
+        let firstID = UUID()
+        let nextID = UUID()
+        let first = FeedPlayerSpy()
+        let next = FeedPlayerSpy()
+        gate.select(firstID)
+        gate.play(first, videoID: firstID)
+        XCTAssertTrue(first.didPlay)
+
+        gate.select(nextID)
+        XCTAssertFalse(first.didPlay, "The old player must pause even if its cell wasn't reconfigured.")
+        gate.play(next, videoID: nextID)
+        gate.play(first, videoID: firstID)
+        XCTAssertFalse(first.didPlay, "A stale seek completion must not restart the old clip.")
+        XCTAssertTrue(next.didPlay)
+
+        gate.select(nil)
+        gate.play(next, videoID: nextID)
+        XCTAssertFalse(next.didPlay, "Leaving the feed stops even a retained player.")
+    }
+
+    @MainActor
+    func testFeedPlaybackAllowsOnlyOnePlayerForTheSameClip() {
+        let gate = FeedPlaybackGate()
+        let clip = UUID()
+        let outgoingHost = FeedPlayerSpy()
+        let replacementHost = FeedPlayerSpy()
+        gate.select(clip)
+        gate.play(outgoingHost, videoID: clip)
+        gate.play(replacementHost, videoID: clip)
+        XCTAssertFalse(outgoingHost.didPlay)
+        XCTAssertTrue(replacementHost.didPlay)
+        XCTAssertFalse(gate.owns(outgoingHost, videoID: clip))
+    }
+
+    private final class FeedPlayerSpy: AVPlayer, @unchecked Sendable {
+        private(set) var didPlay = false
+        override func play() { didPlay = true }
+        override func pause() { didPlay = false }
+    }
+
     func testComposerSharesEligibleSoundAndBackingByDefault() {
         var options = PostSharingOptions()
         var setup = SoundSetup(instrument: "violin", waveform: "sine", key: .C, scale: .major,
