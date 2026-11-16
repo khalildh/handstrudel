@@ -213,6 +213,52 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(range.label, original)
     }
 
+    @MainActor
+    func testPostingReturnsToTheWheelWhileScreeningContinues() async throws {
+        guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_DRAFT_POST_FIXTURE_URL"],
+              let endpoint = URL(string: address), endpoint.host == "127.0.0.1",
+              let file = ProcessInfo.processInfo.environment["HANDSTRUDEL_DRAFT_TEST_CLIP"] else {
+            throw XCTSkip("Requires a loopback draft posting fixture and a simulator-readable MP4.")
+        }
+        app.launchArguments = ["--uitesting", "--uitest-draft-after-start", "-hasSeenOnboarding", "YES"]
+        app.launchEnvironment["HANDSTRUDEL_TEST_CLIP"] = file
+        app.launchEnvironment["SUPABASE_URL"] = address
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "draft-post-fixture-key"
+        app.launch()
+        signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 10))
+        element("tab-music").tap()
+        element("start-button").tap()
+
+        let review = app.navigationBars["Review take"]
+        XCTAssertTrue(review.waitForExistence(timeout: 8))
+        let compose = app.buttons["Post to HandStrudel"]
+        if !compose.isHittable { app.swipeUp() }
+        compose.tap()
+        let composer = app.navigationBars["New post"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        let post = app.buttons["Post publicly"]
+        if !post.isHittable { app.swipeUp() }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND hittable == true"), object: post)
+        await fulfillment(of: [ready], timeout: 8)
+        post.tap()
+
+        let wheel = element("close-button")
+        let resumed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: wheel)
+        await fulfillment(of: [resumed], timeout: 25)
+        XCTAssertFalse(composer.exists)
+        XCTAssertFalse(review.exists)
+        XCTAssertFalse(app.staticTexts["Video posted."].exists)
+
+        let resultURL = try XCTUnwrap(URL(string: "/__fixture/draft-upload-result?status=published", relativeTo: endpoint))
+        var request = URLRequest(url: resultURL)
+        request.httpMethod = "POST"
+        let (_, response) = try await URLSession.shared.data(for: request)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 204)
+        XCTAssertTrue(app.staticTexts["Video posted."].waitForExistence(timeout: 8))
+        XCTAssertTrue(wheel.isHittable)
+    }
+
     func testMusicCanSavePresetBeforeOpeningTheWheel() {
         app.launchArguments = ["--uitesting"]
         app.launch()
@@ -870,6 +916,39 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(fullscreen.label, "Full screen")
         XCTAssertEqual(slider.value as? String, position)
         XCTAssertTrue(count.exists)
+    }
+
+    func testAccountVideoFillsScreenAndAutoplaysNextClip() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_ACCOUNT_PLAYBACK_FIXTURE_URL"] else {
+            throw XCTSkip("Requires a real MP4 and FIXTURE_ACCOUNT_CLIPS=1.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "account-playback-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        signInToProfile()
+        let latest = app.buttons["profile-latest-performance"]
+        XCTAssertTrue(latest.waitForExistence(timeout: 10))
+        if !latest.isHittable { app.swipeUp() }
+        latest.tap()
+        let video = element("performance-video")
+        XCTAssertTrue(video.waitForExistence(timeout: 5))
+        XCTAssertEqual(video.label, "Evening loop")
+
+        let fullscreen = app.buttons["profile-video-fullscreen"]
+        fullscreen.tap()
+        XCTAssertEqual(fullscreen.label, "Exit full screen")
+        XCTAssertEqual(video.frame.minY, app.frame.minY, accuracy: 1)
+        XCTAssertEqual(video.frame.maxY, app.frame.maxY, accuracy: 1)
+        XCTAssertEqual(video.frame.width, app.frame.width, accuracy: 1)
+
+        let advanced = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Second performance"), object: video)
+        XCTAssertEqual(XCTWaiter.wait(for: [advanced], timeout: 15), .completed)
+        XCTAssertEqual(fullscreen.label, "Exit full screen")
+        let slider = app.sliders["feed-video-progress"]
+        let playing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND NOT (value BEGINSWITH %@)", "0:00"), object: slider)
+        XCTAssertEqual(XCTWaiter.wait(for: [playing], timeout: 5), .completed)
     }
 
     @MainActor

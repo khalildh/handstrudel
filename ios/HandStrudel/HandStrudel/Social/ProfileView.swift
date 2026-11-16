@@ -153,7 +153,7 @@ struct ProfileView: View {
         .sheet(isPresented: $showAppearance) { StudioThemePicker() }
         .sheet(isPresented: $showUsageAnalytics) { UsageAnalyticsSettings() }
         .sheet(isPresented: $showEdit) { EditCreatorProfileView(auth: auth) }
-        .sheet(item: $playing, onDismiss: {
+        .fullScreenCover(item: $playing, onDismiss: {
             let action = pendingAction
             pendingAction = nil
             action?()
@@ -164,7 +164,7 @@ struct ProfileView: View {
             }, onTrySound: { sound in
                 pendingAction = { onTrySound(sound) }
                 playing = nil
-            }, allowsSharing: video.hidden != true)
+            }, allowsSharing: video.hidden != true, playlist: portfolio.videos)
         }
         .confirmationDialog("Delete this post?", isPresented: Binding(
             get: { confirmDeleteVideo != nil }, set: { if !$0 { confirmDeleteVideo = nil } }),

@@ -1565,7 +1565,12 @@ final class SocialTests: XCTestCase {
             XCTAssertEqual(request.action, "status")
             return PublishUploadResponse(status: .checking)
         }
-        let timedOut = await waiting.resume(draftID: draft.id, accountID: owner, store: store)
+        var handoffs = 0
+        let timedOut = await waiting.resume(draftID: draft.id, accountID: owner, store: store) {
+            handoffs += 1
+            XCTAssertEqual(store.postSubmission(for: draft.id, accountID: owner), pending)
+        }
+        XCTAssertEqual(handoffs, 1)
         XCTAssertFalse(timedOut)
         guard case .pending = waiting.phase else { return XCTFail("Timeout must remain pending") }
 
@@ -1607,7 +1612,9 @@ final class SocialTests: XCTestCase {
             if request.action == "status" { return PublishUploadResponse(status: .reserved) }
             throw URLError(.networkConnectionLost)
         }
-        let posted = await uploader.resume(draftID: draft.id, accountID: owner, store: store)
+        let posted = await uploader.resume(draftID: draft.id, accountID: owner, store: store) {
+            XCTFail("A failed status lookup or submission must not hand off the composer")
+        }
         XCTAssertFalse(posted)
         XCTAssertEqual(requests.map(\.action), ["status", "submit"])
         XCTAssertEqual(requests.map(\.id), [id, id])

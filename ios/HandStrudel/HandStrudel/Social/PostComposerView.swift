@@ -23,6 +23,12 @@ struct PostSharingOptions {
     }
 }
 
+enum DraftPostUpdate {
+    case checking
+    case posted
+    case failed(String)
+}
+
 /// Preview a just-recorded clip, add a caption, post it to HandStrudel.
 struct PostComposerView: View {
     let clip: URL
@@ -33,8 +39,8 @@ struct PostComposerView: View {
     let soundSetup: SoundSetup?
     let backingCredit: BackingCredit?
     @ObservedObject var auth: AuthManager
-    var onLeaveWhileChecking: () -> Void = {}
-    var onPosted: () -> Void = {}
+    let onSubmissionAccepted: () -> Void
+    let onPostUpdate: (DraftPostUpdate) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var uploader = VideoUploader()
@@ -43,7 +49,6 @@ struct PostComposerView: View {
     @State private var sharing = PostSharingOptions()
     @State private var commentsEnabled = true
     @State private var hasAudio: Bool?
-    @State private var leftWhileChecking = false
 
     private var submission: DraftPostSubmission? {
         auth.userId.flatMap { drafts.postSubmission(for: draftID, accountID: $0) }
@@ -114,14 +119,8 @@ struct PostComposerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(submission == nil ? "Cancel" : "Done") {
-                        if submission?.isPending == true {
-                            leftWhileChecking = true
-                            onLeaveWhileChecking()
-                        }
-                        dismiss()
-                    }
-                    .disabled(uploader.isBusy && uploader.phase != .checking)
+                    Button(submission == nil ? "Cancel" : "Done") { dismiss() }
+                        .disabled(uploader.isBusy)
                 }
             }
         }
@@ -150,7 +149,7 @@ struct PostComposerView: View {
         switch uploader.phase {
         case .preparing: ProgressView("Preparing video…")
         case .uploading(let f): ProgressView(value: f) { Text("Uploading…") }
-        case .checking: ProgressView("Checking video. You can leave this screen.")
+        case .checking: ProgressView("Submitting video…")
         case .pending(let msg): Text(msg).foregroundStyle(.secondary).font(.footnote)
         case .failed(let msg): Text(msg).foregroundStyle(.red).font(.footnote)
         default: EmptyView()
@@ -162,12 +161,26 @@ struct PostComposerView: View {
         let preset = sharing.sharedPreset(soundSetup)
         let allowBacking = sharing.sharesBacking(hasAudio: hasAudio == true, backingCredit: backingCredit)
         Task {
-            if await uploader.post(clip: clip, draftID: draftID, accountID: accountID, store: drafts,
-                                   caption: caption, instrument: instrument, mode: mode,
-                                   soundSetup: preset, commentsEnabled: commentsEnabled,
-                                   backingEnabled: allowBacking, backingCredit: backingCredit) {
-                onPosted()
-                if !leftWhileChecking { dismiss() }
+            var handedOff = false
+            func leaveComposer() {
+                handedOff = true
+                onSubmissionAccepted()
+                dismiss()
+            }
+            let posted = await uploader.post(clip: clip, draftID: draftID, accountID: accountID, store: drafts,
+                                             caption: caption, instrument: instrument, mode: mode,
+                                             soundSetup: preset, commentsEnabled: commentsEnabled,
+                                             backingEnabled: allowBacking, backingCredit: backingCredit) {
+                guard auth.userId == accountID else { return }
+                leaveComposer()
+                onPostUpdate(.checking)
+            }
+            guard auth.userId == accountID else { return }
+            if posted {
+                if !handedOff { leaveComposer() }
+                onPostUpdate(.posted)
+            } else if handedOff, case .failed(let message) = uploader.phase {
+                onPostUpdate(.failed(message))
             }
         }
     }

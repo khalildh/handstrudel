@@ -289,6 +289,8 @@ struct RecordingDraftsView: View {
     let onRetake: (() -> Void)?
     var onSuccessfulTake: (UUID) -> Void = { _ in }
     let onViewPost: (UUID) -> Void
+    let onReturnToMusic: () -> Void
+    let onPostUpdate: (DraftPostUpdate) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -336,7 +338,8 @@ struct RecordingDraftsView: View {
 
     private func editor(_ draft: RecordingDraft) -> some View {
         RecordingDraftEditor(store: store, auth: auth, draft: draft, onRetake: onRetake,
-                             onSuccessfulTake: onSuccessfulTake, onViewPost: onViewPost)
+                             onSuccessfulTake: onSuccessfulTake, onViewPost: onViewPost,
+                             onReturnToMusic: onReturnToMusic, onPostUpdate: onPostUpdate)
     }
 }
 
@@ -348,6 +351,8 @@ private struct RecordingDraftEditor: View {
     let onRetake: (() -> Void)?
     let onSuccessfulTake: (UUID) -> Void
     let onViewPost: (UUID) -> Void
+    let onReturnToMusic: () -> Void
+    let onPostUpdate: (DraftPostUpdate) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer?
     @State private var duration = 0.0
@@ -363,6 +368,7 @@ private struct RecordingDraftEditor: View {
     @State private var sharing: RecordingDraftExport?
     @State private var posting: RecordingDraftExport?
     @State private var pendingPost: RecordingDraftExport?
+    @State private var returnAfterPosting = false
     @State private var signIn = false
     @StateObject private var postStatus = VideoUploader()
     private var busy: Bool { exportTask != nil }
@@ -474,15 +480,20 @@ private struct RecordingDraftEditor: View {
             ShareSheet(activityItems: [copy.url])
                 .onDisappear(perform: copy.remove)
         }
-        .sheet(item: $posting) { copy in
+        .sheet(item: $posting, onDismiss: {
+            if returnAfterPosting {
+                returnAfterPosting = false
+                onReturnToMusic()
+            }
+        }) { copy in
             PostComposerView(clip: copy.url, draftID: draft.id, drafts: store,
                              instrument: draft.instrument, mode: draft.mode, soundSetup: draft.soundSetup,
-                             backingCredit: draft.backingCredit, auth: auth, onLeaveWhileChecking: {
-                message = "Submitted for checking. Your original is still in Private drafts."
-            }) {
-                message = "Posted. The original is still in Private drafts."
-                onSuccessfulTake(draft.id)
-            }
+                             backingCredit: draft.backingCredit, auth: auth, onSubmissionAccepted: {
+                returnAfterPosting = true
+            }, onPostUpdate: { update in
+                if case .posted = update { onSuccessfulTake(draft.id) }
+                onPostUpdate(update)
+            })
             .onDisappear(perform: copy.remove)
         }
         .sheet(isPresented: $signIn, onDismiss: {
