@@ -48,6 +48,9 @@ let readAt = null;
 let videoLikeReadAt = null;
 let displayName = "Studio Viewer";
 let following = false;
+const draftPosting = process.env.FIXTURE_DRAFT_POSTING === "1";
+const draftUploadID = "30000000-0000-0000-0000-000000000099";
+let draftUploadStatus = "reserved";
 let avatarKey = process.env.FIXTURE_AVATAR === "1" ? demoThumb : null;
 const liked = new Set();
 const saved = new Set();
@@ -68,6 +71,40 @@ createServer((request, response) => {
     response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(value));
   };
   switch (url.pathname) {
+    case "/__fixture/draft-upload-result": {
+      if (!draftPosting || request.method !== "POST" || draftUploadStatus !== "checking") return response.writeHead(409).end();
+      const result = url.searchParams.get("status");
+      if (result !== "published" && result !== "held") return response.writeHead(400).end();
+      draftUploadStatus = result;
+      return response.writeHead(204).end();
+    }
+    case "/functions/v1/sign-upload":
+      if (!draftPosting || request.method !== "POST") return response.writeHead(404).end();
+      request.resume();
+      draftUploadStatus = "reserved";
+      return send({
+        id: draftUploadID,
+        videoUploadUrl: `http://${request.headers.host}/__fixture/draft-video`,
+        thumbUploadUrl: `http://${request.headers.host}/__fixture/draft-thumb`,
+      });
+    case "/__fixture/draft-video":
+    case "/__fixture/draft-thumb":
+      if (!draftPosting || request.method !== "PUT") return response.writeHead(404).end();
+      request.on("end", () => response.writeHead(204).end());
+      request.resume();
+      return;
+    case "/functions/v1/publish-upload": {
+      if (!draftPosting || request.method !== "POST") return response.writeHead(404).end();
+      let body = "";
+      request.on("data", (chunk) => { body += chunk; });
+      request.on("end", () => {
+        const { action, id } = JSON.parse(body);
+        if (id.toLowerCase() !== draftUploadID) return response.writeHead(404).end();
+        if (action === "submit" && draftUploadStatus === "reserved") draftUploadStatus = "checking";
+        send({ status: draftUploadStatus });
+      });
+      return;
+    }
     case "/__fixture/feed-media":
       if (!canControlMedia || request.method !== "POST") return response.writeHead(404).end();
       mediaAvailable = url.searchParams.get("available") === "1";
@@ -112,7 +149,10 @@ createServer((request, response) => {
         return send({ avatarKey });
       }
       return response.writeHead(415).end();
-    case "/rest/v1/videos": return send([]);
+    case "/rest/v1/videos":
+      return send(process.env.FIXTURE_ACCOUNT_CLIPS === "1"
+        ? [post, secondPost].map((clip) => ({ ...clip, user_id: viewer, username: "viewer" }))
+        : []);
     case "/rest/v1/rpc/video_engagement":
       return showEngagement ? send([engagement(video)]) : response.writeHead(404).end();
     case "/rest/v1/rpc/video_engagement_v2":

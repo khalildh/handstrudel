@@ -37,10 +37,11 @@ final class VideoUploader: ObservableObject {
 
     func post(clip: URL, draftID: UUID, accountID: UUID, store: RecordingDrafts,
               caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?,
-              commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?) async -> Bool {
+              commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?,
+              onScreeningStarted: () -> Void = {}) async -> Bool {
         guard !isBusy else { return false }
         if store.postSubmission(for: draftID, accountID: accountID) != nil {
-            return await resume(draftID: draftID, accountID: accountID, store: store)
+            return await resume(draftID: draftID, accountID: accountID, store: store, onScreeningStarted: onScreeningStarted)
         }
         do {
             phase = .preparing
@@ -73,10 +74,10 @@ final class VideoUploader: ObservableObject {
             // Persist before submitting: even a lost HTTP response can mean the server accepted it.
             guard try store.replacePostSubmission(nil, with: pending, draftID: draftID, accountID: accountID) else {
                 phase = .idle
-                return await resume(draftID: draftID, accountID: accountID, store: store)
+                return await resume(draftID: draftID, accountID: accountID, store: store, onScreeningStarted: onScreeningStarted)
             }
             return await track(pending, draftID: draftID, accountID: accountID, store: store,
-                               submitImmediately: true, waitForResult: true)
+                               submitImmediately: true, waitForResult: true, onScreeningStarted: onScreeningStarted)
         } catch FunctionsError.httpError(_, let data) {
             let detail = try? JSONDecoder().decode(ErrorResponse.self, from: data).error
             phase = .failed(detail ?? "Couldn't post this video. Your private draft is safe.")
@@ -87,10 +88,11 @@ final class VideoUploader: ObservableObject {
         }
     }
 
-    func resume(draftID: UUID, accountID: UUID, store: RecordingDrafts, waitForResult: Bool = true) async -> Bool {
+    func resume(draftID: UUID, accountID: UUID, store: RecordingDrafts, waitForResult: Bool = true,
+                onScreeningStarted: () -> Void = {}) async -> Bool {
         guard !isBusy, let submission = store.postSubmission(for: draftID, accountID: accountID) else { return false }
         return await track(submission, draftID: draftID, accountID: accountID, store: store,
-                           submitImmediately: false, waitForResult: waitForResult)
+                           submitImmediately: false, waitForResult: waitForResult, onScreeningStarted: onScreeningStarted)
     }
 
     private struct ErrorResponse: Decodable { let error: String }
@@ -114,7 +116,7 @@ final class VideoUploader: ObservableObject {
     }
 
     private func track(_ submission: DraftPostSubmission, draftID: UUID, accountID: UUID, store: RecordingDrafts,
-                       submitImmediately: Bool, waitForResult: Bool) async -> Bool {
+                       submitImmediately: Bool, waitForResult: Bool, onScreeningStarted: () -> Void) async -> Bool {
         guard case .pending(let id, let fields) = submission else {
             phase = .done
             return false
@@ -127,6 +129,7 @@ final class VideoUploader: ObservableObject {
             if status == .reserved && !submitImmediately {
                 status = try await publish(submitRequest, accountID).status
             }
+            if status == .checking { onScreeningStarted() }
             if waitForResult {
                 let deadline = ContinuousClock.now.advanced(by: pollTimeout)
                 while status == .checking, ContinuousClock.now < deadline {

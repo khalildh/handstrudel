@@ -967,10 +967,14 @@ private struct NotificationPerformanceView: View {
     @State private var failed = false
     @State private var unavailable = false
     @State private var attempt = 0
+    @State private var isFullscreen = false
+    @State private var showsFullscreenControls = true
 
     var body: some View {
         if let video {
-            PerformanceDetail(video: video, auth: auth, notification: item, onTrySound: onTrySound)
+            PerformanceDetail(video: video, auth: auth, isFullscreen: $isFullscreen,
+                              showsFullscreenControls: $showsFullscreenControls,
+                              notification: item, onTrySound: onTrySound)
                 .task { await markRead() }
         } else {
             VStack(spacing: 14) {
@@ -1076,7 +1080,7 @@ private struct PublicCreatorView: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .refreshable { await load() }
             .task(id: auth.userId) { await load() }
-            .sheet(item: $opened, onDismiss: {
+            .fullScreenCover(item: $opened, onDismiss: {
                 if let start = afterDismiss { afterDismiss = nil; onStart(start) }
             }) { video in
                 CreatorVideoView(video: video, auth: auth, onPlayAlong: { source in
@@ -1085,7 +1089,7 @@ private struct PublicCreatorView: View {
                 }, onTrySound: { sound in
                     afterDismiss = .preset(sound)
                     opened = nil
-                })
+                }, playlist: videos)
             }
             .sheet(isPresented: $signIn) { SignInView(auth: auth, reason: "Sign in to follow this creator.") }
         }
@@ -1360,16 +1364,35 @@ struct CreatorVideoView: View {
     var onPlayAlong: ((Video) -> Void)? = nil
     var onTrySound: ((SoundSetup) -> Void)? = nil
     var allowsSharing = true
+    var playlist: [Video] = []
     @Environment(\.dismiss) private var dismiss
+    @State private var playingVideo: Video?
+    @State private var isFullscreen = false
+    @State private var showsFullscreenControls = true
 
     var body: some View {
+        let current = playingVideo ?? video
         NavigationStack {
-            PerformanceDetail(video: video, auth: auth, onPlayAlong: onPlayAlong, onTrySound: onTrySound,
-                              allowsSharing: allowsSharing)
+            PerformanceDetail(video: current, auth: auth, isFullscreen: $isFullscreen,
+                              showsFullscreenControls: $showsFullscreenControls,
+                              onPlayAlong: onPlayAlong, onTrySound: onTrySound,
+                              allowsSharing: allowsSharing && current.hidden != true, advance: { playNext(after: current) })
+                .id(current.id)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
                 }
         }
+        .statusBarHidden(isFullscreen)
+    }
+
+    private func playNext(after current: Video) -> Bool {
+        let clips = playlist.filter { $0.userId == current.userId && $0.hidden != true }
+        guard let first = clips.first else { return false }
+        let next = clips.firstIndex(where: { $0.id == current.id })
+            .map { clips[($0 + 1) % clips.count] } ?? first
+        guard next.id != current.id else { return false }
+        playingVideo = next
+        return true
     }
 }
 
@@ -1378,14 +1401,15 @@ private struct PerformanceDetail: View {
     @Environment(\.scenePhase) private var scenePhase
     let video: Video
     @ObservedObject var auth: AuthManager
+    @Binding var isFullscreen: Bool
+    @Binding var showsFullscreenControls: Bool
     var notification: CreatorActivity? = nil
     var onPlayAlong: ((Video) -> Void)? = nil
     var onTrySound: ((SoundSetup) -> Void)? = nil
     var allowsSharing = true
+    var advance: () -> Bool = { false }
     @StateObject private var playback = FeedPlaybackController()
     @State private var playbackGate = FeedPlaybackGate()
-    @State private var isFullscreen = false
-    @State private var showsFullscreenControls = true
     @State private var detailIsVisible = false
     @State private var playerIsOnScreen = true
     @State private var paused = false
@@ -1401,13 +1425,16 @@ private struct PerformanceDetail: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let insets = isFullscreen ? geometry.safeAreaInsets : EdgeInsets()
+            let playerHeight = isFullscreen ? geometry.size.height + insets.top + insets.bottom : min(430, geometry.size.width * 1.19)
             ScrollViewReader { scrolling in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        detailPlayer
-                            .frame(height: isFullscreen ? geometry.size.height : min(430, geometry.size.width * 1.19))
+                        detailPlayer(safeInsets: insets)
+                            .frame(height: playerHeight)
                             .clipShape(RoundedRectangle(cornerRadius: isFullscreen ? 0 : 16))
                             .accessibilityElement(children: .contain)
+                            .accessibilityLabel(video.caption.isEmpty ? "Video" : video.caption)
                             .accessibilityIdentifier("performance-video")
                             .background {
                                 GeometryReader { playerFrame in
@@ -1425,6 +1452,7 @@ private struct PerformanceDetail: View {
                 }
                 .coordinateSpace(name: "detail-scroll")
                 .scrollDisabled(isFullscreen)
+                .ignoresSafeArea(.container, edges: isFullscreen ? .vertical : [])
                 .onChange(of: isFullscreen) { fullscreen in
                     if fullscreen {
                         showsFullscreenControls = true
@@ -1460,16 +1488,17 @@ private struct PerformanceDetail: View {
         .tint(palette.accent)
     }
 
-    private var detailPlayer: some View {
+    private func detailPlayer(safeInsets: EdgeInsets) -> some View {
         ZStack(alignment: .bottom) {
             ClipPlaybackSurface(video: video, playback: playback, playbackGate: playbackGate,
                                 isCurrent: isCurrent, paused: $paused, muted: muted, aspectFit: true,
                                 selectsPlayback: true, fullscreenControls: isFullscreen ? $showsFullscreenControls : nil,
-                                advance: { false })
+                                advance: advance)
             if !isFullscreen || showsFullscreenControls {
                 ClipPlaybackControls(playback: playback, paused: isFullscreen ? $paused : nil,
                                      muted: muted, toggleMute: { muted.toggle() })
                     .padding(10)
+                    .padding(.bottom, safeInsets.bottom)
                     .background(.black.opacity(0.45))
             }
         }
@@ -1481,6 +1510,7 @@ private struct PerformanceDetail: View {
             .accessibilityLabel(isFullscreen ? "Exit full screen" : "Full screen")
             .accessibilityIdentifier("profile-video-fullscreen")
             .padding(12)
+            .padding(.top, safeInsets.top)
         }
     }
 

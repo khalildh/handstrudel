@@ -82,6 +82,7 @@ struct ContentView: View {
     @State private var showBackingMixer = false
     @AppStorage("playAlongBackingVolume") private var backingVolume = BackingTrackVolume.defaultValue
     @State private var reviewingDraft: RecordingDraft?
+    @State private var draftPostNotice: String?
     @State private var retakeRequested = false
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("studioPlayInput") private var preferredInput: StudioPlayInput = .air
@@ -162,6 +163,26 @@ struct ContentView: View {
                 .opacity(0.01)
                 .allowsHitTesting(false)
         }
+        .overlay(alignment: .top) {
+            if let draftPostNotice {
+                Text(draftPostNotice)
+                    .font(.subheadline.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(palette.ink)
+                    .padding(12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 54)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("draft-post-notice")
+            }
+        }
+        .task(id: draftPostNotice) {
+            guard draftPostNotice != nil else { return }
+            do { try await Task.sleep(for: .seconds(4)) } catch { return }
+            if !Task.isCancelled { draftPostNotice = nil }
+        }
+        .onChange(of: auth.userId) { _ in draftPostNotice = nil }
         .onAppear {
             if scenePhase == .active { AppAnalytics.shared.recordActiveDay() }
             recorderEvents.onInterruption = { error in
@@ -188,14 +209,16 @@ struct ContentView: View {
             startDemoIfRequested()
             engine.importLoopFixtureIfRequested()
             // Open a sample take in the simulator, which cannot record with ReplayKit.
-            if let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
+            if !ProcessInfo.processInfo.arguments.contains("--uitest-draft-after-start"),
+               let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
                 DispatchQueue.main.async { openSampleDraft(at: URL(fileURLWithPath: path)) }
             }
             #endif
         }
         .sheet(isPresented: $showDrafts, onDismiss: openDraftPostAfterDismissal) {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil,
-                                onSuccessfulTake: recordReviewMilestone, onViewPost: viewDraftPost)
+                                onSuccessfulTake: recordReviewMilestone, onViewPost: viewDraftPost,
+                                onReturnToMusic: returnToMusicAfterPosting, onPostUpdate: showDraftPostUpdate)
         }
         .sheet(isPresented: $showLoops) {
             LoopShelfView(engine: engine)
@@ -254,7 +277,8 @@ struct ContentView: View {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: draft, onRetake: engine.isRunning ? {
                 retakeRequested = true
                 reviewingDraft = nil
-            } : nil, onSuccessfulTake: recordReviewMilestone, onViewPost: viewDraftPost)
+            } : nil, onSuccessfulTake: recordReviewMilestone, onViewPost: viewDraftPost,
+                onReturnToMusic: returnToMusicAfterPosting, onPostUpdate: showDraftPostUpdate)
                 .onAppear { engine.pause() }
         }
         .alert("Recording", isPresented: Binding(
@@ -302,6 +326,12 @@ struct ContentView: View {
         .onChange(of: engine.isRunning) { running in
             if running {
                 startingSession = false
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--uitest-draft-after-start"),
+                   let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
+                    openSampleDraft(at: URL(fileURLWithPath: path))
+                }
+                #endif
                 if backingAutoplayPending, let backing {
                     backingAutoplayPending = false
                     if scenePhase == .active { playBacking(backing) }
@@ -583,6 +613,20 @@ struct ContentView: View {
         draftPostToOpen = id
         if reviewingDraft != nil { reviewingDraft = nil }
         else { showDrafts = false }
+    }
+
+    private func returnToMusicAfterPosting() {
+        destination = .music
+        reviewingDraft = nil
+        showDrafts = false
+    }
+
+    private func showDraftPostUpdate(_ update: DraftPostUpdate) {
+        switch update {
+        case .checking: draftPostNotice = "Video submitted for checking."
+        case .posted: draftPostNotice = "Video posted."
+        case .failed(let detail): draftPostNotice = detail
+        }
     }
 
     private func openDraftPostAfterDismissal() {
