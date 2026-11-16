@@ -15,6 +15,7 @@ struct RecordingDraft: Codable, Identifiable, Equatable {
     var trimStart: Double?
     var trimEnd: Double?
     var title: String? = nil
+    var postSubmissions: [UUID: DraftPostSubmission]? = nil
 
     var displayTitle: String { title ?? instrument ?? "Performance" }
     var outputScale: Double { recordedAtHalfSpeed == true ? 0.5 : 1 }
@@ -135,6 +136,22 @@ final class RecordingDrafts: ObservableObject {
 
     func rename(_ id: UUID, to title: String) throws -> RecordingDraft {
         try updateDraft(id) { $0.title = RecordingDraft.normalizedTitle(title) }
+    }
+
+    func postSubmission(for draftID: UUID, accountID: UUID) -> DraftPostSubmission? {
+        drafts.first { $0.id == draftID }?.postSubmissions?[accountID]
+    }
+
+    @discardableResult
+    func replacePostSubmission(_ previous: DraftPostSubmission?, with next: DraftPostSubmission?,
+                               draftID: UUID, accountID: UUID) throws -> Bool {
+        guard postSubmission(for: draftID, accountID: accountID) == previous else { return false }
+        try updateDraft(draftID) {
+            var submissions = $0.postSubmissions ?? [:]
+            submissions[accountID] = next
+            $0.postSubmissions = submissions.isEmpty ? nil : submissions
+        }
+        return true
     }
 
     private func updateDraft(_ id: UUID, _ update: (inout RecordingDraft) -> Void) throws -> RecordingDraft {
@@ -323,7 +340,7 @@ struct RecordingDraftsView: View {
 
 private struct RecordingDraftEditor: View {
     @Environment(\.studioPalette) private var palette
-    let store: RecordingDrafts
+    @ObservedObject var store: RecordingDrafts
     @ObservedObject var auth: AuthManager
     @State var draft: RecordingDraft
     let onRetake: (() -> Void)?
@@ -344,7 +361,12 @@ private struct RecordingDraftEditor: View {
     @State private var posting: RecordingDraftExport?
     @State private var pendingPost: RecordingDraftExport?
     @State private var signIn = false
+    @StateObject private var postStatus = VideoUploader()
     private var busy: Bool { exportTask != nil }
+
+    private var postSubmission: DraftPostSubmission? {
+        auth.userId.flatMap { store.postSubmission(for: draft.id, accountID: $0) }
+    }
 
     private var savedTrim: DraftTrimSelection? {
         DraftTrimSelection(duration: duration, start: draft.trimStart, end: draft.trimEnd)
@@ -394,13 +416,7 @@ private struct RecordingDraftEditor: View {
                     }
                     .disabled(savedTrim == nil || pendingTrim != nil)
                     if SocialConfig.isConfigured {
-                        Button("Post") {
-                            export { copy in
-                                if auth.isSignedIn && !auth.needsProfileSetup { posting = copy }
-                                else { pendingPost = copy; signIn = true }
-                            }
-                        }
-                        .disabled(savedTrim == nil || pendingTrim != nil)
+                        postAction
                     }
                     Spacer()
                     if let onRetake { Button("Retake", action: onRetake) }
@@ -412,6 +428,7 @@ private struct RecordingDraftEditor: View {
             .disabled(busy)
         }
         .background(palette.background)
+        .task(id: auth.userId) { await refreshPostStatus(waitForResult: false) }
         .task {
             let url = store.videoURL(for: draft.id)
             do {
@@ -453,8 +470,11 @@ private struct RecordingDraftEditor: View {
                 .onDisappear(perform: copy.remove)
         }
         .sheet(item: $posting) { copy in
-            PostComposerView(clip: copy.url, instrument: draft.instrument, mode: draft.mode, soundSetup: draft.soundSetup,
-                             backingCredit: draft.backingCredit, auth: auth) {
+            PostComposerView(clip: copy.url, draftID: draft.id, drafts: store,
+                             instrument: draft.instrument, mode: draft.mode, soundSetup: draft.soundSetup,
+                             backingCredit: draft.backingCredit, auth: auth, onLeaveWhileChecking: {
+                message = "Submitted for checking. Your original is still in Private drafts."
+            }) {
                 message = "Posted. The original is still in Private drafts."
                 onSuccessfulTake(draft.id)
             }
@@ -472,6 +492,43 @@ private struct RecordingDraftEditor: View {
             }
         } message: {
             Text("Copies you’ve already saved or shared will stay where you put them.")
+        }
+    }
+
+    @ViewBuilder private var postAction: some View {
+        switch postSubmission {
+        case .pending:
+            Button(postStatus.isBusy ? "Checking post…" : "Check post status") {
+                Task { await refreshPostStatus(waitForResult: true) }
+            }
+            .disabled(postStatus.isBusy)
+        case .published(let id):
+            let url = SocialConfig.watchURL.appending(queryItems: [URLQueryItem(name: "v", value: id.uuidString.lowercased())])
+            Link("View post", destination: url)
+        case nil:
+            Button("Post") {
+                export { copy in
+                    if auth.isSignedIn && !auth.needsProfileSetup { posting = copy }
+                    else { pendingPost = copy; signIn = true }
+                }
+            }
+            .disabled(savedTrim == nil || pendingTrim != nil)
+        }
+    }
+
+    private func refreshPostStatus(waitForResult: Bool) async {
+        guard let accountID = auth.userId, postSubmission?.isPending == true, !postStatus.isBusy else { return }
+        let posted = await postStatus.resume(draftID: draft.id, accountID: accountID, store: store, waitForResult: waitForResult)
+        guard !Task.isCancelled, auth.userId == accountID else { return }
+        if posted {
+            message = "Posted. The original is still in Private drafts."
+            onSuccessfulTake(draft.id)
+        } else {
+            switch postStatus.phase {
+            case .failed(let detail): message = detail
+            case .pending(let detail) where postSubmission?.isPending == true: message = detail
+            default: break
+            }
         }
     }
 

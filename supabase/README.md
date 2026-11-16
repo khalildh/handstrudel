@@ -1,9 +1,9 @@
 # HandStrudel backend (Supabase + Cloudflare R2)
 
 Accounts, profiles, posts, likes, follows, reports and blocks live in Supabase
-Postgres (`migrations/`). Video and thumbnail files live in Cloudflare R2,
-served from `media.handstrudel.com` (Cloudflare-cached custom domain; CSAM Scanning Tool on). R2 has no egress fees, and egress is what
-a video feed costs.
+Postgres (`migrations/`). New videos and thumbnails live in private Cloudflare
+R2 and are served by `clips.handstrudel.com` only while the post is public.
+Legacy clips and profile photos keep using `media.handstrudel.com`.
 
 ## Layout
 - `migrations/20261113000000_accounts_feed.sql`: tables, triggers (like counts, auto-hide after 3 reports), RLS, and the `feed_videos` view.
@@ -19,7 +19,7 @@ a video feed costs.
 - `migrations/20261114060000_profile_avatars.sql`: exposes avatar keys on public creator profiles and restricts writes to the server.
 - `tests/database/feed.test.sql`: pgTAP tests for RLS and triggers. Run them with `supabase test db`.
 - `tests/database/comments.test.sql`: pgTAP tests for comment permissions, thread visibility, and moderation.
-- `functions/sign-upload`: presigned R2 PUT URLs for a new post. It checks the caller's JWT and username, limits each user to 20 posts a day, and caps uploads at 15 MB.
+- `functions/sign-upload` and `functions/publish-upload`: reserve a private R2 upload and publish only after Sightengine clears the video and thumbnail. Set up the private bucket, secrets, and cutover using the [video upload release checklist](../docs/video-upload-release.md).
 - `functions/delete-video`: deletes one of the caller's own videos and its R2 files.
 - `functions/delete-account`: deletes the caller's R2 files and auth user, and the user's rows cascade. Required by App Store Guideline 5.1.1(v).
 - `functions/profile-avatar`: authenticates photo changes, validates and re-encodes square JPEGs, and replaces or removes the user's public R2 avatar. Deploy the migration and this function before shipping the upload UI. Previously shared avatar URLs may remain in CDN caches until they expire.
@@ -31,11 +31,11 @@ supabase test db        # run the RLS tests
 cp functions/.env.example functions/.env   # fill in R2 credentials
 supabase functions serve
 ```
-To use the local stack, set `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `MEDIA_BASE_URL` in the Xcode scheme's environment. DEBUG builds read them in `Social/SocialConfig.swift`.
+To use the local stack, set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MEDIA_BASE_URL` and `CLIP_MEDIA_BASE_URL` in the Xcode scheme's environment. DEBUG builds read them in `Social/SocialConfig.swift`.
 
 ## Production setup (one time)
 1. Create the Supabase project, then `supabase link --project-ref <ref>` and `supabase db push`.
-2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload delete-video delete-account profile-avatar`.
+2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload publish-upload delete-video delete-account profile-avatar`.
 3. Auth providers:
    - **Apple:** add the bundle ID `com.handstrudel.app` as a client ID (native sign-in needs no Services ID or key).
    - **Email:** enable it, and change the "Magic Link" email template to include `{{ .Token }}`, so users get a 6-digit code for the in-app code entry.

@@ -3,11 +3,26 @@ import Supabase
 import UIKit
 
 /// Turns a ReplayKit clip into a feed post: transcode to 720-wide H.264,
-/// grab a thumbnail, upload both to R2 via presigned URLs, insert the row.
+/// grab a thumbnail, upload both privately, then wait for the server's publication result.
 @MainActor
 final class VideoUploader: ObservableObject {
-    enum Phase: Equatable { case idle, preparing, uploading(Double), done, failed(String) }
+    enum Phase: Equatable { case idle, preparing, uploading(Double), checking, pending(String), done, failed(String) }
     @Published private(set) var phase: Phase = .idle
+    private let publish: @MainActor (PublishUploadRequest, UUID) async throws -> PublishUploadResponse
+    private let pollTimeout: Duration
+
+    init(pollTimeout: Duration = .seconds(120),
+         publish: (@MainActor (PublishUploadRequest, UUID) async throws -> PublishUploadResponse)? = nil) {
+        self.pollTimeout = pollTimeout
+        self.publish = publish ?? Self.sendPublicationRequest
+    }
+
+    var isBusy: Bool {
+        switch phase {
+        case .preparing, .uploading, .checking: return true
+        default: return false
+        }
+    }
 
     struct Prepared {
         let videoURL: URL
@@ -20,8 +35,13 @@ final class VideoUploader: ObservableObject {
     /// Output width for posted clips; height keeps the recording's aspect.
     nonisolated static let outputWidth = 720
 
-    func post(clip: URL, caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?,
-              commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?, userId: UUID) async -> Bool {
+    func post(clip: URL, draftID: UUID, accountID: UUID, store: RecordingDrafts,
+              caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?,
+              commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?) async -> Bool {
+        guard !isBusy else { return false }
+        if store.postSubmission(for: draftID, accountID: accountID) != nil {
+            return await resume(draftID: draftID, accountID: accountID, store: store)
+        }
         do {
             phase = .preparing
             if let backingCredit {
@@ -35,7 +55,8 @@ final class VideoUploader: ObservableObject {
             let prepared = try await Self.prepare(clip)
             defer { try? FileManager.default.removeItem(at: prepared.videoURL) }
             phase = .uploading(0)
-            let signed: SignUploadResponse = try await supabase.functions.invoke(
+            let functions = try await Self.functions(for: accountID)
+            let signed: SignUploadResponse = try await functions.invoke(
                 "sign-upload",
                 options: FunctionInvokeOptions(body: SignUploadRequest(
                     videoBytes: try Self.fileSize(prepared.videoURL),
@@ -43,21 +64,102 @@ final class VideoUploader: ObservableObject {
             try await Self.put(fileURL: prepared.videoURL, to: signed.videoUploadUrl, type: "video/mp4")
             phase = .uploading(0.9)
             try await Self.put(data: prepared.thumb, to: signed.thumbUploadUrl, type: "image/jpeg")
-            try await supabase.from("videos").insert(NewVideo(
-                id: signed.id, userId: userId, videoKey: signed.videoKey, thumbKey: signed.thumbKey,
+            let fields = VideoPostFields(
                 caption: String(caption.prefix(150)), instrument: instrument, mode: mode,
                 durationS: prepared.duration, width: prepared.width, height: prepared.height,
                 soundSetup: soundSetup, commentsEnabled: commentsEnabled ? nil : false,
-                backingEnabled: backingEnabled ? true : nil, sourceVideoId: backingCredit?.videoId)).execute()
-            phase = .done
-            return true
-        } catch let error as PostgrestError where error.message == "BACKING_UNAVAILABLE" {
-            phase = .failed("The creator no longer allows new play-along posts. Your private draft is safe.")
+                backingEnabled: backingEnabled ? true : nil, sourceVideoId: backingCredit?.videoId)
+            let pending = DraftPostSubmission.pending(id: signed.id, fields: fields)
+            // Persist before submitting: even a lost HTTP response can mean the server accepted it.
+            guard try store.replacePostSubmission(nil, with: pending, draftID: draftID, accountID: accountID) else {
+                phase = .idle
+                return await resume(draftID: draftID, accountID: accountID, store: store)
+            }
+            return await track(pending, draftID: draftID, accountID: accountID, store: store,
+                               submitImmediately: true, waitForResult: true)
+        } catch FunctionsError.httpError(_, let data) {
+            let detail = try? JSONDecoder().decode(ErrorResponse.self, from: data).error
+            phase = .failed(detail ?? "Couldn't post this video. Your private draft is safe.")
             return false
         } catch {
             phase = .failed(error.localizedDescription)
             return false
         }
+    }
+
+    func resume(draftID: UUID, accountID: UUID, store: RecordingDrafts, waitForResult: Bool = true) async -> Bool {
+        guard !isBusy, let submission = store.postSubmission(for: draftID, accountID: accountID) else { return false }
+        return await track(submission, draftID: draftID, accountID: accountID, store: store,
+                           submitImmediately: false, waitForResult: waitForResult)
+    }
+
+    private struct ErrorResponse: Decodable { let error: String }
+
+    private static func functions(for accountID: UUID) async throws -> FunctionsClient {
+        let session = try await supabase.auth.session
+        guard session.user.id == accountID else {
+            throw SocialError.message("Sign back in to the account that started this post.")
+        }
+        // The shared client attaches the latest session at send time; pin the owner for draft requests.
+        return FunctionsClient(url: SocialConfig.supabaseURL.appending(path: "functions/v1"), headers: [
+            "apikey": SocialConfig.supabaseAnonKey,
+            "Authorization": "Bearer " + session.accessToken,
+        ])
+    }
+
+    private static func sendPublicationRequest(_ request: PublishUploadRequest,
+                                               accountID: UUID) async throws -> PublishUploadResponse {
+        let functions = try await functions(for: accountID)
+        return try await functions.invoke("publish-upload", options: FunctionInvokeOptions(body: request))
+    }
+
+    private func track(_ submission: DraftPostSubmission, draftID: UUID, accountID: UUID, store: RecordingDrafts,
+                       submitImmediately: Bool, waitForResult: Bool) async -> Bool {
+        guard case .pending(let id, let fields) = submission else {
+            phase = .done
+            return false
+        }
+        let statusRequest = PublishUploadRequest(action: "status", id: id)
+        let submitRequest = PublishUploadRequest(action: "submit", id: id, fields: fields)
+        phase = .checking
+        do {
+            var status = try await publish(submitImmediately ? submitRequest : statusRequest, accountID).status
+            if status == .reserved && !submitImmediately {
+                status = try await publish(submitRequest, accountID).status
+            }
+            if waitForResult {
+                let deadline = ContinuousClock.now.advanced(by: pollTimeout)
+                while status == .checking, ContinuousClock.now < deadline {
+                    try await Task.sleep(for: .seconds(2))
+                    status = try await publish(statusRequest, accountID).status
+                }
+            }
+            switch status {
+            case .published:
+                let changed = try store.replacePostSubmission(submission, with: .published(id: id), draftID: draftID, accountID: accountID)
+                phase = .done
+                return changed
+            case .held, .failed:
+                try store.replacePostSubmission(submission, with: nil, draftID: draftID, accountID: accountID)
+                phase = .failed(status == .held
+                    ? "This clip didn't pass our public content check. Your private draft is safe."
+                    : "We couldn't finish checking this clip. It wasn't posted. Your private draft is safe.")
+            case .checking, .reserved:
+                phase = .pending("This clip is still being checked. You can check its status in Private drafts.")
+            }
+        } catch {
+            // Only an explicit missing or expired reservation is safe to forget.
+            if case FunctionsError.httpError(let code, let data) = error,
+               let detail = try? JSONDecoder().decode(ErrorResponse.self, from: data).error,
+               (code == 404 && detail == "Upload not found." ||
+                code == 409 && detail == "This upload expired. Try again from Private drafts."),
+               (try? store.replacePostSubmission(submission, with: nil, draftID: draftID, accountID: accountID)) == true {
+                phase = .failed("This upload expired. It wasn't posted. You can post again from Private drafts.")
+            } else {
+                phase = .pending("We couldn't confirm the post status yet. Check again here or in Private drafts.")
+            }
+        }
+        return false
     }
 
     // MARK: Transcode + thumbnail
@@ -223,6 +325,7 @@ final class VideoUploader: ObservableObject {
         r.httpMethod = "PUT"
         r.setValue(type, forHTTPHeaderField: "Content-Type")
         r.setValue(String(length), forHTTPHeaderField: "Content-Length")
+        r.setValue("*", forHTTPHeaderField: "If-None-Match")
         return r
     }
 

@@ -1,6 +1,6 @@
 -- RLS + trigger tests for the accounts/feed schema.  Run: supabase test db
 begin;
-select plan(18);
+select plan(19);
 
 -- Two users (the auth trigger creates their profile rows).
 insert into auth.users (id, email) values
@@ -18,14 +18,14 @@ create function pg_temp.act_as(uid uuid) returns void language sql as $$
   set local role authenticated;
 $$;
 
--- Alice posts a video.
-select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
-insert into public.videos (id, user_id, video_key, thumb_key, caption, like_count)
+-- The server publishes Alice's screened video.
+insert into public.videos (id, user_id, video_key, thumb_key, caption)
 values ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-00000000000a',
         'videos/00000000-0000-0000-0000-00000000000a/v1.mp4',
-        'thumbs/00000000-0000-0000-0000-00000000000a/v1.jpg', 'hello', 999);
-select is((select like_count from public.videos where id = '11111111-1111-1111-1111-111111111111'), 0,
-          'clients cannot seed counters');
+        'thumbs/00000000-0000-0000-0000-00000000000a/v1.jpg', 'hello');
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select throws_ok($$ update public.videos set like_count = 999 $$,
+          '42501', null, 'clients cannot edit counters');
 select is((select sound_setup from public.feed_videos where id = '11111111-1111-1111-1111-111111111111'),
           null::jsonb, 'setups are not shared by default');
 select throws_ok($$ update public.videos set sound_setup = '[1]' $$,
@@ -39,8 +39,10 @@ select throws_ok($$ insert into public.videos (user_id, video_key, thumb_key)
                  '42501', null, 'cannot post as someone else');
 
 select throws_ok($$ insert into public.videos (user_id, video_key, thumb_key)
-                    values ('00000000-0000-0000-0000-00000000000a', 'videos/someone-else/x.mp4', 'thumbs/x.jpg') $$,
-                 '23514', null, 'object keys must be under own folder');
+                    values ('00000000-0000-0000-0000-00000000000a',
+                            'videos/00000000-0000-0000-0000-00000000000a/x.mp4',
+                            'thumbs/00000000-0000-0000-0000-00000000000a/x.jpg') $$,
+                 '42501', null, 'clients cannot publish their own unscreened uploads');
 
 -- Bob likes it; can't delete it.
 reset role;
@@ -49,7 +51,8 @@ insert into public.likes (user_id, video_id) values ('00000000-0000-0000-0000-00
 select is((select like_count from public.videos where id = '11111111-1111-1111-1111-111111111111'), 1, 'like trigger counts');
 select is((select liked_by_me from public.feed_videos where id = '11111111-1111-1111-1111-111111111111'), true, 'feed shows liked_by_me');
 
-delete from public.videos where id = '11111111-1111-1111-1111-111111111111';
+select throws_ok($$ delete from public.videos where id = '11111111-1111-1111-1111-111111111111' $$,
+  '42501', null, 'direct deletes cannot bypass server media cleanup');
 reset role;
 select is((select count(*)::int from public.videos), 1, 'other users cannot delete a video');
 

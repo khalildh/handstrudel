@@ -2,6 +2,7 @@ import { CHORD_PROGRESSIONS, IOS_KEY_SEMITONES, IOS_NOTE_NAMES, IOS_SCALE_INTERV
 import { publicSupabaseUrl as feedBase, publicSupabaseKey as publicKey } from "./public-supabase";
 
 const mediaBase = process.env.NEXT_PUBLIC_MEDIA_BASE_URL || "https://media.handstrudel.com";
+const clipMediaBase = process.env.NEXT_PUBLIC_CLIP_MEDIA_BASE_URL || "https://clips.handstrudel.com";
 
 export const PAGE_SIZE = 12;
 
@@ -150,7 +151,8 @@ export function mediaURL(key: string) {
   // Keep media requests under the configured origin even for untrusted keys.
   const parts = key.split("/");
   if (parts.some((part) => !part || part === "." || part === "..")) return undefined;
-  return `${mediaBase.replace(/\/$/, "")}/${parts.map(encodeURIComponent).join("/")}`;
+  const screened = parts.length === 4 && (parts[0] === "videos" || parts[0] === "thumbs") && parts[2] === "screened";
+  return `${(screened ? clipMediaBase : mediaBase).replace(/\/$/, "")}/${parts.map(encodeURIComponent).join("/")}`;
 }
 
 export function postSearch(input: string) {

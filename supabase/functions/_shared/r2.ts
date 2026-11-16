@@ -19,25 +19,53 @@ export const r2 = () =>
 export const bucketUrl = () =>
   `https://${env("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com/${env("R2_BUCKET")}`;
 
-/** Presigned PUT valid for 10 minutes; Content-Type and Content-Length are signed. */
-export async function presignPut(key: string, contentType: string, contentLength: number) {
-  const url = new URL(`${bucketUrl()}/${key}`);
+export function privateVideoBucketUrl() {
+  const bucket = env("R2_VIDEO_STAGING_BUCKET");
+  if (bucket === env("R2_BUCKET")) throw new Error("New video media must not use the legacy public bucket");
+  return `https://${env("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com/${bucket}`;
+}
+
+export const privateVideoR2 = () =>
+  new AwsClient({
+    accessKeyId: env("R2_VIDEO_STAGING_ACCESS_KEY_ID"),
+    secretAccessKey: env("R2_VIDEO_STAGING_SECRET_ACCESS_KEY"),
+    service: "s3",
+    region: "auto",
+  });
+
+function bucketClient(bucket: string) {
+  if (bucket === bucketUrl()) return r2();
+  if (bucket === privateVideoBucketUrl()) return privateVideoR2();
+  throw new Error("Unrecognized R2 bucket");
+}
+
+export function uploadKeys(userId: string, id: string) {
+  return { videoKey: `videos/${userId}/screened/${id}.mp4`, thumbKey: `thumbs/${userId}/screened/${id}.jpg` };
+}
+
+export function isPrivateVideoKey(key: string) {
+  return /^(videos|thumbs)\/[^/]+\/screened\/[^/]+$/.test(key);
+}
+
+/** The URL cannot overwrite an existing object, even if the client replays it. */
+export async function presignPut(key: string, contentType: string, contentLength: number, bucket: string) {
+  const url = new URL(`${bucket}/${key}`);
   url.searchParams.set("X-Amz-Expires", "600");
-  const signed = await r2().sign(
+  const signed = await bucketClient(bucket).sign(
     new Request(url, {
       method: "PUT",
-      headers: { "Content-Type": contentType, "Content-Length": String(contentLength) },
+      headers: { "Content-Type": contentType, "Content-Length": String(contentLength), "If-None-Match": "*" },
     }),
     { aws: { signQuery: true, allHeaders: true } },
   );
   return signed.url;
 }
 
-export async function deleteKeys(keys: string[]) {
-  const client = r2();
+export async function deleteKeys(keys: string[], bucket = bucketUrl()) {
+  const client = bucketClient(bucket);
   await Promise.all(
     keys.map(async (k) => {
-      const res = await client.fetch(`${bucketUrl()}/${k}`, { method: "DELETE" });
+      const res = await client.fetch(`${bucket}/${k}`, { method: "DELETE", signal: AbortSignal.timeout(15_000) });
       if (!res.ok && res.status !== 404) throw new Error(`R2 delete ${k}: ${res.status}`);
     }),
   );
@@ -53,16 +81,18 @@ export async function putAvatar(key: string, bytes: Uint8Array<ArrayBuffer>) {
 }
 
 /** Every key under a prefix (ListObjectsV2, paginated). */
-export async function listKeys(prefix: string): Promise<string[]> {
-  const client = r2();
+export async function listKeys(prefix: string, bucket = bucketUrl()): Promise<string[]> {
+  const client = bucketClient(bucket);
   const keys: string[] = [];
   let token: string | undefined;
   do {
-    const u = new URL(bucketUrl());
+    const u = new URL(bucket);
     u.searchParams.set("list-type", "2");
     u.searchParams.set("prefix", prefix);
     if (token) u.searchParams.set("continuation-token", token);
-    const xml = await (await client.fetch(u)).text();
+    const response = await client.fetch(u);
+    if (!response.ok) throw new Error(`R2 list objects: ${response.status}`);
+    const xml = await response.text();
     for (const m of xml.matchAll(/<Key>([^<]+)<\/Key>/g)) keys.push(m[1]);
     token = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)?.[1];
   } while (token);

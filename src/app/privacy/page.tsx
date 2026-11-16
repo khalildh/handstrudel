@@ -41,6 +41,7 @@ export default function Privacy() {
       <ul>
         <li><strong>Supabase</strong> — accounts, sign-in, and the database.</li>
         <li><strong>Cloudflare R2</strong> — storing and serving posted videos, thumbnails, and public profile photos.</li>
+        <li><strong>Sightengine</strong> — automated content screening of videos and thumbnails you submit for public posting. Recordings kept in Private drafts are not submitted.</li>
         <li><strong>Resend</strong> — sending sign-in code emails.</li>
         <li><strong>Apple</strong> — Sign in with Apple and in-app purchases (we never see payment details).</li>
         <li><strong>RevenueCat</strong> — managing in-app purchase status, linked to your account ID when you&apos;re signed in.</li>
