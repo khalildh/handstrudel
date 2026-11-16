@@ -10,7 +10,7 @@ private enum PerformanceStart {
 
 /// Full-screen, vertically paged feed of public posts.
 /// Browsable signed out; liking, following, reporting and blocking need an account.
-struct FeedView: View {
+struct FeedView<Navigation: View>: View {
     @Environment(\.studioPalette) private var palette
     @ObservedObject var auth: AuthManager
     let isActive: Bool
@@ -18,6 +18,7 @@ struct FeedView: View {
     let onMakeMusic: () -> Void
     let onTrySound: (SoundSetup) -> Void
     let onPlayAlong: (Video) -> Void
+    let navigation: (Bool) -> Navigation
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model = FeedModel()
     @State private var showSignIn = false
@@ -39,6 +40,9 @@ struct FeedView: View {
     @State private var audioDownload: Video?
     @State private var pendingBookmark: Video?
     @State private var sharing: Video?
+    @State private var overlayHeights = FeedOverlayHeights(header: 100, navigation: 66)
+
+    private var hasVideos: Bool { !model.videos.isEmpty }
 
     private var allowsFeedPlayback: Bool {
         isActive && scenePhase == .active && commenting == nil && !showActivity && creatorVideo == nil
@@ -49,121 +53,95 @@ struct FeedView: View {
     private var engagementTarget: UUID? { allowsFeedPlayback && !isFullscreen ? model.currentVideoID : nil }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: isFullscreen ? 0 : 12) {
-            if !isFullscreen { topBar }
-            if !isFullscreen, let challenge, !model.followingOnly {
-                Button { openChallenge = challenge } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "waveform").foregroundStyle(palette.accent)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("WEEKLY PLAY-ALONG").font(.caption2.monospaced().weight(.semibold))
-                                .foregroundStyle(palette.accent)
-                            Text(verbatim: challenge.title).font(.subheadline.bold()).lineLimit(1)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.caption)
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(palette.surface, in: RoundedRectangle(cornerRadius: 13))
+        ZStack {
+            if hasVideos {
+                PagedFeed(videos: model.videos, current: $model.current, isVisible: isActive, allowsPlayback: allowsFeedPlayback, refresh: {
+                    await model.refresh(user: auth.userId)
+                }) { video, isCurrent, playbackGate in
+                    FeedCell(video: video, isCurrent: isCurrent, isFullscreen: isFullscreen, playbackGate: playbackGate,
+                             engagement: model.engagement[video.id],
+                             overlayHeights: isFullscreen ? .init() : overlayHeights,
+                             isMine: video.userId == auth.userId,
+                             isFollowing: model.following.contains(video.userId),
+                             isSaved: model.savedIDs.contains(video.id),
+                             canDownloadAudio: model.audioDownloadIDs.contains(video.id),
+                             canChangeAudioPermission: video.userId == auth.userId && video.sourceVideoId == nil,
+                             muted: muted, toggleMute: { muted.toggle() },
+                             like: { act { try await model.toggleLike(video, user: $0) } },
+                             follow: { act { try await model.toggleFollow(video.userId, user: $0) } },
+                             report: { requireSignIn { _ in reporting = video } },
+                             block: { act { try await model.block(video.userId, user: $0); show("Blocked @\(video.username ?? "user")") } },
+                             delete: { Task { try? await model.delete(video) } },
+                             comments: { openComments(video) },
+                             creator: { creatorVideo = video },
+                             bookmark: {
+                                 toggleBookmark(video)
+                             },
+                             share: { sharing = video },
+                             downloadAudio: { audioDownload = video },
+                             changeAudioPermission: {
+                                 Task {
+                                     do {
+                                         let allowed = try await model.toggleAudioPermission(video.id)
+                                         show(allowed ? "Audio downloads allowed." : "Audio downloads turned off.")
+                                     } catch { show("Couldn't change audio downloads. Try again.") }
+                                 }
+                             },
+                             advance: { advanceAfterClip(video.id) },
+                             showSound: { soundVideo = video },
+                             revokeBacking: {
+                                 act { _ in
+                                     try await FeedService.stopAllowingBacking(video: video.id)
+                                     await model.refreshVideoControls(for: video.id)
+                                     show("New play-along posts are off.")
+                                 }
+                             },
+                             source: { id in Task { await openSource(id) } })
+                        .environment(\.studioPalette, palette)
+                        .environment(\.colorScheme, .dark)
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("weekly-challenge")
-            }
-            ZStack(alignment: .top) {
-                if model.videos.isEmpty {
-                    emptyState
-                } else {
-                    PagedFeed(videos: model.videos, current: $model.current, allowsPlayback: allowsFeedPlayback, refresh: {
-                        await model.refresh(user: auth.userId)
-                    }) { video, isCurrent, playbackGate in
-                        FeedCell(video: video, isCurrent: isCurrent, isFullscreen: isFullscreen, playbackGate: playbackGate,
-                                 engagement: model.engagement[video.id],
-                                 isMine: video.userId == auth.userId,
-                                 isFollowing: model.following.contains(video.userId),
-                                 isSaved: model.savedIDs.contains(video.id),
-                                 canDownloadAudio: model.audioDownloadIDs.contains(video.id),
-                                 canChangeAudioPermission: video.userId == auth.userId && video.sourceVideoId == nil,
-                                 muted: muted, toggleMute: { muted.toggle() },
-                                 like: { act { try await model.toggleLike(video, user: $0) } },
-                                 follow: { act { try await model.toggleFollow(video.userId, user: $0) } },
-                                 report: { requireSignIn { _ in reporting = video } },
-                                 block: { act { try await model.block(video.userId, user: $0); show("Blocked @\(video.username ?? "user")") } },
-                                 delete: { Task { try? await model.delete(video) } },
-                                 comments: { openComments(video) },
-                                 creator: { creatorVideo = video },
-                                 bookmark: {
-                                     toggleBookmark(video)
-                                 },
-                                 share: { sharing = video },
-                                 downloadAudio: { audioDownload = video },
-                                 changeAudioPermission: {
-                                     Task {
-                                         do {
-                                             let allowed = try await model.toggleAudioPermission(video.id)
-                                             show(allowed ? "Audio downloads allowed." : "Audio downloads turned off.")
-                                         } catch { show("Couldn't change audio downloads. Try again.") }
-                                     }
-                                 },
-                                 advance: { advanceAfterClip(video.id) },
-                                 showSound: { soundVideo = video },
-                                 revokeBacking: {
-                                     act { _ in
-                                         try await FeedService.stopAllowingBacking(video: video.id)
-                                         await model.refreshVideoControls(for: video.id)
-                                         show("New play-along posts are off.")
-                                     }
-                                 },
-                                 source: { id in Task { await openSource(id) } })
-                            .environment(\.studioPalette, palette)
-                            .environment(\.colorScheme, .dark)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: isFullscreen ? 0 : 20))
-                    .overlay {
-                        if !isFullscreen {
-                            RoundedRectangle(cornerRadius: 20).strokeBorder(palette.border).allowsHitTesting(false)
-                        }
-                    }
-                    .onChange(of: model.current) { _ in Task { await model.loadMore() } }
-                    .accessibilityScrollAction { edge in
-                        if edge == .bottom { movePage(by: 1) }
-                        if edge == .top { movePage(by: -1) }
-                    }
-                    .accessibilityAction(named: Text("Previous video")) { movePage(by: -1) }
-                    .accessibilityAction(named: Text("Next video")) { movePage(by: 1) }
+                .onChange(of: model.current) { _ in Task { await model.loadMore() } }
+                .accessibilityScrollAction { edge in
+                    if edge == .bottom { movePage(by: 1) }
+                    if edge == .top { movePage(by: -1) }
                 }
-                if let toast {
-                    Text(toast)
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 16).padding(.vertical, 10)
-                        .background(.ultraThinMaterial, in: Capsule()).padding(12)
-                        .transition(.opacity)
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                if !model.videos.isEmpty || isFullscreen {
-                    HStack(spacing: 7) {
-                        if !isFullscreen {
-                            Button { muted.toggle() } label: {
-                                FeedVideoIcon(symbol: muted ? "speaker.slash" : "speaker.wave.2")
-                            }
-                            .accessibilityLabel(muted ? "Unmute" : "Mute")
-                        }
-                        Button { isFullscreen.toggle() } label: {
-                            FeedVideoIcon(symbol: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                        }
-                        .accessibilityLabel(isFullscreen ? "Exit full screen" : "Full screen")
-                        .accessibilityIdentifier("feed-fullscreen")
-                    }
-                    .buttonStyle(.plain)
-                    .padding(isFullscreen ? 18 : 12)
-                }
+                .accessibilityAction(named: Text("Previous video")) { movePage(by: -1) }
+                .accessibilityAction(named: Text("Next video")) { movePage(by: 1) }
+            } else {
+                emptyState
+                    .padding(.top, overlayHeights.header)
+                    .padding(.bottom, overlayHeights.navigation)
             }
         }
-        .padding(.horizontal, isFullscreen ? 0 : 12)
-        .padding(.top, isFullscreen ? 0 : 9)
-        .padding(.bottom, isFullscreen ? 0 : 10)
-        .background((isFullscreen ? Color.black : palette.background).ignoresSafeArea())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(hasVideos || isFullscreen ? Color.black : palette.background)
         .foregroundStyle(palette.ink)
+        .overlay(alignment: .top) {
+            if isActive { overlaidHeader }
+        }
+        .overlay(alignment: .bottom) {
+            if isActive && !isFullscreen {
+                navigation(hasVideos)
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear.preference(key: FeedOverlayHeights.self, value: .init(navigation: geometry.size.height))
+                        }
+                        .allowsHitTesting(false)
+                    }
+            }
+        }
+        .overlay(alignment: .top) {
+            if isActive, let toast {
+                Text(toast)
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.top, overlayHeights.header + 4)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+        .onPreferenceChange(FeedOverlayHeights.self) { overlayHeights = $0 }
         .accessibilityAction(.escape) { if isFullscreen { isFullscreen = false } }
         .task(id: FeedRefresh(user: auth.userId, mode: model.mode)) {
             await model.refresh(user: auth.userId)
@@ -290,39 +268,96 @@ struct FeedView: View {
         }
     }
 
-    private var topBar: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack { feedTitle; Spacer(minLength: 8); feedPicker; feedActions }
-            VStack(spacing: 8) {
-                HStack { feedTitle; Spacer(); feedActions }
-                feedPicker
+    private var overlaidHeader: some View {
+        VStack(spacing: 4) {
+            if !isFullscreen {
+                HStack(spacing: 6) {
+                    feedMenu
+                    Spacer(minLength: 0)
+                    feedActions
+                }
+            }
+            HStack(spacing: 10) {
+                if !isFullscreen, let challenge, !model.followingOnly {
+                    Button { openChallenge = challenge } label: {
+                        Label(challenge.title, systemImage: "waveform")
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                            .foregroundStyle(hasVideos ? palette.mediaAccent : palette.accent)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(hasVideos ? Color.black.opacity(0.6) : palette.surface, in: Capsule())
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Weekly play-along: \(challenge.title)")
+                    .accessibilityIdentifier("weekly-challenge")
+                }
+                Spacer(minLength: 0)
+                if hasVideos || isFullscreen { playbackActions }
             }
         }
-        .padding(.horizontal, 9)
-    }
-
-    private var feedTitle: some View {
-        Text("Feed")
-            .font(.system(size: 33, weight: .regular, design: .serif))
-            .accessibilityAddTraits(.isHeader)
-            .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private var feedPicker: some View {
-        Picker("Feed", selection: $model.mode) {
-            Text("Discover").tag(FeedMode.discover)
-            Text("Latest").tag(FeedMode.latest)
-            Text("Following").tag(FeedMode.following)
+        .buttonStyle(.plain)
+        .foregroundStyle(hasVideos || isFullscreen ? Color.white : palette.ink)
+        .padding(.horizontal, 16)
+        .padding(.top, 7)
+        .background {
+            if hasVideos && !isFullscreen {
+                LinearGradient(colors: [.black.opacity(0.8), .black.opacity(0.38), .clear], startPoint: .top, endPoint: .bottom)
+                    .allowsHitTesting(false)
+            }
         }
-        .pickerStyle(.segmented)
-        .frame(minWidth: 226, maxWidth: 320)
-        .accessibilityIdentifier("feed-filter")
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(key: FeedOverlayHeights.self, value: .init(header: geometry.size.height))
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var playbackActions: some View {
+        HStack(spacing: 7) {
+            if !isFullscreen {
+                Button { muted.toggle() } label: {
+                    FeedVideoIcon(symbol: muted ? "speaker.slash" : "speaker.wave.2")
+                }
+                .accessibilityLabel(muted ? "Unmute" : "Mute")
+            }
+            Button { isFullscreen.toggle() } label: {
+                FeedVideoIcon(symbol: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+            }
+            .accessibilityLabel(isFullscreen ? "Exit full screen" : "Full screen")
+            .accessibilityIdentifier("feed-fullscreen")
+        }
+    }
+
+    private var feedMenu: some View {
+        Menu {
+            Picker("Show", selection: $model.mode) {
+                ForEach(FeedMode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 7) {
+                Text(model.mode == .discover ? "Feed" : model.mode.title)
+                    .font(.system(size: 33, weight: .regular, design: .serif))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Image(systemName: "chevron.down").font(.system(size: 11, weight: .semibold))
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Feed options")
+        .accessibilityValue(model.mode.title)
+        .accessibilityIdentifier("feed-options")
     }
 
     private var feedActions: some View {
         HStack(spacing: 0) {
             Button { showSearch = true } label: {
                 Image(systemName: "magnifyingglass").font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Search posts")
             .accessibilityIdentifier("search-posts")
@@ -330,6 +365,7 @@ struct FeedView: View {
                 requireSignIn { _ in showSaved = true }
             } label: {
                 Image(systemName: "bookmark").font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Saved performances")
             .accessibilityIdentifier("saved-performances")
@@ -341,6 +377,7 @@ struct FeedView: View {
                     .overlay(alignment: .topTrailing) {
                         if unreadActivity { Circle().fill(palette.accent).frame(width: 7, height: 7).padding(7) }
                     }
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel(unreadActivity ? "Notifications, unread" : "Notifications")
             .accessibilityIdentifier("activity-inbox")
@@ -457,10 +494,30 @@ private struct FeedRefresh: Equatable {
     let mode: FeedMode
 }
 
-enum FeedMode: Hashable {
+enum FeedMode: Hashable, CaseIterable {
     case discover, latest, following
 
+    var title: String {
+        switch self {
+        case .discover: return "Discover"
+        case .latest: return "Latest"
+        case .following: return "Following"
+        }
+    }
+
     var fetchLimit: Int { self == .discover ? 24 : FeedService.pageSize }
+}
+
+private struct FeedOverlayHeights: PreferenceKey, Equatable {
+    var header: CGFloat = 0
+    var navigation: CGFloat = 0
+
+    static let defaultValue = Self()
+    static func reduce(value: inout Self, nextValue: () -> Self) {
+        let next = nextValue()
+        value.header = max(value.header, next.header)
+        value.navigation = max(value.navigation, next.navigation)
+    }
 }
 
 enum DiscoveryFeedRanking {
@@ -1633,6 +1690,7 @@ private struct FeedCell: View {
     let isFullscreen: Bool
     let playbackGate: FeedPlaybackGate
     let engagement: VideoEngagement?
+    let overlayHeights: FeedOverlayHeights
     let isMine: Bool
     let isFollowing: Bool
     let isSaved: Bool
@@ -1679,13 +1737,13 @@ private struct FeedCell: View {
                             }
                         }
                     } else {
-                        postControls(railHeight: max(44, bounds.size.height - 106))
+                        postControls(railHeight: max(44, bounds.size.height - overlayHeights.header - overlayHeights.navigation - 56))
                         if isCurrent { FeedProgressStrip(playback: playback) }
                     }
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 15)
-                .padding(.bottom, isCurrent && playback.position != nil ? 3 : 16)
+                .padding(.bottom, overlayHeights.navigation + (isCurrent && playback.position != nil ? 3 : 16))
             }
         }
         .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -2033,6 +2091,7 @@ private struct FeedSoundSheet: View {
 private struct PagedFeed<Cell: View>: UIViewRepresentable {
     let videos: [Video]
     @Binding var current: Int
+    let isVisible: Bool
     let allowsPlayback: Bool
     let refresh: () async -> Void
     let cell: (Video, Bool, FeedPlaybackGate) -> Cell
@@ -2044,7 +2103,9 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         layout.scrollDirection = .vertical
         layout.minimumLineSpacing = 0
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        cv.isPagingEnabled = true
+        cv.accessibilityIdentifier = "feed-video-viewport"
+        cv.accessibilityElementsHidden = !isVisible
+        cv.decelerationRate = .fast
         cv.alwaysBounceVertical = true
         cv.isDirectionalLockEnabled = true
         cv.delaysContentTouches = false
@@ -2064,6 +2125,7 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
     func updateUIView(_ cv: UICollectionView, context: Context) {
         let old = context.coordinator.parent
         context.coordinator.parent = self
+        cv.accessibilityElementsHidden = !isVisible
         context.coordinator.selectPage(current)
         let oldIDs = old.videos.map(\.id)
         let newIDs = videos.map(\.id)
@@ -2099,6 +2161,7 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
     final class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
         var parent: PagedFeed
         let playbackGate = FeedPlaybackGate()
+        private var snapPage: Int?
         init(_ parent: PagedFeed) { self.parent = parent }
 
         func selectPage(_ page: Int) {
@@ -2149,8 +2212,32 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
             CGSize(width: max(1, cv.bounds.width), height: max(1, cv.bounds.height))
         }
 
+        func scrollViewWillBeginDragging(_ sv: UIScrollView) {
+            snapPage = nil
+        }
+
+        func scrollViewWillEndDragging(_ sv: UIScrollView, withVelocity velocity: CGPoint,
+                                       targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+            let height = sv.bounds.height
+            guard height > 0, parent.videos.indices.contains(parent.current) else { return }
+            let offset = sv.contentOffset.y
+            let projected = targetContentOffset.pointee.y
+            // Leave the overscroll at the top to the native refresh control.
+            guard parent.current != 0 || offset >= 0 || projected > 0 else { return }
+            let start = CGFloat(parent.current) * height
+            let distance = offset - start
+            let projectedDistance = projected - start
+            let travel = abs(distance) >= abs(projectedDistance) ? distance : projectedDistance
+            let threshold = min(120, height / 3)
+            let step = travel >= threshold ? 1 : travel <= -threshold ? -1 : 0
+            let page = min(parent.videos.count - 1, max(0, parent.current + step))
+            snapPage = page
+            targetContentOffset.pointee.y = CGFloat(page) * height
+        }
+
         func scrollViewDidEndDecelerating(_ sv: UIScrollView) {
             guard !parent.videos.isEmpty else { return }
+            snapPage = nil
             let page = min(parent.videos.count - 1, max(0, Int((sv.contentOffset.y / max(sv.bounds.height, 1)).rounded())))
             if page != parent.current {
                 selectPage(page)
@@ -2159,7 +2246,11 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         }
 
         func scrollViewDidEndDragging(_ sv: UIScrollView, willDecelerate decelerate: Bool) {
-            if !decelerate { scrollViewDidEndDecelerating(sv) }
+            guard !decelerate else { return }
+            if let page = snapPage {
+                sv.setContentOffset(CGPoint(x: 0, y: CGFloat(page) * sv.bounds.height), animated: false)
+            }
+            scrollViewDidEndDecelerating(sv)
         }
     }
 }
