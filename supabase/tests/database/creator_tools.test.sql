@@ -1,5 +1,5 @@
 begin;
-select plan(23);
+select plan(25);
 
 insert into auth.users (id, email) values
   ('30000000-0000-0000-0000-000000000001', 'source@test.dev'),
@@ -77,6 +77,23 @@ select public.mark_creator_activity_read(current_setting('test.reply_activity'):
 reset role;
 select is((select read_at from public.creator_activity where id = current_setting('test.reply_activity')::uuid),
           null::timestamptz, 'third party cannot mark activity read');
+
+select pg_temp.claim('30000000-0000-0000-0000-000000000001');
+set local role service_role;
+insert into public.pending_video_uploads (id, user_id, video_bytes, thumb_bytes, status)
+values ('40000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000003', 100, 20, 'checking');
+insert into public.reports (reporter_id, video_id, reason)
+values ('30000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000001', 'test');
+select throws_ok($$ select public.publish_screened_video('40000000-0000-0000-0000-000000000004',
+  '{"source_video_id":"40000000-0000-0000-0000-000000000001"}') $$,
+  'P0001', 'BACKING_UNAVAILABLE', 'server checks the upload owner report, not the session actor');
+delete from public.reports where reporter_id = '30000000-0000-0000-0000-000000000003';
+insert into public.blocks (blocker_id, blocked_id)
+values ('30000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000001');
+select throws_ok($$ select public.publish_screened_video('40000000-0000-0000-0000-000000000004',
+  '{"source_video_id":"40000000-0000-0000-0000-000000000001"}') $$,
+  'P0001', 'BACKING_UNAVAILABLE', 'server checks the upload owner block, not the session actor');
+reset role;
 
 select pg_temp.claim('30000000-0000-0000-0000-000000000001');
 set local role authenticated;

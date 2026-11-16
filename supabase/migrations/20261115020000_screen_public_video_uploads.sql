@@ -42,19 +42,39 @@ $$;
 revoke execute on function public.reserve_video_upload(uuid, integer, integer) from public, anon, authenticated;
 grant execute on function public.reserve_video_upload(uuid, integer, integer) to service_role;
 
+-- A server-published video has no end-user JWT. Its owner, not the current
+-- database session's identity, determines whether a play-along source is available.
+create or replace function public.validate_backing_permission() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    new.is_play_along := new.source_video_id is not null;
+    if new.is_play_along and not exists (
+      select 1 from public.videos v join public.profiles p on p.id = v.user_id
+      where v.id = new.source_video_id and not v.hidden and v.backing_enabled and p.username is not null
+        and not public.is_blocked_between(new.user_id, v.user_id)
+        and not exists (
+          select 1 from public.reports r where r.video_id = v.id and r.reporter_id = new.user_id
+        )
+    ) then
+      raise exception 'BACKING_UNAVAILABLE' using errcode = 'P0001';
+    end if;
+  end if;
+  if new.is_play_along and new.backing_enabled then
+    raise exception 'BACKING_REMIX_NOT_REUSABLE' using errcode = 'P0001';
+  end if;
+  return new;
+end
+$$;
+
 -- The service calls this after screening the write-once objects in private storage.
 create function public.publish_screened_video(upload_id uuid, fields jsonb, checked_attempt integer default 0)
-returns void language plpgsql set search_path = ''
-  set request.jwt.claim.sub = '' set request.jwt.claims = '{}' as $$
+returns void language plpgsql set search_path = '' as $$
 declare owner_id uuid;
 begin
   update public.pending_video_uploads set status = 'published', post_fields = null, retry_at = null
     where id = upload_id and status = 'checking' and attempt = checked_attempt returning user_id into owner_id;
   if not found then raise exception 'UPLOAD_NOT_CHECKING'; end if;
-
-  -- The existing play-along trigger checks the uploader's blocks and reports via auth.uid().
-  perform pg_catalog.set_config('request.jwt.claim.sub', owner_id::text, true);
-  perform pg_catalog.set_config('request.jwt.claims', pg_catalog.json_build_object('sub', owner_id, 'role', 'service_role')::text, true);
 
   insert into public.videos (id, user_id, video_key, thumb_key, caption, instrument, mode,
       duration_s, width, height, sound_setup, comments_enabled, backing_enabled, source_video_id)
