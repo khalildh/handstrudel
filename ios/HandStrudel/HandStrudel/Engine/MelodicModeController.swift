@@ -92,7 +92,7 @@ final class MelodicModeController: ModeController {
         }
 
         // Re-evaluate when config changes
-        let harmonyKey = "\(engine.selectedKey.rawValue)|\(engine.selectedScale.rawValue)|\(engine.chordMode)"
+        let harmonyKey = "\(engine.selectedKey.rawValue)|\(engine.selectedScale.id)|\(engine.chordMode)"
         let structKey = "\(keyPrefix)|\(engine.structIdx)|\(engine.drumStateKey)|\(engine.selectedWaveform)|\(harmonyKey)"
         if structKey != engine.lastStructKey {
             engine.lastStructKey = structKey

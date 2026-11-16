@@ -183,7 +183,7 @@ struct StartOverlayView: View {
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showScaleSheet) {
-            ScalePickerSheet(selected: $engine.selectedScale,
+            ScalePickerSheet(selected: engine.scaleSelection, key: engine.selectedKey,
                              storeManager: storeManager)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
@@ -234,7 +234,7 @@ struct StartOverlayView: View {
                         Text(engine.selectedSoundFontInstrument.name)
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(palette.ink)
-                        Text("\(engine.selectedKey.rawValue) \(engine.selectedScale.rawValue)  /  \(engine.chordMelodyProgression.name)")
+                        Text("\(engine.selectedKey.rawValue) \(engine.selectedScale.displayName)  /  \(engine.chordMelodyProgression.name)")
                             .font(.caption.monospaced())
                             .foregroundStyle(palette.muted)
                     }
@@ -282,7 +282,7 @@ struct StartOverlayView: View {
         .frame(height: 225)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Sound artwork")
-        .accessibilityValue("\(selected.name), \(engine.selectedKey.rawValue) \(engine.selectedScale.rawValue), \(engine.chordMelodyProgression.name), \(index + 1) of \(instruments.count)")
+        .accessibilityValue("\(selected.name), \(engine.selectedKey.rawValue) \(engine.selectedScale.displayName), \(engine.chordMelodyProgression.name), \(index + 1) of \(instruments.count)")
         .accessibilityIdentifier("sound-artwork")
         .accessibilityAdjustableAction { direction in
             let nextIndex: Int
@@ -410,9 +410,10 @@ struct StartOverlayView: View {
     /// visible lock badge, which SwiftUI menus can't render.
     private var scaleChip: some View {
         Button(action: { showScaleSheet = true }) {
-            soundRow("Scale", value: engine.selectedScale.rawValue, icon: "pianokeys")
+            soundRow("Scale", value: engine.selectedScale.displayName, icon: "pianokeys")
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("scale-picker")
     }
 
     private var rowDivider: some View {
@@ -822,23 +823,70 @@ private struct ProgressionPickerSheet: View {
 
 // MARK: - Scale picker sheet
 
-private struct ScalePickerSheet: View {
+extension EngineController {
+    var scaleSelection: Binding<Scale> {
+        Binding(get: { self.selectedScale }, set: { self.selectScale($0) })
+    }
+}
+
+struct ScalePickerSheet: View {
     @Environment(\.studioPalette) private var palette
     @Binding var selected: Scale
+    let key: MusicKey
     @ObservedObject var storeManager: StoreManager
     @Environment(\.dismiss) private var dismiss
     @State private var showPaywall = false
+    @State private var editor: ScaleEditorRequest?
+    @State private var saved = PersistenceManager.shared.loadCustomScales()
+
+    private var hasPro: Bool { storeManager.isUnlocked("pro") }
 
     var body: some View {
         NavigationStack {
-            List(Scale.allCases) { scale in
-                row(for: scale)
+            List {
+                Section("Your scales") {
+                    Button {
+                        if hasPro { editor = ScaleEditorRequest() }
+                        else { showPaywall = true }
+                    } label: {
+                        HStack {
+                            Label("Create Custom Scale", systemImage: "plus.circle")
+                            Spacer()
+                            if !hasPro { ProBadge() }
+                        }
+                    }
+                    .accessibilityIdentifier("create-custom-scale")
+                    .listRowBackground(palette.background)
+                    ForEach(saved) { scale in
+                        row(for: .custom(scale))
+                            .swipeActions {
+                                Button("Delete", systemImage: "trash", role: .destructive) { remove(scale) }
+                                Button("Edit", systemImage: "pencil") {
+                                    if hasPro { editor = ScaleEditorRequest(scale: scale) }
+                                    else { showPaywall = true }
+                                }
+                                .tint(palette.accent)
+                            }
+                    }
+                }
+                Section("Built-in scales") {
+                    ForEach(Scale.allCases) { row(for: $0) }
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(palette.background)
             .navigationTitle("Scale")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
+            .sheet(item: $editor) { request in
+                CustomScaleEditor(key: key, existing: request.scale, seed: selected.intervals) { scale in
+                    guard hasPro, PersistenceManager.shared.saveCustomScale(scale) else { return false }
+                    selected = .custom(scale)
+                    saved = PersistenceManager.shared.loadCustomScales()
+                    return true
+                }
+            }
             .sheet(isPresented: $showPaywall) {
                 proPaywall(storeManager: storeManager)
                     .presentationDetents([.medium, .large])
@@ -848,7 +896,7 @@ private struct ScalePickerSheet: View {
     }
 
     private func row(for scale: Scale) -> some View {
-        let locked = scale.isPremium && !storeManager.isUnlocked(scale.packId ?? "")
+        let locked = scale.isPremium && !hasPro
         return Button(action: {
             if locked {
                 showPaywall = true
@@ -858,7 +906,7 @@ private struct ScalePickerSheet: View {
             }
         }) {
             HStack(spacing: 12) {
-                Text(scale.rawValue)
+                Text(scale.displayName)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(locked ? palette.muted : palette.ink)
                 if locked { ProBadge() }
@@ -871,6 +919,98 @@ private struct ScalePickerSheet: View {
             }
         }
         .listRowBackground(palette.background)
+    }
+
+    private func remove(_ scale: CustomScale) {
+        PersistenceManager.shared.removeCustomScale(scale.id)
+        saved.removeAll { $0.id == scale.id }
+        if selected.customScale?.id == scale.id { selected = .pentatonic }
+    }
+}
+
+private struct ScaleEditorRequest: Identifiable {
+    let id = UUID()
+    var scale: CustomScale? = nil
+}
+
+private struct CustomScaleEditor: View {
+    @Environment(\.studioPalette) private var palette
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var notes: Set<Int>
+    @State private var saveFailed = false
+    private let key: MusicKey
+    private let scaleID: UUID
+    private let onSave: (CustomScale) -> Bool
+
+    init(key: MusicKey, existing: CustomScale?, seed: [Int], onSave: @escaping (CustomScale) -> Bool) {
+        self.key = key
+        scaleID = existing?.id ?? UUID()
+        self.onSave = onSave
+        _name = State(initialValue: existing?.name ?? "")
+        _notes = State(initialValue: Set(existing?.intervals ?? seed))
+    }
+
+    private var scale: CustomScale? { CustomScale(id: scaleID, name: name, intervals: notes.sorted()) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Name") {
+                    TextField("My scale", text: $name)
+                        .accessibilityIdentifier("custom-scale-name")
+                }
+                Section {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 10) {
+                        ForEach(0..<12) { interval in
+                            noteButton(interval)
+                        }
+                    }
+                } header: {
+                    Text("Notes in \(key.rawValue)")
+                } footer: {
+                    Text("Keep the root and select at least two more notes. Your pattern follows you when you change key.")
+                }
+                if saveFailed {
+                    Text("Couldn't save the scale. You can keep up to \(PersistenceManager.customScaleLimit) custom scales.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Custom Scale")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save & Use") {
+                        guard let scale else { return }
+                        if onSave(scale) { dismiss() }
+                        else { saveFailed = true }
+                    }
+                    .disabled(scale == nil)
+                }
+            }
+        }
+        .tint(palette.accent)
+    }
+
+    private func noteButton(_ interval: Int) -> some View {
+        let included = notes.contains(interval)
+        let note = pitchClassName(60 + key.semitone + interval)
+        return Button {
+            if included { notes.remove(interval) }
+            else { notes.insert(interval) }
+        } label: {
+            Label(note, systemImage: interval == 0 ? "lock.fill" : included ? "checkmark.circle.fill" : "circle")
+                .font(.subheadline.monospaced().weight(.semibold))
+                .foregroundStyle(included ? palette.onAccent : palette.ink)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(included ? palette.accent : palette.surface, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .disabled(interval == 0)
+        .accessibilityLabel(interval == 0 ? "\(note), root" : note)
+        .accessibilityAddTraits(included ? .isSelected : [])
+        .accessibilityIdentifier("custom-scale-note-\(interval)")
     }
 }
 

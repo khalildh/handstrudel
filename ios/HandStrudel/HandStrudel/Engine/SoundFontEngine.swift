@@ -27,6 +27,7 @@ final class SoundFontEngine {
 
     private let engine = AVAudioEngine()
     private let sampler = AVAudioUnitSampler()
+    var onNoteStarted: (() -> Void)?
 
     /// Whether a `.sf2` was found and the audio graph started successfully.
     private(set) var isAvailable = false
@@ -149,6 +150,7 @@ final class SoundFontEngine {
         sampler.startNote(note, withVelocity: vel, onChannel: channel)
         activeNotes[voice] = (note, channel)
         voiceVelocity[voice] = vel
+        onNoteStarted?()
     }
 
     /// Release a sustained voice.

@@ -8,17 +8,30 @@ const clips = ["Glass kalimba", "Late night strings", "Pocket piano"].map((capti
 }));
 const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "apikey" };
 
-async function mockClips(page: Page, isBroken = () => false) {
+async function mockClips(page: Page, isBroken = () => false, videos = clips) {
   await page.route("https://feed.handstrudel.test/rest/v1/feed_videos**", (route) => {
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
     const id = new URL(route.request().url()).searchParams.get("id")?.slice(3);
-    return route.fulfill({ headers: cors, json: id ? clips.filter((clip) => clip.id === id) : clips });
+    return route.fulfill({ headers: cors, json: id ? videos.filter((clip) => clip.id === id) : videos });
   });
   await page.route("https://media.handstrudel.test/clips/**", (route) => {
     if (isBroken()) return route.fulfill({ status: 503 });
     return route.fulfill({ path: join(process.cwd(), "tests/web/fixture.mp4"), contentType: "video/mp4" });
   });
 }
+
+test("shared custom scales and legacy pentatonic IDs have readable names", async ({ page }) => {
+  const custom = { id: "51000000-0000-0000-0000-000000000001", name: "Soft Glow", intervals: [0, 4, 7] };
+  const videos = clips.map((clip, index) => ({
+    ...clip,
+    sound_setup: { version: 1, key: "C", scale: index === 0 ? custom : "Pentatonic", bpm: 110 },
+  }));
+  await mockClips(page, () => false, videos);
+  await page.goto(`/watch?v=${clips[0].id}`);
+  await expect(page.locator(".watch-preset")).toContainText("C Soft Glow · 110 BPM");
+  await page.getByRole("button", { name: "Next performance" }).click();
+  await expect(page.locator(".watch-preset")).toContainText("C Major Pentatonic · 110 BPM");
+});
 
 test("previous and next work from the player on mobile without replacing the video element", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

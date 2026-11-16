@@ -75,6 +75,7 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
 
     var onBeat: ((Int) -> Void)?
     var onLog: ((String) -> Void)?
+    var onNoteStarted: (() -> Void)?
 
     override init() {
         super.init()
@@ -250,6 +251,7 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         let safeMidi = max(0, min(127, midi))
         let safeVel = max(0, min(1, velocity))
         webView.evaluateJavaScript("noteOn('\(hand)',\(safeMidi),'\(waveform)',\(String(format: "%.2f", safeVel)))", completionHandler: nil)
+        if isReady, !hand.hasPrefix("jam-") { onNoteStarted?() }
     }
 
     func noteOff(hand: String) {

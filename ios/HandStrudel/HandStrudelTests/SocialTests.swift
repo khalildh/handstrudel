@@ -7,6 +7,112 @@ import XCTest
 
 final class SocialTests: XCTestCase {
     @MainActor
+    func testUsageAnalyticsRequiresConsentAndDeduplicatesMilestones() throws {
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var events: [AppAnalytics.Event] = []
+        let analytics = AppAnalytics(defaults: defaults) { events.append($0) }
+        let dayEnd = Date(timeIntervalSince1970: 86_399)
+        let nextDay = dayEnd.addingTimeInterval(1)
+
+        analytics.recordActiveDay(now: dayEnd)
+        analytics.record(.firstNote)
+        analytics.record(.recordingStarted)
+        XCTAssertTrue(events.isEmpty)
+
+        defaults.set(true, forKey: AppAnalytics.optInKey)
+        analytics.recordActiveDay(now: dayEnd)
+        analytics.recordActiveDay(now: dayEnd)
+        analytics.record(.firstNote)
+        analytics.record(.firstNote)
+        let relaunched = AppAnalytics(defaults: defaults) { events.append($0) }
+        relaunched.recordActiveDay(now: dayEnd)
+        relaunched.record(.firstNote)
+        relaunched.recordActiveDay(now: nextDay)
+        relaunched.record(.recordingStarted)
+        relaunched.record(.recordingSaved)
+        relaunched.record(.recordingPosted)
+        relaunched.record(.recordingStarted)
+        XCTAssertEqual(events, [.activeDay, .firstNote, .activeDay, .returnDay,
+                                .recordingStarted, .recordingSaved, .recordingPosted, .recordingStarted])
+
+        defaults.set(false, forKey: AppAnalytics.optInKey)
+        relaunched.recordActiveDay(now: nextDay.addingTimeInterval(86_400))
+        relaunched.record(.recordingPosted)
+        XCTAssertEqual(events.count, 8)
+    }
+
+    @MainActor
+    func testProfileAvatarIsAvailableImmediatelyOnReturnAndExpires() async throws {
+        let photo = UIImage(systemName: "person.crop.circle")!
+        let resource = ProfileImageStore.Resource(url: URL(string: "https://example.test/avatar.jpg")!, kind: .avatar)
+        var requests = 0
+        var now = Date(timeIntervalSince1970: 1)
+        let store = ProfileImageStore(fetch: { _ in requests += 1; return .image(photo) }, now: { now })
+
+        XCTAssertNil(store.displayedImage(for: resource))
+        let first = await store.load(resource)
+        XCTAssertTrue(first === photo)
+        XCTAssertTrue(store.displayedImage(for: resource) === photo)
+        let reopened = await store.load(resource)
+        XCTAssertTrue(reopened === photo)
+        XCTAssertEqual(requests, 1)
+
+        now.addTimeInterval(301)
+        XCTAssertNil(store.displayedImage(for: resource))
+    }
+
+    @MainActor
+    func testProfileThumbnailRechecksVisibilityWithoutBlankingTheWarmImage() async {
+        let photo = UIImage(systemName: "film")!
+        let resource = ProfileImageStore.Resource(url: URL(string: "https://example.test/clip.jpg")!, kind: .thumbnail)
+        let rechecking = expectation(description: "Thumbnail visibility is rechecked")
+        let release = AsyncStream<Void>.makeStream()
+        var requests = 0
+        let store = ProfileImageStore(fetch: { _ in
+            requests += 1
+            if requests == 1 { return .image(photo) }
+            rechecking.fulfill()
+            var iterator = release.stream.makeAsyncIterator()
+            _ = await iterator.next()
+            return .denied
+        })
+
+        _ = await store.load(resource)
+        let refresh = Task { await store.load(resource) }
+        await fulfillment(of: [rechecking], timeout: 1)
+        XCTAssertTrue(store.displayedImage(for: resource) === photo)
+        release.continuation.yield(())
+        release.continuation.finish()
+        let result = await refresh.value
+        XCTAssertNil(result)
+        XCTAssertNil(store.displayedImage(for: resource))
+    }
+
+    @MainActor
+    func testClearingProfileImagesRejectsAnInFlightResponse() async {
+        let photo = UIImage(systemName: "film")!
+        let resource = ProfileImageStore.Resource(url: URL(string: "https://example.test/clip.jpg")!, kind: .thumbnail)
+        let started = expectation(description: "Old account started an image request")
+        let release = AsyncStream<Void>.makeStream()
+        let store = ProfileImageStore(fetch: { _ in
+            started.fulfill()
+            var iterator = release.stream.makeAsyncIterator()
+            _ = await iterator.next()
+            return .image(photo)
+        })
+
+        let old = Task { await store.load(resource) }
+        await fulfillment(of: [started], timeout: 1)
+        store.clear()
+        release.continuation.finish()
+        let result = await old.value
+        XCTAssertNil(result)
+        XCTAssertNil(store.displayedImage(for: resource))
+    }
+
+    @MainActor
     func testAccountPortfolioKeepsItsSnapshotWhileRefreshingOnReturn() async throws {
         let owner = try XCTUnwrap(UUID(uuidString: Self.discoveryUser))
         let client = discoveryClient { _ in (200, Self.discoveryVideo) }

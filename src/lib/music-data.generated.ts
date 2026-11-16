@@ -187,6 +187,14 @@ export const IOS_SCALE_INTERVALS = new Map<string, number[]>([
   ["Chromatic", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]],
   ["Hungarian Minor", [0, 2, 3, 6, 7, 8, 11]],
   ["Hirajoshi", [0, 2, 3, 7, 8]],
+  ["Minor Pentatonic", [0, 3, 5, 7, 10]],
+  ["Major Blues", [0, 2, 3, 4, 7, 9]],
+  ["Phrygian Dominant", [0, 1, 4, 5, 7, 8, 10]],
+  ["Diminished (Half-Whole)", [0, 1, 3, 4, 6, 7, 9, 10]],
+  ["Harmonic Major", [0, 2, 4, 5, 7, 8, 11]],
+  ["Lydian Dominant", [0, 2, 4, 6, 7, 9, 10]],
+  ["Altered", [0, 1, 3, 4, 6, 8, 10]],
+  ["Dominant Bebop", [0, 2, 4, 5, 7, 9, 10, 11]],
 ]);
 
 export interface ParamSpec {

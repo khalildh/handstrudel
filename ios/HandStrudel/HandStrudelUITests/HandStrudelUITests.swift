@@ -1035,6 +1035,53 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))
     }
 
+    func testCustomScaleCanBeSavedAndRecalled() {
+        app.launchArguments = ["--uitesting", "--uitest-pro-scales"]
+        app.launch()
+        func openScalePicker() {
+            let changeSound = app.buttons["Change sound"]
+            XCTAssertTrue(changeSound.waitForExistence(timeout: 5))
+            changeSound.tap()
+            let scale = element("scale-picker")
+            XCTAssertTrue(scale.waitForExistence(timeout: 5))
+            scale.tap()
+        }
+        let name = "Pulse \(UUID().uuidString.prefix(6))"
+        openScalePicker()
+        let create = element("create-custom-scale")
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let nameField = app.textFields["custom-scale-name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText(name)
+        let save = app.buttons["Save & Use"]
+        XCTAssertTrue(save.isEnabled)
+        save.tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
+
+        app.terminate()
+        app.launch()
+        openScalePicker()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
+    }
+
+    func testCustomScaleRequiresPro() {
+        app.launchArguments = ["--uitesting", "--force-locked"]
+        app.launch()
+        let changeSound = app.buttons["Change sound"]
+        XCTAssertTrue(changeSound.waitForExistence(timeout: 5))
+        changeSound.tap()
+        let scale = element("scale-picker")
+        XCTAssertTrue(scale.waitForExistence(timeout: 5))
+        scale.tap()
+        let create = element("create-custom-scale")
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        XCTAssertTrue(app.staticTexts["Pro Upgrade"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["custom-scale-name"].exists)
+    }
+
     func testMusic_showsStartButton() {
         launchToStart()
         XCTAssertTrue(element("start-button").waitForExistence(timeout: 5))

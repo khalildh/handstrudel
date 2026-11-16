@@ -56,5 +56,14 @@ After the moderation reviewer is assigned, preview the remaining changes with `s
 ## Weekly play-along pilot
 Choose a source clip with the creator's approval and with play-along already enabled. In the dashboard, add a row to `public.weekly_challenges` with its video ID, a short title and prompt, a one-week UTC window, and `featured = true`. Only one featured window can be active at a time. During the window, attributed public takes on that source appear automatically. Leave the table empty to keep the pilot hidden; revoking the source's opt-in also hides the challenge.
 
+## Optional app usage metrics
+In the project SQL Editor, view UTC daily totals with:
+
+```sql
+select day, event, events from public.app_usage_daily order by day desc, event;
+```
+
+`active_day` counts one foreground day per opted-in install. `return_day` counts an active day after any earlier observed day on the same install; it is not a Day 1 or Day 7 cohort. `first_note` counts once per opted-in install. Recording events count successful starts, completed private drafts, and posts confirmed by the app. These are best-effort client signals, not exact totals or user histories.
+
 ## iOS Universal Links
 Deploy the site with `public/.well-known/apple-app-site-association` and `vercel.json`, and verify the file returns HTTPS 200 with JSON and no redirect. Enable Associated Domains for the iOS app ID in Apple's developer portal, then rebuild with a matching provisioning profile and test a `https://handstrudel.com/watch?v=…` link from Messages on a physical iPhone. The website remains the fallback.

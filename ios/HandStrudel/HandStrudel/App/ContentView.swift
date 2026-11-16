@@ -160,6 +160,7 @@ struct ContentView: View {
                 .allowsHitTesting(false)
         }
         .onAppear {
+            if scenePhase == .active { AppAnalytics.shared.recordActiveDay() }
             recorderEvents.onInterruption = { error in
                 if let activeAudioLoop {
                     if engine.isLoopRecording { resolveAudioLoop(activeAudioLoop, interruption: error) }
@@ -168,7 +169,7 @@ struct ContentView: View {
                 }
                 guard isRecording, !recorderBusy, let draft = activeDraft else { return }
                 finishRecordingUI()
-                if (try? drafts.complete(draft)) != nil {
+                if (try? completeLiveRecording(draft)) != nil {
                     recordingError = "Recording interrupted. Check Private drafts for the saved take."
                 } else {
                     drafts.discardUnfinished(draft)
@@ -311,6 +312,7 @@ struct ContentView: View {
             backing?.player.volume = Float(BackingTrackVolume.clamped(volume))
         }
         .onChange(of: scenePhase) { phase in
+            if phase == .active { AppAnalytics.shared.recordActiveDay() }
             engine.setLearnSceneActive(phase == .active)
             if phase == .background {
                 backingLoad?.cancel()
@@ -334,6 +336,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
             guard !engine.isRunning, let presetId = notification.object as? String else { return }
             if let preset = PRESETS.first(where: { $0.id == presetId }) {
+                limitScaleToEntitlement()
                 engine.start(config: preset.mapping, advanced: false, input: preferredInput)
             }
         }
@@ -341,6 +344,7 @@ struct ContentView: View {
             guard let mode = notification.object as? String else { return }
             if !engine.isRunning {
                 // Start with default preset first
+                limitScaleToEntitlement()
                 engine.start(config: DEFAULT_MAPPING, advanced: false, input: preferredInput)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -457,10 +461,18 @@ struct ContentView: View {
             soundError = "This setup is unavailable or requires a sound pack you don't own."
             return
         }
+        limitScaleToEntitlement()
         startingSession = true
         destination = .music
         if !appliedSetup { engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true) }
         engine.start(config: DEFAULT_MAPPING, advanced: false, input: preferredInput)
+    }
+
+    private func limitScaleToEntitlement() {
+        if let pack = engine.selectedScale.packId, !storeManager.isUnlocked(pack) {
+            engine.selectedScale = .pentatonic
+            engine.recomputeScaleNotes()
+        }
     }
 
     private func changePlayInput(_ input: StudioPlayInput) {
@@ -590,9 +602,11 @@ struct ContentView: View {
         if engine.scaleUseSoundFont,
            engine.soundFontEngine.startIfNeeded(program: engine.selectedSoundFontInstrument.program) {
             engine.soundFontEngine.oneShot(midi: midi, velocity: 0.75, duration: 0.48)
+            AppAnalytics.shared.record(.firstNote)
         } else {
             engine.strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform,
                                           velocity: 0.75, duration: 0.48)
+            if engine.strudelBridge.isReady { AppAnalytics.shared.record(.firstNote) }
         }
         engine.haptics.noteTrigger()
     }
@@ -823,7 +837,7 @@ struct ContentView: View {
 
     private func randomizeSettings() {
         let allKeys = MusicKey.allCases
-        let allScales = Scale.allCases
+        let allScales = Scale.allCases.filter { $0.packId.map(storeManager.isUnlocked) ?? true }
         let waveformIds = WAVEFORMS.map(\.id)
 
         engine.selectedKey = allKeys.randomElement() ?? .C
@@ -2172,6 +2186,7 @@ struct ContentView: View {
                 } else {
                     recorderBusy = false
                     isRecording = true
+                    AppAnalytics.shared.record(.recordingStarted)
                     if scenePhase == .background { stopRecording(); return }
                     if draft.recordedAtHalfSpeed == true && !engine.supportsHalfSpeedRecording {
                         stopRecording()
@@ -2209,10 +2224,10 @@ struct ContentView: View {
                 finishRecordingUI()
                 do {
                     if let error { throw error }
-                    try drafts.complete(draft)
+                    try completeLiveRecording(draft)
                     if scenePhase != .background { reviewingDraft = draft }
                 } catch {
-                    if (try? drafts.complete(draft)) != nil {
+                    if (try? completeLiveRecording(draft)) != nil {
                         recordingError = "Recording was interrupted. Check Private drafts for the saved take."
                     } else {
                         drafts.discardUnfinished(draft)
@@ -2221,6 +2236,11 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    private func completeLiveRecording(_ draft: RecordingDraft) throws {
+        try drafts.complete(draft)
+        AppAnalytics.shared.record(.recordingSaved)
     }
 
     private func finishRecordingUI() {

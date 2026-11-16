@@ -25,7 +25,7 @@ enum MusicKey: String, CaseIterable, Identifiable, Codable {
 
 // MARK: - Scales
 
-enum Scale: String, CaseIterable, Identifiable, Codable {
+enum BuiltInScale: String, CaseIterable, Hashable {
     case major = "Major"
     case minor = "Minor"
     case dorian = "Dorian"
@@ -41,8 +41,22 @@ enum Scale: String, CaseIterable, Identifiable, Codable {
     case chromatic = "Chromatic"
     case hungarianMinor = "Hungarian Minor"
     case hirajoshi = "Hirajoshi"
+    case minorPentatonic = "Minor Pentatonic"
+    case majorBlues = "Major Blues"
+    case phrygianDominant = "Phrygian Dominant"
+    case diminished = "Diminished (Half-Whole)"
+    case harmonicMajor = "Harmonic Major"
+    case lydianDominant = "Lydian Dominant"
+    case altered = "Altered"
+    case dominantBebop = "Dominant Bebop"
 
-    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .pentatonic: return "Major Pentatonic"
+        case .blues: return "Minor Blues"
+        default: return rawValue
+        }
+    }
 
     var intervals: [Int] {
         switch self {
@@ -61,6 +75,14 @@ enum Scale: String, CaseIterable, Identifiable, Codable {
         case .chromatic:      return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         case .hungarianMinor: return [0, 2, 3, 6, 7, 8, 11]
         case .hirajoshi:      return [0, 2, 3, 7, 8]
+        case .minorPentatonic: return [0, 3, 5, 7, 10]
+        case .majorBlues: return [0, 2, 3, 4, 7, 9]
+        case .phrygianDominant: return [0, 1, 4, 5, 7, 8, 10]
+        case .diminished: return [0, 1, 3, 4, 6, 7, 9, 10]
+        case .harmonicMajor: return [0, 2, 4, 5, 7, 8, 11]
+        case .lydianDominant: return [0, 2, 4, 6, 7, 9, 10]
+        case .altered: return [0, 1, 3, 4, 6, 8, 10]
+        case .dominantBebop: return [0, 2, 4, 5, 7, 9, 10, 11]
         }
     }
 
@@ -71,8 +93,108 @@ enum Scale: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    var packId: String? {
-        isPremium ? "pro" : nil
+}
+
+struct CustomScale: Codable, Hashable, Identifiable {
+    let id: UUID
+    let name: String
+    let intervals: [Int]
+
+    init?(id: UUID = UUID(), name: String, intervals: [Int]) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.unicodeScalars.count <= 40,
+              !name.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+              (3...12).contains(intervals.count), intervals.first == 0,
+              intervals == intervals.sorted(), intervals.last.map({ $0 < 12 }) == true,
+              Set(intervals).count == intervals.count else { return nil }
+        self.id = id
+        self.name = name
+        self.intervals = intervals
+    }
+
+    init(from decoder: Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        let id = try fields.decode(UUID.self, forKey: .id)
+        let name = try fields.decode(String.self, forKey: .name)
+        let intervals = try fields.decode([Int].self, forKey: .intervals)
+        guard let scale = Self(id: id, name: name, intervals: intervals), name == scale.name else {
+            throw DecodingError.dataCorruptedError(forKey: .intervals, in: fields, debugDescription: "Invalid custom scale")
+        }
+        self = scale
+    }
+}
+
+enum Scale: CaseIterable, Identifiable, Codable, Hashable {
+    case builtIn(BuiltInScale)
+    case custom(CustomScale)
+
+    static let allCases = BuiltInScale.allCases.map(Scale.builtIn)
+    static let major = Scale.builtIn(.major), minor = Scale.builtIn(.minor), dorian = Scale.builtIn(.dorian)
+    static let pentatonic = Scale.builtIn(.pentatonic), blues = Scale.builtIn(.blues)
+    static let harmonicMinor = Scale.builtIn(.harmonicMinor), melodicMinor = Scale.builtIn(.melodicMinor)
+    static let phrygian = Scale.builtIn(.phrygian), lydian = Scale.builtIn(.lydian), mixolydian = Scale.builtIn(.mixolydian)
+    static let locrian = Scale.builtIn(.locrian), wholeTone = Scale.builtIn(.wholeTone), chromatic = Scale.builtIn(.chromatic)
+    static let hungarianMinor = Scale.builtIn(.hungarianMinor), hirajoshi = Scale.builtIn(.hirajoshi)
+    static let minorPentatonic = Scale.builtIn(.minorPentatonic)
+
+    init?(rawValue: String) {
+        guard let scale = BuiltInScale(rawValue: rawValue) else { return nil }
+        self = .builtIn(scale)
+    }
+
+    var rawValue: String {
+        switch self {
+        case let .builtIn(scale): return scale.rawValue
+        case .custom: return "Custom"
+        }
+    }
+
+    var id: String { customScale?.id.uuidString ?? rawValue }
+
+    var customScale: CustomScale? {
+        if case let .custom(scale) = self { return scale }
+        return nil
+    }
+
+    var displayName: String {
+        switch self {
+        case let .builtIn(scale): return scale.displayName
+        case let .custom(scale): return scale.name
+        }
+    }
+
+    var intervals: [Int] {
+        switch self {
+        case let .builtIn(scale): return scale.intervals
+        case let .custom(scale): return scale.intervals
+        }
+    }
+
+    var isPremium: Bool {
+        if case let .builtIn(scale) = self { return scale.isPremium }
+        return true
+    }
+
+    var packId: String? { isPremium ? "pro" : nil }
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer()
+        if let name = try? value.decode(String.self) {
+            guard let scale = Scale(rawValue: name) else {
+                throw DecodingError.dataCorruptedError(in: value, debugDescription: "Unknown built-in scale")
+            }
+            self = scale
+        } else {
+            self = .custom(try value.decode(CustomScale.self))
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var value = encoder.singleValueContainer()
+        switch self {
+        case let .builtIn(scale): try value.encode(scale.rawValue)
+        case let .custom(scale): try value.encode(scale)
+        }
     }
 }
 
@@ -129,7 +251,7 @@ func chordNotes(key: MusicKey, scale: Scale, degree: Int) -> [Int] {
     // Fifth = 4 scale steps up
     let fifthDeg = (safeDegree + 4) % count
     var fifth = 48 + key.semitone + scaleIntervals[fifthDeg]
-    if fifth <= third { fifth += 12 }
+    while fifth <= third { fifth += 12 }
 
     return [root, third, fifth]
 }

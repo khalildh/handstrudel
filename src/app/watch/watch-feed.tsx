@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { creatorHref, describeClipChords, isVideoID, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicVideo } from "../../lib/public-feed";
+import { creatorHref, describeClipChords, describeClipScale, isVideoID, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicVideo } from "../../lib/public-feed";
 import WatchComments from "./watch-comments";
 import { clipDuration, clipTitle, WatchArtwork, WatchFooter, WatchHeader, WatchIcon, WatchThumbnail } from "./watch-design";
 
@@ -34,6 +34,7 @@ export default function WatchFeed() {
   const selected = id ? listed ?? (shared?.id === id ? shared.video : undefined) : videos[0];
   const resolving = id && isVideoID(id) && !listed && shared?.id !== id;
   const setup = selected?.sound_setup?.version === 1 ? selected.sound_setup : null;
+  const scale = describeClipScale(setup?.scale);
   const chords = describeClipChords(setup);
   const author = selected ? creatorHref(selected.username) : null;
   const currentIndex = videos.findIndex((video) => video.id === selected?.id);
@@ -46,7 +47,7 @@ export default function WatchFeed() {
   const embedMarkup = embedURL ? `<iframe src="${embedURL}" title="HandStrudel performance" width="360" height="640" style="max-width:100%;border:0" loading="lazy" allowfullscreen></iframe>` : "";
   const presetDetails = [
     selected?.instrument,
-    typeof setup?.key === "string" && typeof setup.scale === "string" ? `${setup.key} ${setup.scale}` : null,
+    typeof setup?.key === "string" && scale ? `${setup.key} ${scale.name}` : null,
     typeof setup?.bpm === "number" && setup.bpm >= 20 && setup.bpm <= 400 ? `${Math.round(setup.bpm)} BPM` : null,
   ].filter(Boolean).join(" · ");
 

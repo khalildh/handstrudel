@@ -28,7 +28,7 @@ export interface PublicVideo {
 interface PublicSoundSetup {
   version?: number;
   key?: string;
-  scale?: string;
+  scale?: string | { id: string; name: string; intervals: number[] };
   bpm?: number;
   progression?: string;
   customDegrees?: number[];
@@ -42,11 +42,26 @@ const chordQualities = new Map([
   ["3,6,10", "min7b5"], ["3,6,9", "dim7"], ["4,8,11", "maj7#5"],
 ]);
 
+export function describeClipScale(scale: PublicSoundSetup["scale"]) {
+  if (typeof scale === "string") {
+    const intervals = IOS_SCALE_INTERVALS.get(scale);
+    if (!intervals) return null;
+    const name = scale === "Pentatonic" ? "Major Pentatonic" : scale === "Blues" ? "Minor Blues" : scale;
+    return { name, intervals };
+  }
+  if (!scale || typeof scale.name !== "string" || !scale.name || scale.name.trim() !== scale.name ||
+      Array.from(scale.name).length > 40 || /[\u0000-\u001f\u007f-\u009f]/.test(scale.name)) return null;
+  const { intervals } = scale;
+  if (!Array.isArray(intervals) || intervals.length < 3 || intervals.length > 12 || intervals[0] !== 0 ||
+      !intervals.every((n, i) => Number.isInteger(n) && n < 12 && (i === 0 || n > intervals[i - 1]))) return null;
+  return { name: scale.name, intervals };
+}
+
 function savedChordNames(setup: PublicSoundSetup, degrees: readonly number[]): string[] | null {
   const seventh = setup.mode === "scalechordmelody";
   if (!degrees.length || (!seventh && !triadModes.has(setup.mode ?? ""))) return null;
   const tonic = IOS_KEY_SEMITONES.get(setup.key ?? "");
-  const scale = IOS_SCALE_INTERVALS.get(setup.scale ?? "");
+  const scale = describeClipScale(setup.scale)?.intervals;
   // Shorter iOS scales wrap degrees back onto earlier roots. Keep those layouts numeric.
   if (tonic === undefined || scale?.length !== 7) return null;
   const names: string[] = [];

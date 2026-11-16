@@ -17,6 +17,7 @@ struct ControlSheet: View {
     @State private var audioExportError: String?
     @State private var exportingLoop = false
     @State private var showSetups = false
+    @State private var showScalePicker = false
     @State private var exportedAudioURL: URL?
     @State private var soundFontCategory: GMCategory = DEFAULT_SOUNDFONT_INSTRUMENT.category
     @State private var customProgressionText = ""
@@ -122,6 +123,11 @@ struct ControlSheet: View {
                 engine.applySoundSetup(setup, store: storeManager)
                 showSetups = false
             }
+        }
+        .sheet(isPresented: $showScalePicker) {
+            ScalePickerSheet(selected: engine.scaleSelection, key: engine.selectedKey, storeManager: storeManager)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showLearnPicker, onDismiss: {
             if startLessonOnDismiss { startLessonOnDismiss = false; dismiss() }
@@ -891,48 +897,17 @@ struct ControlSheet: View {
                 }
             }
 
-            // Scale picker
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(Scale.allCases) { scale in
-                        let locked = scale.isPremium && !storeManager.isUnlocked(scale.packId ?? "")
-                        Button(action: {
-                            if locked, let packId = scale.packId {
-                                paywallPackId = packId
-                            } else {
-                                engine.selectedScale = scale
-                                engine.recomputeScaleNotes()
-                            }
-                        }) {
-                            Text(scale.rawValue)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundColor(engine.selectedScale == scale ? palette.accent : .primary.opacity(0.6))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    Capsule()
-                                        .fill(engine.selectedScale == scale ? palette.accent.opacity(0.15) : Color.primary.opacity(0.04))
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .stroke(engine.selectedScale == scale ? palette.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
-                                )
-                                .overlay(alignment: .topTrailing) {
-                                    if locked {
-                                        Text("PRO")
-                                            .font(.system(size: 6, weight: .bold, design: .rounded))
-                                            .foregroundColor(palette.ink.opacity(0.8))
-                                            .padding(.horizontal, 3)
-                                            .padding(.vertical, 1)
-                                            .background(Capsule().fill(palette.ink.opacity(0.15)))
-                                            .offset(x: 4, y: -4)
-                                    }
-                                }
-                                .opacity(locked ? 0.5 : 1.0)
-                        }
-                    }
+            Button { showScalePicker = true } label: {
+                HStack {
+                    Label("Scale", systemImage: "pianokeys")
+                    Spacer()
+                    Text(engine.selectedScale.displayName).foregroundStyle(palette.accent)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold))
                 }
+                .frame(minHeight: 36)
             }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("scale-picker")
 
             // Toggles - pill style
             HStack(spacing: 12) {
