@@ -25,6 +25,12 @@ struct Profile: Codable, Equatable, Identifiable {
     }
 }
 
+struct VideoEngagement: Decodable, Equatable {
+    let saves: Int
+    let shares: Int
+    let remixes: Int
+}
+
 struct Video: Codable, Equatable, Identifiable {
     let id: UUID
     let userId: UUID

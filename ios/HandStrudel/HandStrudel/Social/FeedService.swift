@@ -8,6 +8,18 @@ enum FeedService {
     static let commentPageSize = 20
     static let activityPageSize = 25
 
+    private struct VideoTarget: Encodable { let target_video: UUID }
+
+    static func engagement(for video: UUID) async throws -> VideoEngagement? {
+        let rows: [VideoEngagement] = try await supabase.rpc("video_engagement", params: VideoTarget(target_video: video))
+            .execute().value
+        return rows.first
+    }
+
+    static func recordShare(for video: UUID) async throws {
+        try await supabase.rpc("record_video_share", params: VideoTarget(target_video: video)).execute()
+    }
+
     static func recordView(video: UUID, receipt: UUID) async throws -> Int? {
         struct ViewReport: Encodable {
             let target_video: UUID

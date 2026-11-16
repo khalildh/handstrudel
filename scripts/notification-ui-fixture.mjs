@@ -11,6 +11,8 @@ const demoLikes = 42;
 const clipBytes = process.env.FIXTURE_CLIP ? readFileSync(process.env.FIXTURE_CLIP) : null;
 const canControlMedia = process.env.FIXTURE_CONTROL_MEDIA === "1";
 const countViews = process.env.FIXTURE_VIEW_COUNTS === "1";
+const showEngagement = process.env.FIXTURE_ENGAGEMENT === "1";
+let shareCount = 4;
 const counted = new Set();
 let mediaAvailable = !canControlMedia;
 const demoThumb = "thumbs/76c9a372-7439-48dc-94ec-75a06cb6f1d7/385e21ab-7160-4378-b897-c602de952140.jpg";
@@ -102,6 +104,12 @@ createServer((request, response) => {
       }
       return response.writeHead(415).end();
     case "/rest/v1/videos": return send([]);
+    case "/rest/v1/rpc/video_engagement":
+      return showEngagement ? send([{ saves: 5 + saved.size, shares: shareCount, remixes: 3 }]) : response.writeHead(404).end();
+    case "/rest/v1/rpc/record_video_share":
+      if (!showEngagement) return response.writeHead(404).end();
+      shareCount += 1;
+      return response.writeHead(204).end();
     case "/rest/v1/rpc/record_video_view": {
       if (!countViews || request.method !== "POST") return response.writeHead(404).end();
       let body = "";
