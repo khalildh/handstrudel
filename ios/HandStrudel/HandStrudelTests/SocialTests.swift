@@ -6,6 +6,28 @@ import XCTest
 @testable import HandStrudel
 
 final class SocialTests: XCTestCase {
+    func testQualifiedVideoViewRequiresPlaybackAndIgnoresScrubbing() throws {
+        var watch = QualifiedClipWatch()
+        func position(_ seconds: Double) throws -> FeedPlaybackPosition {
+            try XCTUnwrap(FeedPlaybackPosition(duration: 8, seconds: seconds))
+        }
+        XCTAssertFalse(watch.sample(try position(0), playing: true))
+        XCTAssertFalse(watch.sample(try position(5), playing: true))
+        XCTAssertFalse(watch.sample(try position(5.2), playing: false))
+        watch.resetSample()
+        for seconds in [2.0, 2.5, 3.0, 3.5] {
+            XCTAssertFalse(watch.sample(try position(seconds), playing: true))
+        }
+        XCTAssertTrue(watch.sample(try position(4.0), playing: true))
+        XCTAssertFalse(watch.sample(try position(4.5), playing: true))
+    }
+
+    func testShortClipCanQualifyAtHalfItsDuration() throws {
+        var watch = QualifiedClipWatch()
+        XCTAssertFalse(watch.sample(try XCTUnwrap(FeedPlaybackPosition(duration: 1, seconds: 0)), playing: true))
+        XCTAssertTrue(watch.sample(try XCTUnwrap(FeedPlaybackPosition(duration: 1, seconds: 0.5)), playing: true))
+    }
+
     @MainActor
     func testUsageAnalyticsRequiresConsentAndDeduplicatesMilestones() throws {
         let suite = UUID().uuidString

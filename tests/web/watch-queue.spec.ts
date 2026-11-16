@@ -33,6 +33,41 @@ test("shared custom scales and legacy pentatonic IDs have readable names", async
   await expect(page.locator(".watch-preset")).toContainText("C Major Pentatonic · 110 BPM");
 });
 
+test("playing a clip updates views without counting load, seeks, or replays", async ({ page }) => {
+  const videos = clips.map((clip) => ({ ...clip, view_count: 7 }));
+  await mockClips(page, () => false, videos);
+  const receipts: string[] = [];
+  await page.route("https://feed.handstrudel.test/rest/v1/rpc/record_video_view", (route) => {
+    const headers = { ...cors, "access-control-allow-headers": "apikey,content-type" };
+    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    const report = route.request().postDataJSON();
+    expect(report.target_video).toBe(clips[0].id);
+    receipts.push(report.watch_receipt);
+    return route.fulfill({ headers, json: 8 });
+  });
+  await page.goto(`/watch?v=${clips[0].id}`);
+  await expect(page.getByText("7 views", { exact: true })).toBeVisible();
+  const video = page.locator("video");
+  await video.evaluate(async (element: HTMLVideoElement) => {
+    if (element.readyState < 1) await new Promise((resolve) => element.addEventListener("loadedmetadata", resolve, { once: true }));
+    element.currentTime = 0.65;
+    await new Promise((resolve) => element.addEventListener("seeked", resolve, { once: true }));
+  });
+  expect(receipts).toHaveLength(0);
+  async function play() {
+    await video.evaluate(async (element: HTMLVideoElement) => {
+      element.currentTime = 0;
+      element.muted = true;
+      await element.play();
+      if (!element.ended) await new Promise((resolve) => element.addEventListener("ended", resolve, { once: true }));
+    });
+  }
+  await play();
+  await expect(page.getByText("8 views", { exact: true })).toBeVisible();
+  await play();
+  expect(receipts).toHaveLength(1);
+});
+
 test("previous and next work from the player on mobile without replacing the video element", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockClips(page);

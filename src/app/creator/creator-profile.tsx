@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { isCreatorHandle, loadPublicCreator, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicCreator, type PublicVideo } from "../../lib/public-feed";
+import { formatVideoViews, isCreatorHandle, loadPublicCreator, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicCreator, type PublicVideo } from "../../lib/public-feed";
 import { clipTitle, WatchArtwork, WatchFooter, WatchHeader, WatchIcon, WatchThumbnail } from "../watch/watch-design";
 
 export default function CreatorProfile() {
@@ -205,6 +205,7 @@ function CreatorClip({ video, focusOnAppend }: { video: PublicVideo; focusOnAppe
         <div className="creator-clip-copy">
           <strong>{title}</strong>
           {video.instrument?.trim() && video.instrument.trim() !== title && <small>{video.instrument.trim()}</small>}
+          {formatVideoViews(video.view_count) && <small>{formatVideoViews(video.view_count)}</small>}
           <time dateTime={video.created_at}>{clipDate.format(new Date(video.created_at))}</time>
         </div>
       </Link>

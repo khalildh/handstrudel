@@ -523,6 +523,7 @@ struct CreatorPortfolio: View {
                     if let instrument = video.soundSetup?.instrumentName ?? video.instrument, !instrument.isEmpty {
                         Text(instrument).font(.caption).foregroundStyle(palette.muted).lineLimit(1)
                     }
+                    VideoViewLabel(count: video.viewCount).foregroundStyle(palette.muted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "play.fill")

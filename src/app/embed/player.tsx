@@ -2,7 +2,8 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { isVideoID, loadPublicVideos, mediaURL, type PublicVideo } from "../../lib/public-feed";
+import { formatVideoViews, isVideoID, loadPublicVideos, mediaURL, type PublicVideo } from "../../lib/public-feed";
+import { useVideoViews } from "../../lib/use-video-views";
 import { clipTitle, WatchIcon } from "../watch/watch-design";
 
 export default function EmbeddedPerformance() {
@@ -32,6 +33,7 @@ export default function EmbeddedPerformance() {
 }
 
 function EmbeddedClip({ video }: { video: PublicVideo }) {
+  const views = useVideoViews(video.id, video.view_count);
   const [playbackFailed, setPlaybackFailed] = useState(false);
   const hadPlayerFocus = useRef(false);
   const watchLink = useRef<HTMLAnchorElement>(null);
@@ -47,7 +49,10 @@ function EmbeddedClip({ video }: { video: PublicVideo }) {
     <main className={unavailable ? "embed-page embed-page-recovery" : "embed-page"}>
       {!unavailable && (
         <video controls playsInline preload="none" aria-label={title}
-          poster={mediaURL(video.thumb_key)} src={src} onError={({ currentTarget }) => {
+          poster={mediaURL(video.thumb_key)} src={src}
+          onTimeUpdate={(event) => views.sample(event.currentTarget)}
+          onSeeking={views.resetSample} onPause={views.resetSample}
+          onError={({ currentTarget }) => {
             if (!currentTarget.error || currentTarget.error.code === MediaError.MEDIA_ERR_ABORTED) return;
             hadPlayerFocus.current = document.activeElement === currentTarget;
             setPlaybackFailed(true);
@@ -60,7 +65,7 @@ function EmbeddedClip({ video }: { video: PublicVideo }) {
         {unavailable ? "Open on HandStrudel" : (
           <>
             <WatchIcon name="wave" />
-            <span><strong>{title}</strong><small>@{video.username} · HandStrudel</small></span>
+            <span><strong>{title}</strong><small>@{video.username} · {formatVideoViews(views.count) ?? "HandStrudel"}</small></span>
           </>
         )}
         <WatchIcon name="arrow" />

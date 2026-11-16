@@ -636,6 +636,42 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(slider.value as? String, pausedPosition)
     }
 
+    func testCreatorVideoUsesFeedControlsAndCountsPlayback() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_VIDEO_VIEWS_FIXTURE_URL"] else {
+            throw XCTSkip("Requires a real MP4 and FIXTURE_VIEW_COUNTS=1.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        XCTAssertTrue(element("tab-feed").waitForExistence(timeout: 5))
+        element("tab-feed").tap()
+        let creator = app.buttons["@loopmaker"].firstMatch
+        XCTAssertTrue(creator.waitForExistence(timeout: 5))
+        creator.tap()
+        let latest = app.buttons["profile-latest-performance"]
+        XCTAssertTrue(latest.waitForExistence(timeout: 5))
+        latest.tap()
+        let slider = app.sliders["feed-video-progress"]
+        XCTAssertTrue(slider.waitForExistence(timeout: 7))
+        let count = app.staticTexts["8 views"].firstMatch
+        XCTAssertTrue(count.waitForExistence(timeout: 6))
+        element("performance-video").coordinate(withNormalizedOffset: CGVector(dx: 0.48, dy: 0.44)).tap()
+        slider.adjust(toNormalizedSliderPosition: 0.61)
+        let position = try XCTUnwrap(slider.value as? String)
+
+        let fullscreen = app.buttons["profile-video-fullscreen"]
+        fullscreen.tap()
+        XCTAssertEqual(fullscreen.label, "Exit full screen")
+        XCTAssertEqual(slider.value as? String, position)
+        XCTAssertFalse(count.isHittable)
+        fullscreen.tap()
+        XCTAssertEqual(fullscreen.label, "Full screen")
+        XCTAssertEqual(slider.value as? String, position)
+        XCTAssertTrue(count.exists)
+    }
+
     @MainActor
     func testFeedSearchBroadensHandleMiss() async throws {
         guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_SEARCH_FIXTURE_URL"] else {
