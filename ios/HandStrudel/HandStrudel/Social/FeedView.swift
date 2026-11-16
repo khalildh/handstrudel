@@ -25,7 +25,7 @@ struct FeedView: View {
     @State private var commenting: Video?
     @State private var lastCommentVideo: UUID?
     @State private var toast: String?
-    @State private var muted = true
+    @AppStorage("feedMuted") private var muted = false
     @State private var showActivity = false
     @State private var unreadActivity = false
     @State private var creatorVideo: Video?
@@ -1774,6 +1774,7 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
             guard abs(cv.contentOffset.y - target) > 1 else { return }
             cv.layoutIfNeeded()
             cv.setContentOffset(CGPoint(x: 0, y: target), animated: false)
+            cv.layoutIfNeeded()
         }
 
         func collectionView(_ cv: UICollectionView, numberOfItemsInSection section: Int) -> Int { parent.videos.count }
@@ -1782,6 +1783,11 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
             let c = cv.dequeueReusableCell(withReuseIdentifier: "cell", for: ip)
             configure(c, at: ip)
             return c
+        }
+
+        func collectionView(_ cv: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt ip: IndexPath) {
+            // A prefetched cell can have been built before auto-advance selected it.
+            configure(cell, at: ip)
         }
 
         func configure(_ c: UICollectionViewCell?, at ip: IndexPath) {
@@ -1833,7 +1839,7 @@ struct FeedPlaybackPosition: Equatable {
 @MainActor
 private final class FeedPlaybackController: ObservableObject {
     @Published private(set) var position: FeedPlaybackPosition?
-    private var player: AVQueuePlayer?
+    private var player: AVPlayer?
     private var timeObserver: Any?
     private var isCurrent = false
     private var wantsPlayback = false
@@ -1842,7 +1848,7 @@ private final class FeedPlaybackController: ObservableObject {
     private var seekID = 0
     private var durationHint: Double?
 
-    func configure(player newPlayer: AVQueuePlayer, isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?) {
+    func configure(player newPlayer: AVPlayer, isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?) {
         if player !== newPlayer {
             disconnect()
             player = newPlayer
@@ -1857,7 +1863,7 @@ private final class FeedPlaybackController: ObservableObject {
         syncPlayback()
     }
 
-    func disconnect(from expectedPlayer: AVQueuePlayer? = nil) {
+    func disconnect(from expectedPlayer: AVPlayer? = nil) {
         if let expectedPlayer, player !== expectedPlayer { return }
         stopObserving()
         cancelSeek()
@@ -1886,10 +1892,10 @@ private final class FeedPlaybackController: ObservableObject {
         if !isTracking { seek(to: next) }
     }
 
-    func finished(_ owner: AVQueuePlayer, advance: () -> Bool) {
+    func finished(_ owner: AVPlayer, advance: () -> Bool) {
         guard player === owner, isCurrent, wantsPlayback, !isTracking, !isSeeking else { return }
-        if advance() { wantsPlayback = false }
         owner.pause()
+        if advance() { wantsPlayback = false }
         if let duration = position?.duration, let beginning = FeedPlaybackPosition(duration: duration, seconds: 0) {
             position = beginning
             seek(to: beginning)
@@ -1899,7 +1905,7 @@ private final class FeedPlaybackController: ObservableObject {
         }
     }
 
-    private func observe(_ owner: AVQueuePlayer) {
+    private func observe(_ owner: AVPlayer) {
         let interval = CMTime(value: 1, timescale: 5)
         timeObserver = owner.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self, weak owner] time in
             MainActor.assumeIsolated {
@@ -1913,7 +1919,7 @@ private final class FeedPlaybackController: ObservableObject {
         }
     }
 
-    private func sample(_ owner: AVQueuePlayer, time: CMTime) {
+    private func sample(_ owner: AVPlayer, time: CMTime) {
         guard isCurrent, !isTracking, !isSeeking, player === owner else { return }
         let measured = owner.currentItem?.duration.seconds ?? 0
         let duration = measured.isFinite && measured > 0 ? measured : durationHint ?? 0
@@ -1987,13 +1993,13 @@ private struct FeedProgressStrip: View {
 
 @MainActor
 final class FeedClipFailureMonitor {
-    private let player: AVQueuePlayer
+    private let player: AVPlayer
     private var onFailure: (() -> Void)?
     private var observations: [NSKeyValueObservation] = []
     private var itemStatus: NSKeyValueObservation?
     private var itemEndFailure: AnyCancellable?
 
-    init(player: AVQueuePlayer, looper: AVPlayerLooper? = nil, onFailure: @escaping () -> Void) {
+    init(player: AVPlayer, looper: AVPlayerLooper? = nil, onFailure: @escaping () -> Void) {
         self.player = player
         self.onFailure = onFailure
         // The typed KVO payload can omit these Objective-C enum values.
@@ -2076,7 +2082,7 @@ private struct FeedPlayer: UIViewRepresentable {
         private let thumbView = UIImageView()
         private var failureMonitor: FeedClipFailureMonitor?
         private var endObservation: AnyCancellable?
-        private(set) var player: AVQueuePlayer?
+        private(set) var player: AVPlayer?
         var playback: FeedPlaybackController?
         private var loadedURL: URL?
         var onFailure: (() -> Void)?
@@ -2107,19 +2113,19 @@ private struct FeedPlayer: UIViewRepresentable {
                 DispatchQueue.main.async { if self?.loadedURL == url { self?.thumbView.image = img } }
             }.resume()
             let item = AVPlayerItem(url: url)
-            let q = AVQueuePlayer(items: [item])
-            q.actionAtItemEnd = .pause
-            player = q
-            playerLayer.player = q
-            failureMonitor = FeedClipFailureMonitor(player: q) { [weak self] in
+            let clipPlayer = AVPlayer(playerItem: item)
+            clipPlayer.actionAtItemEnd = .pause
+            player = clipPlayer
+            playerLayer.player = clipPlayer
+            failureMonitor = FeedClipFailureMonitor(player: clipPlayer) { [weak self] in
                 self?.player?.pause()
                 self?.onFailure?()
             }
             endObservation = NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification, object: item)
-                .sink { [weak self, weak q] _ in
-                    DispatchQueue.main.async { [weak self, weak q] in
-                        guard let self, let q, self.player === q, let onEnd else { return }
-                        playback?.finished(q, advance: onEnd)
+                .sink { [weak self, weak clipPlayer] _ in
+                    DispatchQueue.main.async { [weak self, weak clipPlayer] in
+                        guard let self, let clipPlayer, self.player === clipPlayer, let onEnd else { return }
+                        playback?.finished(clipPlayer, advance: onEnd)
                     }
                 }
         }

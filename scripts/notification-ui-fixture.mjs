@@ -25,6 +25,7 @@ const post = {
 const secondPost = {
   ...post, id: "30000000-0000-0000-0000-000000000002", username: "secondartist",
   user_id: "20000000-0000-0000-0000-000000000003", caption: "Second performance", like_count: 0,
+  video_key: "test/next-clip.mp4",
 };
 const initial = {
   id: root, video_id: video, user_id: viewer, username: "viewer", parent_id: null,
@@ -57,7 +58,8 @@ createServer((request, response) => {
       if (!canControlMedia || request.method !== "POST") return response.writeHead(404).end();
       mediaAvailable = url.searchParams.get("available") === "1";
       return response.writeHead(204).end();
-    case "/test/clip.mp4": {
+    case "/test/clip.mp4":
+    case "/test/next-clip.mp4": {
       if (!clipBytes || !mediaAvailable) return response.writeHead(404).end();
       const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range ?? "");
       const start = range ? Number(range[1]) : 0;

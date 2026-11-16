@@ -508,8 +508,12 @@ final class HandStrudelUITests: XCTestCase {
         app.launch()
         element("tab-feed").tap()
         XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Mute"].firstMatch.exists)
         let next = app.staticTexts["Second performance"].firstMatch
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: next)], timeout: 10), .completed)
+        let nextPlayhead = app.sliders["feed-video-progress"].firstMatch
+        let moving = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true AND (value BEGINSWITH %@ OR value BEGINSWITH %@)", "0:01", "0:02"), object: nextPlayhead)
+        XCTAssertEqual(XCTWaiter.wait(for: [moving], timeout: 8), .completed, "The second clip must play, not just appear.")
     }
 
     func testBookmarkAppearsInPrivateSavedLibrary() throws {
@@ -549,7 +553,8 @@ final class HandStrudelUITests: XCTestCase {
         let download = app.buttons["Download audio"]
         XCTAssertTrue(download.waitForExistence(timeout: 5))
         download.tap()
-        XCTAssertTrue(app.buttons["Save to Files"].waitForExistence(timeout: 10), app.alerts.firstMatch.debugDescription)
+        let save = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Save to Files")).firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 10), app.alerts.firstMatch.debugDescription)
     }
 
     func testFeedProgressScrubsARealVideoWithoutPaging() throws {
