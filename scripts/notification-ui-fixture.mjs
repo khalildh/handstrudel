@@ -10,6 +10,8 @@ const now = new Date().toISOString();
 const demoLikes = 42;
 const clipBytes = process.env.FIXTURE_CLIP ? readFileSync(process.env.FIXTURE_CLIP) : null;
 const canControlMedia = process.env.FIXTURE_CONTROL_MEDIA === "1";
+const countViews = process.env.FIXTURE_VIEW_COUNTS === "1";
+const counted = new Set();
 let mediaAvailable = !canControlMedia;
 const demoThumb = "thumbs/76c9a372-7439-48dc-94ec-75a06cb6f1d7/385e21ab-7160-4378-b897-c602de952140.jpg";
 const post = {
@@ -17,6 +19,7 @@ const post = {
   video_key: "test/clip.mp4", thumb_key: demoThumb, like_count: demoLikes, created_at: now,
   instrument: "Grand Piano", duration_s: clipBytes ? 4 : undefined,
   backing_enabled: process.env.FIXTURE_PLAY_ALONG === "1",
+  view_count: countViews ? 7 : undefined,
   sound_setup: {
     version: 1, instrument: "grand_piano", waveform: "sine", key: "D", scale: "Minor", progression: "free",
     mode: "soundfont", bpm: 96, useSoundFont: true, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
@@ -99,6 +102,23 @@ createServer((request, response) => {
       }
       return response.writeHead(415).end();
     case "/rest/v1/videos": return send([]);
+    case "/rest/v1/rpc/record_video_view": {
+      if (!countViews || request.method !== "POST") return response.writeHead(404).end();
+      let body = "";
+      request.on("data", (chunk) => { body += chunk; });
+      request.on("end", () => {
+        const { target_video, watch_receipt } = JSON.parse(body);
+        const clip = [post, secondPost].find((item) => item.id === target_video.toLowerCase());
+        if (!clip) return send(null);
+        const receipt = `${clip.id}/${watch_receipt}`;
+        if (!counted.has(receipt)) {
+          counted.add(receipt);
+          clip.view_count += 1;
+        }
+        send(clip.view_count);
+      });
+      return;
+    }
     case "/rest/v1/rpc/set_video_bookmark": {
       let body = "";
       request.on("data", (chunk) => { body += chunk; });

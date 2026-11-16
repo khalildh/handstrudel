@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { creatorHref, describeClipChords, describeClipScale, isVideoID, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicVideo } from "../../lib/public-feed";
+import { creatorHref, describeClipChords, describeClipScale, formatVideoViews, isVideoID, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicVideo } from "../../lib/public-feed";
+import { useVideoViews } from "../../lib/use-video-views";
 import WatchComments from "./watch-comments";
 import { clipDuration, clipTitle, WatchArtwork, WatchFooter, WatchHeader, WatchIcon, WatchThumbnail } from "./watch-design";
 
@@ -32,6 +33,7 @@ export default function WatchFeed() {
   const paging = useRef<AbortController | null>(null);
   const listed = videos.find((video) => video.id === id);
   const selected = id ? listed ?? (shared?.id === id ? shared.video : undefined) : videos[0];
+  const views = useVideoViews(selected?.id, selected?.view_count);
   const resolving = id && isVideoID(id) && !listed && shared?.id !== id;
   const setup = selected?.sound_setup?.version === 1 ? selected.sound_setup : null;
   const scale = describeClipScale(setup?.scale);
@@ -216,6 +218,8 @@ export default function WatchFeed() {
                 <div className="watch-screen-label" aria-hidden="true"><WatchIcon name="wave" /> ON SCREEN</div>
                 <video ref={player} controls={!mediaFailed} playsInline preload="metadata" poster={poster}
                   src={videoSource} aria-label={`Performance by @${selected.username}`} aria-hidden={mediaFailed || undefined}
+                  onTimeUpdate={(event) => views.sample(event.currentTarget)}
+                  onSeeking={views.resetSample} onPause={views.resetSample}
                   onPlaying={() => setPlayBlockedFor(undefined)}
                   onError={() => setMediaFailureFor(selected.id)}
                   onEnded={() => { if (autoplayNext && nextVideo) choose(nextVideo, true); }} />
@@ -256,6 +260,7 @@ export default function WatchFeed() {
                     <div className="watch-byline">
                       {author ? <Link className="watch-author" href={author}>@{selected.username} <WatchIcon name="arrow" /></Link> : `@${selected.username}`}
                       {clipDuration(selected.duration_s) && <span>{clipDuration(selected.duration_s)}</span>}
+                      {formatVideoViews(views.count) && <span>{formatVideoViews(views.count)}</span>}
                     </div>
                   </div>
                   <div className="watch-share-actions">

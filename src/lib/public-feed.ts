@@ -14,6 +14,7 @@ export interface PublicVideo {
   caption: string;
   instrument: string | null;
   duration_s: number | null;
+  view_count?: number;
   width: number | null;
   height: number | null;
   created_at: string;
@@ -138,6 +139,24 @@ export function isVideoID(id: string) {
   return /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(id);
 }
 
+export function formatVideoViews(count?: number) {
+  if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) return null;
+  return `${count.toLocaleString()} ${count === 1 ? "view" : "views"}`;
+}
+
+export async function recordPublicVideoView(id: string, receipt: string): Promise<number | null> {
+  if (!isVideoID(id) || !isVideoID(receipt)) return null;
+  const response = await fetch(new URL("/rest/v1/rpc/record_video_view", feedBase), {
+    method: "POST",
+    headers: { apikey: publicKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ target_video: id, watch_receipt: receipt }),
+    keepalive: true,
+  });
+  if (!response.ok) return null;
+  const count: unknown = await response.json();
+  return typeof count === "number" && Number.isSafeInteger(count) && count >= 0 ? count : null;
+}
+
 export function isCreatorHandle(handle: string) {
   return /^[a-z0-9_]{3,20}$/.test(handle);
 }
@@ -199,6 +218,7 @@ export async function loadPublicVideos(
   else if (search || cursor) url.searchParams.set("or", `(${search?.filter ?? cursor})`);
   const options: RequestInit = { headers: { apikey: publicKey }, signal, cache: "no-store" };
   const supportedSelections = [
+    ",sound_setup,comments_enabled,comment_count,backing_enabled,source_video_id,source_username,view_count",
     ",sound_setup,comments_enabled,comment_count,backing_enabled,source_video_id,source_username",
     ",sound_setup,comments_enabled,comment_count",
     ",sound_setup",

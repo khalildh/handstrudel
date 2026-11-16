@@ -33,6 +33,9 @@ export default function Privacy() {
       </ul>
       <p>We use this only to run HandStrudel: to sign you in, show your posts, power the feed, keep the community safe, and contact you about your account. We don&apos;t sell your data, show ads, or track you across other apps or websites.</p>
 
+      <h2>Public video views</h2>
+      <p>Public videos also show aggregate view counts. We count playback, not just loading the page, and use a random code for each watched clip to avoid counting the same session's replays. The code is not reused across clips and is separate from optional usage analytics.</p>
+
       <h2>Optional app usage analytics</h2>
       <p>You can opt in from Account settings in the app. We count days the app is used, use on a later day, first notes played, and recordings started, saved to Private drafts, and posted. We store daily totals, not individual activity histories. The app does not send account or device IDs, played pitches, custom scale names, gestures, audio, or camera imagery with these events. Turn off Usage Analytics in Account settings to stop sending events.</p>
 

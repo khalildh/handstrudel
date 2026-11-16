@@ -2,11 +2,20 @@ import Foundation
 import Supabase
 
 /// Reads the public feed and performs the social actions on it.
-/// All writes are protected by RLS (callers can only act as themselves).
+/// Social writes act as the caller; public view reports use an anonymous receipt.
 enum FeedService {
     static let pageSize = 10
     static let commentPageSize = 20
     static let activityPageSize = 25
+
+    static func recordView(video: UUID, receipt: UUID) async throws -> Int? {
+        struct ViewReport: Encodable {
+            let target_video: UUID
+            let watch_receipt: UUID
+        }
+        return try await supabase.rpc("record_video_view", params: ViewReport(target_video: video, watch_receipt: receipt))
+            .execute().value
+    }
 
     enum Unavailable: LocalizedError {
         case bookmarks, activity

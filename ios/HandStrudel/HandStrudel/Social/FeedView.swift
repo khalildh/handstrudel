@@ -1,5 +1,4 @@
 import AVFoundation
-import AVKit
 import Combine
 import SwiftUI
 import UIKit
@@ -1230,71 +1229,135 @@ private struct PerformanceDetail: View {
     var onPlayAlong: ((Video) -> Void)? = nil
     var onTrySound: ((SoundSetup) -> Void)? = nil
     var allowsSharing = true
-    @State private var player: AVPlayer?
+    @StateObject private var playback = FeedPlaybackController()
+    @State private var playbackGate = FeedPlaybackGate()
+    @State private var isFullscreen = false
+    @State private var detailIsVisible = false
+    @State private var playerIsOnScreen = true
+    @State private var paused = false
+    @AppStorage("feedMuted") private var muted = false
     @State private var showComments = false
     @State private var audioDownload: Video?
     @State private var canDownloadAudio = false
 
+    private var isCurrent: Bool {
+        detailIsVisible && playerIsOnScreen && scenePhase == .active && !showComments && audioDownload == nil
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                VideoPlayer(player: player)
-                    .aspectRatio(4 / 5, contentMode: .fit)
-                    .frame(maxHeight: 430)
-                    .frame(maxWidth: .infinity)
-                    .background(.black, in: RoundedRectangle(cornerRadius: 16))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .accessibilityIdentifier("performance-video")
-                if let setup = video.soundSetup {
-                    ClipPresetCard(setup: setup, username: video.username ?? auth.profile?.username, onPlay: onTrySound.map { play in
-                        { sound in
-                            player?.pause()
-                            play(sound)
-                        }
-                    })
-                } else if let instrument = video.instrument {
-                    Label(instrument, systemImage: "waveform").font(.caption).foregroundStyle(.secondary)
-                }
-                if !video.caption.isEmpty { Text(verbatim: video.caption) }
-                if let notification { notificationCard(notification) }
-                if video.backingEnabled == true, let onPlayAlong {
-                    Button("Play along", systemImage: "waveform.badge.plus") { onPlayAlong(video) }
-                        .buttonStyle(StudioActionStyle())
-                }
-                if allowsSharing && canDownloadAudio {
-                    Button("Download audio", systemImage: "arrow.down.circle") {
-                        player?.pause()
-                        audioDownload = video
+        GeometryReader { geometry in
+            ScrollViewReader { scrolling in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        detailPlayer
+                            .frame(height: isFullscreen ? geometry.size.height : min(430, geometry.size.width * 1.19))
+                            .clipShape(RoundedRectangle(cornerRadius: isFullscreen ? 0 : 16))
+                            .accessibilityElement(children: .contain)
+                            .accessibilityIdentifier("performance-video")
+                            .background {
+                                GeometryReader { playerFrame in
+                                    let frame = playerFrame.frame(in: .named("detail-scroll"))
+                                    Color.clear.preference(key: ClipIsOnScreen.self,
+                                                           value: frame.maxY > 0 && frame.minY < geometry.size.height)
+                                }
+                            }
+                            .id("detail-player")
+                        if !isFullscreen { details }
                     }
-                    .frame(minHeight: 44)
+                    .padding(isFullscreen ? 0 : 16)
+                    .frame(maxWidth: isFullscreen ? .infinity : 560)
+                    .frame(maxWidth: .infinity)
                 }
-                if notification?.commentId == nil && video.commentsEnabled == true {
-                    Button("Comments", systemImage: "bubble", action: openComments)
-                        .frame(minHeight: 44)
-                }
+                .coordinateSpace(name: "detail-scroll")
+                .scrollDisabled(isFullscreen)
+                .onChange(of: isFullscreen) { if $0 { scrolling.scrollTo("detail-player", anchor: .top) } }
+                .onPreferenceChange(ClipIsOnScreen.self) { playerIsOnScreen = $0 }
             }
-            .padding(16)
-            .frame(maxWidth: 560)
-            .frame(maxWidth: .infinity)
         }
-        .background(palette.background.ignoresSafeArea())
+        .background((isFullscreen ? Color.black : palette.background).ignoresSafeArea())
         .foregroundStyle(palette.ink)
         .navigationTitle("@\(video.username ?? auth.profile?.username ?? "creator")")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(isFullscreen ? .hidden : .visible, for: .navigationBar)
         .toolbar {
             if allowsSharing { ToolbarItem(placement: .primaryAction) { ShareLink(item: video.watchURL) } }
         }
         .sheet(isPresented: $showComments) {
             CommentsView(video: video, auth: auth, targetComment: notification?.commentId)
         }
-        .task { player = AVPlayer(url: video.videoURL) }
         .task(id: video.id) {
             canDownloadAudio = (try? await FeedService.audioDownloadsAllowed([video.id]))?.contains(video.id) == true
         }
         .modifier(PerformanceAudioDownload(video: $audioDownload))
-        .onChange(of: scenePhase) { if $0 != .active { player?.pause() } }
-        .onDisappear { player?.pause() }
+        .onAppear { detailIsVisible = true }
+        .onDisappear { detailIsVisible = false; playbackGate.select(nil) }
+        .accessibilityAction(.escape) { if isFullscreen { isFullscreen = false } }
         .tint(palette.accent)
+    }
+
+    private var detailPlayer: some View {
+        ZStack(alignment: .bottom) {
+            ClipPlaybackSurface(video: video, playback: playback, playbackGate: playbackGate,
+                                isCurrent: isCurrent, paused: $paused, muted: muted, aspectFit: true,
+                                selectsPlayback: true, advance: { false })
+            HStack(spacing: 10) {
+                FeedProgressStrip(playback: playback)
+                Spacer(minLength: 0)
+                Button { muted.toggle() } label: {
+                    FeedVideoIcon(symbol: muted ? "speaker.slash" : "speaker.wave.2")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(muted ? "Unmute" : "Mute")
+            }
+            .foregroundStyle(.white)
+            .padding(10)
+            .background(.black.opacity(0.45))
+        }
+        .overlay(alignment: .topTrailing) {
+            Button { isFullscreen.toggle() } label: {
+                FeedVideoIcon(symbol: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isFullscreen ? "Exit full screen" : "Full screen")
+            .accessibilityIdentifier("profile-video-fullscreen")
+            .padding(12)
+        }
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VideoViewLabel(count: playback.displayedViewCount(fetched: video.viewCount))
+                .foregroundStyle(palette.muted)
+            if let setup = video.soundSetup {
+                ClipPresetCard(setup: setup, username: video.username ?? auth.profile?.username, onPlay: onTrySound.map { play in
+                    { sound in
+                        paused = true
+                        play(sound)
+                    }
+                })
+            } else if let instrument = video.instrument {
+                Label(instrument, systemImage: "waveform").font(.caption).foregroundStyle(.secondary)
+            }
+            if !video.caption.isEmpty { Text(verbatim: video.caption) }
+            if let notification { notificationCard(notification) }
+            if video.backingEnabled == true, let onPlayAlong {
+                Button("Play along", systemImage: "waveform.badge.plus") {
+                    paused = true
+                    onPlayAlong(video)
+                }
+                .buttonStyle(StudioActionStyle())
+            }
+            if allowsSharing && canDownloadAudio {
+                Button("Download audio", systemImage: "arrow.down.circle") {
+                    audioDownload = video
+                }
+                .frame(minHeight: 44)
+            }
+            if notification?.commentId == nil && video.commentsEnabled == true {
+                Button("Comments", systemImage: "bubble", action: openComments)
+                    .frame(minHeight: 44)
+            }
+        }
     }
 
     private func notificationCard(_ item: CreatorActivity) -> some View {
@@ -1315,9 +1378,13 @@ private struct PerformanceDetail: View {
     }
 
     private func openComments() {
-        player?.pause()
         showComments = true
     }
+}
+
+private struct ClipIsOnScreen: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
 }
 
 private struct PerformanceAudioDownload: ViewModifier {
@@ -1534,56 +1601,19 @@ private struct FeedCell: View {
     @State private var paused = false
     @State private var confirmDelete = false
     @StateObject private var playback = FeedPlaybackController()
-    @State private var failedClipID: UUID?
-    @State private var playbackAttempt = 0
     @State private var confirmAudioDownloads = false
-
-    private var playbackFailed: Bool { failedClipID == video.id }
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            FeedPlayer(videoID: video.id, url: video.videoURL, thumb: video.thumbURL, playback: playback,
-                          playbackGate: playbackGate,
-                          isCurrent: isCurrent, playing: !paused && !playbackFailed,
-                          muted: muted, aspectFit: isFullscreen, durationHint: video.durationS, onEnd: advance) {
-                failedClipID = video.id
-            }
-            .id(playbackAttempt)
-            .allowsHitTesting(false)
-            Color.clear.contentShape(Rectangle()).onTapGesture {
-                if !playbackFailed { paused.toggle() }
-            }
+            ClipPlaybackSurface(video: video, playback: playback, playbackGate: playbackGate,
+                                isCurrent: isCurrent, paused: $paused, muted: muted,
+                                aspectFit: isFullscreen, advance: advance)
             LinearGradient(colors: [.clear, .black.opacity(isFullscreen ? 0.58 : 0.88)],
                            startPoint: isFullscreen ? UnitPoint(x: 0.5, y: 0.8) : .center, endPoint: .bottom)
                 .allowsHitTesting(false)
-            if isCurrent && playbackFailed {
-                VStack(spacing: 8) {
-                    Text("Couldn't play this video.")
-                        .font(.subheadline.weight(.semibold))
-                    Button("Retry video") {
-                        failedClipID = nil
-                        paused = false
-                        playbackAttempt += 1
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(palette.mediaAccent)
-                    .foregroundStyle(palette.mediaOnAccent)
-                    .accessibilityIdentifier("feed-retry-video")
-                }
-                .foregroundStyle(.white)
-                .padding(12)
-                .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 12))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if paused && !playbackFailed {
-                Image(systemName: "play.circle.fill")
-                    .font(.system(size: 54))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
             VStack(spacing: 0) {
                 if isFullscreen {
-                    if isCurrent && !playbackFailed {
+                    if isCurrent {
                         HStack(spacing: 12) {
                             FeedProgressStrip(playback: playback)
                             Spacer(minLength: 0)
@@ -1592,17 +1622,12 @@ private struct FeedCell: View {
                     }
                 } else {
                     postControls
-                    if isCurrent && !playbackFailed { FeedProgressStrip(playback: playback) }
+                    if isCurrent { FeedProgressStrip(playback: playback) }
                 }
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 15)
-            .padding(.bottom, isCurrent && !playbackFailed && playback.position != nil ? 3 : 16)
-        }
-        .accessibilityActions {
-            if !playbackFailed {
-                Button(paused ? "Play video" : "Pause video") { paused.toggle() }
-            }
+            .padding(.bottom, isCurrent && playback.position != nil ? 3 : 16)
         }
         .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive, action: delete)
@@ -1620,6 +1645,7 @@ private struct FeedCell: View {
                         VStack(alignment: .leading, spacing: 4) { author; followButton }
                     }
                     if !video.caption.isEmpty { Text(video.caption).font(.subheadline).lineLimit(3) }
+                    VideoViewLabel(count: playback.displayedViewCount(fetched: video.viewCount))
                     if video.soundSetup != nil || video.backingEnabled == true {
                         soundButton
                     } else if let instrument = video.instrument {
@@ -1761,6 +1787,77 @@ private struct FeedVideoIcon: View {
             .frame(width: 44, height: 44)
             .background(.black.opacity(0.55), in: Circle())
             .overlay { Circle().strokeBorder(.white.opacity(0.18)) }
+    }
+}
+
+struct VideoViewLabel: View {
+    let count: Int?
+
+    var body: some View {
+        if let count {
+            Label(count == 1 ? "1 view" : "\(count.formatted()) views", systemImage: "eye")
+                .font(.caption.weight(.medium))
+                .accessibilityIdentifier("video-view-count")
+        }
+    }
+}
+
+private struct ClipPlaybackSurface: View {
+    @Environment(\.studioPalette) private var palette
+    let video: Video
+    @ObservedObject var playback: FeedPlaybackController
+    let playbackGate: FeedPlaybackGate
+    let isCurrent: Bool
+    @Binding var paused: Bool
+    let muted: Bool
+    let aspectFit: Bool
+    var selectsPlayback = false
+    let advance: () -> Bool
+    @State private var attempt = 0
+
+    var body: some View {
+        ZStack {
+            FeedPlayer(videoID: video.id, url: video.videoURL, thumb: video.thumbURL,
+                       playback: playback, playbackGate: playbackGate, isCurrent: isCurrent,
+                       playing: !paused && !playback.failed, muted: muted, aspectFit: aspectFit,
+                       durationHint: video.durationS, countsViews: video.viewCount != nil && video.hidden != true,
+                       selectsPlayback: selectsPlayback, onEnd: advance) {
+                playback.failed = true
+            }
+            .id(attempt)
+            .allowsHitTesting(false)
+            Color.clear.contentShape(Rectangle()).onTapGesture {
+                if !playback.failed { paused.toggle() }
+            }
+            if isCurrent && playback.failed {
+                VStack(spacing: 8) {
+                    Text("Couldn't play this video.").font(.subheadline.weight(.semibold))
+                    Button("Retry video") {
+                        playback.failed = false
+                        paused = false
+                        attempt += 1
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(palette.mediaAccent)
+                    .foregroundStyle(palette.mediaOnAccent)
+                    .accessibilityIdentifier("feed-retry-video")
+                }
+                .foregroundStyle(.white)
+                .padding(12)
+                .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 12))
+            } else if paused && !playback.failed {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 54))
+                    .foregroundStyle(.white)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityActions {
+            if !playback.failed {
+                Button(paused ? "Play video" : "Pause video") { paused.toggle() }
+            }
+        }
     }
 }
 
@@ -2016,9 +2113,44 @@ struct FeedPlaybackPosition: Equatable {
     }
 }
 
+struct QualifiedClipWatch {
+    private var previous: Double?
+    private var watched: Double = 0
+    private(set) var qualified = false
+
+    mutating func resetSample() { previous = nil }
+
+    mutating func sample(_ position: FeedPlaybackPosition, playing: Bool) -> Bool {
+        guard !qualified else { return false }
+        let last = previous
+        previous = playing ? position.seconds : nil
+        guard let last, playing else { return false }
+        let advance = position.seconds - last
+        guard advance > 0, advance <= 0.6 else { return false }
+        watched += advance
+        qualified = watched >= min(2, position.duration / 2)
+        return qualified
+    }
+}
+
+@MainActor
+private enum ClipViewReceipt {
+    // A different token per clip, shared between feed and detail for this app run.
+    private static var receipts: [UUID: UUID] = [:]
+
+    static func forVideo(_ video: UUID) -> UUID {
+        if let existing = receipts[video] { return existing }
+        let receipt = UUID()
+        receipts[video] = receipt
+        return receipt
+    }
+}
+
 @MainActor
 private final class FeedPlaybackController: ObservableObject {
     @Published private(set) var position: FeedPlaybackPosition?
+    @Published private(set) var viewCount: Int?
+    @Published var failed = false
     private var player: AVPlayer?
     private var timeObserver: Any?
     private var isCurrent = false
@@ -2029,9 +2161,15 @@ private final class FeedPlaybackController: ObservableObject {
     private var durationHint: Double?
     private var playbackGate: FeedPlaybackGate?
     private var videoID: UUID?
+    private var countsViews = false
+    private var watch = QualifiedClipWatch()
+
+    func displayedViewCount(fetched: Int?) -> Int? {
+        viewCount.map { max($0, fetched ?? 0) } ?? fetched
+    }
 
     func configure(player newPlayer: AVPlayer, videoID: UUID, gate: FeedPlaybackGate,
-                   isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?) {
+                   isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?, countsViews: Bool) {
         if player !== newPlayer {
             disconnect()
             player = newPlayer
@@ -2039,6 +2177,8 @@ private final class FeedPlaybackController: ObservableObject {
         self.videoID = videoID
         playbackGate = gate
         self.durationHint = durationHint
+        self.countsViews = countsViews
+        if !wantsPlayback { watch.resetSample() }
         self.wantsPlayback = wantsPlayback
         if self.isCurrent != isCurrent {
             self.isCurrent = isCurrent
@@ -2057,6 +2197,7 @@ private final class FeedPlaybackController: ObservableObject {
         playbackGate = nil
         videoID = nil
         isCurrent = false
+        watch.resetSample()
     }
 
     func setEditing(_ editing: Bool) {
@@ -2113,6 +2254,15 @@ private final class FeedPlaybackController: ObservableObject {
         let duration = measured.isFinite && measured > 0 ? measured : durationHint ?? 0
         let next = FeedPlaybackPosition(duration: duration, seconds: time.seconds)
         if position != next { position = next }
+        if countsViews, let next, let videoID, wantsPlayback,
+           watch.sample(next, playing: owner.timeControlStatus == .playing && playbackGate?.owns(owner, videoID: videoID) == true) {
+            let receipt = ClipViewReceipt.forVideo(videoID)
+            Task { [weak self] in
+                guard let total = try? await FeedService.recordView(video: videoID, receipt: receipt),
+                      let self, self.videoID == videoID else { return }
+                self.viewCount = max(total, self.viewCount ?? 0)
+            }
+        }
     }
 
     private func seek(to position: FeedPlaybackPosition) {
@@ -2120,6 +2270,7 @@ private final class FeedPlaybackController: ObservableObject {
         seekID += 1
         let id = seekID
         isSeeking = true
+        watch.resetSample()
         player.pause()
         player.currentItem?.cancelPendingSeeks()
         let time = CMTime(seconds: position.seekSeconds, preferredTimescale: 600)
@@ -2137,6 +2288,7 @@ private final class FeedPlaybackController: ObservableObject {
         seekID += 1
         isTracking = false
         isSeeking = false
+        watch.resetSample()
         player?.currentItem?.cancelPendingSeeks()
     }
 
@@ -2160,7 +2312,7 @@ private struct FeedProgressStrip: View {
     @ObservedObject var playback: FeedPlaybackController
 
     var body: some View {
-        if let position = playback.position {
+        if let position = playback.position, !playback.failed {
             let elapsed = FeedPlaybackPosition.timeLabel(position.seconds)
             let duration = FeedPlaybackPosition.timeLabel(position.duration)
             HStack(spacing: 8) {
@@ -2246,12 +2398,15 @@ private struct FeedPlayer: UIViewRepresentable {
     let muted: Bool
     let aspectFit: Bool
     let durationHint: Double?
+    let countsViews: Bool
+    let selectsPlayback: Bool
     let onEnd: () -> Bool
     let onFailure: () -> Void
 
     func makeUIView(context: Context) -> PlayerView { PlayerView() }
 
     func updateUIView(_ view: PlayerView, context: Context) {
+        if selectsPlayback { playbackGate.select(isCurrent ? videoID : nil) }
         view.onFailure = onFailure
         view.onEnd = onEnd
         view.setAspectFit(aspectFit)
@@ -2260,7 +2415,7 @@ private struct FeedPlayer: UIViewRepresentable {
         guard let player = view.player else { return }
         player.isMuted = muted
         playback.configure(player: player, videoID: videoID, gate: playbackGate,
-                           isCurrent: isCurrent, wantsPlayback: playing, durationHint: durationHint)
+                           isCurrent: isCurrent, wantsPlayback: playing, durationHint: durationHint, countsViews: countsViews)
     }
 
     static func dismantleUIView(_ view: PlayerView, coordinator: ()) {

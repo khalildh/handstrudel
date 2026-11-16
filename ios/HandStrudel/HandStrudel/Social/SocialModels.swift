@@ -37,6 +37,7 @@ struct Video: Codable, Equatable, Identifiable {
     var width: Int?
     var height: Int?
     var likeCount: Int
+    var viewCount: Int?
     var hidden: Bool?
     let createdAt: Date
     private var rawCreatedAt: String?
@@ -60,6 +61,7 @@ struct Video: Codable, Equatable, Identifiable {
         case thumbKey = "thumb_key"
         case durationS = "duration_s"
         case likeCount = "like_count"
+        case viewCount = "view_count"
         case createdAt = "created_at"
         case likedByMe = "liked_by_me"
         case displayName = "display_name"
@@ -86,6 +88,7 @@ struct Video: Codable, Equatable, Identifiable {
         width = try row.decodeIfPresent(Int.self, forKey: .width)
         height = try row.decodeIfPresent(Int.self, forKey: .height)
         likeCount = try row.decode(Int.self, forKey: .likeCount)
+        viewCount = try row.decodeIfPresent(Int.self, forKey: .viewCount)
         hidden = try row.decodeIfPresent(Bool.self, forKey: .hidden)
         createdAt = try row.decode(Date.self, forKey: .createdAt)
         rawCreatedAt = try? row.decode(String.self, forKey: .createdAt)
