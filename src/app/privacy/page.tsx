@@ -33,7 +33,8 @@ export default function Privacy() {
       </ul>
       <p>We use this only to run HandStrudel: to sign you in, show your posts, power the feed, keep the community safe, and contact you about your account. We don&apos;t sell your data, show ads, or track you across other apps or websites.</p>
 
-      <h2>Website download metrics</h2>
+      <h2>Website analytics and download metrics</h2>
+      <p>We use <a href="https://vercel.com/docs/analytics/privacy-policy">Vercel Web Analytics</a> to count visitors and page views and understand how people find the website. This includes information such as the page path, referrer, general location, and browser or device type. We remove query strings and fragments from reported page URLs. Analytics does not use third-party cookies or link visits to HandStrudel accounts.</p>
       <p>We count homepage App Store button clicks by day and button location. These counts don&apos;t include an account ID and don&apos;t use a tracking cookie. The buttons carry a shared campaign label so Apple can report aggregate App Store downloads from the homepage. We don&apos;t match individual clicks to downloads.</p>
 
       <h2>Service providers</h2>
@@ -43,6 +44,7 @@ export default function Privacy() {
         <li><strong>Cloudflare R2</strong> — storing and serving posted videos, thumbnails, and public profile photos.</li>
         <li><strong>Sightengine</strong> — automated content screening of videos and thumbnails you submit for public posting. Recordings kept in Private drafts are not submitted.</li>
         <li><strong>Resend</strong> — sending sign-in code emails.</li>
+        <li><strong>Vercel</strong> — hosting the website and providing website analytics.</li>
         <li><strong>Apple</strong> — Sign in with Apple and in-app purchases (we never see payment details).</li>
         <li><strong>RevenueCat</strong> — managing in-app purchase status, linked to your account ID when you&apos;re signed in.</li>
       </ul>
