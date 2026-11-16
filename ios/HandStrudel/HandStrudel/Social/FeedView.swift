@@ -42,6 +42,7 @@ struct FeedView<Navigation: View>: View {
     @State private var audioDownload: Video?
     @State private var pendingBookmark: Video?
     @State private var sharing: Video?
+    @State private var showsFullscreenControls = true
     @State private var overlayHeights = FeedOverlayHeights(header: 100, navigation: 66)
 
     private var hasVideos: Bool { !model.videos.isEmpty }
@@ -69,6 +70,7 @@ struct FeedView<Navigation: View>: View {
                     await model.refresh(user: auth.userId)
                 }) { video, isCurrent, playbackGate in
                     FeedCell(video: video, isCurrent: isCurrent, isFullscreen: isFullscreen, playbackGate: playbackGate,
+                             showsFullscreenControls: $showsFullscreenControls,
                              engagement: model.engagement[video.id],
                              overlayHeights: .init(header: overlayHeights.header + safeInsets.top,
                                                    navigation: (isFullscreen ? 0 : overlayHeights.navigation) + safeInsets.bottom),
@@ -157,6 +159,7 @@ struct FeedView<Navigation: View>: View {
             }
         }
         .onPreferenceChange(FeedOverlayHeights.self) { overlayHeights = $0 }
+        .onChange(of: isFullscreen) { if $0 { showsFullscreenControls = true } }
         .accessibilityAction(.escape) { if isFullscreen { isFullscreen = false } }
         .task(id: FeedRefresh(user: auth.userId, mode: model.mode)) {
             await model.refresh(user: auth.userId)
@@ -1382,6 +1385,7 @@ private struct PerformanceDetail: View {
     @StateObject private var playback = FeedPlaybackController()
     @State private var playbackGate = FeedPlaybackGate()
     @State private var isFullscreen = false
+    @State private var showsFullscreenControls = true
     @State private var detailIsVisible = false
     @State private var playerIsOnScreen = true
     @State private var paused = false
@@ -1421,7 +1425,12 @@ private struct PerformanceDetail: View {
                 }
                 .coordinateSpace(name: "detail-scroll")
                 .scrollDisabled(isFullscreen)
-                .onChange(of: isFullscreen) { if $0 { scrolling.scrollTo("detail-player", anchor: .top) } }
+                .onChange(of: isFullscreen) { fullscreen in
+                    if fullscreen {
+                        showsFullscreenControls = true
+                        scrolling.scrollTo("detail-player", anchor: .top)
+                    }
+                }
                 .onPreferenceChange(ClipIsOnScreen.self) { playerIsOnScreen = $0 }
             }
         }
@@ -1455,19 +1464,14 @@ private struct PerformanceDetail: View {
         ZStack(alignment: .bottom) {
             ClipPlaybackSurface(video: video, playback: playback, playbackGate: playbackGate,
                                 isCurrent: isCurrent, paused: $paused, muted: muted, aspectFit: true,
-                                selectsPlayback: true, advance: { false })
-            HStack(spacing: 10) {
-                FeedProgressStrip(playback: playback)
-                Spacer(minLength: 0)
-                Button { muted.toggle() } label: {
-                    FeedVideoIcon(symbol: muted ? "speaker.slash" : "speaker.wave.2")
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(muted ? "Unmute" : "Mute")
+                                selectsPlayback: true, fullscreenControls: isFullscreen ? $showsFullscreenControls : nil,
+                                advance: { false })
+            if !isFullscreen || showsFullscreenControls {
+                ClipPlaybackControls(playback: playback, paused: isFullscreen ? $paused : nil,
+                                     muted: muted, toggleMute: { muted.toggle() })
+                    .padding(10)
+                    .background(.black.opacity(0.45))
             }
-            .foregroundStyle(.white)
-            .padding(10)
-            .background(.black.opacity(0.45))
         }
         .overlay(alignment: .topTrailing) {
             Button { isFullscreen.toggle() } label: {
@@ -1758,6 +1762,7 @@ private struct FeedCell: View {
     let isCurrent: Bool
     let isFullscreen: Bool
     let playbackGate: FeedPlaybackGate
+    @Binding var showsFullscreenControls: Bool
     let engagement: VideoEngagement?
     let overlayHeights: FeedOverlayHeights
     let isMine: Bool
@@ -1794,18 +1799,17 @@ private struct FeedCell: View {
             ZStack(alignment: .bottom) {
                 ClipPlaybackSurface(video: video, playback: playback, playbackGate: playbackGate,
                                     isCurrent: isCurrent, paused: $paused, muted: muted,
-                                    aspectFit: isFullscreen, advance: advance)
-                LinearGradient(colors: [.clear, .black.opacity(isFullscreen ? 0.58 : 0.88)],
-                               startPoint: isFullscreen ? UnitPoint(x: 0.5, y: 0.8) : .center, endPoint: .bottom)
-                    .allowsHitTesting(false)
+                                    aspectFit: isFullscreen, fullscreenControls: isFullscreen ? $showsFullscreenControls : nil,
+                                    advance: advance)
+                if !isFullscreen || showsFullscreenControls {
+                    LinearGradient(colors: [.clear, .black.opacity(isFullscreen ? 0.58 : 0.88)],
+                                   startPoint: isFullscreen ? UnitPoint(x: 0.5, y: 0.8) : .center, endPoint: .bottom)
+                        .allowsHitTesting(false)
+                }
                 VStack(spacing: 0) {
                     if isFullscreen {
-                        if isCurrent {
-                            HStack(spacing: 12) {
-                                FeedProgressStrip(playback: playback)
-                                Spacer(minLength: 0)
-                                muteButton
-                            }
+                        if isCurrent && showsFullscreenControls {
+                            ClipPlaybackControls(playback: playback, paused: $paused, muted: muted, toggleMute: toggleMute)
                         }
                     } else {
                         let railHeight = bounds.size.height - overlayHeights.header - overlayHeights.navigation
@@ -1971,14 +1975,6 @@ private struct FeedCell: View {
         .contentShape(Rectangle())
     }
 
-    private var muteButton: some View {
-        Button(action: toggleMute) {
-            actionIcon(muted ? "speaker.slash" : "speaker.wave.2")
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(muted ? "Unmute" : "Mute")
-    }
-
     private var soundButton: some View {
         let title = video.soundSetup?.instrumentName ?? video.instrument ?? "Sound"
         return Button(action: showSound) {
@@ -2026,9 +2022,6 @@ private struct FeedCell: View {
         }
     }
 
-    private func actionIcon(_ symbol: String, tint: Color = .white) -> some View {
-        FeedVideoIcon(symbol: symbol, tint: tint)
-    }
 }
 
 private struct FeedVideoIcon: View {
@@ -2068,6 +2061,7 @@ private struct ClipPlaybackSurface: View {
     let muted: Bool
     let aspectFit: Bool
     var selectsPlayback = false
+    var fullscreenControls: Binding<Bool>? = nil
     let advance: () -> Bool
     @State private var attempt = 0
 
@@ -2083,7 +2077,11 @@ private struct ClipPlaybackSurface: View {
             .id(attempt)
             .allowsHitTesting(false)
             Color.clear.contentShape(Rectangle()).onTapGesture {
-                if !playback.failed { paused.toggle() }
+                if let fullscreenControls {
+                    fullscreenControls.wrappedValue.toggle()
+                } else if !playback.failed {
+                    paused.toggle()
+                }
             }
             if isCurrent && playback.failed {
                 VStack(spacing: 8) {
@@ -2101,7 +2099,7 @@ private struct ClipPlaybackSurface: View {
                 .foregroundStyle(.white)
                 .padding(12)
                 .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 12))
-            } else if paused && !playback.failed {
+            } else if paused && !playback.failed && fullscreenControls == nil {
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: 54))
                     .foregroundStyle(.white)
@@ -2110,10 +2108,44 @@ private struct ClipPlaybackSurface: View {
             }
         }
         .accessibilityActions {
+            if let fullscreenControls {
+                Button(fullscreenControls.wrappedValue ? "Hide playback controls" : "Show playback controls") {
+                    fullscreenControls.wrappedValue.toggle()
+                }
+            }
             if !playback.failed {
                 Button(paused ? "Play video" : "Pause video") { paused.toggle() }
             }
         }
+    }
+}
+
+private struct ClipPlaybackControls: View {
+    @ObservedObject var playback: FeedPlaybackController
+    let paused: Binding<Bool>?
+    let muted: Bool
+    let toggleMute: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let paused {
+                Button { paused.wrappedValue.toggle() } label: {
+                    FeedVideoIcon(symbol: paused.wrappedValue ? "play.fill" : "pause.fill")
+                }
+                .accessibilityLabel(paused.wrappedValue ? "Play video" : "Pause video")
+                .accessibilityIdentifier("fullscreen-playback-toggle")
+                .disabled(playback.failed)
+            }
+            FeedProgressStrip(playback: playback)
+            Spacer(minLength: 0)
+            Button(action: toggleMute) {
+                FeedVideoIcon(symbol: muted ? "speaker.slash" : "speaker.wave.2")
+            }
+            .accessibilityLabel(muted ? "Unmute" : "Mute")
+            .accessibilityIdentifier("video-playback-mute")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
     }
 }
 
