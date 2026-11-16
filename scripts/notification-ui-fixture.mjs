@@ -9,6 +9,7 @@ const reply = "40000000-0000-0000-0000-000000000002";
 const now = new Date().toISOString();
 const demoLikes = 42;
 const clipBytes = process.env.FIXTURE_CLIP ? readFileSync(process.env.FIXTURE_CLIP) : null;
+const thumbnailBytes = process.env.FIXTURE_THUMBNAIL ? readFileSync(process.env.FIXTURE_THUMBNAIL) : null;
 const canControlMedia = process.env.FIXTURE_CONTROL_MEDIA === "1";
 const singleClip = process.env.FIXTURE_SINGLE_CLIP === "1";
 const countViews = process.env.FIXTURE_VIEW_COUNTS === "1";
@@ -109,6 +110,10 @@ createServer((request, response) => {
       if (!canControlMedia || request.method !== "POST") return response.writeHead(404).end();
       mediaAvailable = url.searchParams.get("available") === "1";
       return response.writeHead(204).end();
+    case `/${demoThumb}`:
+      if (!thumbnailBytes) return response.writeHead(404).end();
+      response.writeHead(200, { "Content-Type": "image/jpeg", "Content-Length": thumbnailBytes.length });
+      return response.end(request.method === "HEAD" ? undefined : thumbnailBytes);
     case "/test/clip.mp4":
     case "/test/next-clip.mp4": {
       if (!clipBytes || !mediaAvailable) return response.writeHead(404).end();

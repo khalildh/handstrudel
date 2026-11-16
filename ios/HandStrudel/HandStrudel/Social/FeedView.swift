@@ -1358,6 +1358,11 @@ private struct ClipPresetCard: View {
     }
 }
 
+private enum PlaylistDirection: Int {
+    case previous = -1
+    case next = 1
+}
+
 struct CreatorVideoView: View {
     let video: Video
     @ObservedObject var auth: AuthManager
@@ -1372,11 +1377,16 @@ struct CreatorVideoView: View {
 
     var body: some View {
         let current = playingVideo ?? video
+        let clips = playlist.filter { $0.userId == current.userId && $0.hidden != true }
         NavigationStack {
             PerformanceDetail(video: current, auth: auth, isFullscreen: $isFullscreen,
                               showsFullscreenControls: $showsFullscreenControls,
                               onPlayAlong: onPlayAlong, onTrySound: onTrySound,
-                              allowsSharing: allowsSharing && current.hidden != true, advance: { playNext(after: current) })
+                              allowsSharing: allowsSharing && current.hidden != true,
+                              onSwipe: clips.contains { $0.id != current.id } ? { direction in
+                                  _ = move(direction, from: current, in: clips)
+                              } : nil,
+                              advance: { move(.next, from: current, in: clips) })
                 .id(current.id)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
@@ -1385,11 +1395,12 @@ struct CreatorVideoView: View {
         .statusBarHidden(isFullscreen)
     }
 
-    private func playNext(after current: Video) -> Bool {
-        let clips = playlist.filter { $0.userId == current.userId && $0.hidden != true }
-        guard let first = clips.first else { return false }
-        let next = clips.firstIndex(where: { $0.id == current.id })
-            .map { clips[($0 + 1) % clips.count] } ?? first
+    private func move(_ direction: PlaylistDirection, from current: Video, in clips: [Video]) -> Bool {
+        guard (playingVideo ?? video).id == current.id, !clips.isEmpty else { return false }
+        let index = clips.firstIndex(where: { $0.id == current.id })
+            .map { ($0 + direction.rawValue + clips.count) % clips.count }
+            ?? (direction == .next ? 0 : clips.count - 1)
+        let next = clips[index]
         guard next.id != current.id else { return false }
         playingVideo = next
         return true
@@ -1407,6 +1418,7 @@ private struct PerformanceDetail: View {
     var onPlayAlong: ((Video) -> Void)? = nil
     var onTrySound: ((SoundSetup) -> Void)? = nil
     var allowsSharing = true
+    var onSwipe: ((PlaylistDirection) -> Void)? = nil
     var advance: () -> Bool = { false }
     @StateObject private var playback = FeedPlaybackController()
     @State private var playbackGate = FeedPlaybackGate()
@@ -1493,6 +1505,7 @@ private struct PerformanceDetail: View {
             ClipPlaybackSurface(video: video, playback: playback, playbackGate: playbackGate,
                                 isCurrent: isCurrent, paused: $paused, muted: muted, aspectFit: true,
                                 selectsPlayback: true, fullscreenControls: isFullscreen ? $showsFullscreenControls : nil,
+                                onSwipe: onSwipe,
                                 advance: advance)
             if !isFullscreen || showsFullscreenControls {
                 ClipPlaybackControls(playback: playback, paused: isFullscreen ? $paused : nil,
@@ -2092,6 +2105,7 @@ private struct ClipPlaybackSurface: View {
     let aspectFit: Bool
     var selectsPlayback = false
     var fullscreenControls: Binding<Bool>? = nil
+    var onSwipe: ((PlaylistDirection) -> Void)? = nil
     let advance: () -> Bool
     @State private var attempt = 0
 
@@ -2106,13 +2120,7 @@ private struct ClipPlaybackSurface: View {
             }
             .id(attempt)
             .allowsHitTesting(false)
-            Color.clear.contentShape(Rectangle()).onTapGesture {
-                if let fullscreenControls {
-                    fullscreenControls.wrappedValue.toggle()
-                } else if !playback.failed {
-                    paused.toggle()
-                }
-            }
+            videoTouchArea
             if isCurrent && playback.failed {
                 VStack(spacing: 8) {
                     Text("Couldn't play this video.").font(.subheadline.weight(.semibold))
@@ -2146,6 +2154,29 @@ private struct ClipPlaybackSurface: View {
             if !playback.failed {
                 Button(paused ? "Play video" : "Pause video") { paused.toggle() }
             }
+            if let onSwipe {
+                Button("Next video") { onSwipe(.next) }
+                Button("Previous video") { onSwipe(.previous) }
+            }
+        }
+    }
+
+    @ViewBuilder private var videoTouchArea: some View {
+        let tapArea = Color.clear.contentShape(Rectangle()).onTapGesture {
+            if let fullscreenControls {
+                fullscreenControls.wrappedValue.toggle()
+            } else if !playback.failed {
+                paused.toggle()
+            }
+        }
+        if let onSwipe {
+            tapArea.simultaneousGesture(DragGesture(minimumDistance: 20).onEnded { drag in
+                let dy = drag.translation.height
+                guard abs(dy) >= 48, abs(dy) > abs(drag.translation.width) * 1.25 else { return }
+                onSwipe(dy > 0 ? .next : .previous)
+            })
+        } else {
+            tapArea
         }
     }
 }

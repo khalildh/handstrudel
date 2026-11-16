@@ -509,7 +509,7 @@ struct CreatorPortfolio: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            tabs
+            tabs.zIndex(1)
             if tab == .clips, let latest = videos.first(where: { $0.hidden != true }) {
                 spotlight(latest)
             }
@@ -591,7 +591,11 @@ struct CreatorPortfolio: View {
             }
             .padding(10)
             .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
-            .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border) }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("profile-latest-performance")
@@ -704,6 +708,7 @@ struct CreatorPortfolio: View {
                     .accessibilityHidden(true)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Watch \(clipTitle(video))" + (creditCreator ? video.username.map { " by @\($0)" } ?? "" : ""))
@@ -795,6 +800,7 @@ private struct ProfileThumbnail: View {
                 }
             }
             .clipped()
+            .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
 }

@@ -869,6 +869,14 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue((tile.value as? String)?.hasSuffix(" views") == true)
         XCTAssertEqual(element("profile-views-received").value as? String, "0")
         captureIfRequested("Account-Reposts")
+
+        let performances = app.buttons["profile-performances"]
+        performances.tap()
+        XCTAssertTrue(performances.isSelected)
+        XCTAssertFalse(element("performance-video").exists, "Selecting Performances must not open a video.")
+        repostTab.tap()
+        XCTAssertTrue(tile.waitForExistence(timeout: 5))
+
         tile.press(forDuration: 1)
         let remove = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "Remove repost", "feed-repost")).firstMatch
         XCTAssertTrue(remove.waitForExistence(timeout: 5))
@@ -965,6 +973,47 @@ final class HandStrudelUITests: XCTestCase {
         reposts.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.15)).tap()
         XCTAssertTrue(reposts.isSelected, "The full Reposts tab frame should respond after closing the player.")
         XCTAssertTrue(app.staticTexts["No reposts yet"].waitForExistence(timeout: 5))
+    }
+
+    func testAccountVideoSwipesBetweenPerformances() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_ACCOUNT_SWIPE_FIXTURE_URL"] else {
+            throw XCTSkip("Requires FIXTURE_ACCOUNT_CLIPS=1 with a clip long enough to swipe before autoplay.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "account-swipe-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        signInToProfile()
+        let latest = app.buttons["profile-latest-performance"]
+        XCTAssertTrue(latest.waitForExistence(timeout: 10))
+        if !latest.isHittable { app.swipeUp() }
+        latest.tap()
+        let video = element("performance-video")
+        XCTAssertTrue(video.waitForExistence(timeout: 5))
+        XCTAssertEqual(video.label, "Evening loop")
+
+        func swipeVideo(from start: CGFloat, to end: CGFloat) {
+            video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: start))
+                .press(forDuration: 0.05, thenDragTo: video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: end)))
+        }
+        func expectClip(_ title: String) {
+            let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", title), object: video)
+            XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 4), .completed)
+        }
+
+        swipeVideo(from: 0.25, to: 0.65)
+        expectClip("Second performance")
+
+        let fullscreen = app.buttons["profile-video-fullscreen"]
+        fullscreen.tap()
+        XCTAssertEqual(fullscreen.label, "Exit full screen")
+        swipeVideo(from: 0.65, to: 0.25)
+        expectClip("Evening loop")
+        XCTAssertEqual(fullscreen.label, "Exit full screen")
+        let slider = app.sliders["feed-video-progress"]
+        let playing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND NOT (value BEGINSWITH %@)", "0:00"), object: slider)
+        XCTAssertEqual(XCTWaiter.wait(for: [playing], timeout: 5), .completed)
     }
 
     @MainActor
