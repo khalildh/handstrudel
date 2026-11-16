@@ -263,6 +263,10 @@ enum FeedService {
         )
     }
 
+    static func remixes(of source: UUID, after last: Video? = nil) async throws -> [Video] {
+        try await orderedPage(supabase.from("feed_videos").select().eq("source_video_id", value: source), after: last)
+    }
+
     struct FollowingPage {
         let videos: [Video]
         var confirmedNoFollows = false
@@ -376,6 +380,7 @@ enum FeedService {
         let followers: Int?
         let following: Int?
         let likesReceived: Int?
+        let viewsReceived: Int?
     }
 
     static func profileCounts(for id: UUID, owner: Bool = false) async -> ProfileCounts {
@@ -385,16 +390,18 @@ enum FeedService {
             .select("follower_id", head: true, count: .exact).eq("followee_id", value: id).execute().count
         async let following = try? supabase.from("follows")
             .select("followee_id", head: true, count: .exact).eq("follower_id", value: id).execute().count
-        async let likesReceived = owner ? publicLikesReceived(for: id) : nil
+        async let engagement: PublicCreator? = owner ? (try? await creator(id: id)) : nil
+        let totals = await engagement
         return await ProfileCounts(posts: posts, followers: followers, following: following,
-                                   likesReceived: likesReceived)
+                                   likesReceived: totals?.likesReceived, viewsReceived: totals?.viewsReceived)
     }
 
-    private static func publicLikesReceived(for id: UUID) async -> Int? {
-        struct Total: Decodable { let likes_received: Int? }
-        let rows: [Total]? = try? await supabase.from("public_creators")
-            .select("likes_received").eq("id", value: id).limit(1).execute().value
-        return rows?.first?.likes_received
+    static func myReposts(after last: Video? = nil) async throws -> [Video] {
+        do {
+            return try await orderedPage(supabase.from("my_reposted_videos").select(), after: last, dateColumn: "activity_at")
+        } catch let error as PostgrestError where isMissingView(error) {
+            throw Unavailable.reposts
+        }
     }
 
     static func ownerPage(user: UUID, after last: Video? = nil) async throws -> [Video] {

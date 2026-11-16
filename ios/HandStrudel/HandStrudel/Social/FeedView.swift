@@ -33,6 +33,7 @@ struct FeedView<Navigation: View>: View {
     @State private var creatorVideo: Video?
     @State private var sourceVideo: Video?
     @State private var soundVideo: Video?
+    @State private var remixVideo: Video?
     @State private var showSaved = false
     @State private var showSearch = false
     @State private var challenge: WeeklyChallenge?
@@ -47,7 +48,7 @@ struct FeedView<Navigation: View>: View {
 
     private var allowsFeedPlayback: Bool {
         isActive && scenePhase == .active && commenting == nil && !showActivity && creatorVideo == nil
-            && sourceVideo == nil && soundVideo == nil && sharing == nil
+            && sourceVideo == nil && soundVideo == nil && remixVideo == nil && sharing == nil
             && !showSaved && !showSearch && openChallenge == nil && !showSignIn
     }
 
@@ -100,6 +101,7 @@ struct FeedView<Navigation: View>: View {
                              },
                              advance: { advanceAfterClip(video.id) },
                              showSound: { soundVideo = video },
+                             showRemixes: { remixVideo = video },
                              revokeBacking: {
                                  act { _ in
                                      try await FeedService.stopAllowingBacking(video: video.id)
@@ -207,6 +209,12 @@ struct FeedView<Navigation: View>: View {
             PerformanceLibraryView(kind: .challenge(challenge), auth: auth) { start in
                 pendingStart = start
                 openChallenge = nil
+            }
+        }
+        .sheet(item: $remixVideo, onDismiss: resumePerformance) { video in
+            PerformanceLibraryView(kind: .remixes(video), auth: auth) { start in
+                pendingStart = start
+                remixVideo = nil
             }
         }
         .sheet(item: $commenting, onDismiss: {
@@ -1026,7 +1034,7 @@ private struct PublicCreatorView: View {
                     if let creator {
                         CreatorProfileHeader(username: creator.username, displayName: creator.displayName,
                                              avatarKey: creator.avatarKey ?? videos.first?.avatarKey, counts: counts,
-                                             likesReceived: creator.likesReceived,
+                                             likesReceived: creator.likesReceived, viewsReceived: creator.viewsReceived,
                                              isOwner: auth.userId == creatorId) {
                             if auth.userId != creatorId {
                                 Button(action: changeFollow) {
@@ -1592,12 +1600,13 @@ private struct PerformanceAudioDownload: ViewModifier {
 private struct PerformanceLibraryView: View {
     @Environment(\.studioPalette) private var palette
     enum Kind {
-        case saved, challenge(WeeklyChallenge)
+        case saved, challenge(WeeklyChallenge), remixes(Video)
 
         var title: String {
             switch self {
             case .saved: return "Saved performances"
             case .challenge: return "Weekly play-along"
+            case .remixes: return "Remixes"
             }
         }
     }
@@ -1633,6 +1642,9 @@ private struct PerformanceLibraryView: View {
                             Text("This challenge is no longer available.").foregroundStyle(.secondary)
                         }
                     }
+                } else if case .remixes = kind, let source {
+                    Button("Play along", systemImage: "waveform") { onPlay(.backing(source)) }
+                        .fontWeight(.semibold)
                 }
                 Section {
                     if let error {
@@ -1684,6 +1696,7 @@ private struct PerformanceLibraryView: View {
         switch kind {
         case .saved: return "Save a performance from its options menu to find it here later. Only you can see this list."
         case .challenge: return "No takes yet. Play along and post a take to join this week's challenge."
+        case .remixes: return "No remixes yet. Published Play Along clips will appear here."
         }
     }
 
@@ -1697,6 +1710,12 @@ private struct PerformanceLibraryView: View {
             let page: [Video]
             switch kind {
             case .saved: page = try await FeedService.bookmarks(after: last)
+            case .remixes(let origin):
+                if !append {
+                    let visible = try await FeedService.video(id: origin.id)
+                    source = visible?.backingEnabled == true ? visible : nil
+                }
+                page = try await FeedService.remixes(of: origin.id, after: last)
             case .challenge(let challenge):
                 if !append {
                     guard let current = try await FeedService.weeklyChallenge(), current.id == challenge.id else {
@@ -1762,6 +1781,7 @@ private struct FeedCell: View {
     let changeAudioPermission: () -> Void
     let advance: () -> Bool
     let showSound: () -> Void
+    let showRemixes: () -> Void
     let revokeBacking: () -> Void
     let source: (UUID) -> Void
     @State private var paused = false
@@ -1866,10 +1886,13 @@ private struct FeedCell: View {
                 .accessibilityIdentifier("video-comments-button")
             }
 
-            if let engagement {
-                railMetric("waveform.badge.plus", label: "Remixes", count: engagement.remixes)
-                    .accessibilityIdentifier("feed-remix-count")
+            Button(action: showRemixes) {
+                railGlyph("waveform.badge.plus", count: engagement?.remixes, reserveCount: true)
             }
+            .accessibilityLabel("Remixes")
+            .accessibilityValue(engagement.map { $0.remixes.formatted() } ?? "")
+            .accessibilityHint("Shows published Play Along clips")
+            .accessibilityIdentifier("feed-remix-count")
 
             if !isMine {
                 let didRepost = engagement?.repostedByMe == true

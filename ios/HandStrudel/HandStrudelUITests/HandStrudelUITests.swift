@@ -728,13 +728,13 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(feed.waitForExistence(timeout: 5))
         feed.tap()
         let views = element("feed-views-count")
-        let remixes = element("feed-remix-count")
+        let remixes = app.buttons["feed-remix-count"].firstMatch
         let share = app.buttons["Share video"].firstMatch
         let save = app.buttons["save-performance"].firstMatch
         XCTAssertTrue(remixes.waitForExistence(timeout: 5))
         XCTAssertEqual(remixes.label, "Remixes")
-        XCTAssertFalse(app.buttons["feed-remix-count"].exists)
-        XCTAssertEqual(remixes.value as? String, "3")
+        let countLoaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "3"), object: remixes)
+        XCTAssertEqual(XCTWaiter.wait(for: [countLoaded], timeout: 5), .completed)
         XCTAssertTrue(views.isHittable)
         XCTAssertEqual(save.value as? String, "5 saves")
         XCTAssertEqual(share.value as? String, "4 shares")
@@ -757,6 +757,60 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [recorded], timeout: 7), .completed)
     }
 
+    func testFeedRemixesOpensPublishedPlayAlongClips() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_REMIX_FIXTURE_URL"] else {
+            throw XCTSkip("Requires FIXTURE_REMIXES=1 and FIXTURE_PLAY_ALONG=1.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "remix-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        element("tab-feed").tap()
+        let clip = app.collectionViews["feed-video-viewport"].cells.containing(.staticText, identifier: "Evening loop").firstMatch
+        let remixes = clip.buttons["feed-remix-count"]
+        XCTAssertTrue(remixes.waitForExistence(timeout: 5))
+        remixes.tap()
+        XCTAssertTrue(app.navigationBars["Remixes"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Second performance"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Play along"].isHittable)
+    }
+
+    func testRepostedClipAppearsOnOwnProfileAndCanBeRemoved() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_REPOST_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the repost-enabled feed fixture.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "repost-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 10))
+        element("tab-feed").tap()
+        let clip = app.collectionViews["feed-video-viewport"].cells.containing(.staticText, identifier: "Evening loop").firstMatch
+        let repost = clip.buttons["feed-repost"]
+        XCTAssertTrue(repost.waitForExistence(timeout: 8))
+        repost.tap()
+        let reposted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Remove repost"), object: repost)
+        XCTAssertEqual(XCTWaiter.wait(for: [reposted], timeout: 6), .completed)
+        element("tab-account").tap()
+        let repostTab = app.buttons["profile-reposts"]
+        XCTAssertTrue(repostTab.waitForExistence(timeout: 5))
+        repostTab.tap()
+        let tile = app.buttons["Watch Evening loop by @loopmaker"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 8))
+        XCTAssertTrue((tile.value as? String)?.hasSuffix(" views") == true)
+        XCTAssertEqual(element("profile-views-received").value as? String, "0")
+        captureIfRequested("Account-Reposts")
+        tile.press(forDuration: 1)
+        let remove = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "Remove repost", "feed-repost")).firstMatch
+        XCTAssertTrue(remove.waitForExistence(timeout: 5))
+        remove.tap()
+        XCTAssertTrue(app.staticTexts["No reposts yet"].waitForExistence(timeout: 8))
+        XCTAssertFalse(tile.exists)
+    }
+
     func testCreatorVideoUsesFeedControlsAndCountsPlayback() throws {
         guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_VIDEO_VIEWS_FIXTURE_URL"] else {
             throw XCTSkip("Requires a real MP4 and FIXTURE_VIEW_COUNTS=1.")
@@ -773,6 +827,9 @@ final class HandStrudelUITests: XCTestCase {
         creator.tap()
         let latest = app.buttons["profile-latest-performance"]
         XCTAssertTrue(latest.waitForExistence(timeout: 5))
+        let tile = app.buttons["Watch Evening loop"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 5))
+        XCTAssertTrue((tile.value as? String)?.hasSuffix(" views") == true)
         latest.tap()
         let slider = app.sliders["feed-video-progress"]
         XCTAssertTrue(slider.waitForExistence(timeout: 7))
@@ -1062,6 +1119,10 @@ final class HandStrudelUITests: XCTestCase {
         let likes = element("profile-likes-received")
         XCTAssertEqual(likes.label, "Likes received")
         XCTAssertEqual(likes.value as? String, "42")
+        let views = element("profile-views-received")
+        XCTAssertEqual(views.label, "Total video views")
+        XCTAssertEqual(views.value as? String, 1234.formatted())
+        XCTAssertFalse(app.buttons["profile-reposts"].exists)
         XCTAssertTrue(app.buttons["Share profile"].exists)
         let spotlight = app.buttons["profile-latest-performance"]
         XCTAssertTrue(spotlight.waitForExistence(timeout: 5))
@@ -1102,6 +1163,12 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(likes.isHittable)
         XCTAssertEqual(likes.label, "Likes received")
         XCTAssertEqual(likes.value as? String, "42")
+        let views = element("profile-views-received")
+        for _ in 0..<2 where !views.isHittable {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(views.isHittable)
+        XCTAssertEqual(views.value as? String, 1234.formatted())
         captureIfRequested("Artist-Profile-Largest-Text")
     }
 

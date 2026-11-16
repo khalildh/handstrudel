@@ -308,11 +308,13 @@ struct PublicCreator: Decodable, Identifiable {
     let displayName: String?
     let avatarKey: String?
     let likesReceived: Int?
+    let viewsReceived: Int?
     enum CodingKeys: String, CodingKey {
         case id, username
         case displayName = "display_name"
         case avatarKey = "avatar_key"
         case likesReceived = "likes_received"
+        case viewsReceived = "views_received"
     }
 
     init?(visibleVideo: Video) {
@@ -322,6 +324,7 @@ struct PublicCreator: Decodable, Identifiable {
         displayName = visibleVideo.displayName
         avatarKey = visibleVideo.avatarKey
         likesReceived = nil
+        viewsReceived = nil
     }
 }
 
