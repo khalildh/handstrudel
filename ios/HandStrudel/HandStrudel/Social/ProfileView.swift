@@ -509,10 +509,10 @@ struct CreatorPortfolio: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            tabs
             if tab == .clips, let latest = videos.first(where: { $0.hidden != true }) {
                 spotlight(latest)
             }
-            tabs
             if tab == .reposts {
                 repostGallery
             } else {
@@ -549,7 +549,12 @@ struct CreatorPortfolio: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .foregroundStyle(tab == option ? palette.ink : palette.muted)
                         .background(tab == option ? palette.surface : .clear, in: RoundedRectangle(cornerRadius: 10))
-                        .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(tab == option ? palette.border : .clear) }
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 10)
+                                .strokeBorder(tab == option ? palette.border : .clear)
+                                .allowsHitTesting(false)
+                        }
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(option.accessibilityID)

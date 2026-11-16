@@ -949,6 +949,22 @@ final class HandStrudelUITests: XCTestCase {
         let slider = app.sliders["feed-video-progress"]
         let playing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND NOT (value BEGINSWITH %@)", "0:00"), object: slider)
         XCTAssertEqual(XCTWaiter.wait(for: [playing], timeout: 5), .completed)
+
+        fullscreen.tap()
+        let done = app.navigationBars["@viewer"].buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        done.tap()
+        let sounds = app.buttons["profile-sounds"]
+        XCTAssertTrue(sounds.waitForExistence(timeout: 5))
+        if !sounds.isHittable { app.swipeUp() }
+        sounds.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.15)).tap()
+        XCTAssertTrue(sounds.isSelected, "The full Sounds tab frame should respond after closing the player.")
+        XCTAssertTrue(app.buttons["profile-play-sound"].firstMatch.waitForExistence(timeout: 5))
+
+        let reposts = app.buttons["profile-reposts"]
+        reposts.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.15)).tap()
+        XCTAssertTrue(reposts.isSelected, "The full Reposts tab frame should respond after closing the player.")
+        XCTAssertTrue(app.staticTexts["No reposts yet"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -1234,7 +1250,10 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(preset.waitForExistence(timeout: 5))
         XCTAssertEqual(preset.label, "Play this sound")
         app.navigationBars["@loopmaker"].buttons["Done"].tap()
-        app.buttons["profile-sounds"].tap()
+        let sounds = app.buttons["profile-sounds"]
+        XCTAssertTrue(sounds.waitForExistence(timeout: 5))
+        sounds.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.15)).tap()
+        XCTAssertTrue(sounds.isSelected)
         let sound = app.buttons["profile-play-sound"].firstMatch
         XCTAssertTrue(sound.waitForExistence(timeout: 5))
         captureIfRequested("Artist-Sounds")
