@@ -33,6 +33,8 @@ const secondPost = {
   ...post, id: "30000000-0000-0000-0000-000000000002", username: "secondartist",
   user_id: "20000000-0000-0000-0000-000000000003", caption: "Second performance", like_count: 0,
   video_key: "test/next-clip.mp4",
+  source_video_id: process.env.FIXTURE_REMIXES === "1" ? video : undefined,
+  source_username: process.env.FIXTURE_REMIXES === "1" ? post.username : undefined,
 };
 const initial = {
   id: root, video_id: video, user_id: viewer, username: "viewer", parent_id: null,
@@ -165,6 +167,8 @@ createServer((request, response) => {
     case "/rest/v1/video_bookmarks": return send([...saved].map((video_id) => ({ video_id })));
     case "/rest/v1/saved_videos": return send([post, secondPost].filter(({ id }) => saved.has(id)).map((item) => ({ ...item, saved_at: now })));
     case "/rest/v1/video_audio_downloads": return send(process.env.FIXTURE_AUDIO_DOWNLOAD === "1" ? [{ video_id: video }] : []);
+    case "/rest/v1/my_reposted_videos":
+      return send([post, secondPost].filter(({ id }) => reposted.has(id)).map((item) => ({ ...item, activity_at: now })));
     case "/rest/v1/following_activity_videos":
       if (showReposts) return send([{
         ...post, activity_at: now, reposted_by: secondPost.username, reposted_by_id: secondPost.user_id,
@@ -191,15 +195,16 @@ createServer((request, response) => {
       const id = url.searchParams.get("id")?.slice(3).toLowerCase();
       const handle = url.searchParams.get("username")?.slice(3);
       const author = url.searchParams.get("user_id")?.slice(3).toLowerCase();
+      const source = url.searchParams.get("source_video_id")?.slice(3).toLowerCase();
       return send((singleClip ? [post] : [post, secondPost]).filter((item) => (!id || item.id === id) && (!handle || item.username === handle)
-        && (!author || item.user_id === author)));
+        && (!author || item.user_id === author) && (!source || item.source_video_id === source)));
     }
     case "/rest/v1/public_creators": {
       const handle = url.searchParams.get("username")?.slice(3);
       const id = url.searchParams.get("id")?.slice(3).toLowerCase();
       const profiles = [
-        { id: creator, username: "loopmaker", display_name: "Loop Maker", likes_received: demoLikes },
-        { id: viewer, username: "viewer", display_name: displayName, likes_received: 0 },
+        { id: creator, username: "loopmaker", display_name: "Loop Maker", likes_received: demoLikes, views_received: 1234 },
+        { id: viewer, username: "viewer", display_name: displayName, likes_received: 0, views_received: 0 },
       ];
       return send(profiles.filter((item) => (!handle || item.username === handle) && (!id || item.id === id)));
     }

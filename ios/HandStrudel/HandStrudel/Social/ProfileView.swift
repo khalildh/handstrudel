@@ -80,7 +80,9 @@ final class AccountPortfolio: ObservableObject {
         let followers = result.followers ?? cached?.followers
         let following = result.following ?? cached?.following
         let likes = result.likesReceived ?? cached?.likesReceived
-        counts = FeedService.ProfileCounts(posts: posts, followers: followers, following: following, likesReceived: likes)
+        let views = result.viewsReceived ?? cached?.viewsReceived
+        counts = FeedService.ProfileCounts(posts: posts, followers: followers, following: following,
+                                           likesReceived: likes, viewsReceived: views)
     }
 
     func remove(_ video: UUID, from id: UUID) {
@@ -255,7 +257,8 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 20) {
                 CreatorProfileHeader(username: username, displayName: profile.displayName,
                                      avatarKey: profile.avatarKey, counts: portfolio.counts,
-                                     likesReceived: portfolio.counts?.likesReceived, isOwner: true) {
+                                     likesReceived: portfolio.counts?.likesReceived,
+                                     viewsReceived: portfolio.counts?.viewsReceived, isOwner: true) {
                     Button("Edit profile", systemImage: "pencil") { showEdit = true }
                         .buttonStyle(ProfileActionStyle())
                 }
@@ -293,6 +296,7 @@ struct CreatorProfileHeader<Actions: View>: View {
     let avatarKey: String?
     let counts: FeedService.ProfileCounts?
     let likesReceived: Int?
+    let viewsReceived: Int?
     let isOwner: Bool
     @ViewBuilder var actions: () -> Actions
 
@@ -358,16 +362,37 @@ struct CreatorProfileHeader<Actions: View>: View {
         .accessibilityHidden(true)
     }
 
-    private var stats: some View {
-        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
-            : AnyLayout(HStackLayout(alignment: .top, spacing: 10))
-        return layout {
-            stat("Posts", counts?.posts)
-            stat("Followers", counts?.followers)
-            stat("Following", counts?.following)
-            stat("Likes", likesReceived, spokenName: "Likes received")
-                .accessibilityIdentifier("profile-likes-received")
+    @ViewBuilder private var stats: some View {
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 10) {
+                communityStats
+                engagementStats
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 8) {
+                    communityStats
+                    engagementStats
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top, spacing: 10) { communityStats }
+                    HStack(alignment: .top, spacing: 10) { engagementStats }
+                }
+            }
         }
+    }
+
+    @ViewBuilder private var communityStats: some View {
+        stat("Posts", counts?.posts)
+        stat("Followers", counts?.followers)
+        stat("Following", counts?.following)
+    }
+
+    @ViewBuilder private var engagementStats: some View {
+        stat("Likes", likesReceived, spokenName: "Likes received")
+            .accessibilityIdentifier("profile-likes-received")
+        stat("Views", viewsReceived, spokenName: "Total video views")
+            .accessibilityIdentifier("profile-views-received")
     }
 
     private func stat(_ name: String, _ count: Int?, spokenName: String? = nil) -> some View {
@@ -376,6 +401,7 @@ struct CreatorProfileHeader<Actions: View>: View {
                 .font(.system(.title3, design: .monospaced).weight(.semibold))
             Text(name).font(.caption).foregroundStyle(palette.muted)
         }
+        .fixedSize(horizontal: true, vertical: false)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spokenName ?? name)
@@ -439,6 +465,12 @@ struct CreatorPortfolio: View {
     @Environment(\.studioPalette) private var palette
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var tab: Tab = .clips
+    @State private var reposts: [Video] = []
+    @State private var repostRequest = UUID()
+    @State private var loadingReposts = true
+    @State private var moreReposts = false
+    @State private var repostError: String?
+    @State private var repostRemovalFailed = false
 
     let videos: [Video]
     let loading: Bool
@@ -453,8 +485,17 @@ struct CreatorPortfolio: View {
     var delete: ((Video) -> Void)? = nil
 
     private enum Tab: String, CaseIterable {
-        case clips = "Performances", sounds = "Sounds"
-        var icon: String { self == .clips ? "rectangle.grid.3x2" : "waveform" }
+        case clips = "Performances", sounds = "Sounds", reposts = "Reposts"
+
+        var icon: String {
+            switch self {
+            case .clips: return "rectangle.grid.3x2"
+            case .sounds: return "waveform"
+            case .reposts: return "arrow.triangle.2.circlepath"
+            }
+        }
+
+        var accessibilityID: String { "profile-\(rawValue.lowercased())" }
     }
 
     private var sharedSounds: [Video] {
@@ -472,28 +513,38 @@ struct CreatorPortfolio: View {
                 spotlight(latest)
             }
             tabs
-            if tab == .clips { gallery }
-            else { sounds }
-            if failed {
-                Text("Couldn't load performances.").font(.footnote).foregroundStyle(palette.muted)
-                Button("Try again", action: retry).buttonStyle(ProfileActionStyle())
-            } else if loading {
-                ProgressView("Loading performances")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-            } else if more {
-                Button("Load more performances", action: loadMore).buttonStyle(ProfileActionStyle())
+            if tab == .reposts {
+                repostGallery
+            } else {
+                if tab == .clips { gallery }
+                else { sounds }
+                if failed {
+                    Text("Couldn't load performances.").font(.footnote).foregroundStyle(palette.muted)
+                    Button("Try again", action: retry).buttonStyle(ProfileActionStyle())
+                } else if loading {
+                    ProgressView("Loading performances")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                } else if more {
+                    Button("Load more performances", action: loadMore).buttonStyle(ProfileActionStyle())
+                }
             }
+        }
+        .task(id: tab) { if tab == .reposts { await loadReposts() } }
+        .alert("Couldn't remove repost", isPresented: $repostRemovalFailed) {
+            Button("OK", role: .cancel) {}
         }
     }
 
     private var tabs: some View {
         let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 3)) : AnyLayout(HStackLayout(spacing: 4))
         return layout {
-            ForEach(Tab.allCases, id: \.self) { option in
+            ForEach(isOwner ? Tab.allCases : [.clips, .sounds], id: \.self) { option in
                 Button { tab = option } label: {
                     Label(option.rawValue, systemImage: option.icon)
                         .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
                         .padding(.vertical, 6)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .foregroundStyle(tab == option ? palette.ink : palette.muted)
@@ -501,7 +552,7 @@ struct CreatorPortfolio: View {
                         .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(tab == option ? palette.border : .clear) }
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier(option == .clips ? "profile-performances" : "profile-sounds")
+                .accessibilityIdentifier(option.accessibilityID)
                 .accessibilityAddTraits(tab == option ? .isSelected : [])
             }
         }
@@ -548,8 +599,7 @@ struct CreatorPortfolio: View {
                   subtitle: isOwner ? "Record a clip and post it to give people a first listen." : "Check back when this artist shares a clip.")
             if let makeMusic { Button("Make music", action: makeMusic).buttonStyle(ProfileActionStyle(primary: true)) }
         } else {
-            let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: typeSize.isAccessibilitySize ? 2 : 3)
-            LazyVGrid(columns: columns, spacing: 5) {
+            LazyVGrid(columns: gridColumns, spacing: 5) {
                 ForEach(videos) { video in
                     if let delete {
                         tile(video).contextMenu {
@@ -563,7 +613,65 @@ struct CreatorPortfolio: View {
         }
     }
 
-    private func tile(_ video: Video) -> some View {
+    private var gridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 5), count: typeSize.isAccessibilitySize ? 2 : 3)
+    }
+
+    @ViewBuilder private var repostGallery: some View {
+        if !reposts.isEmpty {
+            LazyVGrid(columns: gridColumns, spacing: 5) {
+                ForEach(reposts) { video in
+                    tile(video, creditCreator: true).contextMenu {
+                        Button("Remove repost", systemImage: "arrow.uturn.backward") {
+                            Task {
+                                do {
+                                    _ = try await FeedService.setReposted(false, video: video.id)
+                                    reposts.removeAll { $0.id == video.id }
+                                    await loadReposts()
+                                } catch { repostRemovalFailed = true }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if !loadingReposts, repostError == nil {
+            empty(icon: "arrow.triangle.2.circlepath", title: "No reposts yet",
+                  subtitle: "Repost a clip from the feed to share it with your followers and find it here.")
+        }
+        if let repostError {
+            Text(repostError).font(.footnote).foregroundStyle(palette.muted)
+            Button("Try again") { Task { await loadReposts() } }.buttonStyle(ProfileActionStyle())
+        } else if loadingReposts {
+            ProgressView("Loading reposts").frame(maxWidth: .infinity).padding(.vertical, 16)
+        } else if moreReposts {
+            Button("Load more reposts") { Task { await loadReposts(append: true) } }.buttonStyle(ProfileActionStyle())
+        }
+    }
+
+    private func loadReposts(append: Bool = false) async {
+        guard isOwner, !append || (!loadingReposts && moreReposts && !reposts.isEmpty) else { return }
+        let request = UUID()
+        repostRequest = request
+        loadingReposts = true
+        repostError = nil
+        defer { if repostRequest == request { loadingReposts = false } }
+        do {
+            let page = try await FeedService.myReposts(after: append ? reposts.last : nil)
+            guard repostRequest == request, !Task.isCancelled else { return }
+            if append {
+                let ids = Set(reposts.map(\.id))
+                reposts += page.filter { !ids.contains($0.id) }
+            } else {
+                reposts = page
+            }
+            moreReposts = page.count == FeedService.pageSize
+        } catch {
+            guard repostRequest == request, !Task.isCancelled else { return }
+            repostError = (error as? FeedService.Unavailable)?.localizedDescription ?? "Couldn't load your reposts."
+        }
+    }
+
+    private func tile(_ video: Video, creditCreator: Bool = false) -> some View {
         Button { open(video) } label: {
             Color.clear.aspectRatio(3 / 4, contentMode: .fit)
                 .overlay { ProfileThumbnail(video: video) }
@@ -574,18 +682,43 @@ struct CreatorPortfolio: View {
                     }
                 }
                 .overlay(alignment: .bottomLeading) {
-                    Label(video.likeCount.formatted(.number.notation(.compactName)), systemImage: "heart.fill")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(5)
-                        .background(.black.opacity(0.65), in: Capsule())
-                        .padding(5)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if creditCreator, let username = video.username {
+                            Text(verbatim: "@\(username)").lineLimit(1)
+                        }
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 6) { tileCounts(video) }
+                            VStack(alignment: .leading, spacing: 3) { tileCounts(video) }
+                        }
+                    }
+                    .font(.caption2.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .padding(5)
+                    .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 7))
+                    .padding(5)
+                    .accessibilityHidden(true)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Watch \(clipTitle(video))")
-        .accessibilityValue(video.hidden == true ? "Hidden, \(video.likeCount) likes" : "\(video.likeCount) likes")
+        .accessibilityLabel("Watch \(clipTitle(video))" + (creditCreator ? video.username.map { " by @\($0)" } ?? "" : ""))
+        .accessibilityValue(tileAccessibilityValue(video))
+    }
+
+    @ViewBuilder private func tileCounts(_ video: Video) -> some View {
+        Label(video.likeCount.formatted(.number.notation(.compactName)), systemImage: "heart.fill")
+            .fixedSize()
+        if let views = video.viewCount {
+            Label(views.formatted(.number.notation(.compactName)), systemImage: "eye")
+                .fixedSize()
+        }
+    }
+
+    private func tileAccessibilityValue(_ video: Video) -> String {
+        var details = video.hidden == true ? ["Hidden"] : []
+        details.append(video.likeCount == 1 ? "1 like" : "\(video.likeCount.formatted()) likes")
+        if let views = video.viewCount { details.append(views == 1 ? "1 view" : "\(views.formatted()) views") }
+        return details.joined(separator: ", ")
     }
 
     @ViewBuilder private var sounds: some View {

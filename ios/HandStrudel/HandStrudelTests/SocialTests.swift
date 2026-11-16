@@ -159,8 +159,8 @@ final class SocialTests: XCTestCase {
             }
             return clips
         }, fetchCounts: { _ in
-            offline ? .init(posts: nil, followers: nil, following: nil, likesReceived: nil)
-                : .init(posts: 1, followers: 2, following: 3, likesReceived: 42)
+            offline ? .init(posts: nil, followers: nil, following: nil, likesReceived: nil, viewsReceived: nil)
+                : .init(posts: 1, followers: 2, following: 3, likesReceived: 42, viewsReceived: 120)
         })
 
         portfolio.selectAccount(owner)
@@ -170,6 +170,7 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(calls, 2)
         XCTAssertEqual(portfolio.videos, clips)
         XCTAssertEqual(portfolio.counts?.likesReceived, 42)
+        XCTAssertEqual(portfolio.counts?.viewsReceived, 120)
         release.continuation.yield(())
         release.continuation.finish()
         await refresh.value
@@ -182,6 +183,7 @@ final class SocialTests: XCTestCase {
         XCTAssertTrue(portfolio.hasLoadedPage)
         XCTAssertEqual(portfolio.videos, updatedClips)
         XCTAssertEqual(portfolio.counts?.likesReceived, 42)
+        XCTAssertEqual(portfolio.counts?.viewsReceived, 120)
     }
 
     @MainActor
@@ -196,7 +198,7 @@ final class SocialTests: XCTestCase {
             var iterator = release.stream.makeAsyncIterator()
             _ = await iterator.next()
             return clips
-        }, fetchCounts: { _ in .init(posts: 1, followers: 0, following: 0, likesReceived: 42) })
+        }, fetchCounts: { _ in .init(posts: 1, followers: 0, following: 0, likesReceived: 42, viewsReceived: 120) })
 
         portfolio.selectAccount(owner)
         let pending = Task { await portfolio.load(for: owner) }
@@ -601,7 +603,7 @@ final class SocialTests: XCTestCase {
         }
     }
 
-    func testPublicCreatorDecodesLikesReceivedAndSupportsOldRows() throws {
+    func testPublicCreatorDecodesProfileTotalsAndSupportsOldRows() throws {
         func creator(_ total: String) throws -> PublicCreator {
             try JSONDecoder().decode(PublicCreator.self, from: Data(
                 """
@@ -611,6 +613,9 @@ final class SocialTests: XCTestCase {
         XCTAssertEqual(try creator(",\"likes_received\":1243").likesReceived, 1243)
         XCTAssertEqual(try creator(",\"likes_received\":0").likesReceived, 0)
         XCTAssertNil(try creator("").likesReceived)
+        XCTAssertEqual(try creator(",\"views_received\":1234").viewsReceived, 1234)
+        XCTAssertEqual(try creator(",\"views_received\":0").viewsReceived, 0)
+        XCTAssertNil(try creator("").viewsReceived)
     }
 
     func testFeedVideoDecodes() throws {
