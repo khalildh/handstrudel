@@ -105,19 +105,43 @@ enum FeedService {
     }
 
     static func setBookmark(_ saved: Bool, video: UUID, user: UUID,
-                            from: (String) -> PostgrestQueryBuilder = supabase.from) async throws {
+                            client: PostgrestClient = supabase.schema("public")) async throws {
+        struct Parameters: Encodable { let target_video: UUID; let save: Bool }
+        do {
+            try await client.rpc("set_video_bookmark", params: Parameters(target_video: video, save: saved)).execute()
+            return
+        } catch let error as PostgrestError where error.code == "PGRST202" {}
         do {
             if saved {
                 struct Row: Encodable { let video_id: UUID }
-                try await from("video_bookmarks").insert(Row(video_id: video), returning: .minimal).execute()
+                try await client.from("video_bookmarks").insert(Row(video_id: video), returning: .minimal).execute()
             } else {
-                try await from("video_bookmarks").delete()
+                try await client.from("video_bookmarks").delete()
                     .eq("user_id", value: user).eq("video_id", value: video).execute()
             }
         } catch let error as PostgrestError where saved && error.code == "23505" {
             // An existing bookmark is already saved.
         } catch let error as PostgrestError where isMissingView(error) {
             throw Unavailable.bookmarks
+        }
+    }
+
+    static func audioDownloadsAllowed(_ ids: [UUID]) async throws -> Set<UUID> {
+        guard !ids.isEmpty else { return [] }
+        struct Row: Decodable { let video_id: UUID }
+        let rows: [Row] = try await supabase.from("video_audio_downloads").select("video_id")
+            .in("video_id", values: ids.map { $0.uuidString.lowercased() }).execute().value
+        return Set(rows.map(\.video_id))
+    }
+
+    static func setAudioDownloadsAllowed(_ allowed: Bool, video: UUID) async throws {
+        if allowed {
+            struct Row: Encodable { let video_id: UUID }
+            do {
+                try await supabase.from("video_audio_downloads").insert(Row(video_id: video), returning: .minimal).execute()
+            } catch let error as PostgrestError where error.code == "23505" {}
+        } else {
+            try await supabase.from("video_audio_downloads").delete().eq("video_id", value: video).execute()
         }
     }
 
@@ -198,10 +222,10 @@ enum FeedService {
     /// Newest-first page of `feed_videos` (hidden posts and blocked users are
     /// already excluded by the view). Pass the last item of the previous page.
     static func page(after last: Video? = nil, creator: UUID? = nil,
-                     challenge: UUID? = nil, search: PostSearch? = nil) async throws -> [Video] {
+                     challenge: UUID? = nil, search: PostSearch? = nil, limit: Int = pageSize) async throws -> [Video] {
         let table = challenge == nil ? "feed_videos" : "weekly_challenge_entries"
         return try await orderedPage(
-            supabase.from(table).select(), after: last, creator: creator, challenge: challenge, search: search
+            supabase.from(table).select(), after: last, creator: creator, challenge: challenge, search: search, limit: limit
         )
     }
 
@@ -259,7 +283,7 @@ enum FeedService {
     }
 
     private static func orderedPage(_ base: PostgrestFilterBuilder, after last: Video?, creator: UUID? = nil,
-                                    challenge: UUID? = nil, search: PostSearch? = nil) async throws -> [Video] {
+                                    challenge: UUID? = nil, search: PostSearch? = nil, limit: Int = pageSize) async throws -> [Video] {
         var query = base
         if let creator { query = query.eq("user_id", value: creator) }
         if let challenge { query = query.eq("challenge_id", value: challenge) }
@@ -273,7 +297,7 @@ enum FeedService {
         return try await query
             .order("created_at", ascending: false)
             .order("id", ascending: false)
-            .limit(pageSize)
+            .limit(limit)
             .execute().value
     }
 

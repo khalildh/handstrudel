@@ -5,6 +5,24 @@ extension URL: @retroactive Identifiable {
     public var id: String { absoluteString }
 }
 
+struct PostSharingOptions {
+    var sharePlayablePreset = true
+    var allowPlayAlong = true
+
+    func sharedPreset(_ setup: SoundSetup?) -> SoundSetup? {
+        guard sharePlayablePreset, let setup, setup.isValid else { return nil }
+        return setup
+    }
+
+    static func canShareBacking(hasAudio: Bool, backingCredit: BackingCredit?) -> Bool {
+        hasAudio && backingCredit == nil
+    }
+
+    func sharesBacking(hasAudio: Bool, backingCredit: BackingCredit?) -> Bool {
+        allowPlayAlong && Self.canShareBacking(hasAudio: hasAudio, backingCredit: backingCredit)
+    }
+}
+
 /// Preview a just-recorded clip, add a caption, post it to HandStrudel.
 struct PostComposerView: View {
     let clip: URL
@@ -22,14 +40,16 @@ struct PostComposerView: View {
     @StateObject private var uploader = VideoUploader()
     @State private var caption = ""
     @State private var player: AVPlayer?
-    @State private var shareSound = false
+    @State private var sharing = PostSharingOptions()
     @State private var commentsEnabled = true
-    @State private var backingEnabled = false
+    @State private var hasAudio: Bool?
     @State private var leftWhileChecking = false
 
     private var submission: DraftPostSubmission? {
         auth.userId.flatMap { drafts.postSubmission(for: draftID, accountID: $0) }
     }
+
+    private var checkingAudio: Bool { backingCredit == nil && hasAudio == nil }
 
     var body: some View {
         NavigationStack {
@@ -52,10 +72,10 @@ struct PostComposerView: View {
                     }
                     if let soundSetup, soundSetup.isValid {
                         VStack(alignment: .leading, spacing: 4) {
-                            Toggle("Share playable preset", isOn: $shareSound)
+                            Toggle("Share playable preset", isOn: $sharing.sharePlayablePreset)
                                 .font(.subheadline)
                                 .disabled(uploader.isBusy || submission != nil)
-                            Text(shareSound ? soundSetup.presetDetails : "Let viewers play or privately save your instrument settings. This doesn't share backing audio.")
+                            Text(sharing.sharePlayablePreset ? soundSetup.presetDetails : "Your instrument settings won't be shared.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -66,13 +86,14 @@ struct PostComposerView: View {
                     if let backingCredit {
                         Label("Inspired by @\(backingCredit.username)", systemImage: "waveform")
                             .font(.subheadline).foregroundStyle(.secondary)
-                    } else {
-                        Toggle("Allow others to play along", isOn: $backingEnabled)
+                    } else if PostSharingOptions.canShareBacking(hasAudio: hasAudio == true, backingCredit: backingCredit) {
+                        Toggle("Allow others to play along", isOn: $sharing.allowPlayAlong)
                             .font(.subheadline).disabled(uploader.isBusy || submission != nil)
-                        if backingEnabled {
-                            Text("Anyone can use this clip's audio, including any voice, as a backing loop in a credited performance.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
+                        Text("When on, anyone can reuse this clip's audio, including any voice, as a credited backing loop.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text(checkingAudio ? "Checking for play-along audio…" : "Play-along audio isn't available for this take.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
 
                     status
@@ -81,7 +102,8 @@ struct PostComposerView: View {
                         Text(postLabel).font(.headline).frame(maxWidth: .infinity).padding()
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(uploader.isBusy || auth.userId == nil || (submission != nil && submission?.isPending == false))
+                    .disabled(uploader.isBusy || auth.userId == nil || (submission == nil && checkingAudio)
+                              || (submission != nil && submission?.isPending == false))
                     Text("We check your video and thumbnail before they appear publicly.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -110,12 +132,17 @@ struct PostComposerView: View {
             p.play()
         }
         .onDisappear { player?.pause() }
+        .task(id: clip) {
+            guard backingCredit == nil else { return }
+            let tracks = try? await AVURLAsset(url: clip).loadTracks(withMediaType: .audio)
+            if !Task.isCancelled { hasAudio = tracks?.isEmpty == false }
+        }
         .interactiveDismissDisabled(uploader.isBusy)
     }
 
     private var postLabel: String {
         if uploader.isBusy { return "Posting…" }
-        guard let submission else { return "Post" }
+        guard let submission else { return "Post publicly" }
         return submission.isPending ? "Check post status" : "Posted"
     }
 
@@ -131,12 +158,14 @@ struct PostComposerView: View {
     }
 
     private func post() {
-        guard let accountID = auth.userId else { return }
+        guard let accountID = auth.userId, submission != nil || !checkingAudio else { return }
+        let preset = sharing.sharedPreset(soundSetup)
+        let allowBacking = sharing.sharesBacking(hasAudio: hasAudio == true, backingCredit: backingCredit)
         Task {
             if await uploader.post(clip: clip, draftID: draftID, accountID: accountID, store: drafts,
                                    caption: caption, instrument: instrument, mode: mode,
-                                   soundSetup: shareSound ? soundSetup : nil, commentsEnabled: commentsEnabled,
-                                   backingEnabled: backingEnabled, backingCredit: backingCredit) {
+                                   soundSetup: preset, commentsEnabled: commentsEnabled,
+                                   backingEnabled: allowBacking, backingCredit: backingCredit) {
                 onPosted()
                 if !leftWhileChecking { dismiss() }
             }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, JetBrains_Mono, Manrope } from "next/font/google";
+import { SiteAnalytics } from "./site-analytics";
 import "./globals.css";
 import "./watch/watch.css";
 
@@ -32,7 +33,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${jetbrainsMono.variable} ${fraunces.variable} ${manrope.variable}`}>{children}</body>
+      <body className={`${jetbrainsMono.variable} ${fraunces.variable} ${manrope.variable}`}>
+        {children}
+        <SiteAnalytics />
+      </body>
     </html>
   );
 }

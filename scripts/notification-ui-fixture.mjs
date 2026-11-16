@@ -16,6 +16,7 @@ const post = {
   id: video, user_id: creator, username: "loopmaker", caption: "Evening loop", comments_enabled: true,
   video_key: "test/clip.mp4", thumb_key: demoThumb, like_count: demoLikes, created_at: now,
   instrument: "Grand Piano", duration_s: clipBytes ? 4 : undefined,
+  backing_enabled: process.env.FIXTURE_PLAY_ALONG === "1",
   sound_setup: {
     version: 1, instrument: "grand_piano", waveform: "sine", key: "D", scale: "Minor", progression: "free",
     mode: "soundfont", bpm: 96, useSoundFont: true, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
@@ -24,6 +25,7 @@ const post = {
 const secondPost = {
   ...post, id: "30000000-0000-0000-0000-000000000002", username: "secondartist",
   user_id: "20000000-0000-0000-0000-000000000003", caption: "Second performance", like_count: 0,
+  video_key: "test/next-clip.mp4",
 };
 const initial = {
   id: root, video_id: video, user_id: viewer, username: "viewer", parent_id: null,
@@ -39,6 +41,7 @@ let displayName = "Studio Viewer";
 let following = false;
 let avatarKey = process.env.FIXTURE_AVATAR === "1" ? demoThumb : null;
 const liked = new Set();
+const saved = new Set();
 const withLikes = (comment) => ({ ...comment, like_count: liked.has(comment.id) ? 1 : 0, liked_by_me: liked.has(comment.id) });
 
 createServer((request, response) => {
@@ -55,7 +58,8 @@ createServer((request, response) => {
       if (!canControlMedia || request.method !== "POST") return response.writeHead(404).end();
       mediaAvailable = url.searchParams.get("available") === "1";
       return response.writeHead(204).end();
-    case "/test/clip.mp4": {
+    case "/test/clip.mp4":
+    case "/test/next-clip.mp4": {
       if (!clipBytes || !mediaAvailable) return response.writeHead(404).end();
       const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range ?? "");
       const start = range ? Number(range[1]) : 0;
@@ -95,6 +99,20 @@ createServer((request, response) => {
       }
       return response.writeHead(415).end();
     case "/rest/v1/videos": return send([]);
+    case "/rest/v1/rpc/set_video_bookmark": {
+      let body = "";
+      request.on("data", (chunk) => { body += chunk; });
+      request.on("end", () => {
+        const { target_video: id, save } = JSON.parse(body);
+        if (save) saved.add(id.toLowerCase());
+        else saved.delete(id.toLowerCase());
+        response.writeHead(204).end();
+      });
+      return;
+    }
+    case "/rest/v1/video_bookmarks": return send([...saved].map((video_id) => ({ video_id })));
+    case "/rest/v1/saved_videos": return send([post, secondPost].filter(({ id }) => saved.has(id)).map((item) => ({ ...item, saved_at: now })));
+    case "/rest/v1/video_audio_downloads": return send(process.env.FIXTURE_AUDIO_DOWNLOAD === "1" ? [{ video_id: video }] : []);
     case "/rest/v1/following_videos":
       if (process.env.FIXTURE_MISSING_FOLLOWING_VIEW === "1") {
         return response.writeHead(404, { "Content-Type": "application/json" })

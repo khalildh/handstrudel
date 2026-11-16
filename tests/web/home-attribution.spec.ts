@@ -51,12 +51,13 @@ test("footer links are separated and open scrollable pages on narrow phones", as
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/");
   const links = page.getByRole("navigation", { name: "Site information" });
-  await expect(links.getByRole("link")).toHaveText(["Support", "Privacy", "Terms"]);
-  await expect(links.locator("ul")).toHaveText("Support / Privacy / Terms");
+  await expect(links.getByRole("link")).toHaveText(["Support", "Privacy", "Terms", "Community Guidelines"]);
+  await expect(links.locator("ul")).toHaveText("Support / Privacy / Terms / Community Guidelines");
   for (const [label, heading, path] of [
     ["Support", "Support", "/support"],
     ["Privacy", "Privacy Policy", "/privacy"],
     ["Terms", "Terms of Use", "/terms"],
+    ["Community Guidelines", "Community Guidelines", "/community"],
   ]) {
     await links.getByRole("link", { name: label, exact: true }).press("Enter");
     await expect(page).toHaveURL(new RegExp(`${path}/?$`));

@@ -71,8 +71,10 @@ struct ContentView: View {
     @State private var sharedSoundLoad: Task<Void, Never>?
     @State private var linkedComments: Video?
     @State private var linkedPerformance: Video?
+    @State private var draftPostToOpen: UUID?
     @State private var backing: BackingTrack?
     @State private var backingLoad: Task<Void, Never>?
+    @State private var backingAutoplayPending = false
     @State private var backingPlaying = false
     @State private var showBackingMixer = false
     @AppStorage("playAlongBackingVolume") private var backingVolume = BackingTrackVolume.defaultValue
@@ -119,7 +121,7 @@ struct ContentView: View {
     private var canShowReview: Bool {
         reviewReadyThisSession && scenePhase == .active && destination == .music
             && !engine.isRunning && !startingSession && !showDrafts && !showLoops && !showSetups && reviewingDraft == nil
-            && linkedComments == nil && linkedPerformance == nil && soundError == nil && recordingError == nil
+            && linkedComments == nil && linkedPerformance == nil && draftPostToOpen == nil && soundError == nil && recordingError == nil
             && jamInvitation == nil && jamError == nil
     }
 
@@ -187,9 +189,9 @@ struct ContentView: View {
             }
             #endif
         }
-        .sheet(isPresented: $showDrafts) {
+        .sheet(isPresented: $showDrafts, onDismiss: openDraftPostAfterDismissal) {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil,
-                                onSuccessfulTake: recordReviewMilestone)
+                                onSuccessfulTake: recordReviewMilestone, onViewPost: viewDraftPost)
         }
         .sheet(isPresented: $showLoops) {
             LoopShelfView(engine: engine)
@@ -243,11 +245,12 @@ struct ContentView: View {
                 retakeRequested = false
                 startRecordingCountdown()
             }
+            openDraftPostAfterDismissal()
         }) { draft in
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: draft, onRetake: engine.isRunning ? {
                 retakeRequested = true
                 reviewingDraft = nil
-            } : nil, onSuccessfulTake: recordReviewMilestone)
+            } : nil, onSuccessfulTake: recordReviewMilestone, onViewPost: viewDraftPost)
                 .onAppear { engine.pause() }
         }
         .alert("Recording", isPresented: Binding(
@@ -292,8 +295,17 @@ struct ContentView: View {
         }
         .statusBarHidden(engine.isRunning)
         .onChange(of: engine.isRunning) { running in
-            if running { startingSession = false }
-            else { cancelCountdown(); stopBacking() }
+            if running {
+                startingSession = false
+                if backingAutoplayPending, let backing {
+                    backingAutoplayPending = false
+                    if scenePhase == .active { playBacking(backing) }
+                }
+            } else {
+                cancelCountdown()
+                backingLoad?.cancel()
+                stopBacking()
+            }
         }
         .onChange(of: backingVolume) { volume in
             backing?.player.volume = Float(BackingTrackVolume.clamped(volume))
@@ -301,6 +313,8 @@ struct ContentView: View {
         .onChange(of: scenePhase) { phase in
             engine.setLearnSceneActive(phase == .active)
             if phase == .background {
+                backingLoad?.cancel()
+                backingAutoplayPending = false
                 backing?.player.pause()
                 backingPlaying = false
                 if isRecording { stopRecording() }
@@ -436,15 +450,16 @@ struct ContentView: View {
         }
     }
 
-    private func startSession(setup: SoundSetup? = nil) {
+    private func startSession(setup: SoundSetup? = nil, useCurrentSoundAsFallback: Bool = false) {
         guard !engine.isRunning, !startingSession else { return }
-        if let setup, !engine.applySoundSetup(setup, store: storeManager) {
+        let appliedSetup = setup.map { engine.applySoundSetup($0, store: storeManager) } ?? false
+        if setup != nil, !appliedSetup, !useCurrentSoundAsFallback {
             soundError = "This setup is unavailable or requires a sound pack you don't own."
             return
         }
         startingSession = true
         destination = .music
-        if setup == nil { engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true) }
+        if !appliedSetup { engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true) }
         engine.start(config: DEFAULT_MAPPING, advanced: false, input: preferredInput)
     }
 
@@ -470,25 +485,42 @@ struct ContentView: View {
     }
 
     private func prepareBacking(_ video: Video) {
-        guard !engine.isRunning, !startingSession else { return }
+        guard !isRecording, !recorderBusy, recordCountdown == 0, activeAudioLoop == nil else {
+            soundError = "Finish the current recording before starting Play Along."
+            return
+        }
         backingLoad?.cancel()
         backingLoad = Task {
             do {
                 guard let source = try await FeedService.video(id: video.id),
-                      source.backingEnabled == true, let username = source.username else {
+                      source.backingEnabled == true else {
                     throw SocialError.message("The creator no longer allows play-along on this performance.")
                 }
+                guard let username = source.username, !username.isEmpty else {
+                    throw SocialError.message("This performance is missing the creator credit needed for Play Along.")
+                }
                 let track = try await BackingTrack.load(video: source, username: username)
-                guard !Task.isCancelled, !engine.isRunning, !startingSession else { track.remove(); return }
+                guard !Task.isCancelled else { track.remove(); return }
+                guard !isRecording, !recorderBusy, recordCountdown == 0, activeAudioLoop == nil else {
+                    track.remove()
+                    throw SocialError.message("Finish the current recording before starting Play Along.")
+                }
                 stopBacking()
                 track.player.volume = Float(BackingTrackVolume.clamped(backingVolume))
                 backing = track
+                destination = .music
+                if engine.isRunning {
+                    playBacking(track)
+                    return
+                }
+                backingAutoplayPending = true
                 let setup = source.soundSetup.flatMap { sound in
                     sound.requiredPacks.allSatisfy { storeManager.isUnlocked($0) } ? sound : nil
                 }
-                startSession(setup: setup)
+                startSession(setup: setup, useCurrentSoundAsFallback: true)
             } catch {
                 if !Task.isCancelled {
+                    debugPrint("Play Along load failed:", error)
                     soundError = (error as? SocialError)?.localizedDescription ?? "Couldn't load the backing audio. Try again."
                 }
             }
@@ -498,12 +530,36 @@ struct ContentView: View {
     private func stopBacking() {
         backing?.remove()
         backing = nil
+        backingAutoplayPending = false
         backingPlaying = false
         showBackingMixer = false
     }
 
+    private func playBacking(_ track: BackingTrack) {
+        if !isRecording && !recorderBusy && activeAudioLoop == nil { restoreInstrumentAudio() }
+        backingPlaying = track.player.play()
+        if !backingPlaying { soundError = "Couldn't start the backing audio. Tap Play to try again." }
+    }
+
     private func openSocialLink(_ url: URL) {
-        guard let link = PerformanceLink(url: url), SocialConfig.isConfigured else { return }
+        guard let link = PerformanceLink(url: url) else { return }
+        openPerformance(link)
+    }
+
+    private func viewDraftPost(_ id: UUID) {
+        draftPostToOpen = id
+        if reviewingDraft != nil { reviewingDraft = nil }
+        else { showDrafts = false }
+    }
+
+    private func openDraftPostAfterDismissal() {
+        guard let id = draftPostToOpen else { return }
+        draftPostToOpen = nil
+        openPerformance(.watch(id))
+    }
+
+    private func openPerformance(_ link: PerformanceLink) {
+        guard SocialConfig.isConfigured else { return }
         sharedSoundLoad?.cancel()
         sharedSoundLoad = Task {
             do {
@@ -1837,7 +1893,7 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 Button {
                     if track.player.isPlaying { track.player.pause(); backingPlaying = false }
-                    else { backingPlaying = track.player.play() }
+                    else { playBacking(track) }
                 } label: {
                     Label("Play along with @\(track.credit.username)", systemImage: backingPlaying ? "pause.fill" : "play.fill")
                         .lineLimit(1)
@@ -1989,11 +2045,19 @@ struct ContentView: View {
         engine.loopCaptureBusy = false
         engine.isLoopRecording = false
         engine.loopRecordingProgress = 0
+        restoreInstrumentAudio()
         do {
             let duration = try capture.finish()
-            engine.saveCapturedLoop(id: capture.id, duration: duration, bpm: engine.manualBPM,
-                                    mode: engine.currentModeString, autoplay: scenePhase == .active && interruption == nil)
-            showLoopNotice(interruption == nil ? "Loop saved as WAV." : "Recording interrupted. Partial loop saved as WAV.")
+            let autoplay = scenePhase == .active && interruption == nil
+            let started = engine.saveCapturedLoop(id: capture.id, duration: duration, bpm: engine.manualBPM,
+                                                   mode: engine.currentModeString, autoplay: autoplay)
+            if interruption != nil {
+                showLoopNotice("Recording interrupted. Partial loop saved as WAV.")
+            } else if autoplay && !started {
+                recordingError = "The loop was saved, but it couldn't start playing. Try it from the loop shelf."
+            } else {
+                showLoopNotice("Loop saved as WAV.")
+            }
         } catch {
             capture.discard()
             recordingError = "Couldn't save the loop. \((interruption ?? error).localizedDescription)"
@@ -2274,23 +2338,11 @@ private final class BackingTrack {
         player = try AVAudioPlayer(contentsOf: url)
         player.numberOfLoops = -1
         player.enableRate = true
-        guard player.prepareToPlay() else { throw SocialError.message("The backing audio couldn't be prepared.") }
     }
 
     static func load(video: Video, username: String) async throws -> BackingTrack {
-        let asset = AVURLAsset(url: video.videoURL)
-        let duration = try await asset.load(.duration).seconds
-        guard duration.isFinite, (0.1...61).contains(duration),
-              !(try await asset.loadTracks(withMediaType: .audio)).isEmpty,
-              let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A)
-        else { throw SocialError.message("This performance doesn't have playable backing audio.") }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Backing-\(UUID()).m4a")
+        let url = try await PerformanceAudio.export(video)
         do {
-            exporter.outputURL = url
-            exporter.outputFileType = .m4a
-            await exporter.export()
-            try Task.checkCancellation()
-            guard exporter.status == .completed else { throw exporter.error ?? SocialError.message("Backing audio couldn't be downloaded.") }
             return try BackingTrack(credit: BackingCredit(videoId: video.id, username: username),
                                     savedBPM: video.soundSetup?.bpm, url: url)
         } catch {
@@ -2303,6 +2355,53 @@ private final class BackingTrack {
         player.stop()
         try? FileManager.default.removeItem(at: url)
     }
+}
+
+enum PerformanceAudio {
+    static func export(_ video: Video) async throws -> URL {
+        let downloaded: URL
+        do {
+            let (file, response) = try await URLSession.shared.download(from: video.videoURL)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                try? FileManager.default.removeItem(at: file)
+                throw SocialError.message("This clip couldn't be downloaded.")
+            }
+            downloaded = file
+        } catch {
+            if Task.isCancelled { throw CancellationError() }
+            debugPrint("Performance clip download failed:", error)
+            throw SocialError.message("This clip couldn't be downloaded. Try again.")
+        }
+        let localVideo = FileManager.default.temporaryDirectory.appendingPathComponent("Backing-\(UUID()).mp4")
+        defer {
+            try? FileManager.default.removeItem(at: downloaded)
+            try? FileManager.default.removeItem(at: localVideo)
+        }
+        try Task.checkCancellation()
+        try FileManager.default.moveItem(at: downloaded, to: localVideo)
+        let asset = AVURLAsset(url: localVideo)
+        let duration = try await asset.load(.duration).seconds
+        guard duration.isFinite, (0.1...61).contains(duration),
+              !(try await asset.loadTracks(withMediaType: .audio)).isEmpty,
+              let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A)
+        else { throw SocialError.message("This performance doesn't have playable backing audio.") }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("HandStrudel-\(UUID()).m4a")
+        do {
+            exporter.outputURL = url
+            exporter.outputFileType = .m4a
+            await exporter.export()
+            try Task.checkCancellation()
+            guard exporter.status == .completed else {
+                debugPrint("Backing audio export failed:", exporter.error as Any)
+                throw SocialError.message("Couldn't extract the audio from this clip.")
+            }
+            return url
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
+    }
+
 }
 
 private final class RecorderEvents: NSObject, RPScreenRecorderDelegate {

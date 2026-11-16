@@ -288,6 +288,7 @@ struct RecordingDraftsView: View {
     let openedDraft: RecordingDraft?
     let onRetake: (() -> Void)?
     var onSuccessfulTake: (UUID) -> Void = { _ in }
+    let onViewPost: (UUID) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -334,7 +335,8 @@ struct RecordingDraftsView: View {
     }
 
     private func editor(_ draft: RecordingDraft) -> some View {
-        RecordingDraftEditor(store: store, auth: auth, draft: draft, onRetake: onRetake, onSuccessfulTake: onSuccessfulTake)
+        RecordingDraftEditor(store: store, auth: auth, draft: draft, onRetake: onRetake,
+                             onSuccessfulTake: onSuccessfulTake, onViewPost: onViewPost)
     }
 }
 
@@ -345,6 +347,7 @@ private struct RecordingDraftEditor: View {
     @State var draft: RecordingDraft
     let onRetake: (() -> Void)?
     let onSuccessfulTake: (UUID) -> Void
+    let onViewPost: (UUID) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer?
     @State private var duration = 0.0
@@ -372,6 +375,8 @@ private struct RecordingDraftEditor: View {
         DraftTrimSelection(duration: duration, start: draft.trimStart, end: draft.trimEnd)
     }
 
+    private var canExport: Bool { savedTrim != nil && pendingTrim == nil }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 17) {
@@ -398,29 +403,29 @@ private struct RecordingDraftEditor: View {
                     Label("Recorded at half tempo. Preview and exports play at normal tempo.", systemImage: "tortoise")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
-                if let trim = pendingTrim ?? savedTrim ?? DraftTrimSelection(duration: duration) { trimControls(trim) }
                 if let message {
                     Text(message).font(.footnote).foregroundStyle(.secondary)
                         .accessibilityIdentifier("draft-message")
                 }
                 if busy { ProgressView("Preparing video") }
-                Button { export(saveToPhotos) } label: {
-                    Label("Save to Photos", systemImage: "photo.badge.plus")
+                if SocialConfig.isConfigured {
+                    postAction
+                        .buttonStyle(StudioActionStyle())
                 }
-                .buttonStyle(StudioActionStyle())
-                .disabled(savedTrim == nil || pendingTrim != nil)
-                HStack(spacing: 18) {
-                    Menu("Share") {
+                HStack(spacing: 12) {
+                    Button("Save to Photos", systemImage: "photo.badge.plus") { export(saveToPhotos) }
+                        .buttonStyle(.bordered)
+                        .disabled(!canExport)
+                    Menu("Share", systemImage: "square.and.arrow.up") {
                         Button("Share video", systemImage: "film") { export { sharing = $0 } }
                         Button("Share audio (M4A)", systemImage: "waveform") { export(audioOnly: true) { sharing = $0 } }
                     }
-                    .disabled(savedTrim == nil || pendingTrim != nil)
-                    if SocialConfig.isConfigured {
-                        postAction
-                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!canExport)
                     Spacer()
                     if let onRetake { Button("Retake", action: onRetake) }
                 }
+                if let trim = pendingTrim ?? savedTrim ?? DraftTrimSelection(duration: duration) { trimControls(trim) }
                 Button("Delete draft", role: .destructive) { confirmDelete = true }
                     .padding(.top, 6)
             }
@@ -503,16 +508,16 @@ private struct RecordingDraftEditor: View {
             }
             .disabled(postStatus.isBusy)
         case .published(let id):
-            let url = SocialConfig.watchURL.appending(queryItems: [URLQueryItem(name: "v", value: id.uuidString.lowercased())])
-            Link("View post", destination: url)
+            Button("View post", systemImage: "play.rectangle") { onViewPost(id) }
         case nil:
-            Button("Post") {
+            Button("Post to HandStrudel", systemImage: "arrow.up.circle") {
                 export { copy in
                     if auth.isSignedIn && !auth.needsProfileSetup { posting = copy }
                     else { pendingPost = copy; signIn = true }
                 }
             }
-            .disabled(savedTrim == nil || pendingTrim != nil)
+            .disabled(!canExport)
+            .opacity(canExport ? 1 : 0.55)
         }
     }
 

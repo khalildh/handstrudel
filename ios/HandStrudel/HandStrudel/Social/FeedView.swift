@@ -9,7 +9,7 @@ private enum PerformanceStart {
     case preset(SoundSetup)
 }
 
-/// Full-screen, vertically paged feed of public posts (newest first).
+/// Full-screen, vertically paged feed of public posts.
 /// Browsable signed out; liking, following, reporting and blocking need an account.
 struct FeedView: View {
     @Environment(\.studioPalette) private var palette
@@ -25,7 +25,7 @@ struct FeedView: View {
     @State private var commenting: Video?
     @State private var lastCommentVideo: UUID?
     @State private var toast: String?
-    @State private var muted = true
+    @AppStorage("feedMuted") private var muted = false
     @State private var showActivity = false
     @State private var unreadActivity = false
     @State private var creatorVideo: Video?
@@ -35,6 +35,8 @@ struct FeedView: View {
     @State private var challenge: WeeklyChallenge?
     @State private var openChallenge: WeeklyChallenge?
     @State private var pendingStart: PerformanceStart?
+    @State private var audioDownload: Video?
+    @State private var pendingBookmark: Video?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -61,13 +63,17 @@ struct FeedView: View {
                 if model.videos.isEmpty {
                     emptyState
                 } else {
-                    PagedFeed(videos: model.videos, current: $model.current) { video, isCurrent in
+                    PagedFeed(videos: model.videos, current: $model.current, refresh: {
+                        await model.refresh(user: auth.userId)
+                    }) { video, isCurrent in
                         FeedCell(video: video, isCurrent: isActive && scenePhase == .active && isCurrent
                                  && commenting == nil && !showActivity && creatorVideo == nil && sourceVideo == nil
                                  && !showSaved && !showSearch && openChallenge == nil,
                                  isMine: video.userId == auth.userId,
                                  isFollowing: model.following.contains(video.userId),
                                  isSaved: model.savedIDs.contains(video.id),
+                                 canDownloadAudio: model.audioDownloadIDs.contains(video.id),
+                                 canChangeAudioPermission: video.userId == auth.userId && video.sourceVideoId == nil,
                                  muted: muted, toggleMute: { muted.toggle() },
                                  like: { act { try await model.toggleLike(video, user: $0) } },
                                  follow: { act { try await model.toggleFollow(video.userId, user: $0) } },
@@ -79,6 +85,16 @@ struct FeedView: View {
                                  bookmark: {
                                      toggleBookmark(video)
                                  },
+                                 downloadAudio: { audioDownload = video },
+                                 changeAudioPermission: {
+                                     Task {
+                                         do {
+                                             let allowed = try await model.toggleAudioPermission(video.id)
+                                             show(allowed ? "Audio downloads allowed." : "Audio downloads turned off.")
+                                         } catch { show("Couldn't change audio downloads. Try again.") }
+                                     }
+                                 },
+                                 advance: { advanceAfterClip(video.id) },
                                  playAlong: { onPlayAlong(video) },
                                  revokeBacking: {
                                      act { _ in
@@ -93,12 +109,13 @@ struct FeedView: View {
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(palette.border).allowsHitTesting(false) }
-                    .overlay(alignment: .topTrailing) { pageControls.padding(10) }
                     .onChange(of: model.current) { _ in Task { await model.loadMore() } }
                     .accessibilityScrollAction { edge in
                         if edge == .bottom { movePage(by: 1) }
                         if edge == .top { movePage(by: -1) }
                     }
+                    .accessibilityAction(named: Text("Previous video")) { movePage(by: -1) }
+                    .accessibilityAction(named: Text("Next video")) { movePage(by: 1) }
                 }
                 if let toast {
                     Text(toast)
@@ -114,7 +131,7 @@ struct FeedView: View {
         .padding(.bottom, 10)
         .background(palette.background.ignoresSafeArea())
         .foregroundStyle(palette.ink)
-        .task(id: FeedRefresh(user: auth.userId, following: model.followingOnly)) {
+        .task(id: FeedRefresh(user: auth.userId, mode: model.mode)) {
             await model.refresh(user: auth.userId)
             await refreshBadge()
         }
@@ -132,9 +149,16 @@ struct FeedView: View {
             unreadActivity = false
             showSaved = false
             openChallenge = nil
-            if uid == nil { model.followingOnly = false }
+            if uid == nil, model.followingOnly { model.mode = .discover }
         }
-        .sheet(isPresented: $showSignIn) { SignInView(auth: auth, reason: "Sign in to save performances and join the community.") }
+        .sheet(isPresented: $showSignIn, onDismiss: {
+            let video = pendingBookmark
+            pendingBookmark = nil
+            if let video, let uid = auth.userId, !auth.needsProfileSetup {
+                writeBookmark(video, user: uid, explicitlySave: true)
+            }
+        }) { SignInView(auth: auth, reason: "Sign in to save performances and join the community.") }
+        .modifier(PerformanceAudioDownload(video: $audioDownload))
         .sheet(isPresented: $showSearch, onDismiss: resumePerformance) {
             PostSearchView(auth: auth) { start in
                 pendingStart = start
@@ -204,37 +228,11 @@ struct FeedView: View {
         if model.videos.indices.contains(target) { model.current = target }
     }
 
-    private var pageControls: some View {
-        HStack(spacing: 0) {
-            if model.videos.count > 1 {
-                pageButton("Previous video", icon: "chevron.up", offset: -1)
-            }
-            Text("\(model.current + 1) / \(model.videos.count)")
-                .font(.caption2.monospacedDigit().weight(.semibold))
-                .padding(.horizontal, 8)
-                .frame(minHeight: 28)
-                .accessibilityLabel("Video \(model.current + 1) of \(model.videos.count) loaded")
-                .accessibilityIdentifier("feed-video-position")
-            if model.videos.count > 1 {
-                pageButton("Next video", icon: "chevron.down", offset: 1)
-            }
-        }
-        .foregroundStyle(.white)
-        .background(.black.opacity(0.74), in: Capsule())
-    }
-
-    private func pageButton(_ title: String, icon: String, offset: Int) -> some View {
-        let available = model.videos.indices.contains(model.current + offset)
-        return Button { movePage(by: offset) } label: {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-                .opacity(available ? 1 : 0.35)
-        }
-        .buttonStyle(.plain)
-        .disabled(!available)
-        .accessibilityLabel(title)
+    private func advanceAfterClip(_ id: UUID) -> Bool {
+        guard model.videos.indices.contains(model.current), model.videos[model.current].id == id,
+              model.videos.indices.contains(model.current + 1) else { return false }
+        movePage(by: 1)
+        return true
     }
 
     private func resumePerformance() {
@@ -265,12 +263,13 @@ struct FeedView: View {
     }
 
     private var feedPicker: some View {
-        Picker("Feed", selection: $model.followingOnly) {
-            Text("Latest").tag(false)
-            Text("Following").tag(true)
+        Picker("Feed", selection: $model.mode) {
+            Text("Discover").tag(FeedMode.discover)
+            Text("Latest").tag(FeedMode.latest)
+            Text("Following").tag(FeedMode.following)
         }
         .pickerStyle(.segmented)
-        .frame(maxWidth: 190)
+        .frame(minWidth: 226, maxWidth: 320)
         .accessibilityIdentifier("feed-filter")
     }
 
@@ -316,11 +315,11 @@ struct FeedView: View {
                     } else {
                         if model.error == nil {
                             Text(model.confirmedNoFollows
-                                 ? "Follow a creator from Latest to see their posts here."
+                                 ? "Follow a creator in Discover or Latest to see their posts here."
                                  : "New public posts from creators you follow will appear here.")
                                 .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         }
-                        Button("Browse latest") { model.followingOnly = false }.buttonStyle(StudioActionStyle())
+                        Button("Browse Discover") { model.mode = .discover }.buttonStyle(StudioActionStyle())
                     }
                 } else if model.error == nil {
                     Button("Make the first one", action: onMakeMusic).buttonStyle(StudioActionStyle())
@@ -355,17 +354,24 @@ struct FeedView: View {
     }
 
     private func toggleBookmark(_ video: Video) {
-        requireSignIn { uid in
-            Task {
-                do {
-                    if let saved = try await model.toggleBookmark(video.id, user: uid) {
-                        show(saved ? "Saved privately." : "Removed from Saved.")
-                    }
-                } catch let error as FeedService.Unavailable {
-                    show(error.localizedDescription)
-                } catch {
-                    show("Couldn't update Saved. Try again.")
+        guard let uid = auth.userId, !auth.needsProfileSetup else {
+            pendingBookmark = video
+            showSignIn = true
+            return
+        }
+        writeBookmark(video, user: uid)
+    }
+
+    private func writeBookmark(_ video: Video, user: UUID, explicitlySave: Bool = false) {
+        Task {
+            do {
+                if let saved = try await model.toggleBookmark(video.id, user: user, explicitlySave: explicitlySave) {
+                    show(saved ? "Saved privately." : "Removed from Saved.")
                 }
+            } catch let error as FeedService.Unavailable {
+                show(error.localizedDescription)
+            } catch {
+                show("Couldn't update Saved. Try again.")
             }
         }
     }
@@ -401,7 +407,41 @@ struct FeedView: View {
 
 private struct FeedRefresh: Equatable {
     let user: UUID?
-    let following: Bool
+    let mode: FeedMode
+}
+
+enum FeedMode: Hashable {
+    case discover, latest, following
+
+    var fetchLimit: Int { self == .discover ? 24 : FeedService.pageSize }
+}
+
+enum DiscoveryFeedRanking {
+    static func order(_ videos: [Video], now: Date, after lastCreator: UUID? = nil) -> [Video] {
+        func score(_ video: Video) -> Double {
+            let hoursOld = max(0, now.timeIntervalSince(video.createdAt) / 3600)
+            let freshness = 3 / (1 + hoursOld / 72)
+            let engagement = min(log1p(Double(max(0, video.likeCount))), 4) * 0.65 / (1 + hoursOld / 168)
+            return freshness + engagement
+        }
+
+        var candidates: [(index: Int, video: Video, score: Double)] = videos.enumerated().map { index, video in
+            (index, video, score(video))
+        }
+        candidates.sort { lhs, rhs in
+            if lhs.score == rhs.score { return lhs.index < rhs.index }
+            return lhs.score > rhs.score
+        }
+        var result: [Video] = []
+        var last = lastCreator
+        while !candidates.isEmpty {
+            let pick = candidates.firstIndex { $0.video.userId != last } ?? candidates.startIndex
+            let video = candidates.remove(at: pick).video
+            result.append(video)
+            last = video.userId
+        }
+        return result
+    }
 }
 
 private struct ChallengeRefresh: Equatable {
@@ -418,10 +458,15 @@ final class FeedModel: ObservableObject {
     @Published var following: Set<UUID> = []
     @Published var loading = false
     @Published var error: String?
-    @Published var followingOnly = false
+    @Published var mode: FeedMode = .discover
     @Published private(set) var confirmedNoFollows = false
     @Published private(set) var savedIDs = Set<UUID>()
+    @Published private(set) var audioDownloadIDs = Set<UUID>()
     private var reachedEnd = false
+    private var pageCursor: Video?
+    private var seenVideoIDs = Set<UUID>()
+    private var loadedMode: FeedMode?
+    private var rankingDate = Date()
     private var generation = 0
     private var viewer: UUID?
     private var pendingLikes = Set<UUID>()
@@ -429,9 +474,18 @@ final class FeedModel: ObservableObject {
     private var pendingBookmarks = Set<UUID>()
     private var bookmarkRevision = 0
     private let writeLike: (Bool, UUID, UUID) async throws -> Void
+    private let loadPublicPage: (Video?, Int) async throws -> [Video]
+    private let loadAudioDownloadIDs: ([UUID]) async throws -> Set<UUID>
 
-    init(writeLike: @escaping (Bool, UUID, UUID) async throws -> Void = FeedService.setLiked) {
+    var followingOnly: Bool { mode == .following }
+
+    init(writeLike: @escaping (Bool, UUID, UUID) async throws -> Void = FeedService.setLiked,
+         loadPublicPage: @escaping (Video?, Int) async throws -> [Video] = {
+             try await FeedService.page(after: $0, limit: $1)
+         }, loadAudioDownloadIDs: @escaping ([UUID]) async throws -> Set<UUID> = FeedService.audioDownloadsAllowed) {
         self.writeLike = writeLike
+        self.loadPublicPage = loadPublicPage
+        self.loadAudioDownloadIDs = loadAudioDownloadIDs
     }
 
     func refreshVideoControls(for id: UUID) async {
@@ -447,11 +501,17 @@ final class FeedModel: ObservableObject {
     }) async {
         generation += 1
         let request = generation
-        let followingOnly = self.followingOnly
+        let selectedMode = mode
+        let followingOnly = selectedMode == .following
         if viewer != user { savedIDs = []; bookmarkRevision += 1 }
         viewer = user
         loading = true; error = nil; reachedEnd = false
+        pageCursor = nil
+        seenVideoIDs.removeAll()
+        loadedMode = selectedMode
+        rankingDate = Date()
         confirmedNoFollows = false
+        audioDownloadIDs = []
         videos = []; current = 0; following = []
         defer { if request == generation { loading = false } }
         guard !followingOnly || user != nil else { return }
@@ -463,13 +523,12 @@ final class FeedModel: ObservableObject {
                 page = result.videos
                 noFollows = result.confirmedNoFollows
             } else {
-                page = try await FeedService.page()
+                page = try await loadPublicPage(nil, selectedMode.fetchLimit)
             }
-            guard !Task.isCancelled, request == generation else { return }
-            videos = page
+            guard !Task.isCancelled, request == generation, mode == selectedMode else { return }
+            let displayed = appendVisiblePage(page, mode: selectedMode)
             confirmedNoFollows = noFollows
-            reachedEnd = videos.count < FeedService.pageSize
-            await loadPageDetails(page, request: request)
+            await loadPageDetails(displayed, request: request)
             while !Task.isCancelled, request == generation, !reachedEnd, current >= videos.count - 3 {
                 guard (try? await appendPage(request: request)) == true else { break }
             }
@@ -481,7 +540,7 @@ final class FeedModel: ObservableObject {
     }
 
     func loadMore() async {
-        guard !loading, !reachedEnd, current >= videos.count - 3 else { return }
+        guard !loading, !reachedEnd, loadedMode == mode, current >= videos.count - 3 else { return }
         let request = generation
         loading = true
         defer { if request == generation { loading = false } }
@@ -491,29 +550,40 @@ final class FeedModel: ObservableObject {
     }
 
     private func appendPage(request: Int) async throws -> Bool {
-        guard let last = videos.last else { return false }
-        let page = try await fetchPage(after: last, followingOnly: followingOnly, user: viewer)
-        guard !Task.isCancelled, request == generation else { return false }
-        let seen = Set(videos.map(\.id))
-        let fresh = page.filter { !seen.contains($0.id) }
-        reachedEnd = page.count < FeedService.pageSize || fresh.isEmpty
-        videos += fresh
+        let selectedMode = mode
+        guard loadedMode == selectedMode, let last = pageCursor else { return false }
+        let page = try await fetchPage(after: last, mode: selectedMode, user: viewer)
+        guard !Task.isCancelled, request == generation, mode == selectedMode else { return false }
+        let fresh = appendVisiblePage(page, mode: selectedMode)
         await loadPageDetails(fresh, request: request)
         return !fresh.isEmpty
+    }
+
+    private func appendVisiblePage(_ page: [Video], mode: FeedMode) -> [Video] {
+        let fresh = page.filter { seenVideoIDs.insert($0.id).inserted }
+        // The cursor follows the server's order, not the order viewers see.
+        pageCursor = page.last
+        reachedEnd = page.count < mode.fetchLimit || fresh.isEmpty
+        let displayed = mode == .discover
+            ? DiscoveryFeedRanking.order(fresh, now: rankingDate, after: videos.last?.userId)
+            : fresh
+        videos += displayed
+        return displayed
     }
 
     private func loadPageDetails(_ page: [Video], request: Int) async {
         async let bookmarks: Void = loadBookmarks(in: page, request: request)
         async let follows: Void = loadFollowing(in: page, request: request)
-        _ = await (bookmarks, follows)
+        async let downloads: Void = loadAudioPermissions(in: page, request: request)
+        _ = await (bookmarks, follows, downloads)
     }
 
-    private func fetchPage(after last: Video, followingOnly: Bool, user: UUID?) async throws -> [Video] {
-        if followingOnly {
+    private func fetchPage(after last: Video, mode: FeedMode, user: UUID?) async throws -> [Video] {
+        if mode == .following {
             guard let user else { return [] }
             return try await FeedService.followingPage(user: user, after: last).videos
         }
-        return try await FeedService.page(after: last)
+        return try await loadPublicPage(last, mode.fetchLimit)
     }
 
     private func loadFollowing(in page: [Video], request: Int) async {
@@ -533,13 +603,25 @@ final class FeedModel: ObservableObject {
         savedIDs.formUnion(saved)
     }
 
-    func toggleBookmark(_ id: UUID, user: UUID) async throws -> Bool? {
-        guard user == viewer, pendingBookmarks.insert(id).inserted else { return nil }
+    private func loadAudioPermissions(in page: [Video], request: Int) async {
+        guard let ids = try? await loadAudioDownloadIDs(page.map(\.id)), request == generation else { return }
+        audioDownloadIDs.formUnion(ids)
+    }
+
+    func toggleAudioPermission(_ id: UUID) async throws -> Bool {
+        let allowed = !audioDownloadIDs.contains(id)
+        try await FeedService.setAudioDownloadsAllowed(allowed, video: id)
+        if allowed { audioDownloadIDs.insert(id) } else { audioDownloadIDs.remove(id) }
+        return allowed
+    }
+
+    func toggleBookmark(_ id: UUID, user: UUID, explicitlySave: Bool = false) async throws -> Bool? {
+        guard (user == viewer || explicitlySave), pendingBookmarks.insert(id).inserted else { return nil }
         defer { pendingBookmarks.remove(id) }
         bookmarkRevision += 1
-        let save = !savedIDs.contains(id)
+        let save = explicitlySave || !savedIDs.contains(id)
         try await FeedService.setBookmark(save, video: id, user: user)
-        guard viewer == user else { return nil }
+        guard viewer == user else { return explicitlySave ? save : nil }
         bookmarkRevision += 1
         if save { savedIDs.insert(id) } else { savedIDs.remove(id) }
         return save
@@ -1123,6 +1205,8 @@ private struct PerformanceDetail: View {
     var allowsSharing = true
     @State private var player: AVPlayer?
     @State private var showComments = false
+    @State private var audioDownload: Video?
+    @State private var canDownloadAudio = false
 
     var body: some View {
         ScrollView {
@@ -1150,6 +1234,13 @@ private struct PerformanceDetail: View {
                     Button("Play along", systemImage: "waveform.badge.plus") { onPlayAlong(video) }
                         .buttonStyle(StudioActionStyle())
                 }
+                if allowsSharing && canDownloadAudio {
+                    Button("Download audio", systemImage: "arrow.down.circle") {
+                        player?.pause()
+                        audioDownload = video
+                    }
+                    .frame(minHeight: 44)
+                }
                 if notification?.commentId == nil && video.commentsEnabled == true {
                     Button("Comments", systemImage: "bubble", action: openComments)
                         .frame(minHeight: 44)
@@ -1170,6 +1261,10 @@ private struct PerformanceDetail: View {
             CommentsView(video: video, auth: auth, targetComment: notification?.commentId)
         }
         .task { player = AVPlayer(url: video.videoURL) }
+        .task(id: video.id) {
+            canDownloadAudio = (try? await FeedService.audioDownloadsAllowed([video.id]))?.contains(video.id) == true
+        }
+        .modifier(PerformanceAudioDownload(video: $audioDownload))
         .onChange(of: scenePhase) { if $0 != .active { player?.pause() } }
         .onDisappear { player?.pause() }
         .tint(palette.accent)
@@ -1195,6 +1290,46 @@ private struct PerformanceDetail: View {
     private func openComments() {
         player?.pause()
         showComments = true
+    }
+}
+
+private struct PerformanceAudioDownload: ViewModifier {
+    @Binding var video: Video?
+    @State private var audioFile: URL?
+    @State private var message: String?
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .top) {
+                if video != nil {
+                    ProgressView("Preparing audio…")
+                        .padding(12).background(.regularMaterial, in: Capsule())
+                        .padding(.top, 8)
+                }
+            }
+            .task(id: video?.id) {
+                guard let selected = video else { return }
+                do {
+                    guard try await FeedService.audioDownloadsAllowed([selected.id]).contains(selected.id) else {
+                        throw SocialError.message("The creator hasn't allowed audio downloads for this clip.")
+                    }
+                    let file = try await PerformanceAudio.export(selected)
+                    if Task.isCancelled { try? FileManager.default.removeItem(at: file); return }
+                    audioFile = file
+                } catch {
+                    if !Task.isCancelled {
+                        message = (error as? SocialError)?.localizedDescription ?? "Couldn't prepare the audio. Try again."
+                    }
+                }
+                if !Task.isCancelled { video = nil }
+            }
+            .sheet(item: $audioFile) { file in
+                ShareSheet(activityItems: [file])
+                    .onDisappear { try? FileManager.default.removeItem(at: file) }
+            }
+            .alert("Download audio", isPresented: Binding(
+                get: { message != nil }, set: { if !$0 { message = nil } }
+            )) { Button("OK", role: .cancel) {} } message: { Text(message ?? "") }
     }
 }
 
@@ -1349,6 +1484,8 @@ private struct FeedCell: View {
     let isMine: Bool
     let isFollowing: Bool
     let isSaved: Bool
+    let canDownloadAudio: Bool
+    let canChangeAudioPermission: Bool
     let muted: Bool
     let toggleMute: () -> Void
     let like: () -> Void
@@ -1360,6 +1497,9 @@ private struct FeedCell: View {
     let comments: () -> Void
     let creator: () -> Void
     let bookmark: () -> Void
+    let downloadAudio: () -> Void
+    let changeAudioPermission: () -> Void
+    let advance: () -> Bool
     let playAlong: () -> Void
     let revokeBacking: () -> Void
     let source: (UUID) -> Void
@@ -1368,14 +1508,15 @@ private struct FeedCell: View {
     @StateObject private var playback = FeedPlaybackController()
     @State private var failedClipID: UUID?
     @State private var playbackAttempt = 0
+    @State private var confirmAudioDownloads = false
 
     private var playbackFailed: Bool { failedClipID == video.id }
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            LoopingPlayer(url: video.videoURL, thumb: video.thumbURL, playback: playback,
+            FeedPlayer(url: video.videoURL, thumb: video.thumbURL, playback: playback,
                           isCurrent: isCurrent, playing: !paused && !playbackFailed,
-                          muted: muted, durationHint: video.durationS) {
+                          muted: muted, durationHint: video.durationS, onEnd: advance) {
                 failedClipID = video.id
             }
             .id(playbackAttempt)
@@ -1426,6 +1567,9 @@ private struct FeedCell: View {
         .confirmationDialog("Delete this post?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive, action: delete)
         }
+        .confirmationDialog("Let anyone download this clip's audio?", isPresented: $confirmAudioDownloads, titleVisibility: .visible) {
+            Button("Allow audio downloads", action: changeAudioPermission)
+        } message: { Text("This includes any voice in the clip. Only allow downloads if you have permission to share all of the audio.") }
     }
 
     private var postControls: some View {
@@ -1479,13 +1623,26 @@ private struct FeedCell: View {
                         actionIcon(muted ? "speaker.slash" : "speaker.wave.2")
                     }
                     .accessibilityLabel(muted ? "Unmute" : "Mute")
+                    Button(action: bookmark) {
+                        actionIcon(isSaved ? "bookmark.fill" : "bookmark", tint: isSaved ? palette.mediaAccent : .white)
+                    }
+                    .accessibilityLabel(isSaved ? "Remove from Saved" : "Save privately")
+                    .accessibilityIdentifier("save-performance")
                     ShareLink(item: video.watchURL) {
                         actionIcon("square.and.arrow.up")
                     }
                     .accessibilityLabel("Share video")
                     Menu {
-                        Button(isSaved ? "Remove from Saved" : "Save privately",
-                               systemImage: isSaved ? "bookmark.slash" : "bookmark", action: bookmark)
+                        if canDownloadAudio {
+                            Button("Download audio", systemImage: "arrow.down.circle", action: downloadAudio)
+                        }
+                        if canChangeAudioPermission {
+                            Button(canDownloadAudio ? "Turn off audio downloads" : "Allow audio downloads",
+                                   systemImage: "waveform") {
+                                if canDownloadAudio { changeAudioPermission() }
+                                else { confirmAudioDownloads = true }
+                            }
+                        }
                         if isMine {
                             if video.backingEnabled == true {
                                 Button("Stop allowing play-along", action: revokeBacking)
@@ -1543,6 +1700,7 @@ private struct FeedCell: View {
 private struct PagedFeed<Cell: View>: UIViewRepresentable {
     let videos: [Video]
     @Binding var current: Int
+    let refresh: () async -> Void
     let cell: (Video, Bool) -> Cell
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -1553,6 +1711,7 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         layout.minimumLineSpacing = 0
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.isPagingEnabled = true
+        cv.alwaysBounceVertical = true
         cv.isDirectionalLockEnabled = true
         cv.delaysContentTouches = false
         cv.allowsSelection = false
@@ -1562,6 +1721,9 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         cv.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
         cv.dataSource = context.coordinator
         cv.delegate = context.coordinator
+        let refreshControl = UIRefreshControl()
+        refreshControl.addTarget(context.coordinator, action: #selector(Coordinator.pullToRefresh(_:)), for: .valueChanged)
+        cv.refreshControl = refreshControl
         return cv
     }
 
@@ -1599,12 +1761,20 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         var parent: PagedFeed
         init(_ parent: PagedFeed) { self.parent = parent }
 
+        @objc func pullToRefresh(_ control: UIRefreshControl) {
+            Task {
+                await parent.refresh()
+                control.endRefreshing()
+            }
+        }
+
         func align(_ cv: UICollectionView) {
             guard parent.videos.indices.contains(parent.current), cv.bounds.height > 0 else { return }
             let target = CGFloat(parent.current) * cv.bounds.height
             guard abs(cv.contentOffset.y - target) > 1 else { return }
             cv.layoutIfNeeded()
             cv.setContentOffset(CGPoint(x: 0, y: target), animated: false)
+            cv.layoutIfNeeded()
         }
 
         func collectionView(_ cv: UICollectionView, numberOfItemsInSection section: Int) -> Int { parent.videos.count }
@@ -1613,6 +1783,11 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
             let c = cv.dequeueReusableCell(withReuseIdentifier: "cell", for: ip)
             configure(c, at: ip)
             return c
+        }
+
+        func collectionView(_ cv: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt ip: IndexPath) {
+            // A prefetched cell can have been built before auto-advance selected it.
+            configure(cell, at: ip)
         }
 
         func configure(_ c: UICollectionViewCell?, at ip: IndexPath) {
@@ -1651,7 +1826,7 @@ struct FeedPlaybackPosition: Equatable {
         self.seconds = min(duration, max(0, seconds))
     }
 
-    // Seeking to the exact end can make AVPlayerLooper jump straight to the next loop.
+    // Seek just before the end so scrubbing doesn't immediately advance the feed.
     var seekSeconds: Double { min(seconds, max(0, duration - 1.0 / 60)) }
 
     static func timeLabel(_ seconds: Double) -> String {
@@ -1664,7 +1839,7 @@ struct FeedPlaybackPosition: Equatable {
 @MainActor
 private final class FeedPlaybackController: ObservableObject {
     @Published private(set) var position: FeedPlaybackPosition?
-    private var player: AVQueuePlayer?
+    private var player: AVPlayer?
     private var timeObserver: Any?
     private var isCurrent = false
     private var wantsPlayback = false
@@ -1673,7 +1848,7 @@ private final class FeedPlaybackController: ObservableObject {
     private var seekID = 0
     private var durationHint: Double?
 
-    func configure(player newPlayer: AVQueuePlayer, isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?) {
+    func configure(player newPlayer: AVPlayer, isCurrent: Bool, wantsPlayback: Bool, durationHint: Double?) {
         if player !== newPlayer {
             disconnect()
             player = newPlayer
@@ -1688,7 +1863,7 @@ private final class FeedPlaybackController: ObservableObject {
         syncPlayback()
     }
 
-    func disconnect(from expectedPlayer: AVQueuePlayer? = nil) {
+    func disconnect(from expectedPlayer: AVPlayer? = nil) {
         if let expectedPlayer, player !== expectedPlayer { return }
         stopObserving()
         cancelSeek()
@@ -1717,7 +1892,20 @@ private final class FeedPlaybackController: ObservableObject {
         if !isTracking { seek(to: next) }
     }
 
-    private func observe(_ owner: AVQueuePlayer) {
+    func finished(_ owner: AVPlayer, advance: () -> Bool) {
+        guard player === owner, isCurrent, wantsPlayback, !isTracking, !isSeeking else { return }
+        owner.pause()
+        if advance() { wantsPlayback = false }
+        if let duration = position?.duration, let beginning = FeedPlaybackPosition(duration: duration, seconds: 0) {
+            position = beginning
+            seek(to: beginning)
+        } else {
+            owner.seek(to: .zero)
+            syncPlayback()
+        }
+    }
+
+    private func observe(_ owner: AVPlayer) {
         let interval = CMTime(value: 1, timescale: 5)
         timeObserver = owner.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self, weak owner] time in
             MainActor.assumeIsolated {
@@ -1731,7 +1919,7 @@ private final class FeedPlaybackController: ObservableObject {
         }
     }
 
-    private func sample(_ owner: AVQueuePlayer, time: CMTime) {
+    private func sample(_ owner: AVPlayer, time: CMTime) {
         guard isCurrent, !isTracking, !isSeeking, player === owner else { return }
         let measured = owner.currentItem?.duration.seconds ?? 0
         let duration = measured.isFinite && measured > 0 ? measured : durationHint ?? 0
@@ -1805,20 +1993,17 @@ private struct FeedProgressStrip: View {
 
 @MainActor
 final class FeedClipFailureMonitor {
-    private let player: AVQueuePlayer
+    private let player: AVPlayer
     private var onFailure: (() -> Void)?
     private var observations: [NSKeyValueObservation] = []
     private var itemStatus: NSKeyValueObservation?
     private var itemEndFailure: AnyCancellable?
 
-    init(player: AVQueuePlayer, looper: AVPlayerLooper, onFailure: @escaping () -> Void) {
+    init(player: AVPlayer, looper: AVPlayerLooper? = nil, onFailure: @escaping () -> Void) {
         self.player = player
         self.onFailure = onFailure
         // The typed KVO payload can omit these Objective-C enum values.
         observations = [
-            looper.observe(\.status, options: [.initial]) { @Sendable [weak self] looper, _ in
-                if looper.status == .failed { self?.scheduleFailure() }
-            },
             player.observe(\.status, options: [.initial]) { @Sendable [weak self] player, _ in
                 if player.status == .failed { self?.scheduleFailure() }
             },
@@ -1826,6 +2011,11 @@ final class FeedClipFailureMonitor {
                 DispatchQueue.main.async { [weak self] in self?.observeCurrentItem() }
             }
         ]
+        if let looper {
+            observations.append(looper.observe(\.status, options: [.initial]) { @Sendable [weak self] looper, _ in
+                if looper.status == .failed { self?.scheduleFailure() }
+            })
+        }
         observeCurrentItem()
     }
 
@@ -1857,7 +2047,7 @@ final class FeedClipFailureMonitor {
     }
 }
 
-private struct LoopingPlayer: UIViewRepresentable {
+private struct FeedPlayer: UIViewRepresentable {
     let url: URL
     let thumb: URL
     let playback: FeedPlaybackController
@@ -1865,12 +2055,14 @@ private struct LoopingPlayer: UIViewRepresentable {
     let playing: Bool
     let muted: Bool
     let durationHint: Double?
+    let onEnd: () -> Bool
     let onFailure: () -> Void
 
     func makeUIView(context: Context) -> PlayerView { PlayerView() }
 
     func updateUIView(_ view: PlayerView, context: Context) {
         view.onFailure = onFailure
+        view.onEnd = onEnd
         view.load(url: url, thumb: thumb)
         if view.playback !== playback { view.playback?.disconnect(from: view.player); view.playback = playback }
         guard let player = view.player else { return }
@@ -1888,12 +2080,13 @@ private struct LoopingPlayer: UIViewRepresentable {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
         private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
         private let thumbView = UIImageView()
-        private var looper: AVPlayerLooper?
         private var failureMonitor: FeedClipFailureMonitor?
-        private(set) var player: AVQueuePlayer?
+        private var endObservation: AnyCancellable?
+        private(set) var player: AVPlayer?
         var playback: FeedPlaybackController?
         private var loadedURL: URL?
         var onFailure: (() -> Void)?
+        var onEnd: (() -> Bool)?
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -1920,19 +2113,26 @@ private struct LoopingPlayer: UIViewRepresentable {
                 DispatchQueue.main.async { if self?.loadedURL == url { self?.thumbView.image = img } }
             }.resume()
             let item = AVPlayerItem(url: url)
-            let q = AVQueuePlayer()
-            let looper = AVPlayerLooper(player: q, templateItem: item)
-            self.looper = looper
-            player = q
-            playerLayer.player = q
-            failureMonitor = FeedClipFailureMonitor(player: q, looper: looper) { [weak self] in
+            let clipPlayer = AVPlayer(playerItem: item)
+            clipPlayer.actionAtItemEnd = .pause
+            player = clipPlayer
+            playerLayer.player = clipPlayer
+            failureMonitor = FeedClipFailureMonitor(player: clipPlayer) { [weak self] in
                 self?.player?.pause()
                 self?.onFailure?()
             }
+            endObservation = NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification, object: item)
+                .sink { [weak self, weak clipPlayer] _ in
+                    DispatchQueue.main.async { [weak self, weak clipPlayer] in
+                        guard let self, let clipPlayer, self.player === clipPlayer, let onEnd else { return }
+                        playback?.finished(clipPlayer, advance: onEnd)
+                    }
+                }
         }
 
         func stopObservingAndPause() {
             failureMonitor = nil
+            endObservation = nil
             player?.pause()
         }
 
