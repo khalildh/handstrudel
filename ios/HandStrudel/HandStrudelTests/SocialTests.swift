@@ -369,6 +369,180 @@ final class SocialTests: XCTestCase {
         }
     }
 
+    func testFeedNavigationKeepsAdjacentVideosInOrder() {
+        for (current, step, expected) in [(0, 1, 1), (1, 1, 2), (2, -1, 1), (1, -1, 0)] {
+            XCTAssertEqual(FeedNavigation.destination(from: current, by: step, count: 3, choose: { _ in
+                XCTFail("Only the edges should choose a random clip.")
+                return 0
+            }), expected)
+        }
+    }
+
+    func testFeedNavigationCanChooseEveryOtherVideoAtEitherEdge() {
+        for count in 2...8 {
+            for (current, step) in [(0, -1), (count - 1, 1)] {
+                let targets = (0..<(count - 1)).compactMap { candidate in
+                    FeedNavigation.destination(from: current, by: step, count: count, choose: { range in
+                        XCTAssertEqual(range, 0..<(count - 1))
+                        return candidate
+                    })
+                }
+                XCTAssertEqual(Set(targets), Set(0..<count).subtracting([current]))
+            }
+        }
+    }
+
+    func testFeedNavigationDoesNotInventAnAlternativeForEmptyOrSingleClipFeeds() {
+        for count in [0, 1] {
+            XCTAssertNil(FeedNavigation.destination(from: 0, by: 1, count: count))
+            XCTAssertNil(FeedNavigation.destination(from: 0, by: -1, count: count))
+        }
+        XCTAssertNil(FeedNavigation.destination(from: -1, by: 1, count: 3))
+        XCTAssertNil(FeedNavigation.destination(from: 3, by: -1, count: 3))
+        XCTAssertNil(FeedNavigation.destination(from: 0, by: 0, count: 3))
+    }
+
+    @MainActor
+    func testFeedEdgeSwipesChooseADifferentClipAndAlignTheViewportOnce() throws {
+        let clips = try feedPagingClips()
+        for (start, step, candidate, expected, decelerates) in [
+            (0, -1, 1, 2, false), (2, 1, 0, 0, false), (0, -1, 1, 2, true), (2, 1, 0, 0, true)
+        ] {
+            var current = start
+            var boundaryCalls = 0
+            let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                                 isVisible: false, allowsPlayback: true, refresh: {}, onBoundary: { amount in
+                boundaryCalls += 1
+                XCTAssertEqual(amount, step)
+                guard let next = FeedNavigation.destination(from: current, by: amount, count: clips.count,
+                                                           choose: { _ in candidate }) else { return false }
+                current = next
+                return true
+            }) { video, _, _ in Text(video.caption) }
+            let coordinator = feed.makeCoordinator()
+            defer { coordinator.cancelPendingUpdates() }
+            let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                                collectionViewLayout: UICollectionViewFlowLayout())
+            coordinator.applyUpdate(collection)
+            let origin = CGFloat(start) * collection.bounds.height
+            collection.simulatesDragging = true
+            coordinator.scrollViewWillBeginDragging(collection)
+            collection.simulatedOffset.y = origin + CGFloat(step) * 150
+            var target = collection.simulatedOffset
+            coordinator.scrollViewWillEndDragging(collection, withVelocity: CGPoint(x: 0, y: CGFloat(step)), targetContentOffset: &target)
+            XCTAssertEqual(target.y, origin, "Finish the edge bounce before switching, rather than scrolling across every intervening clip.")
+            XCTAssertEqual(current, start)
+            collection.simulatesDragging = false
+            collection.simulatesDeceleration = decelerates
+            coordinator.scrollViewDidEndDragging(collection, willDecelerate: decelerates)
+            if decelerates {
+                XCTAssertEqual(boundaryCalls, 0)
+                collection.simulatedOffset = target
+                collection.simulatesDeceleration = false
+                coordinator.scrollViewDidEndDecelerating(collection)
+            }
+            XCTAssertEqual(boundaryCalls, 1)
+            XCTAssertEqual(current, expected)
+            XCTAssertEqual(collection.contentOffset.y, CGFloat(expected) * collection.bounds.height)
+            XCTAssertEqual(coordinator.playbackGate.selectedVideoID, clips[expected].id)
+            coordinator.scrollViewDidEndDecelerating(collection)
+            XCTAssertEqual(boundaryCalls, 1, "Repeated scroll callbacks must not pick another random clip.")
+        }
+    }
+
+    @MainActor
+    func testFeedRecognizesEdgeSwipesDespiteRubberBanding() throws {
+        let clips = try feedPagingClips()
+        for start in [0, 2] {
+            var current = start
+            let step = start == 0 ? -1 : 1
+            var boundaryCalls = 0
+            let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                                 isVisible: false, allowsPlayback: true, refresh: {}, onBoundary: { amount in
+                boundaryCalls += 1
+                XCTAssertEqual(amount, step)
+                current = 1
+                return true
+            }) { video, _, _ in Text(video.caption) }
+            let coordinator = feed.makeCoordinator()
+            defer { coordinator.cancelPendingUpdates() }
+            let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                                collectionViewLayout: UICollectionViewFlowLayout())
+            coordinator.applyUpdate(collection)
+            collection.simulatesDragging = true
+            coordinator.scrollViewWillBeginDragging(collection)
+            collection.simulatedOffset.y += CGFloat(step) * 25
+            collection.simulatedPan.travel = CGPoint(x: 0, y: CGFloat(-step) * 60)
+            var target = CGPoint(x: 0, y: CGFloat(start) * collection.bounds.height)
+            coordinator.scrollViewWillEndDragging(collection, withVelocity: .zero, targetContentOffset: &target)
+            collection.simulatesDragging = false
+            coordinator.scrollViewDidEndDragging(collection, willDecelerate: false)
+            XCTAssertEqual(boundaryCalls, 1)
+            XCTAssertEqual(current, 1)
+        }
+    }
+
+    @MainActor
+    func testFeedDefersTheEdgeJumpUntilLateScrollCallbacksHaveSettled() async throws {
+        let clips = try feedPagingClips()
+        var current = 0
+        var boundaryCalls = 0
+        let selected = expectation(description: "The random destination is selected once scrolling really stops")
+        let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                             isVisible: false, allowsPlayback: true, refresh: {}, onSelection: { video in
+            if video.id == clips[2].id { selected.fulfill() }
+        }, onBoundary: { _ in
+            boundaryCalls += 1
+            current = 2
+            return true
+        }) { video, _, _ in Text(video.caption) }
+        let coordinator = feed.makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        collection.simulatesDragging = true
+        coordinator.scrollViewWillBeginDragging(collection)
+        collection.simulatedOffset.y = -150
+        var target = CGPoint.zero
+        coordinator.scrollViewWillEndDragging(collection, withVelocity: CGPoint(x: 0, y: -1), targetContentOffset: &target)
+        collection.simulatesDragging = false
+        collection.simulatesDeceleration = true
+        collection.simulatedOffset = target
+        coordinator.scrollViewDidEndDecelerating(collection)
+        XCTAssertEqual(boundaryCalls, 0, "UIKit can still report deceleration during its end callback.")
+        (coordinator as UIScrollViewDelegate).scrollViewDidScroll?(collection)
+        collection.simulatesDeceleration = false
+        await fulfillment(of: [selected], timeout: 1)
+        XCTAssertEqual(boundaryCalls, 1)
+        XCTAssertEqual(current, 2)
+        XCTAssertEqual(collection.contentOffset.y, collection.bounds.height * 2)
+    }
+
+    @MainActor
+    func testFeedSmallEdgeDragsDoNotPickARandomClip() throws {
+        let clips = try feedPagingClips()
+        for start in [0, 2] {
+            let feed = PagedFeed(videos: clips, current: .constant(start), isVisible: false, allowsPlayback: true,
+                                 refresh: {}, onBoundary: { _ in XCTFail("A short bounce must not navigate."); return false }) {
+                video, _, _ in Text(video.caption)
+            }
+            let coordinator = feed.makeCoordinator()
+            defer { coordinator.cancelPendingUpdates() }
+            let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                                collectionViewLayout: UICollectionViewFlowLayout())
+            coordinator.applyUpdate(collection)
+            collection.simulatesDragging = true
+            coordinator.scrollViewWillBeginDragging(collection)
+            collection.simulatedOffset.y += start == 0 ? -30 : 30
+            var target = CGPoint(x: 0, y: CGFloat(start) * collection.bounds.height)
+            coordinator.scrollViewWillEndDragging(collection, withVelocity: .zero, targetContentOffset: &target)
+            collection.simulatesDragging = false
+            coordinator.scrollViewDidEndDragging(collection, willDecelerate: false)
+            XCTAssertEqual(coordinator.playbackGate.selectedVideoID, clips[start].id)
+        }
+    }
+
     @MainActor
     func testFeedInterruptedDecelerationAnchorsTheNextSwipeToTheVisiblePage() throws {
         let clips = try feedPagingClips()
@@ -619,6 +793,8 @@ final class SocialTests: XCTestCase {
         var simulatedOffset = CGPoint.zero
         var visiblePage = 0
         let visibleCell = UICollectionViewCell()
+        let simulatedPan = FeedPanSpy()
+        override var panGestureRecognizer: UIPanGestureRecognizer { simulatedPan }
         override var isDecelerating: Bool { simulatesDeceleration }
         override var isTracking: Bool { simulatesTracking }
         override var isDragging: Bool { simulatesDragging }
@@ -629,6 +805,11 @@ final class SocialTests: XCTestCase {
         override var indexPathsForVisibleItems: [IndexPath] { [IndexPath(item: visiblePage, section: 0)] }
         override func cellForItem(at indexPath: IndexPath) -> UICollectionViewCell? { visibleCell }
         override func reloadData() {}
+    }
+
+    private final class FeedPanSpy: UIPanGestureRecognizer {
+        var travel = CGPoint.zero
+        override func translation(in view: UIView?) -> CGPoint { travel }
     }
 
     func testComposerSharesEligibleSoundAndBackingByDefault() {

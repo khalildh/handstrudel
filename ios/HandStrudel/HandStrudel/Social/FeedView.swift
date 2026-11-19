@@ -73,7 +73,8 @@ struct FeedView<Navigation: View>: View {
             if hasVideos {
                 PagedFeed(videos: model.videos, current: $model.current, isVisible: isActive, allowsPlayback: allowsFeedPlayback, refresh: {
                     await model.refresh(user: auth.userId)
-                }, sharedPlaybackGate: feedPlaybackGate, onSelection: { playbackStore.select($0) }) { video, _, playbackGate in
+                }, sharedPlaybackGate: feedPlaybackGate, onSelection: { playbackStore.select($0) },
+                          onBoundary: { movePage(by: $0) }) { video, _, playbackGate in
                     FeedCell(video: video, isFullscreen: isFullscreen, playbackGate: playbackGate,
                              clip: clipPlayback(for: video),
                              showsFullscreenControls: $showsFullscreenControls,
@@ -279,13 +280,14 @@ struct FeedView<Navigation: View>: View {
         } message: { Text("Reports are anonymous. Posts with several reports are hidden while we review them.") }
     }
 
-    private func movePage(by amount: Int) {
-        let target = model.current + amount
-        guard model.videos.indices.contains(target) else { return }
+    @discardableResult
+    private func movePage(by amount: Int) -> Bool {
+        guard let target = FeedNavigation.destination(from: model.current, by: amount, count: model.videos.count) else { return false }
         let video = model.videos[target]
         playbackStore.select(video)
         feedPlaybackGate.select(allowsFeedPlayback ? video.id : nil)
         model.current = target
+        return true
     }
 
     private var selectedVideo: Video? {
@@ -335,10 +337,8 @@ struct FeedView<Navigation: View>: View {
     }
 
     private func advanceAfterClip(_ id: UUID) -> Bool {
-        guard model.videos.indices.contains(model.current), model.videos[model.current].id == id,
-              model.videos.indices.contains(model.current + 1) else { return false }
-        movePage(by: 1)
-        return true
+        guard model.videos.indices.contains(model.current), model.videos[model.current].id == id else { return false }
+        return movePage(by: 1)
     }
 
     private func resumePerformance() {
@@ -420,6 +420,10 @@ struct FeedView<Navigation: View>: View {
                 ForEach(FeedMode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
             }
             .pickerStyle(.inline)
+            Button("Refresh feed", systemImage: "arrow.clockwise") {
+                Task { await model.refresh(user: auth.userId) }
+            }
+            .disabled(model.loading)
         } label: {
             HStack(spacing: 7) {
                 Text(model.mode == .discover ? "Feed" : model.mode.title)
@@ -605,6 +609,18 @@ enum FeedMode: Hashable, CaseIterable {
     }
 
     var fetchLimit: Int { self == .discover ? 24 : FeedService.pageSize }
+}
+
+enum FeedNavigation {
+    static func destination(from current: Int, by step: Int, count: Int,
+                            choose: (Range<Int>) -> Int = { Int.random(in: $0) }) -> Int? {
+        guard count > 1, (0..<count).contains(current), step == -1 || step == 1 else { return nil }
+        let adjacent = current + step
+        if (0..<count).contains(adjacent) { return adjacent }
+        // Map a random slot around the current index so an edge never picks itself.
+        let candidate = choose(0..<(count - 1))
+        return candidate >= current ? candidate + 1 : candidate
+    }
 }
 
 private struct FeedOverlayHeights: PreferenceKey, Equatable {
@@ -2389,6 +2405,7 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
     let refresh: () async -> Void
     var sharedPlaybackGate: FeedPlaybackGate? = nil
     var onSelection: ((Video) -> Void)? = nil
+    var onBoundary: ((Int) -> Bool)? = nil
     let cell: (Video, Bool, FeedPlaybackGate) -> Cell
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -2412,9 +2429,11 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
         cv.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
         cv.dataSource = context.coordinator
         cv.delegate = context.coordinator
-        let refreshControl = UIRefreshControl()
-        refreshControl.addTarget(context.coordinator, action: #selector(Coordinator.pullToRefresh(_:)), for: .valueChanged)
-        cv.refreshControl = refreshControl
+        if onBoundary == nil {
+            let refreshControl = UIRefreshControl()
+            refreshControl.addTarget(context.coordinator, action: #selector(Coordinator.pullToRefresh(_:)), for: .valueChanged)
+            cv.refreshControl = refreshControl
+        }
         return cv
     }
 
@@ -2451,6 +2470,7 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
         let playbackGate: FeedPlaybackGate
         private var snapPage: Int?
         private var dragStartPage: Int?
+        private var pendingBoundary: (videoID: UUID, step: Int)?
         private var renderedIDs: [UUID] = []
         private var renderedPage = 0
         private var pendingUpdate: Task<Void, Never>?
@@ -2470,6 +2490,14 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
                 return
             }
             cancelPendingUpdates()
+            // Wait for native scrolling to settle so a final offset callback cannot undo the jump.
+            if let boundary = pendingBoundary {
+                pendingBoundary = nil
+                if parent.allowsPlayback, parent.videos.indices.contains(parent.current),
+                   parent.videos[parent.current].id == boundary.videoID {
+                    _ = parent.onBoundary?(boundary.step)
+                }
+            }
             selectPage(parent.current)
             let ids = parent.videos.map(\.id)
             if renderedIDs != ids {
@@ -2574,6 +2602,7 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
 
         func scrollViewWillBeginDragging(_ sv: UIScrollView) {
             snapPage = nil
+            pendingBoundary = nil
             // Another flick can interrupt deceleration before the old target has settled.
             dragStartPage = visiblePage(in: sv)
             selectVisiblePage(in: sv)
@@ -2604,22 +2633,33 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
             guard height > 0, let startPage = dragStartPage ?? visiblePage(in: sv) else { return }
             let offset = sv.contentOffset.y
             let projected = targetContentOffset.pointee.y
-            // Leave the overscroll at the top to the native refresh control.
-            guard startPage != 0 || offset >= 0 || projected > 0 else { return }
+            // Non-looping containers still use the native pull-to-refresh gesture.
+            guard parent.onBoundary != nil || startPage != 0 || offset >= 0 || projected > 0 else { return }
             let start = CGFloat(startPage) * height
             let distance = offset - start
             let projectedDistance = projected - start
             let travel = abs(distance) >= abs(projectedDistance) ? distance : projectedDistance
             let threshold = min(120, height / 3)
-            let step = travel >= threshold ? 1 : travel <= -threshold ? -1 : 0
-            let page = min(renderedIDs.count - 1, max(0, startPage + step))
+            var step = travel >= threshold ? 1 : travel <= -threshold ? -1 : 0
+            if parent.onBoundary != nil, renderedIDs.count > 1 {
+                // Rubber-banding compresses the content offset, not the user's finger travel.
+                let drag = -sv.panGestureRecognizer.translation(in: sv).y
+                if startPage == 0, drag <= -48 { step = -1 }
+                else if startPage == renderedIDs.count - 1, drag >= 48 { step = 1 }
+            }
+            let requested = startPage + step
+            if parent.onBoundary != nil, renderedIDs.count > 1, step != 0,
+               !renderedIDs.indices.contains(requested), renderedIDs.indices.contains(startPage) {
+                pendingBoundary = (renderedIDs[startPage], step)
+            }
+            let page = min(renderedIDs.count - 1, max(0, requested))
             snapPage = page
             targetContentOffset.pointee.y = CGFloat(page) * height
         }
 
         func scrollViewDidEndDecelerating(_ sv: UIScrollView) {
             playbackGate.isPaging = false
-            guard !parent.videos.isEmpty else { return }
+            guard !parent.videos.isEmpty else { pendingBoundary = nil; return }
             snapPage = nil
             dragStartPage = nil
             let landed = min(max(0, renderedIDs.count - 1), max(0, Int((sv.contentOffset.y / max(sv.bounds.height, 1)).rounded())))
@@ -2631,6 +2671,9 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
                 parent.current = page
             }
             renderedPage = page
+            if let boundary = pendingBoundary, parent.videos[page].id != boundary.videoID {
+                pendingBoundary = nil
+            }
             if let cv = sv as? UICollectionView { applyUpdate(cv) }
         }
 

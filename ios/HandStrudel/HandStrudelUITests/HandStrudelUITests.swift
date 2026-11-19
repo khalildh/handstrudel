@@ -593,6 +593,13 @@ final class HandStrudelUITests: XCTestCase {
         let nextPlayhead = app.sliders["feed-video-progress"].firstMatch
         let moving = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true AND (value BEGINSWITH %@ OR value BEGINSWITH %@)", "0:01", "0:02"), object: nextPlayhead)
         XCTAssertEqual(XCTWaiter.wait(for: [moving], timeout: 8), .completed, "The second clip must play, not just appear.")
+        let first = app.staticTexts["Evening loop"].firstMatch
+        let continued = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)
+        XCTAssertEqual(XCTWaiter.wait(for: [continued], timeout: 10), .completed,
+                       "The last clip must advance to a different clip instead of replaying itself.")
+        let restarted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@ OR value BEGINSWITH %@", "0:01", "0:02"),
+                                                  object: nextPlayhead)
+        XCTAssertEqual(XCTWaiter.wait(for: [restarted], timeout: 8), .completed, "The selected clip must play after crossing the end of the feed.")
     }
 
     func testBookmarkAppearsInPrivateSavedLibrary() throws {
@@ -1194,6 +1201,46 @@ final class HandStrudelUITests: XCTestCase {
         thumb.press(forDuration: 0.05, thenDragTo: upper)
         let second = app.staticTexts["Second performance"].firstMatch
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
+    }
+
+    func testFeedSwipesContinuePastBothEdges() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_FEED_BOUNDARY_FIXTURE_URL"] else {
+            throw XCTSkip("Requires a two-video feed fixture with clips at least 20 seconds long.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "feed-boundary-fixture"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint + "/cold-" + UUID().uuidString
+        app.launch()
+        element("tab-feed").tap()
+        selectFeedMode("Latest")
+        let viewport = app.collectionViews["feed-video-viewport"]
+        XCTAssertTrue(viewport.waitForExistence(timeout: 5))
+        let upper = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.27))
+        let lower = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.73))
+        let shortStart = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.43))
+        let shortEnd = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.57))
+        func expectClip(_ caption: String) {
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
+                                                      object: app.staticTexts[caption].firstMatch)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
+        }
+        expectClip("Evening loop")
+        let slider = app.sliders["feed-video-progress"].firstMatch
+        let barY = slider.frame.midY
+        shortStart.press(forDuration: 0.05, thenDragTo: shortEnd)
+        expectClip("Second performance")
+        XCTAssertEqual(slider.frame.midY, barY, accuracy: 1)
+        shortEnd.press(forDuration: 0.05, thenDragTo: shortStart)
+        expectClip("Evening loop")
+        XCTAssertEqual(slider.frame.midY, barY, accuracy: 1)
+        // Normal adjacent navigation must still work after both edge jumps.
+        lower.press(forDuration: 0.05, thenDragTo: upper)
+        expectClip("Second performance")
+        upper.press(forDuration: 0.05, thenDragTo: lower)
+        expectClip("Evening loop")
+        element("feed-options").tap()
+        XCTAssertTrue(app.buttons["Refresh feed"].waitForExistence(timeout: 3), "Refresh stays available without claiming the backward swipe.")
     }
 
     func testFeedKeepsTheScrubberAndPlaybackAcrossConsecutiveVideoSwipes() throws {
