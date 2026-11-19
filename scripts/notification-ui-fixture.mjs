@@ -40,6 +40,15 @@ const secondPost = {
   source_video_id: process.env.FIXTURE_REMIXES === "1" ? video : undefined,
   source_username: process.env.FIXTURE_REMIXES === "1" ? post.username : undefined,
 };
+const sequencePosts = process.env.FIXTURE_SEQUENCE_CLIPS === "1" ? [3, 4].map((index) => ({
+  ...post,
+  id: `30000000-0000-0000-0000-00000000000${index}`,
+  user_id: `20000000-0000-0000-0000-00000000000${index + 1}`,
+  username: `artist${index}`,
+  caption: index === 3 ? "Third performance" : "Fourth performance, with a longer caption that wraps over several lines.",
+  like_count: 0,
+  video_key: `test/sequence-${index}.mp4`,
+})) : [];
 const initial = {
   id: root, video_id: video, user_id: viewer, username: "viewer", parent_id: null,
   body: "Which octave?", created_at: now, reply_count: 1,
@@ -121,7 +130,9 @@ createServer((request, response) => {
       response.writeHead(200, { "Content-Type": "image/jpeg", "Content-Length": thumbnailBytes.length });
       return response.end(request.method === "HEAD" ? undefined : thumbnailBytes);
     case "/test/clip.mp4":
-    case "/test/next-clip.mp4": {
+    case "/test/next-clip.mp4":
+    case "/test/sequence-3.mp4":
+    case "/test/sequence-4.mp4": {
       if (!clipBytes || !mediaAvailable) return response.writeHead(404).end();
       mediaRequests.push(url.pathname);
       const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range ?? "");
@@ -200,7 +211,7 @@ createServer((request, response) => {
       request.on("data", (chunk) => { body += chunk; });
       request.on("end", () => {
         const { target_video, watch_receipt } = JSON.parse(body);
-        const clip = [post, secondPost].find((item) => item.id === target_video.toLowerCase());
+        const clip = [post, secondPost, ...sequencePosts].find((item) => item.id === target_video.toLowerCase());
         if (!clip) return send(null);
         const receipt = `${clip.id}/${watch_receipt}`;
         if (!counted.has(receipt)) {
@@ -254,7 +265,7 @@ createServer((request, response) => {
       const handle = url.searchParams.get("username")?.slice(3);
       const author = url.searchParams.get("user_id")?.slice(3).toLowerCase();
       const source = url.searchParams.get("source_video_id")?.slice(3).toLowerCase();
-      return send((singleClip ? [post] : [post, secondPost]).filter((item) => (!id || item.id === id) && (!handle || item.username === handle)
+      return send((singleClip ? [post] : [post, secondPost, ...sequencePosts]).filter((item) => (!id || item.id === id) && (!handle || item.username === handle)
         && (!author || item.user_id === author) && (!source || item.source_video_id === source)));
     }
     case "/rest/v1/public_creators": {

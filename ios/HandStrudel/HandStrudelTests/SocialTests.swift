@@ -1,6 +1,7 @@
 import AVFoundation
 import ImageIO
 import Supabase
+import SwiftUI
 import UIKit
 import XCTest
 @testable import HandStrudel
@@ -315,6 +316,319 @@ final class SocialTests: XCTestCase {
         let feed = FeedPagingCollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
         XCTAssertTrue(feed.touchesShouldCancel(in: UISlider()))
         XCTAssertTrue(feed.touchesShouldCancel(in: UIButton()))
+    }
+
+    @MainActor
+    func testFeedActivatesSecondAndThirdCellsAfterDecelerationFlagsClear() async throws {
+        let clips = try feedPagingClips()
+        var current = 0
+        var active = Set<UUID>()
+        var activated: XCTestExpectation?
+        let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                             isVisible: false, allowsPlayback: true, refresh: {}) { video, isCurrent, _ in
+            if isCurrent {
+                active.insert(video.id)
+                activated?.fulfill()
+                activated = nil
+            }
+            return Text(video.caption)
+        }
+        let coordinator = feed.makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+
+        for page in [1, 2, 1] {
+            collection.visiblePage = page
+            coordinator.configure(collection.visibleCell, at: IndexPath(item: page, section: 0))
+            active.remove(clips[page].id)
+            collection.simulatedOffset = CGPoint(x: 0, y: CGFloat(page) * collection.bounds.height)
+            collection.simulatesDeceleration = true
+            coordinator.scrollViewDidEndDecelerating(collection)
+            XCTAssertEqual(current, page)
+            XCTAssertFalse(active.contains(clips[page].id), "Do not replace hosting views during deceleration.")
+
+            activated = expectation(description: "Selected cell becomes active after deceleration")
+            collection.simulatesDeceleration = false
+            await fulfillment(of: [try XCTUnwrap(activated)], timeout: 1)
+            XCTAssertTrue(active.contains(clips[page].id), "The handoff must not depend on another API response.")
+        }
+    }
+
+    private func feedPagingClips() throws -> [Video] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try (0..<3).map { index in
+            let row: [String: Any] = [
+                "id": UUID().uuidString, "user_id": UUID().uuidString, "like_count": 0,
+                "caption": "Performance \(index)", "video_key": "clip-\(index).mp4", "thumb_key": "thumb.jpg",
+                "created_at": "2026-11-19T00:00:00Z"
+            ]
+            return try decoder.decode(Video.self, from: JSONSerialization.data(withJSONObject: row))
+        }
+    }
+
+    @MainActor
+    func testFeedInterruptedDecelerationAnchorsTheNextSwipeToTheVisiblePage() throws {
+        let clips = try feedPagingClips()
+        var current = 0
+        let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                             isVisible: false, allowsPlayback: true, refresh: {}) { video, _, _ in Text(video.caption) }
+        let coordinator = feed.makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        let height = collection.bounds.height
+        collection.simulatesDeceleration = true
+        collection.simulatedOffset.y = height * 0.98
+        coordinator.scrollViewWillBeginDragging(collection)
+        collection.simulatedOffset.y = height * 1.6
+        var target = CGPoint(x: 0, y: height * 1.95)
+        coordinator.scrollViewWillEndDragging(collection, withVelocity: CGPoint(x: 0, y: 2), targetContentOffset: &target)
+        XCTAssertEqual(target.y, height * 2, accuracy: 1, "A second flick must advance past the video already in view.")
+
+        collection.simulatedOffset.y = height * 2
+        collection.simulatesDeceleration = false
+        coordinator.scrollViewDidEndDecelerating(collection)
+        collection.simulatesDeceleration = true
+        collection.simulatedOffset.y = height * 1.02
+        coordinator.scrollViewWillBeginDragging(collection)
+        collection.simulatedOffset.y = height * 0.4
+        target.y = height * 0.05
+        coordinator.scrollViewWillEndDragging(collection, withVelocity: CGPoint(x: 0, y: -2), targetContentOffset: &target)
+        XCTAssertEqual(target.y, 0, accuracy: 1, "Interrupted backward swipes must use the visible page too.")
+    }
+
+    @MainActor
+    func testFeedSelectsTheDominantVideoWithoutWaitingForScrollingToStop() throws {
+        let clips = try feedPagingClips()
+        var current = 0
+        let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                             isVisible: false, allowsPlayback: true, refresh: {}) { video, _, _ in Text(video.caption) }
+        let coordinator = feed.makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        collection.simulatesDragging = true
+        coordinator.scrollViewWillBeginDragging(collection)
+        collection.simulatedOffset.y = collection.bounds.height * 0.6
+        (coordinator as UIScrollViewDelegate).scrollViewDidScroll?(collection)
+        XCTAssertEqual(current, 1, "The overlay must switch before the next video finishes settling.")
+        collection.simulatedOffset.y = collection.bounds.height * 0.4
+        (coordinator as UIScrollViewDelegate).scrollViewDidScroll?(collection)
+        XCTAssertEqual(current, 0)
+    }
+
+    @MainActor
+    func testFeedRevisitClearsTheCachedPlayheadBeforeMediaIsReady() async throws {
+        let clips = try feedPagingClips()
+        let store = FeedPlaybackStore()
+        store.select(clips[0])
+        let clip = store.clip(for: clips[0].id)
+        let player = DelayedFeedSeekPlayer()
+        let gate = FeedPlaybackGate()
+        gate.select(clips[0].id)
+        clip.playback.configure(player: player, videoID: clips[0].id, gate: gate, isCurrent: true,
+                                wantsPlayback: false, durationHint: 20, countsViews: false)
+        clip.playback.setSeconds(12)
+        clip.paused = true
+        XCTAssertEqual(clip.playback.position?.seconds, 12)
+        store.select(clips[1])
+        store.select(clips[0])
+        XCTAssertEqual(clip.playback.position?.seconds, 0, "Do not display the previous visit while buffering.")
+        XCTAssertFalse(clip.paused)
+        player.completeSeek(at: 0, finished: false)
+        await Task.yield()
+        XCTAssertEqual(clip.playback.position?.seconds, 0, "A stale seek completion must not restore the old position.")
+    }
+
+    @MainActor
+    func testFeedRestartKeepsThePlayheadAtZeroUntilTheInitialSeekCompletes() async {
+        let controller = FeedPlaybackController()
+        let player = DelayedFeedSeekPlayer()
+        player.time = CMTime(seconds: 8, preferredTimescale: 600)
+        let id = UUID()
+        let gate = FeedPlaybackGate()
+        gate.select(id)
+        controller.configure(player: player, videoID: id, gate: gate, isCurrent: true,
+                             wantsPlayback: true, durationHint: 20, countsViews: false)
+        controller.setSeconds(8)
+        controller.prepareForVisit(durationHint: 20)
+        controller.configure(player: player, videoID: id, gate: gate, isCurrent: true,
+                             wantsPlayback: true, durationHint: 20, countsViews: false)
+        XCTAssertEqual(controller.position?.seconds, 0)
+        XCTAssertEqual(player.seeks.count, 2)
+        XCTAssertEqual(player.seeks.last?.time.seconds, 0)
+        XCTAssertFalse(player.didPlay)
+        player.completeSeek(at: 0, finished: false)
+        await Task.yield()
+        XCTAssertEqual(controller.position?.seconds, 0)
+        player.completeSeek(at: 1, finished: true)
+        for _ in 0..<20 {
+            if player.didPlay { break }
+            await Task.yield()
+        }
+        XCTAssertTrue(player.didPlay)
+        XCTAssertEqual(controller.position?.seconds, 0)
+    }
+
+    @MainActor
+    func testSharedScrubberReplacesTheOldThumbPositionEvenWhileTracking() {
+        var cancelledOld = false
+        var soughtNew = false
+        func configuration(_ source: AnyObject.Type, seconds: Double) -> FeedSeekSlider {
+            FeedSeekSlider(sourceID: ObjectIdentifier(source), seconds: seconds, duration: 20, enabled: true,
+                           tint: .white, valueLabel: "0:00 of 0:20", onChange: { _ in soughtNew = true },
+                           onEditing: { _ in }, onCancelEditing: { cancelledOld = true },
+                           onVerticalSwipe: nil, onPaging: nil)
+        }
+        let coordinator = FeedSeekSlider.Coordinator(configuration(NSObject.self, seconds: 12))
+        let slider = TrackingFeedSlider()
+        slider.maximumValue = 20
+        slider.value = 12
+        coordinator.update(slider, parent: configuration(AVPlayer.self, seconds: 0))
+        XCTAssertEqual(slider.value, 0)
+        XCTAssertTrue(cancelledOld)
+        XCTAssertFalse(soughtNew, "Resetting the thumb must not seek the newly selected video.")
+    }
+
+    @MainActor
+    func testFeedIgnoresTimeCallbacksQueuedDuringAPreviousVisit() {
+        let controller = FeedPlaybackController()
+        let player = DelayedFeedSeekPlayer()
+        let id = UUID()
+        let gate = FeedPlaybackGate()
+        gate.select(id)
+        controller.configure(player: player, videoID: id, gate: gate, isCurrent: true,
+                             wantsPlayback: false, durationHint: 20, countsViews: false)
+        controller.setSeconds(8)
+        let oldCallback = player.observers[0]
+        controller.prepareForVisit(durationHint: 20)
+        controller.configure(player: player, videoID: id, gate: gate, isCurrent: true,
+                             wantsPlayback: false, durationHint: 20, countsViews: false)
+        oldCallback(CMTime(seconds: 8, preferredTimescale: 600))
+        XCTAssertEqual(controller.position?.seconds, 0, "A reused player must not revive a timestamp from the previous visit.")
+        player.observers.last?(CMTime(seconds: 0.2, preferredTimescale: 600))
+        XCTAssertEqual(controller.position?.seconds, 0.2)
+    }
+
+    private final class TrackingFeedSlider: UISlider {
+        override var isTracking: Bool { true }
+    }
+
+    private final class DelayedFeedSeekPlayer: AVPlayer, @unchecked Sendable {
+        var time = CMTime.zero
+        private(set) var didPlay = false
+        private(set) var seeks: [(time: CMTime, completion: @Sendable (Bool) -> Void)] = []
+        private(set) var observers: [@Sendable (CMTime) -> Void] = []
+        override func currentTime() -> CMTime { time }
+        override func play() { didPlay = true }
+        override func pause() { didPlay = false }
+        override func addPeriodicTimeObserver(forInterval interval: CMTime, queue: DispatchQueue?,
+                                             using block: @escaping @Sendable (CMTime) -> Void) -> Any {
+            observers.append(block)
+            return NSObject()
+        }
+        override func removeTimeObserver(_ observer: Any) {}
+        override func seek(to time: CMTime, toleranceBefore: CMTime, toleranceAfter: CMTime,
+                           completionHandler: @escaping @Sendable (Bool) -> Void) {
+            seeks.append((time, completionHandler))
+        }
+        func completeSeek(at index: Int, finished: Bool) {
+            let seek = seeks[index]
+            if finished { time = seek.time }
+            seek.completion(finished)
+        }
+    }
+
+    @MainActor
+    func testFeedRetainsTheNewestViewCountWhenRevisitingACell() throws {
+        let clips = try feedPagingClips()
+        let model = FeedModel()
+        model.videos = clips
+        model.recordViewCount(8, for: clips[0].id)
+        model.current = 1
+        model.recordViewCount(4, for: clips[1].id)
+        model.current = 0
+        XCTAssertEqual(model.videos[model.current].viewCount, 8)
+        model.recordViewCount(7, for: clips[0].id)
+        model.recordViewCount(-1, for: clips[0].id)
+        model.recordViewCount(100, for: UUID())
+        XCTAssertEqual(model.videos[0].viewCount, 8, "A late or unrelated response must not revert the count.")
+        XCTAssertEqual(model.videos[1].viewCount, 4)
+    }
+
+    @MainActor
+    func testFeedCoalescesDeferredUpdatesWithoutAnotherScrollCallback() async throws {
+        let clips = try feedPagingClips()
+        var rendered: [String] = []
+        let latest = expectation(description: "Latest metadata is applied when touch tracking ends")
+        func feed(_ items: [Video]) -> PagedFeed<Text> {
+            PagedFeed(videos: items, current: .constant(0), isVisible: false, allowsPlayback: true, refresh: {}) { video, _, _ in
+                rendered.append(video.caption)
+                if video.caption == "Latest metadata" { latest.fulfill() }
+                return Text(video.caption)
+            }
+        }
+        let coordinator = feed(clips).makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        collection.simulatesTracking = true
+        var updated = clips
+        updated[0].caption = "Superseded metadata"
+        coordinator.parent = feed(updated)
+        coordinator.applyUpdate(collection)
+        updated[0].caption = "Latest metadata"
+        coordinator.parent = feed(updated)
+        coordinator.applyUpdate(collection)
+        XCTAssertTrue(rendered.isEmpty)
+        collection.simulatesTracking = false
+        await fulfillment(of: [latest], timeout: 1)
+        XCTAssertEqual(rendered, ["Latest metadata"])
+    }
+
+    @MainActor
+    func testFeedCancelsDeferredUpdatesWhenDismantled() async throws {
+        let clips = try feedPagingClips()
+        let unexpected = expectation(description: "Dismantled feed must not update its old views")
+        unexpected.isInverted = true
+        let feed = PagedFeed(videos: clips, current: .constant(0), isVisible: false, allowsPlayback: true, refresh: {}) { _, _, _ in
+            unexpected.fulfill()
+            return Text("Old feed")
+        }
+        let coordinator = feed.makeCoordinator()
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        collection.simulatesTracking = true
+        coordinator.applyUpdate(collection)
+        PagedFeed<Text>.dismantleUIView(collection, coordinator: coordinator)
+        collection.simulatesTracking = false
+        await fulfillment(of: [unexpected], timeout: 0.2)
+    }
+
+    private final class FeedScrollStateSpy: UICollectionView {
+        var simulatesDeceleration = false
+        var simulatesTracking = false
+        var simulatesDragging = false
+        var simulatedOffset = CGPoint.zero
+        var visiblePage = 0
+        let visibleCell = UICollectionViewCell()
+        override var isDecelerating: Bool { simulatesDeceleration }
+        override var isTracking: Bool { simulatesTracking }
+        override var isDragging: Bool { simulatesDragging }
+        override var contentOffset: CGPoint {
+            get { simulatedOffset }
+            set { simulatedOffset = newValue }
+        }
+        override var indexPathsForVisibleItems: [IndexPath] { [IndexPath(item: visiblePage, section: 0)] }
+        override func cellForItem(at indexPath: IndexPath) -> UICollectionViewCell? { visibleCell }
+        override func reloadData() {}
     }
 
     func testComposerSharesEligibleSoundAndBackingByDefault() {
