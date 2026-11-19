@@ -15,3 +15,14 @@ bucket_name = "handstrudel-video-staging"
 
 [triggers]
 crons = ["*/2 * * * *"]
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 0.1
+persist = true
