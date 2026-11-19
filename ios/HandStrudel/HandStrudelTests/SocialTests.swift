@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import ImageIO
 import Supabase
 import SwiftUI
@@ -259,13 +260,265 @@ final class SocialTests: XCTestCase {
     }
 
     @MainActor
-    func testFeedPreloadsOnlyNeighborsAndReusesTheirPausedPlayers() {
+    func testFeedOpeningFrameDecodesTheActualBeginningAndAppliesOrientation() async throws {
+        let url = try await Self.makeClip(width: 64, height: 96, seconds: 1)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let source = AVURLAsset(url: url)
+        let tracks = try await source.loadTracks(withMediaType: .video)
+        let track = try XCTUnwrap(tracks.first)
+        let composition = AVMutableComposition()
+        let rotated = try XCTUnwrap(composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid))
+        try rotated.insertTimeRange(CMTimeRange(start: .zero, duration: CMTime(seconds: 1, preferredTimescale: 30)), of: track, at: .zero)
+        rotated.preferredTransform = CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 96, ty: 0)
+        let image = try await FeedOpeningFrame.decode(composition)
+        XCTAssertEqual(image.size, CGSize(width: 96, height: 64))
+        let cg = try XCTUnwrap(image.cgImage)
+        var pixel = [UInt8](repeating: 0, count: 4)
+        let mean = try pixel.withUnsafeMutableBytes { bytes -> Double in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return (Double(bytes[0]) + Double(bytes[1]) + Double(bytes[2])) / 3
+        }
+        XCTAssertLessThan(mean, 20, "This fixture starts black and brightens; decode frame zero, not a later representative thumbnail.")
+    }
+
+    @MainActor
+    func testFeedOpeningFrameIgnoresADecodeThatCompletesAfterEviction() async {
+        let started = expectation(description: "Opening-frame decode started")
+        var completion: CheckedContinuation<UIImage, Never>?
+        let frame = FeedOpeningFrame(asset: AVMutableComposition(), decode: { _ in
+            await withCheckedContinuation { continuation in
+                completion = continuation
+                started.fulfill()
+            }
+        })
+        await fulfillment(of: [started], timeout: 2)
+        frame.cancel()
+        completion?.resume(returning: openingFrameMarker())
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertNil(frame.image, "An evicted clip must not republish a late decoded image.")
+    }
+
+    @MainActor
+    func testFeedPreloadsOpeningFramesFromTheSameAssetsAndReusesThem() async throws {
+        let marker = openingFrameMarker()
+        var decodedAssets: [AVAsset] = []
+        var players: [FeedPlayerSpy] = []
+        let preloader = FeedVideoPreloader(openingFrameDecoder: { asset in
+            decodedAssets.append(asset)
+            return marker
+        }) { _ in
+            let player = FeedPlayerSpy(playerItem: AVPlayerItem(asset: AVMutableComposition()))
+            players.append(player)
+            return player
+        }
+        let resources = (0..<3).map { FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/frame-\($0).mp4")!) }
+        preloader.update(resources, current: resources[1].id)
+        let next = try XCTUnwrap(preloader.openingFrame(for: resources[2]))
+        let image = await waitForOpeningFrame(next)
+        XCTAssertTrue(image === marker)
+        XCTAssertEqual(decodedAssets.count, 2)
+        XCTAssertTrue(decodedAssets.contains { $0 === players[1].currentItem?.asset }, "Use the buffered video's asset, not another image URL.")
+        _ = preloader.take(resources[2])
+        XCTAssertTrue(preloader.openingFrame(for: resources[2]) === next)
+        XCTAssertEqual(decodedAssets.count, 2, "Adopting a preloaded player must not start another frame decode.")
+        XCTAssertTrue(players.allSatisfy { !$0.didPlay && $0.isMuted })
+        preloader.update([resources[2]], current: resources[2].id)
+        XCTAssertNil(preloader.openingFrame(for: resources[0]))
+        XCTAssertTrue(preloader.openingFrame(for: resources[2]) === next)
+        preloader.update([], current: nil)
+        XCTAssertNil(preloader.openingFrame(for: resources[2]))
+        XCTAssertNil(next.image, "Leaving the preload window releases decoded images as well as video buffers.")
+    }
+
+    @MainActor
+    func testFeedOpeningFrameFailureDoesNotPreventTakingOrPlayingTheVideo() async throws {
+        let attempted = expectation(description: "Opening-frame failure is handled separately")
+        let preloader = FeedVideoPreloader(openingFrameDecoder: { _ in
+            attempted.fulfill()
+            throw CancellationError()
+        }) { _ in FeedPlayerSpy(playerItem: AVPlayerItem(asset: AVMutableComposition())) }
+        let clip = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/failure.mp4")!)
+        preloader.update([clip], current: nil)
+        await fulfillment(of: [attempted], timeout: 2)
+        let player = try XCTUnwrap(preloader.take(clip) as? FeedPlayerSpy)
+        XCTAssertNil(preloader.openingFrame(for: clip)?.image)
+        let gate = FeedPlaybackGate()
+        gate.select(clip.id)
+        gate.play(player, videoID: clip.id)
+        XCTAssertTrue(player.didPlay)
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedPlayerShowsTheCachedOpeningFrameBeforeSelectionAndClearsItOnReuse() async throws {
+        let marker = openingFrameMarker()
+        let preloader = FeedVideoPreloader(openingFrameDecoder: { _ in marker }) { _ in
+            FeedPlayerSpy(playerItem: AVPlayerItem(asset: AVMutableComposition()))
+        }
+        let clip = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/frame.mp4")!)
+        let other = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/other.mp4")!)
+        preloader.update([clip], current: nil)
+        _ = await waitForOpeningFrame(try XCTUnwrap(preloader.openingFrame(for: clip)))
+        let view = FeedPlayer.PlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        view.load(videoID: clip.id, url: clip.url, preloader: preloader, isCurrent: false)
+        XCTAssertTrue(view.openingFrameView.image === marker)
+        XCTAssertFalse(view.openingFrameView.isHidden)
+        XCTAssertNil(view.player, "Displaying a preloaded opening frame must not start an offscreen player.")
+        view.setAspectFit(true)
+        XCTAssertEqual(view.openingFrameView.contentMode, .scaleAspectFit)
+        view.load(videoID: other.id, url: other.url, preloader: preloader, isCurrent: false)
+        XCTAssertNil(view.openingFrameView.image, "Never display the previous clip's frame while reusing a cell.")
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedOpeningFrameIsInvalidatedWhenTheVideoURLChanges() async throws {
+        let marker = openingFrameMarker()
+        let preloader = FeedVideoPreloader(openingFrameDecoder: { _ in marker }) { _ in
+            FeedPlayerSpy(playerItem: AVPlayerItem(asset: AVMutableComposition()))
+        }
+        let clip = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/old.mp4")!)
+        let updated = FeedVideoPreloader.Resource(id: clip.id, url: URL(string: "https://example.test/new.mp4")!)
+        preloader.update([clip], current: nil)
+        let old = try XCTUnwrap(preloader.openingFrame(for: clip))
+        _ = await waitForOpeningFrame(old)
+        preloader.update([updated], current: nil)
+        XCTAssertNil(preloader.openingFrame(for: clip))
+        XCTAssertNil(old.image)
+        XCTAssertFalse(preloader.openingFrame(for: updated) === old)
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    private func openingFrameMarker() -> UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { context in
+            UIColor.cyan.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+    }
+
+    @MainActor
+    private func waitForOpeningFrame(_ frame: FeedOpeningFrame) async -> UIImage? {
+        let ready = expectation(description: "The opening frame was decoded")
+        let observation = frame.$image.compactMap { $0 }.prefix(1).sink { _ in ready.fulfill() }
+        await fulfillment(of: [ready], timeout: 2)
+        withExtendedLifetime(observation) {}
+        return frame.image
+    }
+
+    @MainActor
+    func testFeedWarmsTheSelectedClipSilentlyBeforeTheFeedIsVisible() throws {
+        let clips = try feedPagingClips()
         var created: [FeedPlayerSpy] = []
-        let preloader = FeedVideoPreloader { _ in
+        let preloader = FeedVideoPreloader(makePlayer: { _ in
             let player = FeedPlayerSpy()
             created.append(player)
             return player
+        })
+        let gate = FeedPlaybackGate(preloader: preloader)
+        func feed(visible: Bool) -> PagedFeed<Text> {
+            PagedFeed(videos: clips, current: .constant(0), isVisible: visible, allowsPlayback: visible, refresh: {},
+                      sharedPlaybackGate: gate, allowsPreloading: true) { video, _, _ in Text(video.caption) }
         }
+        let coordinator = feed(visible: false).makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        XCTAssertEqual(created.count, 1, "Only the selected startup clip should consume video bandwidth.")
+        let warmed = try XCTUnwrap(created.first)
+        XCTAssertTrue(warmed.isMuted)
+        XCTAssertFalse(warmed.didPlay)
+        XCTAssertNil(gate.selectedVideoID, "Warmup must not grant playback or count a watch.")
+
+        coordinator.parent = feed(visible: true)
+        coordinator.applyUpdate(collection)
+        XCTAssertEqual(created.count, 2, "Prepare the next clip on entering Feed, without replacing the warmed first player.")
+        let first = FeedVideoPreloader.Resource(id: clips[0].id, url: clips[0].videoURL)
+        XCTAssertTrue(preloader.take(first) === warmed)
+        XCTAssertEqual(gate.selectedVideoID, clips[0].id)
+        gate.play(warmed, videoID: clips[0].id)
+        XCTAssertTrue(warmed.didPlay)
+        XCTAssertFalse(created[1].didPlay)
+
+        coordinator.parent = feed(visible: false)
+        coordinator.applyUpdate(collection)
+        XCTAssertFalse(warmed.didPlay)
+        XCTAssertNil(gate.selectedVideoID)
+        preloader.recycle(warmed, resource: first)
+        XCTAssertTrue(preloader.take(first) === warmed, "Keep the paused selected clip ready when returning to Music.")
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedBackgroundingStopsWarmupEvenWhileAScrollUpdateIsDeferred() throws {
+        let clips = try feedPagingClips()
+        var created: [FeedPlayerSpy] = []
+        let preloader = FeedVideoPreloader(makePlayer: { _ in
+            let player = FeedPlayerSpy()
+            created.append(player)
+            return player
+        })
+        let gate = FeedPlaybackGate(preloader: preloader)
+        func feed(preloads: Bool) -> PagedFeed<Text> {
+            PagedFeed(videos: clips, current: .constant(0), isVisible: false, allowsPlayback: false, refresh: {},
+                      sharedPlaybackGate: gate, allowsPreloading: preloads) { video, _, _ in Text(video.caption) }
+        }
+        let coordinator = feed(preloads: true).makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        let warmed = try XCTUnwrap(created.first)
+        collection.simulatesTracking = true
+        coordinator.parent = feed(preloads: false)
+        coordinator.applyUpdate(collection)
+        let first = FeedVideoPreloader.Resource(id: clips[0].id, url: clips[0].videoURL)
+        XCTAssertFalse(preloader.take(first) === warmed, "Backgrounding should release the prepared player immediately, not wait for the pan to finish.")
+        XCTAssertNil(gate.selectedVideoID)
+        XCTAssertTrue(created.allSatisfy { !$0.didPlay })
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedWarmupFollowsTheSelectedVideoWhenItsRankChanges() throws {
+        let clips = try feedPagingClips()
+        var created: [FeedPlayerSpy] = []
+        let preloader = FeedVideoPreloader(makePlayer: { _ in
+            let player = FeedPlayerSpy()
+            created.append(player)
+            return player
+        })
+        let gate = FeedPlaybackGate(preloader: preloader)
+        func feed(_ videos: [Video]) -> PagedFeed<Text> {
+            PagedFeed(videos: videos, current: .constant(0), isVisible: false, allowsPlayback: false, refresh: {},
+                      sharedPlaybackGate: gate, allowsPreloading: true) { video, _, _ in Text(video.caption) }
+        }
+        let coordinator = feed(clips).makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        coordinator.parent = feed(Array(clips.reversed()))
+        coordinator.applyUpdate(collection)
+        XCTAssertEqual(created.count, 2)
+        let selected = FeedVideoPreloader.Resource(id: clips[2].id, url: clips[2].videoURL)
+        XCTAssertTrue(preloader.take(selected) === created[1])
+        XCTAssertNil(gate.selectedVideoID)
+        XCTAssertTrue(created.allSatisfy { !$0.didPlay })
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedPreloadsOnlyNeighborsAndReusesTheirPausedPlayers() {
+        var created: [FeedPlayerSpy] = []
+        let preloader = FeedVideoPreloader(makePlayer: { _ in
+            let player = FeedPlayerSpy()
+            created.append(player)
+            return player
+        })
         let clips = (0..<4).map { FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/\($0).mp4")!) }
         preloader.update(Array(clips[0...2]), current: clips[1].id)
         XCTAssertEqual(created.count, 2, "Prepare only the previous and next clip, not the whole feed.")
@@ -283,7 +536,7 @@ final class SocialTests: XCTestCase {
     @MainActor
     func testFeedPreloaderDiscardsClipsOutsideTheWindowAndOnLeaving() {
         var created = 0
-        let preloader = FeedVideoPreloader { _ in created += 1; return FeedPlayerSpy() }
+        let preloader = FeedVideoPreloader(makePlayer: { _ in created += 1; return FeedPlayerSpy() })
         let first = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/first.mp4")!)
         let next = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/next.mp4")!)
         preloader.update([first, next], current: first.id)
@@ -297,7 +550,7 @@ final class SocialTests: XCTestCase {
 
     @MainActor
     func testFeedPreloaderRejectsStaleHostsAndChangedVideoURLs() {
-        let preloader = FeedVideoPreloader { _ in FeedPlayerSpy() }
+        let preloader = FeedVideoPreloader(makePlayer: { _ in FeedPlayerSpy() })
         let clip = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/clip.mp4")!)
         let updated = FeedVideoPreloader.Resource(id: clip.id, url: URL(string: "https://example.test/updated.mp4")!)
         preloader.update([clip], current: nil)

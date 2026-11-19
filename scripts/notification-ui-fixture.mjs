@@ -15,6 +15,7 @@ const singleClip = process.env.FIXTURE_SINGLE_CLIP === "1";
 const mediaDelay = Math.max(0, Number(process.env.FIXTURE_MEDIA_DELAY_MS) || 0);
 const engagementDelay = Math.max(0, Number(process.env.FIXTURE_ENGAGEMENT_DELAY_MS) || 0);
 const mediaRequests = [];
+const thumbnailRequests = [];
 const countViews = process.env.FIXTURE_VIEW_COUNTS === "1";
 const showEngagement = process.env.FIXTURE_ENGAGEMENT === "1";
 const showReposts = process.env.FIXTURE_REPOSTS === "1";
@@ -83,10 +84,12 @@ createServer((request, response) => {
     }
     response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(value));
   };
-  const route = url.pathname.replace(/^\/cold-[^/]+(?=\/test\/)/, "");
+  const route = url.pathname.replace(/^\/cold-[^/]+(?=\/(?:test|thumbs)\/)/, "");
   switch (route) {
     case "/__fixture/media-requests":
       return send(mediaRequests);
+    case "/__fixture/thumbnail-requests":
+      return send(thumbnailRequests);
     case "/__fixture/draft-upload-result": {
       if (!draftPosting || request.method !== "POST" || draftUploadStatus !== "checking") return response.writeHead(409).end();
       const result = url.searchParams.get("status");
@@ -126,6 +129,7 @@ createServer((request, response) => {
       mediaAvailable = url.searchParams.get("available") === "1";
       return response.writeHead(204).end();
     case `/${demoThumb}`:
+      thumbnailRequests.push(url.pathname);
       if (!thumbnailBytes) return response.writeHead(404).end();
       response.writeHead(200, { "Content-Type": "image/jpeg", "Content-Length": thumbnailBytes.length });
       return response.end(request.method === "HEAD" ? undefined : thumbnailBytes);

@@ -1158,6 +1158,88 @@ final class HandStrudelUITests: XCTestCase {
     }
 
     @MainActor
+    func testFeedWarmsItsFirstVideoOnMusicHomeBeforeOpening() async throws {
+        guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_STARTUP_FEED_FIXTURE_URL"],
+              let endpoint = URL(string: address), endpoint.host == "127.0.0.1" else {
+            throw XCTSkip("Requires a loopback fixture with a solid blue 20-second clip and FIXTURE_VIEW_COUNTS=1.")
+        }
+        app.terminate()
+        let countURL = URL(string: "/rest/v1/feed_videos?id=eq.30000000-0000-0000-0000-000000000001", relativeTo: endpoint)!
+        let (before, _) = try await URLSession.shared.data(from: countURL)
+        let initial = try XCTUnwrap((JSONSerialization.jsonObject(with: before) as? [[String: Any]])?.first?["view_count"] as? Int)
+        let prefix = "/cold-" + UUID().uuidString
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = address
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "startup-feed-fixture"
+        app.launchEnvironment["MEDIA_BASE_URL"] = address + prefix
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        let requestsURL = URL(string: "/__fixture/media-requests", relativeTo: endpoint)!
+        var paths: [String] = []
+        for _ in 0..<30 {
+            let (data, _) = try await URLSession.shared.data(from: requestsURL)
+            paths = try JSONDecoder().decode([String].self, from: data)
+                .filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
+            if !paths.isEmpty { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        XCTAssertEqual(Set(paths), ["/test/clip.mp4"], "Warm only the selected clip before the user has opened Feed.")
+        try await Task.sleep(for: .seconds(3))
+        XCTAssertTrue(start.isHittable, "Preloading must leave the Music home screen selected.")
+        let (after, _) = try await URLSession.shared.data(from: countURL)
+        let warmed = try XCTUnwrap((JSONSerialization.jsonObject(with: after) as? [[String: Any]])?.first?["view_count"] as? Int)
+        XCTAssertEqual(warmed, initial, "Background preparation must not count as watching a video.")
+        element("tab-feed").tap()
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 5))
+        let screenshot = try XCTUnwrap(app.screenshot().image.cgImage)
+        let sample = try XCTUnwrap(screenshot.cropping(to: CGRect(x: Double(screenshot.width) * 0.5, y: Double(screenshot.height) * 0.42,
+                                                                 width: 12, height: 12)))
+        var pixel = [UInt8](repeating: 0, count: 4)
+        try pixel.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(sample, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        XCTAssertGreaterThan(Int(pixel[2]), Int(pixel[0]) + 60, "The warmed video should be visible immediately, not an empty black player.")
+        captureIfRequested("Feed-Startup-Warmed")
+        let playing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value MATCHES %@", "0:(0[1-9]|1[0-9]) of 0:20"),
+                                                object: app.sliders["feed-video-progress"].firstMatch)
+        await fulfillment(of: [playing], timeout: 8)
+    }
+
+    @MainActor
+    func testFeedPlaybackUsesVideoFramesInsteadOfDownloadingUploadedThumbnails() async throws {
+        guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_OPENING_FRAME_FIXTURE_URL"],
+              let endpoint = URL(string: address), endpoint.host == "127.0.0.1" else {
+            throw XCTSkip("Requires a loopback fixture with clips at least 20 seconds long and thumbnail request tracking.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = address
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "opening-frame-fixture"
+        let prefix = "/cold-" + UUID().uuidString
+        app.launchEnvironment["MEDIA_BASE_URL"] = address + prefix
+        app.launch()
+        element("tab-feed").tap()
+        selectFeedMode("Latest")
+        let first = app.staticTexts["Evening loop"].firstMatch
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)], timeout: 6)
+        let slider = app.sliders["feed-video-progress"].firstMatch
+        let moving = NSPredicate(format: "value MATCHES %@", "0:(0[1-9]|1[0-9]) of 0:20")
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: moving, object: slider)], timeout: 12)
+        let viewport = app.collectionViews["feed-video-viewport"]
+        viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.7))
+            .press(forDuration: 0.05, thenDragTo: viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.3)))
+        let next = app.staticTexts["Second performance"].firstMatch
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: next)], timeout: 5)
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: moving, object: slider)], timeout: 12)
+        let requestURL = URL(string: "/__fixture/thumbnail-requests", relativeTo: endpoint)!
+        let (data, _) = try await URLSession.shared.data(from: requestURL)
+        let requests = try JSONDecoder().decode([String].self, from: data).filter { $0.hasPrefix(prefix + "/thumbs/") }
+        XCTAssertTrue(requests.isEmpty, "Playback should render actual video frames, not fetch uploaded posters: \(requests)")
+    }
+
+    @MainActor
     func testFeedPreloadsTheNextClipWithoutSwiping() async throws {
         guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_DELAYED_FEED_FIXTURE_URL"],
               let endpoint = URL(string: address), endpoint.host == "127.0.0.1" else {
@@ -1550,6 +1632,7 @@ final class HandStrudelUITests: XCTestCase {
     }
 
     func testPlayThisSoundFromFeedOpensMusicSession() throws {
+        app.launchEnvironment["MEDIA_BASE_URL"] = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"]
         try launchWithProfileFixture()
         element("tab-feed").tap()
         let sound = app.buttons["feed-sound-options"].firstMatch
@@ -1608,7 +1691,13 @@ final class HandStrudelUITests: XCTestCase {
         menu.tap()
         let option = app.buttons[title].firstMatch
         XCTAssertTrue(option.waitForExistence(timeout: 5))
-        option.tap()
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: option)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
+        option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", title), object: menu)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
+        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: option)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
     }
 
     func testProfileCanRemoveExistingPhoto() throws {

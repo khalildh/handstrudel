@@ -73,7 +73,8 @@ struct FeedView<Navigation: View>: View {
             if hasVideos {
                 PagedFeed(videos: model.videos, current: $model.current, isVisible: isActive, allowsPlayback: allowsFeedPlayback, refresh: {
                     await model.refresh(user: auth.userId)
-                }, sharedPlaybackGate: feedPlaybackGate, onSelection: { playbackStore.select($0) },
+                }, sharedPlaybackGate: feedPlaybackGate, allowsPreloading: scenePhase == .active,
+                          onSelection: { playbackStore.select($0) },
                           onBoundary: { movePage(by: $0) }) { video, _, playbackGate in
                     FeedCell(video: video, isFullscreen: isFullscreen, playbackGate: playbackGate,
                              clip: clipPlayback(for: video),
@@ -2223,7 +2224,7 @@ private struct ClipPlaybackSurface: View {
 
     var body: some View {
         ZStack {
-            FeedPlayer(videoID: video.id, url: video.videoURL, thumb: video.thumbURL,
+            FeedPlayer(videoID: video.id, url: video.videoURL,
                        playback: playback, playbackGate: playbackGate, isCurrent: isCurrent,
                        playing: !paused && !playback.failed, muted: muted, aspectFit: aspectFit,
                        durationHint: video.durationS, countsViews: video.viewCount != nil && video.hidden != true,
@@ -2404,9 +2405,12 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
     let allowsPlayback: Bool
     let refresh: () async -> Void
     var sharedPlaybackGate: FeedPlaybackGate? = nil
+    var allowsPreloading: Bool? = nil
     var onSelection: ((Video) -> Void)? = nil
     var onBoundary: ((Int) -> Bool)? = nil
     let cell: (Video, Bool, FeedPlaybackGate) -> Cell
+
+    var shouldPreload: Bool { allowsPreloading ?? (isVisible && allowsPlayback) }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -2482,6 +2486,8 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
         func applyUpdate(_ cv: UICollectionView) {
             if !parent.allowsPlayback {
                 playbackGate.select(nil)
+            }
+            if !parent.shouldPreload {
                 playbackGate.preloader.update([], current: nil)
             }
             // Replacing hosting configurations mid-pan can cancel the active touch sequence.
@@ -2541,13 +2547,14 @@ struct PagedFeed<Cell: View>: UIViewRepresentable {
 
         func prepareNeighbors(around page: Int? = nil) {
             let current = page ?? parent.current
-            guard parent.isVisible, parent.allowsPlayback, parent.videos.indices.contains(current) else {
+            guard parent.shouldPreload, parent.videos.indices.contains(current) else {
                 playbackGate.preloader.update([], current: nil)
                 return
             }
-            let indices = max(0, current - 1)...min(parent.videos.count - 1, current + 1)
+            let watching = parent.isVisible && parent.allowsPlayback
+            let indices = watching ? max(0, current - 1)...min(parent.videos.count - 1, current + 1) : current...current
             let resources = indices.map { FeedVideoPreloader.Resource(id: parent.videos[$0].id, url: parent.videos[$0].videoURL) }
-            playbackGate.preloader.update(resources, current: parent.videos[current].id)
+            playbackGate.preloader.update(resources, current: watching ? parent.videos[current].id : nil)
         }
 
         @objc func pullToRefresh(_ control: UIRefreshControl) {
@@ -2698,10 +2705,14 @@ final class FeedPagingCollectionView: UICollectionView {
 
 @MainActor
 final class FeedPlaybackGate: ObservableObject {
-    let preloader = FeedVideoPreloader()
+    let preloader: FeedVideoPreloader
     var isPaging = false
     @Published private(set) var selectedVideoID: UUID?
     private weak var owner: AVPlayer?
+
+    init(preloader: FeedVideoPreloader? = nil) {
+        self.preloader = preloader ?? FeedVideoPreloader()
+    }
 
     func select(_ videoID: UUID?) {
         guard selectedVideoID != videoID else { return }
@@ -2724,6 +2735,44 @@ final class FeedPlaybackGate: ObservableObject {
 }
 
 @MainActor
+final class FeedOpeningFrame: ObservableObject {
+    typealias Decoder = @MainActor (AVAsset) async throws -> UIImage
+
+    @Published private(set) var image: UIImage?
+    private var task: Task<Void, Never>?
+
+    init(asset: AVAsset, decode: @escaping Decoder = FeedOpeningFrame.decode) {
+        task = Task { @MainActor [weak self] in
+            guard let image = try? await decode(asset), !Task.isCancelled else { return }
+            self?.image = image
+        }
+    }
+
+    func cancel() {
+        task?.cancel()
+        task = nil
+        image = nil
+    }
+
+    static func decode(_ asset: AVAsset) async throws -> UIImage {
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 1080, height: 1920)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        return try await withTaskCancellationHandler {
+            let frame = try await generator.image(at: .zero).image
+            try Task.checkCancellation()
+            return UIImage(cgImage: frame)
+        } onCancel: {
+            generator.cancelAllCGImageGeneration()
+        }
+    }
+
+    deinit { task?.cancel() }
+}
+
+@MainActor
 final class FeedVideoPreloader {
     struct Resource: Equatable {
         let id: UUID
@@ -2733,13 +2782,17 @@ final class FeedVideoPreloader {
     private var resources: [UUID: URL] = [:]
     private var prepared: [UUID: BufferedClip] = [:]
     private var borrowed: [UUID: ObjectIdentifier] = [:]
+    private var openingFrames: [UUID: (url: URL, frame: FeedOpeningFrame)] = [:]
+    private let openingFrameDecoder: FeedOpeningFrame.Decoder
     private let makePlayer: (URL) -> AVPlayer
 
-    init(makePlayer: @escaping (URL) -> AVPlayer = { url in
+    init(openingFrameDecoder: @escaping FeedOpeningFrame.Decoder = FeedOpeningFrame.decode,
+         makePlayer: @escaping (URL) -> AVPlayer = { url in
         let item = AVPlayerItem(url: url)
         item.preferredForwardBufferDuration = 3
         return AVPlayer(playerItem: item)
     }) {
+        self.openingFrameDecoder = openingFrameDecoder
         self.makePlayer = makePlayer
     }
 
@@ -2748,9 +2801,23 @@ final class FeedVideoPreloader {
         for id in Array(prepared.keys) where prepared[id]?.url != resources[id] {
             prepared.removeValue(forKey: id)?.discard()
         }
-        for resource in window where resource.id != current && borrowed[resource.id] == nil && prepared[resource.id] == nil {
-            prepared[resource.id] = buffer(url: resource.url)
+        for id in Array(openingFrames.keys) where openingFrames[id]?.url != resources[id] {
+            openingFrames.removeValue(forKey: id)?.frame.cancel()
         }
+        for resource in window where resource.id != current && borrowed[resource.id] == nil && prepared[resource.id] == nil {
+            prepared[resource.id] = buffer(resource)
+        }
+    }
+
+    func openingFrame(for resource: Resource) -> FeedOpeningFrame? {
+        guard openingFrames[resource.id]?.url == resource.url else { return nil }
+        return openingFrames[resource.id]?.frame
+    }
+
+    private func prepareOpeningFrame(_ resource: Resource, player: AVPlayer) {
+        guard openingFrame(for: resource) == nil, let asset = player.currentItem?.asset else { return }
+        openingFrames.removeValue(forKey: resource.id)?.frame.cancel()
+        openingFrames[resource.id] = (resource.url, FeedOpeningFrame(asset: asset, decode: openingFrameDecoder))
     }
 
     func take(_ resource: Resource) -> AVPlayer {
@@ -2764,6 +2831,7 @@ final class FeedVideoPreloader {
         }
         player.actionAtItemEnd = .pause
         borrowed[resource.id] = ObjectIdentifier(player)
+        prepareOpeningFrame(resource, player: player)
         return player
     }
 
@@ -2778,6 +2846,9 @@ final class FeedVideoPreloader {
         borrowed.removeValue(forKey: resource.id)
         guard resources[resource.id] == resource.url, player.status != .failed else {
             player.replaceCurrentItem(with: nil)
+            if openingFrames[resource.id]?.url == resource.url {
+                openingFrames.removeValue(forKey: resource.id)?.frame.cancel()
+            }
             return
         }
         player.seek(to: .zero)
@@ -2785,11 +2856,12 @@ final class FeedVideoPreloader {
         prepared[resource.id] = BufferedClip(url: resource.url, player: player)
     }
 
-    private func buffer(url: URL) -> BufferedClip {
-        let player = makePlayer(url)
+    private func buffer(_ resource: Resource) -> BufferedClip {
+        let player = makePlayer(resource.url)
         player.isMuted = true
         player.actionAtItemEnd = .pause
-        return BufferedClip(url: url, player: player)
+        prepareOpeningFrame(resource, player: player)
+        return BufferedClip(url: resource.url, player: player)
     }
 
     @MainActor
@@ -3250,10 +3322,9 @@ final class FeedClipFailureMonitor {
     }
 }
 
-private struct FeedPlayer: UIViewRepresentable {
+struct FeedPlayer: UIViewRepresentable {
     let videoID: UUID
     let url: URL
-    let thumb: URL
     let playback: FeedPlaybackController
     let playbackGate: FeedPlaybackGate
     let isCurrent: Bool
@@ -3273,7 +3344,7 @@ private struct FeedPlayer: UIViewRepresentable {
         view.onFailure = onFailure
         view.onEnd = onEnd
         view.setAspectFit(aspectFit)
-        view.load(videoID: videoID, url: url, thumb: thumb, preloader: playbackGate.preloader, isCurrent: isCurrent)
+        view.load(videoID: videoID, url: url, preloader: playbackGate.preloader, isCurrent: isCurrent)
         if view.playback !== playback { view.playback?.disconnect(from: view.player); view.playback = playback }
         guard let player = view.player else { return }
         player.isMuted = muted
@@ -3288,12 +3359,14 @@ private struct FeedPlayer: UIViewRepresentable {
     final class PlayerView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
         private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
-        private let thumbView = UIImageView()
+        let openingFrameView = UIImageView()
+        private var frameObservation: AnyCancellable?
+        private weak var observedFrame: FeedOpeningFrame?
         private var failureMonitor: FeedClipFailureMonitor?
         private var endObservation: AnyCancellable?
         private(set) var player: AVPlayer?
         var playback: FeedPlaybackController?
-        private var loadedURL: URL?
+        private var loadedResource: FeedVideoPreloader.Resource?
         private var resource: FeedVideoPreloader.Resource?
         private var preloader: FeedVideoPreloader?
         var onFailure: (() -> Void)?
@@ -3303,40 +3376,45 @@ private struct FeedPlayer: UIViewRepresentable {
             super.init(frame: frame)
             backgroundColor = .black
             playerLayer.videoGravity = .resizeAspectFill
-            thumbView.contentMode = .scaleAspectFill
-            thumbView.clipsToBounds = true
-            addSubview(thumbView)
-            // Reveal video once frames are ready, so the thumbnail covers loading.
+            openingFrameView.contentMode = .scaleAspectFill
+            openingFrameView.clipsToBounds = true
+            openingFrameView.isAccessibilityElement = false
+            addSubview(openingFrameView)
             playerLayer.addObserver(self, forKeyPath: "readyForDisplay", options: [.new], context: nil)
         }
         required init?(coder: NSCoder) { fatalError() }
 
-        override func layoutSubviews() { super.layoutSubviews(); thumbView.frame = bounds }
+        override func layoutSubviews() { super.layoutSubviews(); openingFrameView.frame = bounds }
 
         func setAspectFit(_ fit: Bool) {
             playerLayer.videoGravity = fit ? .resizeAspect : .resizeAspectFill
-            thumbView.contentMode = fit ? .scaleAspectFit : .scaleAspectFill
+            openingFrameView.contentMode = fit ? .scaleAspectFit : .scaleAspectFill
         }
 
-        func load(videoID: UUID, url: URL, thumb: URL, preloader: FeedVideoPreloader, isCurrent: Bool) {
-            if url != loadedURL {
-                releasePlayer()
-                loadedURL = url
-                thumbView.image = nil
-                thumbView.isHidden = false
-                URLSession.shared.dataTask(with: thumb) { [weak self] data, _, _ in
-                    guard let data, let img = UIImage(data: data) else { return }
-                    DispatchQueue.main.async { if self?.loadedURL == url { self?.thumbView.image = img } }
-                }.resume()
-            }
-            guard isCurrent else { releasePlayer(); return }
-            guard player == nil else { return }
+        func load(videoID: UUID, url: URL, preloader: FeedVideoPreloader, isCurrent: Bool) {
             let resource = FeedVideoPreloader.Resource(id: videoID, url: url)
+            if resource != loadedResource {
+                releasePlayer()
+                loadedResource = resource
+                showOpeningFrame(nil)
+                openingFrameView.image = nil
+            }
+            guard isCurrent else {
+                releasePlayer()
+                showOpeningFrame(preloader.openingFrame(for: resource))
+                return
+            }
+            if player != nil {
+                showOpeningFrame(preloader.openingFrame(for: resource))
+                return
+            }
             self.resource = resource
             self.preloader = preloader
             let clipPlayer = preloader.take(resource)
             player = clipPlayer
+            showOpeningFrame(preloader.openingFrame(for: resource))
             playerLayer.player = clipPlayer
+            openingFrameView.isHidden = playerLayer.isReadyForDisplay
             failureMonitor = FeedClipFailureMonitor(player: clipPlayer) { [weak self] in
                 self?.player?.pause()
                 self?.onFailure?()
@@ -3350,6 +3428,16 @@ private struct FeedPlayer: UIViewRepresentable {
                 }
         }
 
+        private func showOpeningFrame(_ frame: FeedOpeningFrame?) {
+            guard observedFrame !== frame else { return }
+            frameObservation = nil
+            observedFrame = frame
+            openingFrameView.image = frame?.image
+            frameObservation = frame?.$image.sink { [weak self] image in
+                self?.openingFrameView.image = image
+            }
+        }
+
         func releasePlayer() {
             failureMonitor = nil
             endObservation = nil
@@ -3361,13 +3449,13 @@ private struct FeedPlayer: UIViewRepresentable {
             player = nil
             preloader = nil
             resource = nil
-            thumbView.isHidden = false
+            openingFrameView.isHidden = false
         }
 
         override func observeValue(forKeyPath keyPath: String?, of object: Any?,
                                    change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
             guard keyPath == "readyForDisplay" else { return }
-            DispatchQueue.main.async { self.thumbView.isHidden = self.playerLayer.isReadyForDisplay }
+            DispatchQueue.main.async { self.openingFrameView.isHidden = self.playerLayer.isReadyForDisplay }
         }
 
         deinit {

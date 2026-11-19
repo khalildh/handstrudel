@@ -63,7 +63,6 @@ struct ContentView: View {
     @AppStorage("creatorReviewMilestones") private var reviewData = Data()
     @State private var reviewReadyThisSession = false
     @State private var destination: Destination = .music
-    @State private var hasOpenedFeed = false
     @State private var feedHasVideo = false
     @State private var feedFullscreen = false
     @State private var startingSession = false
@@ -133,11 +132,18 @@ struct ContentView: View {
         ZStack {
             (engine.isRunning || feedFullscreen ? Color.black : palette.background).ignoresSafeArea()
 
-            if !engine.isRunning || hasOpenedFeed {
+            if SocialConfig.isConfigured {
+                FeedView(auth: auth, isActive: destination == .feed && !engine.isRunning, isFullscreen: $feedFullscreen,
+                         onMakeMusic: { destination = .music }, onTrySound: trySharedSound,
+                         onPlayAlong: prepareBacking, onVideoAvailabilityChanged: { feedHasVideo = $0 },
+                         navigation: { destinationTabs(overVideo: $0) })
+                    .opacity(destination == .feed && !engine.isRunning ? 1 : 0)
+                    .allowsHitTesting(destination == .feed && !engine.isRunning)
+                    .accessibilityHidden(destination != .feed || engine.isRunning)
+            }
+
+            if !engine.isRunning && (destination != .feed || !SocialConfig.isConfigured) {
                 destinations
-                    .opacity(engine.isRunning ? 0 : 1)
-                    .allowsHitTesting(!engine.isRunning)
-                    .accessibilityHidden(engine.isRunning)
             }
 
             if engine.isRunning {
@@ -365,8 +371,7 @@ struct ContentView: View {
             if status.hasPrefix("error:") { startingSession = false; stopBacking() }
         }
         .onChange(of: destination) { tab in
-            if tab == .feed { hasOpenedFeed = true }
-            else { feedFullscreen = false }
+            if tab != .feed { feedFullscreen = false }
         }
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
             guard !engine.isRunning, let presetId = notification.object as? String else { return }
@@ -399,16 +404,6 @@ struct ContentView: View {
     private var destinations: some View {
         VStack(spacing: 0) {
             ZStack {
-                if hasOpenedFeed && SocialConfig.isConfigured {
-                    FeedView(auth: auth, isActive: destination == .feed && !engine.isRunning, isFullscreen: $feedFullscreen,
-                             onMakeMusic: { destination = .music }, onTrySound: trySharedSound,
-                             onPlayAlong: prepareBacking, onVideoAvailabilityChanged: { feedHasVideo = $0 },
-                             navigation: { destinationTabs(overVideo: $0) })
-                        .opacity(destination == .feed ? 1 : 0)
-                        .allowsHitTesting(destination == .feed)
-                        .accessibilityHidden(destination != .feed)
-                }
-
                 switch destination {
                 case .feed:
                     if !SocialConfig.isConfigured {
