@@ -1509,7 +1509,7 @@ private struct PerformanceDetail: View {
                                 advance: advance)
             if !isFullscreen || showsFullscreenControls {
                 ClipPlaybackControls(playback: playback, paused: isFullscreen ? $paused : nil,
-                                     muted: muted, toggleMute: { muted.toggle() })
+                                     muted: muted, toggleMute: { muted.toggle() }, durationHint: video.durationS)
                     .padding(10)
                     .padding(.bottom, safeInsets.bottom)
                     .background(.black.opacity(0.45))
@@ -1852,7 +1852,8 @@ private struct FeedCell: View {
                 VStack(spacing: 0) {
                     if isFullscreen {
                         if isCurrent && showsFullscreenControls {
-                            ClipPlaybackControls(playback: playback, paused: $paused, muted: muted, toggleMute: toggleMute)
+                            ClipPlaybackControls(playback: playback, paused: $paused, muted: muted,
+                                                 toggleMute: toggleMute, durationHint: video.durationS)
                         }
                     } else {
                         let railHeight = bounds.size.height - overlayHeights.header - overlayHeights.navigation
@@ -1860,7 +1861,7 @@ private struct FeedCell: View {
                         postControls(railHeight: max(44, railHeight))
                         // Reserve the scrubber row even when the player has no duration yet.
                         ZStack {
-                            if isCurrent { FeedProgressStrip(playback: playback) }
+                            if isCurrent { FeedProgressStrip(playback: playback, durationHint: video.durationS) }
                         }
                         .frame(height: FeedProgressStrip.height)
                     }
@@ -2186,6 +2187,7 @@ private struct ClipPlaybackControls: View {
     let paused: Binding<Bool>?
     let muted: Bool
     let toggleMute: () -> Void
+    var durationHint: Double? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -2197,7 +2199,7 @@ private struct ClipPlaybackControls: View {
                 .accessibilityIdentifier("fullscreen-playback-toggle")
                 .disabled(playback.failed)
             }
-            FeedProgressStrip(playback: playback)
+            FeedProgressStrip(playback: playback, durationHint: durationHint)
             Spacer(minLength: 0)
             Button(action: toggleMute) {
                 FeedVideoIcon(symbol: muted ? "speaker.slash" : "speaker.wave.2")
@@ -2295,13 +2297,14 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         let layout = PageLayout()
         layout.scrollDirection = .vertical
         layout.minimumLineSpacing = 0
-        let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        let cv = FeedPagingCollectionView(frame: .zero, collectionViewLayout: layout)
         cv.accessibilityIdentifier = "feed-video-viewport"
         cv.accessibilityElementsHidden = !isVisible
         cv.decelerationRate = .fast
         cv.alwaysBounceVertical = true
         cv.isDirectionalLockEnabled = true
         cv.delaysContentTouches = false
+        cv.canCancelContentTouches = true
         cv.allowsSelection = false
         cv.showsVerticalScrollIndicator = false
         cv.contentInsetAdjustmentBehavior = .never
@@ -2316,23 +2319,14 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
     }
 
     func updateUIView(_ cv: UICollectionView, context: Context) {
-        let old = context.coordinator.parent
         context.coordinator.parent = self
         cv.accessibilityElementsHidden = !isVisible
-        context.coordinator.selectPage(current)
-        let oldIDs = old.videos.map(\.id)
-        let newIDs = videos.map(\.id)
-        if oldIDs != newIDs {
-            cv.reloadData()
-            if !newIDs.starts(with: oldIDs) { context.coordinator.align(cv) }
-        } else {
-            if !cv.isDragging && !cv.isDecelerating { context.coordinator.align(cv) }
-            for case let ip in cv.indexPathsForVisibleItems { context.coordinator.configure(cv.cellForItem(at: ip), at: ip) }
-        }
+        context.coordinator.applyUpdate(cv)
     }
 
     static func dismantleUIView(_ view: UICollectionView, coordinator: Coordinator) {
         coordinator.playbackGate.select(nil)
+        coordinator.playbackGate.preloader.update([], current: nil)
     }
 
     private final class PageLayout: UICollectionViewFlowLayout {
@@ -2355,11 +2349,45 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         var parent: PagedFeed
         let playbackGate = FeedPlaybackGate()
         private var snapPage: Int?
+        private var renderedIDs: [UUID] = []
+        private var renderedPage = 0
         init(_ parent: PagedFeed) { self.parent = parent }
+
+        func applyUpdate(_ cv: UICollectionView) {
+            if !parent.allowsPlayback {
+                playbackGate.select(nil)
+                playbackGate.preloader.update([], current: nil)
+            }
+            // Replacing hosting configurations mid-pan can cancel the active touch sequence.
+            guard !cv.isTracking, !cv.isDragging, !cv.isDecelerating else { return }
+            selectPage(parent.current)
+            prepareNeighbors()
+            let ids = parent.videos.map(\.id)
+            if renderedIDs != ids {
+                let appended = ids.starts(with: renderedIDs)
+                renderedIDs = ids
+                cv.reloadData()
+                if !appended || renderedPage != parent.current { align(cv) }
+            } else {
+                if renderedPage != parent.current { align(cv) }
+                for ip in cv.indexPathsForVisibleItems { configure(cv.cellForItem(at: ip), at: ip) }
+            }
+            renderedPage = parent.current
+        }
 
         func selectPage(_ page: Int) {
             let id = parent.allowsPlayback && parent.videos.indices.contains(page) ? parent.videos[page].id : nil
             playbackGate.select(id)
+        }
+
+        func prepareNeighbors() {
+            guard parent.isVisible, parent.allowsPlayback, parent.videos.indices.contains(parent.current) else {
+                playbackGate.preloader.update([], current: nil)
+                return
+            }
+            let indices = max(0, parent.current - 1)...min(parent.videos.count - 1, parent.current + 1)
+            let resources = indices.map { FeedVideoPreloader.Resource(id: parent.videos[$0].id, url: parent.videos[$0].videoURL) }
+            playbackGate.preloader.update(resources, current: parent.videos[parent.current].id)
         }
 
         @objc func pullToRefresh(_ control: UIRefreshControl) {
@@ -2378,7 +2406,7 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
             cv.layoutIfNeeded()
         }
 
-        func collectionView(_ cv: UICollectionView, numberOfItemsInSection section: Int) -> Int { parent.videos.count }
+        func collectionView(_ cv: UICollectionView, numberOfItemsInSection section: Int) -> Int { renderedIDs.count }
 
         func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
             let c = cv.dequeueReusableCell(withReuseIdentifier: "cell", for: ip)
@@ -2391,11 +2419,18 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
             configure(cell, at: ip)
         }
 
+        func collectionView(_ cv: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt ip: IndexPath) {
+            guard !cv.visibleCells.contains(where: { $0 === cell }) else { return }
+            // Return the old player to the bounded buffer instead of retaining offscreen hosts.
+            cell.contentConfiguration = nil
+        }
+
         func configure(_ c: UICollectionViewCell?, at ip: IndexPath) {
-            guard let c, ip.item < parent.videos.count else { return }
-            let v = parent.videos[ip.item]
+            guard let c, renderedIDs.indices.contains(ip.item),
+                  let v = parent.videos.first(where: { $0.id == renderedIDs[ip.item] }) else { return }
             c.contentConfiguration = UIHostingConfiguration {
-                parent.cell(v, parent.allowsPlayback && ip.item == parent.current, playbackGate).id(v.id)
+                parent.cell(v, parent.allowsPlayback && parent.videos.indices.contains(parent.current)
+                            && v.id == parent.videos[parent.current].id, playbackGate).id(v.id)
             }
                 .margins(.all, 0)
         }
@@ -2407,6 +2442,7 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
 
         func scrollViewWillBeginDragging(_ sv: UIScrollView) {
             snapPage = nil
+            playbackGate.isPaging = true
         }
 
         func scrollViewWillEndDragging(_ sv: UIScrollView, withVelocity velocity: CGPoint,
@@ -2429,13 +2465,19 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
         }
 
         func scrollViewDidEndDecelerating(_ sv: UIScrollView) {
+            playbackGate.isPaging = false
             guard !parent.videos.isEmpty else { return }
             snapPage = nil
-            let page = min(parent.videos.count - 1, max(0, Int((sv.contentOffset.y / max(sv.bounds.height, 1)).rounded())))
+            let landed = min(max(0, renderedIDs.count - 1), max(0, Int((sv.contentOffset.y / max(sv.bounds.height, 1)).rounded())))
+            let page = renderedIDs.indices.contains(landed)
+                ? parent.videos.firstIndex(where: { $0.id == renderedIDs[landed] }) ?? min(landed, parent.videos.count - 1)
+                : min(landed, parent.videos.count - 1)
             if page != parent.current {
                 selectPage(page)
                 parent.current = page
             }
+            renderedPage = page
+            if let cv = sv as? UICollectionView { applyUpdate(cv) }
         }
 
         func scrollViewDidEndDragging(_ sv: UIScrollView, willDecelerate decelerate: Bool) {
@@ -2448,10 +2490,19 @@ private struct PagedFeed<Cell: View>: UIViewRepresentable {
     }
 }
 
+final class FeedPagingCollectionView: UICollectionView {
+    override func touchesShouldCancel(in view: UIView) -> Bool {
+        // UIKit normally protects UIControls from scrolling, including the scrubber thumb.
+        true
+    }
+}
+
 // MARK: - Looping video
 
 @MainActor
 final class FeedPlaybackGate {
+    let preloader = FeedVideoPreloader()
+    var isPaging = false
     private var selected: UUID?
     private weak var owner: AVPlayer?
 
@@ -2472,6 +2523,112 @@ final class FeedPlaybackGate {
             owner = player
         }
         if player.timeControlStatus == .paused { player.play() }
+    }
+}
+
+@MainActor
+final class FeedVideoPreloader {
+    struct Resource: Equatable {
+        let id: UUID
+        let url: URL
+    }
+
+    private var resources: [UUID: URL] = [:]
+    private var prepared: [UUID: BufferedClip] = [:]
+    private var borrowed: [UUID: ObjectIdentifier] = [:]
+    private let makePlayer: (URL) -> AVPlayer
+
+    init(makePlayer: @escaping (URL) -> AVPlayer = { url in
+        let item = AVPlayerItem(url: url)
+        item.preferredForwardBufferDuration = 3
+        return AVPlayer(playerItem: item)
+    }) {
+        self.makePlayer = makePlayer
+    }
+
+    func update(_ window: [Resource], current: UUID?) {
+        resources = Dictionary(window.map { ($0.id, $0.url) }, uniquingKeysWith: { first, _ in first })
+        for id in Array(prepared.keys) where prepared[id]?.url != resources[id] {
+            prepared.removeValue(forKey: id)?.discard()
+        }
+        for resource in window where resource.id != current && borrowed[resource.id] == nil && prepared[resource.id] == nil {
+            prepared[resource.id] = buffer(url: resource.url)
+        }
+    }
+
+    func take(_ resource: Resource) -> AVPlayer {
+        let cached = prepared.removeValue(forKey: resource.id)
+        let player: AVPlayer
+        if let cached, cached.url == resource.url, cached.player.status != .failed {
+            player = cached.take()
+        } else {
+            cached?.discard()
+            player = makePlayer(resource.url)
+        }
+        player.actionAtItemEnd = .pause
+        borrowed[resource.id] = ObjectIdentifier(player)
+        return player
+    }
+
+    func recycle(_ player: AVPlayer, resource: Resource) {
+        player.pause()
+        player.isMuted = true
+        player.cancelPendingPrerolls()
+        guard borrowed[resource.id] == ObjectIdentifier(player) else {
+            player.replaceCurrentItem(with: nil)
+            return
+        }
+        borrowed.removeValue(forKey: resource.id)
+        guard resources[resource.id] == resource.url, player.status != .failed else {
+            player.replaceCurrentItem(with: nil)
+            return
+        }
+        player.seek(to: .zero)
+        prepared.removeValue(forKey: resource.id)?.discard()
+        prepared[resource.id] = BufferedClip(url: resource.url, player: player)
+    }
+
+    private func buffer(url: URL) -> BufferedClip {
+        let player = makePlayer(url)
+        player.isMuted = true
+        player.actionAtItemEnd = .pause
+        return BufferedClip(url: url, player: player)
+    }
+
+    @MainActor
+    private final class BufferedClip {
+        let url: URL
+        let player: AVPlayer
+        private var observation: NSKeyValueObservation?
+        private var started = false
+
+        init(url: URL, player: AVPlayer) {
+            self.url = url
+            self.player = player
+            observation = player.observe(\.status, options: [.initial, .new]) { @Sendable [weak self] _, _ in
+                DispatchQueue.main.async { self?.prepareIfReady() }
+            }
+        }
+
+        private func prepareIfReady() {
+            guard observation != nil, !started, player.status == .readyToPlay else { return }
+            started = true
+            // Preroll fills the playback pipeline without playing audio or advancing the clip.
+            player.preroll(atRate: 1, completionHandler: nil)
+        }
+
+        func take() -> AVPlayer {
+            observation = nil
+            player.cancelPendingPrerolls()
+            return player
+        }
+
+        func discard() {
+            observation = nil
+            player.cancelPendingPrerolls()
+            player.pause()
+            player.replaceCurrentItem(with: nil)
+        }
     }
 }
 
@@ -2596,7 +2753,7 @@ private final class FeedPlaybackController: ObservableObject {
     }
 
     func setSeconds(_ seconds: Double) {
-        guard isCurrent, let duration = position?.duration,
+        guard isCurrent, let duration = position?.duration ?? durationHint,
               let next = FeedPlaybackPosition(duration: duration, seconds: seconds) else { return }
         position = next
         if !isTracking { seek(to: next) }
@@ -2606,7 +2763,7 @@ private final class FeedPlaybackController: ObservableObject {
         guard player === owner, let videoID, playbackGate?.owns(owner, videoID: videoID) == true,
               isCurrent, wantsPlayback, !isTracking, !isSeeking else { return }
         owner.pause()
-        if advance() { wantsPlayback = false }
+        if playbackGate?.isPaging != true, advance() { wantsPlayback = false }
         if let duration = position?.duration, let beginning = FeedPlaybackPosition(duration: duration, seconds: 0) {
             position = beginning
             seek(to: beginning)
@@ -2693,24 +2850,65 @@ private struct FeedProgressStrip: View {
     static let height: CGFloat = 44
     @Environment(\.studioPalette) private var palette
     @ObservedObject var playback: FeedPlaybackController
+    var durationHint: Double? = nil
 
     var body: some View {
-        if let position = playback.position, !playback.failed {
-            let elapsed = FeedPlaybackPosition.timeLabel(position.seconds)
-            let duration = FeedPlaybackPosition.timeLabel(position.duration)
-            HStack(spacing: 8) {
-                Slider(value: Binding(get: { position.seconds }, set: playback.setSeconds),
-                       in: 0...position.duration, onEditingChanged: playback.setEditing)
-                    .tint(palette.mediaAccent)
-                    .frame(minHeight: Self.height)
-                    .accessibilityLabel("Video progress")
-                    .accessibilityValue("\(elapsed) of \(duration)")
-                    .accessibilityIdentifier("feed-video-progress")
-                Text("\(elapsed) / \(duration)")
-                    .font(.caption2.monospacedDigit().weight(.semibold))
-                    .accessibilityHidden(true)
-            }
+        let position = playback.position ?? FeedPlaybackPosition(duration: durationHint ?? 0, seconds: 0)
+        let elapsed = FeedPlaybackPosition.timeLabel(position?.seconds ?? 0)
+        let duration = position.map { FeedPlaybackPosition.timeLabel($0.duration) } ?? "--:--"
+        HStack(spacing: 8) {
+            FeedSeekSlider(seconds: position?.seconds ?? 0, duration: position?.duration ?? 1,
+                           enabled: position != nil && !playback.failed,
+                           tint: UIColor(palette.mediaAccent), valueLabel: "\(elapsed) of \(duration)",
+                           onChange: playback.setSeconds, onEditing: playback.setEditing)
+                .frame(minHeight: Self.height)
+            Text("\(elapsed) / \(duration)")
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .accessibilityHidden(true)
         }
+        .frame(height: Self.height)
+        .opacity(playback.failed ? 0 : 1)
+        .allowsHitTesting(!playback.failed)
+        .accessibilityHidden(playback.failed)
+    }
+}
+
+private struct FeedSeekSlider: UIViewRepresentable {
+    let seconds: Double
+    let duration: Double
+    let enabled: Bool
+    let tint: UIColor
+    let valueLabel: String
+    let onChange: (Double) -> Void
+    let onEditing: (Bool) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UISlider {
+        let slider = UISlider()
+        slider.accessibilityLabel = "Video progress"
+        slider.accessibilityIdentifier = "feed-video-progress"
+        slider.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .valueChanged)
+        slider.addTarget(context.coordinator, action: #selector(Coordinator.began), for: .touchDown)
+        slider.addTarget(context.coordinator, action: #selector(Coordinator.ended), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        return slider
+    }
+
+    func updateUIView(_ slider: UISlider, context: Context) {
+        context.coordinator.parent = self
+        slider.maximumValue = Float(duration)
+        if !slider.isTracking { slider.value = Float(seconds) }
+        slider.isEnabled = enabled
+        slider.minimumTrackTintColor = tint
+        slider.accessibilityValue = valueLabel
+    }
+
+    final class Coordinator: NSObject {
+        var parent: FeedSeekSlider
+        init(_ parent: FeedSeekSlider) { self.parent = parent }
+        @objc func changed(_ slider: UISlider) { parent.onChange(Double(slider.value)) }
+        @objc func began() { parent.onEditing(true) }
+        @objc func ended() { parent.onEditing(false) }
     }
 }
 
@@ -2793,7 +2991,7 @@ private struct FeedPlayer: UIViewRepresentable {
         view.onFailure = onFailure
         view.onEnd = onEnd
         view.setAspectFit(aspectFit)
-        view.load(url: url, thumb: thumb)
+        view.load(videoID: videoID, url: url, thumb: thumb, preloader: playbackGate.preloader, isCurrent: isCurrent)
         if view.playback !== playback { view.playback?.disconnect(from: view.player); view.playback = playback }
         guard let player = view.player else { return }
         player.isMuted = muted
@@ -2802,9 +3000,7 @@ private struct FeedPlayer: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ view: PlayerView, coordinator: ()) {
-        view.playback?.disconnect(from: view.player)
-        view.playback = nil
-        view.stopObservingAndPause()
+        view.releasePlayer()
     }
 
     final class PlayerView: UIView {
@@ -2816,6 +3012,8 @@ private struct FeedPlayer: UIViewRepresentable {
         private(set) var player: AVPlayer?
         var playback: FeedPlaybackController?
         private var loadedURL: URL?
+        private var resource: FeedVideoPreloader.Resource?
+        private var preloader: FeedVideoPreloader?
         var onFailure: (() -> Void)?
         var onEnd: (() -> Bool)?
 
@@ -2838,26 +3036,30 @@ private struct FeedPlayer: UIViewRepresentable {
             thumbView.contentMode = fit ? .scaleAspectFit : .scaleAspectFill
         }
 
-        func load(url: URL, thumb: URL) {
-            guard url != loadedURL else { return }
-            stopObservingAndPause()
-            loadedURL = url
-            thumbView.image = nil
-            thumbView.isHidden = false
-            URLSession.shared.dataTask(with: thumb) { [weak self] data, _, _ in
-                guard let data, let img = UIImage(data: data) else { return }
-                DispatchQueue.main.async { if self?.loadedURL == url { self?.thumbView.image = img } }
-            }.resume()
-            let item = AVPlayerItem(url: url)
-            let clipPlayer = AVPlayer(playerItem: item)
-            clipPlayer.actionAtItemEnd = .pause
+        func load(videoID: UUID, url: URL, thumb: URL, preloader: FeedVideoPreloader, isCurrent: Bool) {
+            if url != loadedURL {
+                releasePlayer()
+                loadedURL = url
+                thumbView.image = nil
+                thumbView.isHidden = false
+                URLSession.shared.dataTask(with: thumb) { [weak self] data, _, _ in
+                    guard let data, let img = UIImage(data: data) else { return }
+                    DispatchQueue.main.async { if self?.loadedURL == url { self?.thumbView.image = img } }
+                }.resume()
+            }
+            guard isCurrent else { releasePlayer(); return }
+            guard player == nil else { return }
+            let resource = FeedVideoPreloader.Resource(id: videoID, url: url)
+            self.resource = resource
+            self.preloader = preloader
+            let clipPlayer = preloader.take(resource)
             player = clipPlayer
             playerLayer.player = clipPlayer
             failureMonitor = FeedClipFailureMonitor(player: clipPlayer) { [weak self] in
                 self?.player?.pause()
                 self?.onFailure?()
             }
-            endObservation = NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification, object: item)
+            endObservation = NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification, object: clipPlayer.currentItem)
                 .sink { [weak self, weak clipPlayer] _ in
                     DispatchQueue.main.async { [weak self, weak clipPlayer] in
                         guard let self, let clipPlayer, self.player === clipPlayer, let onEnd else { return }
@@ -2866,10 +3068,18 @@ private struct FeedPlayer: UIViewRepresentable {
                 }
         }
 
-        func stopObservingAndPause() {
+        func releasePlayer() {
             failureMonitor = nil
             endObservation = nil
-            player?.pause()
+            if let player { playback?.disconnect(from: player) }
+            playback = nil
+            playerLayer.player = nil
+            if let player, let preloader, let resource { preloader.recycle(player, resource: resource) }
+            else { player?.pause() }
+            player = nil
+            preloader = nil
+            resource = nil
+            thumbView.isHidden = false
         }
 
         override func observeValue(forKeyPath keyPath: String?, of object: Any?,
