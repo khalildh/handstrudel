@@ -519,13 +519,15 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(retry.waitForExistence(timeout: 20))
         let clip = app.collectionViews["feed-video-viewport"].cells.containing(.staticText, identifier: "Evening loop").firstMatch
         let caption = clip.staticTexts["Evening loop"]
-        let share = clip.buttons["Share video"]
+        let share = app.buttons["Share video"].firstMatch
         XCTAssertTrue(caption.exists)
         XCTAssertTrue(share.exists)
         let captionY = caption.frame.midY
         let shareY = share.frame.midY
         let slider = app.sliders["feed-video-progress"].firstMatch
-        XCTAssertFalse(slider.exists)
+        XCTAssertTrue(slider.exists)
+        XCTAssertEqual(slider.value as? String, "Playback unavailable")
+        let scrubberY = slider.frame.midY
 
         try await setAvailability(true)
         retry.tap()
@@ -534,6 +536,7 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(caption.exists)
         XCTAssertEqual(caption.frame.midY, captionY, accuracy: 1, "The scrubber must not move the caption.")
         XCTAssertEqual(share.frame.midY, shareY, accuracy: 1, "The scrubber must not move the action rail.")
+        XCTAssertEqual(slider.frame.midY, scrubberY, accuracy: 1, "Retry must not insert or move the shared scrubber.")
         let playing = NSPredicate(format: "value MATCHES %@", "0:0[1-3] of 0:04")
         let actualPlayback = XCTNSPredicateExpectation(predicate: playing, object: slider)
         await fulfillment(of: [actualPlayback], timeout: 9)
@@ -590,6 +593,13 @@ final class HandStrudelUITests: XCTestCase {
         let nextPlayhead = app.sliders["feed-video-progress"].firstMatch
         let moving = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true AND (value BEGINSWITH %@ OR value BEGINSWITH %@)", "0:01", "0:02"), object: nextPlayhead)
         XCTAssertEqual(XCTWaiter.wait(for: [moving], timeout: 8), .completed, "The second clip must play, not just appear.")
+        let first = app.staticTexts["Evening loop"].firstMatch
+        let continued = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)
+        XCTAssertEqual(XCTWaiter.wait(for: [continued], timeout: 10), .completed,
+                       "The last clip must advance to a different clip instead of replaying itself.")
+        let restarted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@ OR value BEGINSWITH %@", "0:01", "0:02"),
+                                                  object: nextPlayhead)
+        XCTAssertEqual(XCTWaiter.wait(for: [restarted], timeout: 8), .completed, "The selected clip must play after crossing the end of the feed.")
     }
 
     func testBookmarkAppearsInPrivateSavedLibrary() throws {
@@ -764,7 +774,7 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 10))
         element("tab-feed").tap()
         let clip = app.collectionViews["feed-video-viewport"].cells.containing(.staticText, identifier: "Evening loop").firstMatch
-        let repost = clip.buttons["feed-repost"]
+        let repost = app.buttons["feed-repost"].firstMatch
         func expect(_ label: String, value: String) {
             let state = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@ AND value == %@", label, value), object: repost)
             XCTAssertEqual(XCTWaiter.wait(for: [state], timeout: 6), .completed)
@@ -834,7 +844,7 @@ final class HandStrudelUITests: XCTestCase {
         app.launch()
         element("tab-feed").tap()
         let clip = app.collectionViews["feed-video-viewport"].cells.containing(.staticText, identifier: "Evening loop").firstMatch
-        let remixes = clip.buttons["feed-remix-count"]
+        let remixes = app.buttons["feed-remix-count"].firstMatch
         XCTAssertTrue(remixes.waitForExistence(timeout: 5))
         remixes.tap()
         XCTAssertTrue(app.navigationBars["Remixes"].waitForExistence(timeout: 5))
@@ -855,7 +865,7 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 10))
         element("tab-feed").tap()
         let clip = app.collectionViews["feed-video-viewport"].cells.containing(.staticText, identifier: "Evening loop").firstMatch
-        let repost = clip.buttons["feed-repost"]
+        let repost = app.buttons["feed-repost"].firstMatch
         XCTAssertTrue(repost.waitForExistence(timeout: 8))
         repost.tap()
         let reposted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Remove repost"), object: repost)
@@ -1148,6 +1158,88 @@ final class HandStrudelUITests: XCTestCase {
     }
 
     @MainActor
+    func testFeedWarmsItsFirstVideoOnMusicHomeBeforeOpening() async throws {
+        guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_STARTUP_FEED_FIXTURE_URL"],
+              let endpoint = URL(string: address), endpoint.host == "127.0.0.1" else {
+            throw XCTSkip("Requires a loopback fixture with a solid blue 20-second clip and FIXTURE_VIEW_COUNTS=1.")
+        }
+        app.terminate()
+        let countURL = URL(string: "/rest/v1/feed_videos?id=eq.30000000-0000-0000-0000-000000000001", relativeTo: endpoint)!
+        let (before, _) = try await URLSession.shared.data(from: countURL)
+        let initial = try XCTUnwrap((JSONSerialization.jsonObject(with: before) as? [[String: Any]])?.first?["view_count"] as? Int)
+        let prefix = "/cold-" + UUID().uuidString
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = address
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "startup-feed-fixture"
+        app.launchEnvironment["MEDIA_BASE_URL"] = address + prefix
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        let requestsURL = URL(string: "/__fixture/media-requests", relativeTo: endpoint)!
+        var paths: [String] = []
+        for _ in 0..<30 {
+            let (data, _) = try await URLSession.shared.data(from: requestsURL)
+            paths = try JSONDecoder().decode([String].self, from: data)
+                .filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
+            if !paths.isEmpty { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        XCTAssertEqual(Set(paths), ["/test/clip.mp4"], "Warm only the selected clip before the user has opened Feed.")
+        try await Task.sleep(for: .seconds(3))
+        XCTAssertTrue(start.isHittable, "Preloading must leave the Music home screen selected.")
+        let (after, _) = try await URLSession.shared.data(from: countURL)
+        let warmed = try XCTUnwrap((JSONSerialization.jsonObject(with: after) as? [[String: Any]])?.first?["view_count"] as? Int)
+        XCTAssertEqual(warmed, initial, "Background preparation must not count as watching a video.")
+        element("tab-feed").tap()
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 5))
+        let screenshot = try XCTUnwrap(app.screenshot().image.cgImage)
+        let sample = try XCTUnwrap(screenshot.cropping(to: CGRect(x: Double(screenshot.width) * 0.5, y: Double(screenshot.height) * 0.42,
+                                                                 width: 12, height: 12)))
+        var pixel = [UInt8](repeating: 0, count: 4)
+        try pixel.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(sample, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        XCTAssertGreaterThan(Int(pixel[2]), Int(pixel[0]) + 60, "The warmed video should be visible immediately, not an empty black player.")
+        captureIfRequested("Feed-Startup-Warmed")
+        let playing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value MATCHES %@", "0:(0[1-9]|1[0-9]) of 0:20"),
+                                                object: app.sliders["feed-video-progress"].firstMatch)
+        await fulfillment(of: [playing], timeout: 8)
+    }
+
+    @MainActor
+    func testFeedPlaybackUsesVideoFramesInsteadOfDownloadingUploadedThumbnails() async throws {
+        guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_OPENING_FRAME_FIXTURE_URL"],
+              let endpoint = URL(string: address), endpoint.host == "127.0.0.1" else {
+            throw XCTSkip("Requires a loopback fixture with clips at least 20 seconds long and thumbnail request tracking.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = address
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "opening-frame-fixture"
+        let prefix = "/cold-" + UUID().uuidString
+        app.launchEnvironment["MEDIA_BASE_URL"] = address + prefix
+        app.launch()
+        element("tab-feed").tap()
+        selectFeedMode("Latest")
+        let first = app.staticTexts["Evening loop"].firstMatch
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)], timeout: 6)
+        let slider = app.sliders["feed-video-progress"].firstMatch
+        let moving = NSPredicate(format: "value MATCHES %@", "0:(0[1-9]|1[0-9]) of 0:20")
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: moving, object: slider)], timeout: 12)
+        let viewport = app.collectionViews["feed-video-viewport"]
+        viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.7))
+            .press(forDuration: 0.05, thenDragTo: viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.3)))
+        let next = app.staticTexts["Second performance"].firstMatch
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: next)], timeout: 5)
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: moving, object: slider)], timeout: 12)
+        let requestURL = URL(string: "/__fixture/thumbnail-requests", relativeTo: endpoint)!
+        let (data, _) = try await URLSession.shared.data(from: requestURL)
+        let requests = try JSONDecoder().decode([String].self, from: data).filter { $0.hasPrefix(prefix + "/thumbs/") }
+        XCTAssertTrue(requests.isEmpty, "Playback should render actual video frames, not fetch uploaded posters: \(requests)")
+    }
+
+    @MainActor
     func testFeedPreloadsTheNextClipWithoutSwiping() async throws {
         guard let address = ProcessInfo.processInfo.environment["HANDSTRUDEL_DELAYED_FEED_FIXTURE_URL"],
               let endpoint = URL(string: address), endpoint.host == "127.0.0.1" else {
@@ -1191,6 +1283,133 @@ final class HandStrudelUITests: XCTestCase {
         thumb.press(forDuration: 0.05, thenDragTo: upper)
         let second = app.staticTexts["Second performance"].firstMatch
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 5), .completed)
+    }
+
+    func testFeedSwipesContinuePastBothEdges() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_FEED_BOUNDARY_FIXTURE_URL"] else {
+            throw XCTSkip("Requires a two-video feed fixture with clips at least 20 seconds long.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "feed-boundary-fixture"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint + "/cold-" + UUID().uuidString
+        app.launch()
+        element("tab-feed").tap()
+        selectFeedMode("Latest")
+        let viewport = app.collectionViews["feed-video-viewport"]
+        XCTAssertTrue(viewport.waitForExistence(timeout: 5))
+        let upper = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.27))
+        let lower = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.73))
+        let shortStart = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.43))
+        let shortEnd = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.57))
+        func expectClip(_ caption: String) {
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
+                                                      object: app.staticTexts[caption].firstMatch)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
+        }
+        expectClip("Evening loop")
+        let slider = app.sliders["feed-video-progress"].firstMatch
+        let barY = slider.frame.midY
+        shortStart.press(forDuration: 0.05, thenDragTo: shortEnd)
+        expectClip("Second performance")
+        XCTAssertEqual(slider.frame.midY, barY, accuracy: 1)
+        shortEnd.press(forDuration: 0.05, thenDragTo: shortStart)
+        expectClip("Evening loop")
+        XCTAssertEqual(slider.frame.midY, barY, accuracy: 1)
+        // Normal adjacent navigation must still work after both edge jumps.
+        lower.press(forDuration: 0.05, thenDragTo: upper)
+        expectClip("Second performance")
+        upper.press(forDuration: 0.05, thenDragTo: lower)
+        expectClip("Evening loop")
+        element("feed-options").tap()
+        XCTAssertTrue(app.buttons["Refresh feed"].waitForExistence(timeout: 3), "Refresh stays available without claiming the backward swipe.")
+    }
+
+    func testFeedKeepsTheScrubberAndPlaybackAcrossConsecutiveVideoSwipes() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_SEQUENCE_FEED_FIXTURE_URL"] else {
+            throw XCTSkip("Requires FIXTURE_SEQUENCE_CLIPS=1, delayed engagement/media, and a real clip at least 20 seconds long.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "sequence-feed-fixture"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint + "/cold-" + UUID().uuidString
+        app.launch()
+        element("tab-feed").tap()
+        selectFeedMode("Latest")
+        let viewport = app.collectionViews["feed-video-viewport"]
+        XCTAssertTrue(viewport.waitForExistence(timeout: 5))
+        let captions = ["Evening loop", "Second performance", "Third performance",
+                        "Fourth performance, with a longer caption that wraps over several lines."]
+        let upper = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.3))
+        let lower = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.7))
+        let pages = [0, 1, 2, 3, 2, 1, 0]
+        var sharedRailFrame: CGRect?
+        var sharedScrubberFrame: CGRect?
+        for (step, page) in pages.enumerated() {
+            let clip = viewport.cells.containing(.staticText, identifier: captions[page]).firstMatch
+            let caption = clip.staticTexts[captions[page]]
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: caption)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 4), .completed)
+            let slider = app.sliders["feed-video-progress"].firstMatch
+            XCTAssertTrue(slider.isHittable, "Every selected clip must already have its scrubber, including pages \(page + 1) and later.")
+            let rail = element("feed-action-rail")
+            XCTAssertTrue(rail.isHittable)
+            XCTAssertFalse(clip.sliders["feed-video-progress"].exists, "The scrubber must not scroll with a video cell.")
+            XCTAssertFalse(clip.buttons["Share video"].exists, "The action rail must not scroll with a video cell.")
+            if let sharedRailFrame, let sharedScrubberFrame {
+                XCTAssertEqual(rail.frame.minY, sharedRailFrame.minY, accuracy: 1)
+                XCTAssertEqual(rail.frame.maxY, sharedRailFrame.maxY, accuracy: 1)
+                XCTAssertEqual(slider.frame.midY, sharedScrubberFrame.midY, accuracy: 1)
+            } else {
+                sharedRailFrame = rail.frame
+                sharedScrubberFrame = slider.frame
+            }
+            XCTAssertEqual(app.buttons["Like"].firstMatch.value as? String, page == 0 ? "42 likes" : "0 likes")
+            if page == 3 {
+                let playing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value MATCHES %@", "0:(0[1-9]|1[0-9]) of 0:20"), object: slider)
+                XCTAssertEqual(XCTWaiter.wait(for: [playing], timeout: 12), .completed,
+                               "The fourth video must actually start playing: \(slider.value ?? "missing playhead")")
+            }
+            if step + 1 < pages.count {
+                if pages[step + 1] > page { lower.press(forDuration: 0.05, thenDragTo: upper) }
+                else { upper.press(forDuration: 0.05, thenDragTo: lower) }
+            }
+        }
+    }
+
+    @MainActor
+    func testFeedViewCountDoesNotRevertWhenReturningToAVideo() async throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_SEQUENCE_FEED_FIXTURE_URL"],
+              let fixture = URL(string: endpoint), fixture.host == "127.0.0.1" else {
+            throw XCTSkip("Requires the sequence fixture with FIXTURE_VIEW_COUNTS=1 and a real clip at least 20 seconds long.")
+        }
+        app.terminate()
+        let countURL = URL(string: "/rest/v1/feed_videos?id=eq.30000000-0000-0000-0000-000000000001", relativeTo: fixture)!
+        let (data, _) = try await URLSession.shared.data(from: countURL)
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        let initial = try XCTUnwrap(rows.first?["view_count"] as? Int)
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "view-count-return-fixture"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint + "/cold-" + UUID().uuidString
+        app.launch()
+        element("tab-feed").tap()
+        selectFeedMode("Latest")
+        XCTAssertTrue(app.staticTexts["Evening loop"].firstMatch.waitForExistence(timeout: 5))
+        let views = element("feed-views-count")
+        XCTAssertTrue(views.waitForExistence(timeout: 5))
+        let counted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", String(initial + 1)), object: views)
+        await fulfillment(of: [counted], timeout: 15)
+        let viewport = app.collectionViews["feed-video-viewport"]
+        let upper = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.3))
+        let lower = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.7))
+        lower.press(forDuration: 0.05, thenDragTo: upper)
+        let second = app.staticTexts["Second performance"].firstMatch
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: second)], timeout: 4)
+        upper.press(forDuration: 0.05, thenDragTo: lower)
+        let first = app.staticTexts["Evening loop"].firstMatch
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: first)], timeout: 4)
+        XCTAssertEqual(views.value as? String, String(initial + 1), "Returning must immediately show the updated count, not the feed's older snapshot.")
     }
 
     func testInstrumentCarouselWrapsAcrossTheFreeInstruments() {
@@ -1413,6 +1632,7 @@ final class HandStrudelUITests: XCTestCase {
     }
 
     func testPlayThisSoundFromFeedOpensMusicSession() throws {
+        app.launchEnvironment["MEDIA_BASE_URL"] = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"]
         try launchWithProfileFixture()
         element("tab-feed").tap()
         let sound = app.buttons["feed-sound-options"].firstMatch
@@ -1471,7 +1691,13 @@ final class HandStrudelUITests: XCTestCase {
         menu.tap()
         let option = app.buttons[title].firstMatch
         XCTAssertTrue(option.waitForExistence(timeout: 5))
-        option.tap()
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: option)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
+        option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", title), object: menu)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
+        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: option)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
     }
 
     func testProfileCanRemoveExistingPhoto() throws {

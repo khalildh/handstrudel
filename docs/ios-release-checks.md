@@ -8,7 +8,7 @@ without them; read the `.xcresult` skip messages before calling a run complete.
 ## App Store Connect handoff
 
 Before uploading, confirm that the version and build number are unused in
-App Store Connect. The local candidate is **1.0.1 (25)**; check it against
+App Store Connect. The local candidate is **1.0.1 (42)**; check it against
 the version train and TestFlight history. Use a Release archive from the
 reviewed commit, not a Debug install.
 

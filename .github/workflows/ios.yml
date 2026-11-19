@@ -24,6 +24,9 @@ jobs:
       SCHEME: HandStrudel
       PROJECT: HandStrudel.xcodeproj
       TEST_RUNNER_HANDSTRUDEL_OFFLINE_SMOKE: "1"
+      TEST_RUNNER_SUPABASE_URL: "http://127.0.0.1:1"
+      TEST_RUNNER_SUPABASE_ANON_KEY: "offline-ci"
+      TEST_RUNNER_MEDIA_BASE_URL: "http://127.0.0.1:1"
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       SIMULATOR_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-26-2
     steps:

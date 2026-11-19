@@ -1,6 +1,8 @@
 import AVFoundation
+import Combine
 import ImageIO
 import Supabase
+import SwiftUI
 import UIKit
 import XCTest
 @testable import HandStrudel
@@ -258,13 +260,265 @@ final class SocialTests: XCTestCase {
     }
 
     @MainActor
-    func testFeedPreloadsOnlyNeighborsAndReusesTheirPausedPlayers() {
+    func testFeedOpeningFrameDecodesTheActualBeginningAndAppliesOrientation() async throws {
+        let url = try await Self.makeClip(width: 64, height: 96, seconds: 1)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let source = AVURLAsset(url: url)
+        let tracks = try await source.loadTracks(withMediaType: .video)
+        let track = try XCTUnwrap(tracks.first)
+        let composition = AVMutableComposition()
+        let rotated = try XCTUnwrap(composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid))
+        try rotated.insertTimeRange(CMTimeRange(start: .zero, duration: CMTime(seconds: 1, preferredTimescale: 30)), of: track, at: .zero)
+        rotated.preferredTransform = CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 96, ty: 0)
+        let image = try await FeedOpeningFrame.decode(composition)
+        XCTAssertEqual(image.size, CGSize(width: 96, height: 64))
+        let cg = try XCTUnwrap(image.cgImage)
+        var pixel = [UInt8](repeating: 0, count: 4)
+        let mean = try pixel.withUnsafeMutableBytes { bytes -> Double in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return (Double(bytes[0]) + Double(bytes[1]) + Double(bytes[2])) / 3
+        }
+        XCTAssertLessThan(mean, 20, "This fixture starts black and brightens; decode frame zero, not a later representative thumbnail.")
+    }
+
+    @MainActor
+    func testFeedOpeningFrameIgnoresADecodeThatCompletesAfterEviction() async {
+        let started = expectation(description: "Opening-frame decode started")
+        var completion: CheckedContinuation<UIImage, Never>?
+        let frame = FeedOpeningFrame(asset: AVMutableComposition(), decode: { _ in
+            await withCheckedContinuation { continuation in
+                completion = continuation
+                started.fulfill()
+            }
+        })
+        await fulfillment(of: [started], timeout: 2)
+        frame.cancel()
+        completion?.resume(returning: openingFrameMarker())
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertNil(frame.image, "An evicted clip must not republish a late decoded image.")
+    }
+
+    @MainActor
+    func testFeedPreloadsOpeningFramesFromTheSameAssetsAndReusesThem() async throws {
+        let marker = openingFrameMarker()
+        var decodedAssets: [AVAsset] = []
+        var players: [FeedPlayerSpy] = []
+        let preloader = FeedVideoPreloader(openingFrameDecoder: { asset in
+            decodedAssets.append(asset)
+            return marker
+        }) { _ in
+            let player = FeedPlayerSpy(playerItem: AVPlayerItem(asset: AVMutableComposition()))
+            players.append(player)
+            return player
+        }
+        let resources = (0..<3).map { FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/frame-\($0).mp4")!) }
+        preloader.update(resources, current: resources[1].id)
+        let next = try XCTUnwrap(preloader.openingFrame(for: resources[2]))
+        let image = await waitForOpeningFrame(next)
+        XCTAssertTrue(image === marker)
+        XCTAssertEqual(decodedAssets.count, 2)
+        XCTAssertTrue(decodedAssets.contains { $0 === players[1].currentItem?.asset }, "Use the buffered video's asset, not another image URL.")
+        _ = preloader.take(resources[2])
+        XCTAssertTrue(preloader.openingFrame(for: resources[2]) === next)
+        XCTAssertEqual(decodedAssets.count, 2, "Adopting a preloaded player must not start another frame decode.")
+        XCTAssertTrue(players.allSatisfy { !$0.didPlay && $0.isMuted })
+        preloader.update([resources[2]], current: resources[2].id)
+        XCTAssertNil(preloader.openingFrame(for: resources[0]))
+        XCTAssertTrue(preloader.openingFrame(for: resources[2]) === next)
+        preloader.update([], current: nil)
+        XCTAssertNil(preloader.openingFrame(for: resources[2]))
+        XCTAssertNil(next.image, "Leaving the preload window releases decoded images as well as video buffers.")
+    }
+
+    @MainActor
+    func testFeedOpeningFrameFailureDoesNotPreventTakingOrPlayingTheVideo() async throws {
+        let attempted = expectation(description: "Opening-frame failure is handled separately")
+        let preloader = FeedVideoPreloader(openingFrameDecoder: { _ in
+            attempted.fulfill()
+            throw CancellationError()
+        }) { _ in FeedPlayerSpy(playerItem: AVPlayerItem(asset: AVMutableComposition())) }
+        let clip = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/failure.mp4")!)
+        preloader.update([clip], current: nil)
+        await fulfillment(of: [attempted], timeout: 2)
+        let player = try XCTUnwrap(preloader.take(clip) as? FeedPlayerSpy)
+        XCTAssertNil(preloader.openingFrame(for: clip)?.image)
+        let gate = FeedPlaybackGate()
+        gate.select(clip.id)
+        gate.play(player, videoID: clip.id)
+        XCTAssertTrue(player.didPlay)
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedPlayerShowsTheCachedOpeningFrameBeforeSelectionAndClearsItOnReuse() async throws {
+        let marker = openingFrameMarker()
+        let preloader = FeedVideoPreloader(openingFrameDecoder: { _ in marker }) { _ in
+            FeedPlayerSpy(playerItem: AVPlayerItem(asset: AVMutableComposition()))
+        }
+        let clip = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/frame.mp4")!)
+        let other = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/other.mp4")!)
+        preloader.update([clip], current: nil)
+        _ = await waitForOpeningFrame(try XCTUnwrap(preloader.openingFrame(for: clip)))
+        let view = FeedPlayer.PlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        view.load(videoID: clip.id, url: clip.url, preloader: preloader, isCurrent: false)
+        XCTAssertTrue(view.openingFrameView.image === marker)
+        XCTAssertFalse(view.openingFrameView.isHidden)
+        XCTAssertNil(view.player, "Displaying a preloaded opening frame must not start an offscreen player.")
+        view.setAspectFit(true)
+        XCTAssertEqual(view.openingFrameView.contentMode, .scaleAspectFit)
+        view.load(videoID: other.id, url: other.url, preloader: preloader, isCurrent: false)
+        XCTAssertNil(view.openingFrameView.image, "Never display the previous clip's frame while reusing a cell.")
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedOpeningFrameIsInvalidatedWhenTheVideoURLChanges() async throws {
+        let marker = openingFrameMarker()
+        let preloader = FeedVideoPreloader(openingFrameDecoder: { _ in marker }) { _ in
+            FeedPlayerSpy(playerItem: AVPlayerItem(asset: AVMutableComposition()))
+        }
+        let clip = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/old.mp4")!)
+        let updated = FeedVideoPreloader.Resource(id: clip.id, url: URL(string: "https://example.test/new.mp4")!)
+        preloader.update([clip], current: nil)
+        let old = try XCTUnwrap(preloader.openingFrame(for: clip))
+        _ = await waitForOpeningFrame(old)
+        preloader.update([updated], current: nil)
+        XCTAssertNil(preloader.openingFrame(for: clip))
+        XCTAssertNil(old.image)
+        XCTAssertFalse(preloader.openingFrame(for: updated) === old)
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    private func openingFrameMarker() -> UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { context in
+            UIColor.cyan.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+    }
+
+    @MainActor
+    private func waitForOpeningFrame(_ frame: FeedOpeningFrame) async -> UIImage? {
+        let ready = expectation(description: "The opening frame was decoded")
+        let observation = frame.$image.compactMap { $0 }.prefix(1).sink { _ in ready.fulfill() }
+        await fulfillment(of: [ready], timeout: 2)
+        withExtendedLifetime(observation) {}
+        return frame.image
+    }
+
+    @MainActor
+    func testFeedWarmsTheSelectedClipSilentlyBeforeTheFeedIsVisible() throws {
+        let clips = try feedPagingClips()
         var created: [FeedPlayerSpy] = []
-        let preloader = FeedVideoPreloader { _ in
+        let preloader = FeedVideoPreloader(makePlayer: { _ in
             let player = FeedPlayerSpy()
             created.append(player)
             return player
+        })
+        let gate = FeedPlaybackGate(preloader: preloader)
+        func feed(visible: Bool) -> PagedFeed<Text> {
+            PagedFeed(videos: clips, current: .constant(0), isVisible: visible, allowsPlayback: visible, refresh: {},
+                      sharedPlaybackGate: gate, allowsPreloading: true) { video, _, _ in Text(video.caption) }
         }
+        let coordinator = feed(visible: false).makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        XCTAssertEqual(created.count, 1, "Only the selected startup clip should consume video bandwidth.")
+        let warmed = try XCTUnwrap(created.first)
+        XCTAssertTrue(warmed.isMuted)
+        XCTAssertFalse(warmed.didPlay)
+        XCTAssertNil(gate.selectedVideoID, "Warmup must not grant playback or count a watch.")
+
+        coordinator.parent = feed(visible: true)
+        coordinator.applyUpdate(collection)
+        XCTAssertEqual(created.count, 2, "Prepare the next clip on entering Feed, without replacing the warmed first player.")
+        let first = FeedVideoPreloader.Resource(id: clips[0].id, url: clips[0].videoURL)
+        XCTAssertTrue(preloader.take(first) === warmed)
+        XCTAssertEqual(gate.selectedVideoID, clips[0].id)
+        gate.play(warmed, videoID: clips[0].id)
+        XCTAssertTrue(warmed.didPlay)
+        XCTAssertFalse(created[1].didPlay)
+
+        coordinator.parent = feed(visible: false)
+        coordinator.applyUpdate(collection)
+        XCTAssertFalse(warmed.didPlay)
+        XCTAssertNil(gate.selectedVideoID)
+        preloader.recycle(warmed, resource: first)
+        XCTAssertTrue(preloader.take(first) === warmed, "Keep the paused selected clip ready when returning to Music.")
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedBackgroundingStopsWarmupEvenWhileAScrollUpdateIsDeferred() throws {
+        let clips = try feedPagingClips()
+        var created: [FeedPlayerSpy] = []
+        let preloader = FeedVideoPreloader(makePlayer: { _ in
+            let player = FeedPlayerSpy()
+            created.append(player)
+            return player
+        })
+        let gate = FeedPlaybackGate(preloader: preloader)
+        func feed(preloads: Bool) -> PagedFeed<Text> {
+            PagedFeed(videos: clips, current: .constant(0), isVisible: false, allowsPlayback: false, refresh: {},
+                      sharedPlaybackGate: gate, allowsPreloading: preloads) { video, _, _ in Text(video.caption) }
+        }
+        let coordinator = feed(preloads: true).makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        let warmed = try XCTUnwrap(created.first)
+        collection.simulatesTracking = true
+        coordinator.parent = feed(preloads: false)
+        coordinator.applyUpdate(collection)
+        let first = FeedVideoPreloader.Resource(id: clips[0].id, url: clips[0].videoURL)
+        XCTAssertFalse(preloader.take(first) === warmed, "Backgrounding should release the prepared player immediately, not wait for the pan to finish.")
+        XCTAssertNil(gate.selectedVideoID)
+        XCTAssertTrue(created.allSatisfy { !$0.didPlay })
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedWarmupFollowsTheSelectedVideoWhenItsRankChanges() throws {
+        let clips = try feedPagingClips()
+        var created: [FeedPlayerSpy] = []
+        let preloader = FeedVideoPreloader(makePlayer: { _ in
+            let player = FeedPlayerSpy()
+            created.append(player)
+            return player
+        })
+        let gate = FeedPlaybackGate(preloader: preloader)
+        func feed(_ videos: [Video]) -> PagedFeed<Text> {
+            PagedFeed(videos: videos, current: .constant(0), isVisible: false, allowsPlayback: false, refresh: {},
+                      sharedPlaybackGate: gate, allowsPreloading: true) { video, _, _ in Text(video.caption) }
+        }
+        let coordinator = feed(clips).makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        coordinator.parent = feed(Array(clips.reversed()))
+        coordinator.applyUpdate(collection)
+        XCTAssertEqual(created.count, 2)
+        let selected = FeedVideoPreloader.Resource(id: clips[2].id, url: clips[2].videoURL)
+        XCTAssertTrue(preloader.take(selected) === created[1])
+        XCTAssertNil(gate.selectedVideoID)
+        XCTAssertTrue(created.allSatisfy { !$0.didPlay })
+        preloader.update([], current: nil)
+    }
+
+    @MainActor
+    func testFeedPreloadsOnlyNeighborsAndReusesTheirPausedPlayers() {
+        var created: [FeedPlayerSpy] = []
+        let preloader = FeedVideoPreloader(makePlayer: { _ in
+            let player = FeedPlayerSpy()
+            created.append(player)
+            return player
+        })
         let clips = (0..<4).map { FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/\($0).mp4")!) }
         preloader.update(Array(clips[0...2]), current: clips[1].id)
         XCTAssertEqual(created.count, 2, "Prepare only the previous and next clip, not the whole feed.")
@@ -282,7 +536,7 @@ final class SocialTests: XCTestCase {
     @MainActor
     func testFeedPreloaderDiscardsClipsOutsideTheWindowAndOnLeaving() {
         var created = 0
-        let preloader = FeedVideoPreloader { _ in created += 1; return FeedPlayerSpy() }
+        let preloader = FeedVideoPreloader(makePlayer: { _ in created += 1; return FeedPlayerSpy() })
         let first = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/first.mp4")!)
         let next = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/next.mp4")!)
         preloader.update([first, next], current: first.id)
@@ -296,7 +550,7 @@ final class SocialTests: XCTestCase {
 
     @MainActor
     func testFeedPreloaderRejectsStaleHostsAndChangedVideoURLs() {
-        let preloader = FeedVideoPreloader { _ in FeedPlayerSpy() }
+        let preloader = FeedVideoPreloader(makePlayer: { _ in FeedPlayerSpy() })
         let clip = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/clip.mp4")!)
         let updated = FeedVideoPreloader.Resource(id: clip.id, url: URL(string: "https://example.test/updated.mp4")!)
         preloader.update([clip], current: nil)
@@ -315,6 +569,500 @@ final class SocialTests: XCTestCase {
         let feed = FeedPagingCollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
         XCTAssertTrue(feed.touchesShouldCancel(in: UISlider()))
         XCTAssertTrue(feed.touchesShouldCancel(in: UIButton()))
+    }
+
+    @MainActor
+    func testFeedActivatesSecondAndThirdCellsAfterDecelerationFlagsClear() async throws {
+        let clips = try feedPagingClips()
+        var current = 0
+        var active = Set<UUID>()
+        var activated: XCTestExpectation?
+        let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                             isVisible: false, allowsPlayback: true, refresh: {}) { video, isCurrent, _ in
+            if isCurrent {
+                active.insert(video.id)
+                activated?.fulfill()
+                activated = nil
+            }
+            return Text(video.caption)
+        }
+        let coordinator = feed.makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+
+        for page in [1, 2, 1] {
+            collection.visiblePage = page
+            coordinator.configure(collection.visibleCell, at: IndexPath(item: page, section: 0))
+            active.remove(clips[page].id)
+            collection.simulatedOffset = CGPoint(x: 0, y: CGFloat(page) * collection.bounds.height)
+            collection.simulatesDeceleration = true
+            coordinator.scrollViewDidEndDecelerating(collection)
+            XCTAssertEqual(current, page)
+            XCTAssertFalse(active.contains(clips[page].id), "Do not replace hosting views during deceleration.")
+
+            activated = expectation(description: "Selected cell becomes active after deceleration")
+            collection.simulatesDeceleration = false
+            await fulfillment(of: [try XCTUnwrap(activated)], timeout: 1)
+            XCTAssertTrue(active.contains(clips[page].id), "The handoff must not depend on another API response.")
+        }
+    }
+
+    private func feedPagingClips() throws -> [Video] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try (0..<3).map { index in
+            let row: [String: Any] = [
+                "id": UUID().uuidString, "user_id": UUID().uuidString, "like_count": 0,
+                "caption": "Performance \(index)", "video_key": "clip-\(index).mp4", "thumb_key": "thumb.jpg",
+                "created_at": "2026-11-19T00:00:00Z"
+            ]
+            return try decoder.decode(Video.self, from: JSONSerialization.data(withJSONObject: row))
+        }
+    }
+
+    func testFeedNavigationKeepsAdjacentVideosInOrder() {
+        for (current, step, expected) in [(0, 1, 1), (1, 1, 2), (2, -1, 1), (1, -1, 0)] {
+            XCTAssertEqual(FeedNavigation.destination(from: current, by: step, count: 3, choose: { _ in
+                XCTFail("Only the edges should choose a random clip.")
+                return 0
+            }), expected)
+        }
+    }
+
+    func testFeedNavigationCanChooseEveryOtherVideoAtEitherEdge() {
+        for count in 2...8 {
+            for (current, step) in [(0, -1), (count - 1, 1)] {
+                let targets = (0..<(count - 1)).compactMap { candidate in
+                    FeedNavigation.destination(from: current, by: step, count: count, choose: { range in
+                        XCTAssertEqual(range, 0..<(count - 1))
+                        return candidate
+                    })
+                }
+                XCTAssertEqual(Set(targets), Set(0..<count).subtracting([current]))
+            }
+        }
+    }
+
+    func testFeedNavigationDoesNotInventAnAlternativeForEmptyOrSingleClipFeeds() {
+        for count in [0, 1] {
+            XCTAssertNil(FeedNavigation.destination(from: 0, by: 1, count: count))
+            XCTAssertNil(FeedNavigation.destination(from: 0, by: -1, count: count))
+        }
+        XCTAssertNil(FeedNavigation.destination(from: -1, by: 1, count: 3))
+        XCTAssertNil(FeedNavigation.destination(from: 3, by: -1, count: 3))
+        XCTAssertNil(FeedNavigation.destination(from: 0, by: 0, count: 3))
+    }
+
+    @MainActor
+    func testFeedEdgeSwipesChooseADifferentClipAndAlignTheViewportOnce() throws {
+        let clips = try feedPagingClips()
+        for (start, step, candidate, expected, decelerates) in [
+            (0, -1, 1, 2, false), (2, 1, 0, 0, false), (0, -1, 1, 2, true), (2, 1, 0, 0, true)
+        ] {
+            var current = start
+            var boundaryCalls = 0
+            let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                                 isVisible: false, allowsPlayback: true, refresh: {}, onBoundary: { amount in
+                boundaryCalls += 1
+                XCTAssertEqual(amount, step)
+                guard let next = FeedNavigation.destination(from: current, by: amount, count: clips.count,
+                                                           choose: { _ in candidate }) else { return false }
+                current = next
+                return true
+            }) { video, _, _ in Text(video.caption) }
+            let coordinator = feed.makeCoordinator()
+            defer { coordinator.cancelPendingUpdates() }
+            let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                                collectionViewLayout: UICollectionViewFlowLayout())
+            coordinator.applyUpdate(collection)
+            let origin = CGFloat(start) * collection.bounds.height
+            collection.simulatesDragging = true
+            coordinator.scrollViewWillBeginDragging(collection)
+            collection.simulatedOffset.y = origin + CGFloat(step) * 150
+            var target = collection.simulatedOffset
+            coordinator.scrollViewWillEndDragging(collection, withVelocity: CGPoint(x: 0, y: CGFloat(step)), targetContentOffset: &target)
+            XCTAssertEqual(target.y, origin, "Finish the edge bounce before switching, rather than scrolling across every intervening clip.")
+            XCTAssertEqual(current, start)
+            collection.simulatesDragging = false
+            collection.simulatesDeceleration = decelerates
+            coordinator.scrollViewDidEndDragging(collection, willDecelerate: decelerates)
+            if decelerates {
+                XCTAssertEqual(boundaryCalls, 0)
+                collection.simulatedOffset = target
+                collection.simulatesDeceleration = false
+                coordinator.scrollViewDidEndDecelerating(collection)
+            }
+            XCTAssertEqual(boundaryCalls, 1)
+            XCTAssertEqual(current, expected)
+            XCTAssertEqual(collection.contentOffset.y, CGFloat(expected) * collection.bounds.height)
+            XCTAssertEqual(coordinator.playbackGate.selectedVideoID, clips[expected].id)
+            coordinator.scrollViewDidEndDecelerating(collection)
+            XCTAssertEqual(boundaryCalls, 1, "Repeated scroll callbacks must not pick another random clip.")
+        }
+    }
+
+    @MainActor
+    func testFeedRecognizesEdgeSwipesDespiteRubberBanding() throws {
+        let clips = try feedPagingClips()
+        for start in [0, 2] {
+            var current = start
+            let step = start == 0 ? -1 : 1
+            var boundaryCalls = 0
+            let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                                 isVisible: false, allowsPlayback: true, refresh: {}, onBoundary: { amount in
+                boundaryCalls += 1
+                XCTAssertEqual(amount, step)
+                current = 1
+                return true
+            }) { video, _, _ in Text(video.caption) }
+            let coordinator = feed.makeCoordinator()
+            defer { coordinator.cancelPendingUpdates() }
+            let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                                collectionViewLayout: UICollectionViewFlowLayout())
+            coordinator.applyUpdate(collection)
+            collection.simulatesDragging = true
+            coordinator.scrollViewWillBeginDragging(collection)
+            collection.simulatedOffset.y += CGFloat(step) * 25
+            collection.simulatedPan.travel = CGPoint(x: 0, y: CGFloat(-step) * 60)
+            var target = CGPoint(x: 0, y: CGFloat(start) * collection.bounds.height)
+            coordinator.scrollViewWillEndDragging(collection, withVelocity: .zero, targetContentOffset: &target)
+            collection.simulatesDragging = false
+            coordinator.scrollViewDidEndDragging(collection, willDecelerate: false)
+            XCTAssertEqual(boundaryCalls, 1)
+            XCTAssertEqual(current, 1)
+        }
+    }
+
+    @MainActor
+    func testFeedDefersTheEdgeJumpUntilLateScrollCallbacksHaveSettled() async throws {
+        let clips = try feedPagingClips()
+        var current = 0
+        var boundaryCalls = 0
+        let selected = expectation(description: "The random destination is selected once scrolling really stops")
+        let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                             isVisible: false, allowsPlayback: true, refresh: {}, onSelection: { video in
+            if video.id == clips[2].id { selected.fulfill() }
+        }, onBoundary: { _ in
+            boundaryCalls += 1
+            current = 2
+            return true
+        }) { video, _, _ in Text(video.caption) }
+        let coordinator = feed.makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        collection.simulatesDragging = true
+        coordinator.scrollViewWillBeginDragging(collection)
+        collection.simulatedOffset.y = -150
+        var target = CGPoint.zero
+        coordinator.scrollViewWillEndDragging(collection, withVelocity: CGPoint(x: 0, y: -1), targetContentOffset: &target)
+        collection.simulatesDragging = false
+        collection.simulatesDeceleration = true
+        collection.simulatedOffset = target
+        coordinator.scrollViewDidEndDecelerating(collection)
+        XCTAssertEqual(boundaryCalls, 0, "UIKit can still report deceleration during its end callback.")
+        (coordinator as UIScrollViewDelegate).scrollViewDidScroll?(collection)
+        collection.simulatesDeceleration = false
+        await fulfillment(of: [selected], timeout: 1)
+        XCTAssertEqual(boundaryCalls, 1)
+        XCTAssertEqual(current, 2)
+        XCTAssertEqual(collection.contentOffset.y, collection.bounds.height * 2)
+    }
+
+    @MainActor
+    func testFeedSmallEdgeDragsDoNotPickARandomClip() throws {
+        let clips = try feedPagingClips()
+        for start in [0, 2] {
+            let feed = PagedFeed(videos: clips, current: .constant(start), isVisible: false, allowsPlayback: true,
+                                 refresh: {}, onBoundary: { _ in XCTFail("A short bounce must not navigate."); return false }) {
+                video, _, _ in Text(video.caption)
+            }
+            let coordinator = feed.makeCoordinator()
+            defer { coordinator.cancelPendingUpdates() }
+            let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                                collectionViewLayout: UICollectionViewFlowLayout())
+            coordinator.applyUpdate(collection)
+            collection.simulatesDragging = true
+            coordinator.scrollViewWillBeginDragging(collection)
+            collection.simulatedOffset.y += start == 0 ? -30 : 30
+            var target = CGPoint(x: 0, y: CGFloat(start) * collection.bounds.height)
+            coordinator.scrollViewWillEndDragging(collection, withVelocity: .zero, targetContentOffset: &target)
+            collection.simulatesDragging = false
+            coordinator.scrollViewDidEndDragging(collection, willDecelerate: false)
+            XCTAssertEqual(coordinator.playbackGate.selectedVideoID, clips[start].id)
+        }
+    }
+
+    @MainActor
+    func testFeedInterruptedDecelerationAnchorsTheNextSwipeToTheVisiblePage() throws {
+        let clips = try feedPagingClips()
+        var current = 0
+        let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                             isVisible: false, allowsPlayback: true, refresh: {}) { video, _, _ in Text(video.caption) }
+        let coordinator = feed.makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        let height = collection.bounds.height
+        collection.simulatesDeceleration = true
+        collection.simulatedOffset.y = height * 0.98
+        coordinator.scrollViewWillBeginDragging(collection)
+        collection.simulatedOffset.y = height * 1.6
+        var target = CGPoint(x: 0, y: height * 1.95)
+        coordinator.scrollViewWillEndDragging(collection, withVelocity: CGPoint(x: 0, y: 2), targetContentOffset: &target)
+        XCTAssertEqual(target.y, height * 2, accuracy: 1, "A second flick must advance past the video already in view.")
+
+        collection.simulatedOffset.y = height * 2
+        collection.simulatesDeceleration = false
+        coordinator.scrollViewDidEndDecelerating(collection)
+        collection.simulatesDeceleration = true
+        collection.simulatedOffset.y = height * 1.02
+        coordinator.scrollViewWillBeginDragging(collection)
+        collection.simulatedOffset.y = height * 0.4
+        target.y = height * 0.05
+        coordinator.scrollViewWillEndDragging(collection, withVelocity: CGPoint(x: 0, y: -2), targetContentOffset: &target)
+        XCTAssertEqual(target.y, 0, accuracy: 1, "Interrupted backward swipes must use the visible page too.")
+    }
+
+    @MainActor
+    func testFeedSelectsTheDominantVideoWithoutWaitingForScrollingToStop() throws {
+        let clips = try feedPagingClips()
+        var current = 0
+        let feed = PagedFeed(videos: clips, current: Binding(get: { current }, set: { current = $0 }),
+                             isVisible: false, allowsPlayback: true, refresh: {}) { video, _, _ in Text(video.caption) }
+        let coordinator = feed.makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        collection.simulatesDragging = true
+        coordinator.scrollViewWillBeginDragging(collection)
+        collection.simulatedOffset.y = collection.bounds.height * 0.6
+        (coordinator as UIScrollViewDelegate).scrollViewDidScroll?(collection)
+        XCTAssertEqual(current, 1, "The overlay must switch before the next video finishes settling.")
+        collection.simulatedOffset.y = collection.bounds.height * 0.4
+        (coordinator as UIScrollViewDelegate).scrollViewDidScroll?(collection)
+        XCTAssertEqual(current, 0)
+    }
+
+    @MainActor
+    func testFeedRevisitClearsTheCachedPlayheadBeforeMediaIsReady() async throws {
+        let clips = try feedPagingClips()
+        let store = FeedPlaybackStore()
+        store.select(clips[0])
+        let clip = store.clip(for: clips[0].id)
+        let player = DelayedFeedSeekPlayer()
+        let gate = FeedPlaybackGate()
+        gate.select(clips[0].id)
+        clip.playback.configure(player: player, videoID: clips[0].id, gate: gate, isCurrent: true,
+                                wantsPlayback: false, durationHint: 20, countsViews: false)
+        clip.playback.setSeconds(12)
+        clip.paused = true
+        XCTAssertEqual(clip.playback.position?.seconds, 12)
+        store.select(clips[1])
+        store.select(clips[0])
+        XCTAssertEqual(clip.playback.position?.seconds, 0, "Do not display the previous visit while buffering.")
+        XCTAssertFalse(clip.paused)
+        player.completeSeek(at: 0, finished: false)
+        await Task.yield()
+        XCTAssertEqual(clip.playback.position?.seconds, 0, "A stale seek completion must not restore the old position.")
+    }
+
+    @MainActor
+    func testFeedRestartKeepsThePlayheadAtZeroUntilTheInitialSeekCompletes() async {
+        let controller = FeedPlaybackController()
+        let player = DelayedFeedSeekPlayer()
+        player.time = CMTime(seconds: 8, preferredTimescale: 600)
+        let id = UUID()
+        let gate = FeedPlaybackGate()
+        gate.select(id)
+        controller.configure(player: player, videoID: id, gate: gate, isCurrent: true,
+                             wantsPlayback: true, durationHint: 20, countsViews: false)
+        controller.setSeconds(8)
+        controller.prepareForVisit(durationHint: 20)
+        controller.configure(player: player, videoID: id, gate: gate, isCurrent: true,
+                             wantsPlayback: true, durationHint: 20, countsViews: false)
+        XCTAssertEqual(controller.position?.seconds, 0)
+        XCTAssertEqual(player.seeks.count, 2)
+        XCTAssertEqual(player.seeks.last?.time.seconds, 0)
+        XCTAssertFalse(player.didPlay)
+        player.completeSeek(at: 0, finished: false)
+        await Task.yield()
+        XCTAssertEqual(controller.position?.seconds, 0)
+        player.completeSeek(at: 1, finished: true)
+        for _ in 0..<20 {
+            if player.didPlay { break }
+            await Task.yield()
+        }
+        XCTAssertTrue(player.didPlay)
+        XCTAssertEqual(controller.position?.seconds, 0)
+    }
+
+    @MainActor
+    func testSharedScrubberReplacesTheOldThumbPositionEvenWhileTracking() {
+        var cancelledOld = false
+        var soughtNew = false
+        func configuration(_ source: AnyObject.Type, seconds: Double) -> FeedSeekSlider {
+            FeedSeekSlider(sourceID: ObjectIdentifier(source), seconds: seconds, duration: 20, enabled: true,
+                           tint: .white, valueLabel: "0:00 of 0:20", onChange: { _ in soughtNew = true },
+                           onEditing: { _ in }, onCancelEditing: { cancelledOld = true },
+                           onVerticalSwipe: nil, onPaging: nil)
+        }
+        let coordinator = FeedSeekSlider.Coordinator(configuration(NSObject.self, seconds: 12))
+        let slider = TrackingFeedSlider()
+        slider.maximumValue = 20
+        slider.value = 12
+        coordinator.update(slider, parent: configuration(AVPlayer.self, seconds: 0))
+        XCTAssertEqual(slider.value, 0)
+        XCTAssertTrue(cancelledOld)
+        XCTAssertFalse(soughtNew, "Resetting the thumb must not seek the newly selected video.")
+    }
+
+    @MainActor
+    func testFeedIgnoresTimeCallbacksQueuedDuringAPreviousVisit() {
+        let controller = FeedPlaybackController()
+        let player = DelayedFeedSeekPlayer()
+        let id = UUID()
+        let gate = FeedPlaybackGate()
+        gate.select(id)
+        controller.configure(player: player, videoID: id, gate: gate, isCurrent: true,
+                             wantsPlayback: false, durationHint: 20, countsViews: false)
+        controller.setSeconds(8)
+        let oldCallback = player.observers[0]
+        controller.prepareForVisit(durationHint: 20)
+        controller.configure(player: player, videoID: id, gate: gate, isCurrent: true,
+                             wantsPlayback: false, durationHint: 20, countsViews: false)
+        oldCallback(CMTime(seconds: 8, preferredTimescale: 600))
+        XCTAssertEqual(controller.position?.seconds, 0, "A reused player must not revive a timestamp from the previous visit.")
+        player.observers.last?(CMTime(seconds: 0.2, preferredTimescale: 600))
+        XCTAssertEqual(controller.position?.seconds, 0.2)
+    }
+
+    private final class TrackingFeedSlider: UISlider {
+        override var isTracking: Bool { true }
+    }
+
+    private final class DelayedFeedSeekPlayer: AVPlayer, @unchecked Sendable {
+        var time = CMTime.zero
+        private(set) var didPlay = false
+        private(set) var seeks: [(time: CMTime, completion: @Sendable (Bool) -> Void)] = []
+        private(set) var observers: [@Sendable (CMTime) -> Void] = []
+        override func currentTime() -> CMTime { time }
+        override func play() { didPlay = true }
+        override func pause() { didPlay = false }
+        override func addPeriodicTimeObserver(forInterval interval: CMTime, queue: DispatchQueue?,
+                                             using block: @escaping @Sendable (CMTime) -> Void) -> Any {
+            observers.append(block)
+            return NSObject()
+        }
+        override func removeTimeObserver(_ observer: Any) {}
+        override func seek(to time: CMTime, toleranceBefore: CMTime, toleranceAfter: CMTime,
+                           completionHandler: @escaping @Sendable (Bool) -> Void) {
+            seeks.append((time, completionHandler))
+        }
+        func completeSeek(at index: Int, finished: Bool) {
+            let seek = seeks[index]
+            if finished { time = seek.time }
+            seek.completion(finished)
+        }
+    }
+
+    @MainActor
+    func testFeedRetainsTheNewestViewCountWhenRevisitingACell() throws {
+        let clips = try feedPagingClips()
+        let model = FeedModel()
+        model.videos = clips
+        model.recordViewCount(8, for: clips[0].id)
+        model.current = 1
+        model.recordViewCount(4, for: clips[1].id)
+        model.current = 0
+        XCTAssertEqual(model.videos[model.current].viewCount, 8)
+        model.recordViewCount(7, for: clips[0].id)
+        model.recordViewCount(-1, for: clips[0].id)
+        model.recordViewCount(100, for: UUID())
+        XCTAssertEqual(model.videos[0].viewCount, 8, "A late or unrelated response must not revert the count.")
+        XCTAssertEqual(model.videos[1].viewCount, 4)
+    }
+
+    @MainActor
+    func testFeedCoalescesDeferredUpdatesWithoutAnotherScrollCallback() async throws {
+        let clips = try feedPagingClips()
+        var rendered: [String] = []
+        let latest = expectation(description: "Latest metadata is applied when touch tracking ends")
+        func feed(_ items: [Video]) -> PagedFeed<Text> {
+            PagedFeed(videos: items, current: .constant(0), isVisible: false, allowsPlayback: true, refresh: {}) { video, _, _ in
+                rendered.append(video.caption)
+                if video.caption == "Latest metadata" { latest.fulfill() }
+                return Text(video.caption)
+            }
+        }
+        let coordinator = feed(clips).makeCoordinator()
+        defer { coordinator.cancelPendingUpdates() }
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        collection.simulatesTracking = true
+        var updated = clips
+        updated[0].caption = "Superseded metadata"
+        coordinator.parent = feed(updated)
+        coordinator.applyUpdate(collection)
+        updated[0].caption = "Latest metadata"
+        coordinator.parent = feed(updated)
+        coordinator.applyUpdate(collection)
+        XCTAssertTrue(rendered.isEmpty)
+        collection.simulatesTracking = false
+        await fulfillment(of: [latest], timeout: 1)
+        XCTAssertEqual(rendered, ["Latest metadata"])
+    }
+
+    @MainActor
+    func testFeedCancelsDeferredUpdatesWhenDismantled() async throws {
+        let clips = try feedPagingClips()
+        let unexpected = expectation(description: "Dismantled feed must not update its old views")
+        unexpected.isInverted = true
+        let feed = PagedFeed(videos: clips, current: .constant(0), isVisible: false, allowsPlayback: true, refresh: {}) { _, _, _ in
+            unexpected.fulfill()
+            return Text("Old feed")
+        }
+        let coordinator = feed.makeCoordinator()
+        let collection = FeedScrollStateSpy(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                            collectionViewLayout: UICollectionViewFlowLayout())
+        coordinator.applyUpdate(collection)
+        collection.simulatesTracking = true
+        coordinator.applyUpdate(collection)
+        PagedFeed<Text>.dismantleUIView(collection, coordinator: coordinator)
+        collection.simulatesTracking = false
+        await fulfillment(of: [unexpected], timeout: 0.2)
+    }
+
+    private final class FeedScrollStateSpy: UICollectionView {
+        var simulatesDeceleration = false
+        var simulatesTracking = false
+        var simulatesDragging = false
+        var simulatedOffset = CGPoint.zero
+        var visiblePage = 0
+        let visibleCell = UICollectionViewCell()
+        let simulatedPan = FeedPanSpy()
+        override var panGestureRecognizer: UIPanGestureRecognizer { simulatedPan }
+        override var isDecelerating: Bool { simulatesDeceleration }
+        override var isTracking: Bool { simulatesTracking }
+        override var isDragging: Bool { simulatesDragging }
+        override var contentOffset: CGPoint {
+            get { simulatedOffset }
+            set { simulatedOffset = newValue }
+        }
+        override var indexPathsForVisibleItems: [IndexPath] { [IndexPath(item: visiblePage, section: 0)] }
+        override func cellForItem(at indexPath: IndexPath) -> UICollectionViewCell? { visibleCell }
+        override func reloadData() {}
+    }
+
+    private final class FeedPanSpy: UIPanGestureRecognizer {
+        var travel = CGPoint.zero
+        override func translation(in view: UIView?) -> CGPoint { travel }
     }
 
     func testComposerSharesEligibleSoundAndBackingByDefault() {
