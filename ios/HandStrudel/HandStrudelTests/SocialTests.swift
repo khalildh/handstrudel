@@ -257,6 +257,66 @@ final class SocialTests: XCTestCase {
         override func pause() { didPlay = false }
     }
 
+    @MainActor
+    func testFeedPreloadsOnlyNeighborsAndReusesTheirPausedPlayers() {
+        var created: [FeedPlayerSpy] = []
+        let preloader = FeedVideoPreloader { _ in
+            let player = FeedPlayerSpy()
+            created.append(player)
+            return player
+        }
+        let clips = (0..<4).map { FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/\($0).mp4")!) }
+        preloader.update(Array(clips[0...2]), current: clips[1].id)
+        XCTAssertEqual(created.count, 2, "Prepare only the previous and next clip, not the whole feed.")
+        XCTAssertTrue(created.allSatisfy { !$0.didPlay && $0.isMuted })
+        let next = preloader.take(clips[2])
+        XCTAssertTrue(next === created[1], "Paging must adopt the buffered player, not download another copy.")
+
+        preloader.update(Array(clips[1...3]), current: clips[2].id)
+        XCTAssertEqual(created.count, 4)
+        preloader.recycle(next, resource: clips[2])
+        XCTAssertTrue(preloader.take(clips[2]) === next)
+        XCTAssertTrue(created.allSatisfy { !$0.didPlay })
+    }
+
+    @MainActor
+    func testFeedPreloaderDiscardsClipsOutsideTheWindowAndOnLeaving() {
+        var created = 0
+        let preloader = FeedVideoPreloader { _ in created += 1; return FeedPlayerSpy() }
+        let first = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/first.mp4")!)
+        let next = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/next.mp4")!)
+        preloader.update([first, next], current: first.id)
+        let old = preloader.take(next)
+        preloader.update([], current: nil)
+        preloader.recycle(old, resource: next)
+        let reopened = preloader.take(next)
+        XCTAssertFalse(reopened === old)
+        XCTAssertEqual(created, 2)
+    }
+
+    @MainActor
+    func testFeedPreloaderRejectsStaleHostsAndChangedVideoURLs() {
+        let preloader = FeedVideoPreloader { _ in FeedPlayerSpy() }
+        let clip = FeedVideoPreloader.Resource(id: UUID(), url: URL(string: "https://example.test/clip.mp4")!)
+        let updated = FeedVideoPreloader.Resource(id: clip.id, url: URL(string: "https://example.test/updated.mp4")!)
+        preloader.update([clip], current: nil)
+        let old = preloader.take(clip)
+        let replacement = preloader.take(clip)
+        preloader.recycle(old, resource: clip)
+        preloader.recycle(replacement, resource: clip)
+        XCTAssertTrue(preloader.take(clip) === replacement)
+        preloader.recycle(replacement, resource: clip)
+        preloader.update([updated], current: nil)
+        XCTAssertFalse(preloader.take(updated) === replacement)
+    }
+
+    @MainActor
+    func testVerticalFeedSwipeCanCancelTheScrubberAndButtons() {
+        let feed = FeedPagingCollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
+        XCTAssertTrue(feed.touchesShouldCancel(in: UISlider()))
+        XCTAssertTrue(feed.touchesShouldCancel(in: UIButton()))
+    }
+
     func testComposerSharesEligibleSoundAndBackingByDefault() {
         var options = PostSharingOptions()
         var setup = SoundSetup(instrument: "violin", waveform: "sine", key: .C, scale: .major,

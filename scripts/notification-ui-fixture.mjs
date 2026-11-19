@@ -12,6 +12,9 @@ const clipBytes = process.env.FIXTURE_CLIP ? readFileSync(process.env.FIXTURE_CL
 const thumbnailBytes = process.env.FIXTURE_THUMBNAIL ? readFileSync(process.env.FIXTURE_THUMBNAIL) : null;
 const canControlMedia = process.env.FIXTURE_CONTROL_MEDIA === "1";
 const singleClip = process.env.FIXTURE_SINGLE_CLIP === "1";
+const mediaDelay = Math.max(0, Number(process.env.FIXTURE_MEDIA_DELAY_MS) || 0);
+const engagementDelay = Math.max(0, Number(process.env.FIXTURE_ENGAGEMENT_DELAY_MS) || 0);
+const mediaRequests = [];
 const countViews = process.env.FIXTURE_VIEW_COUNTS === "1";
 const showEngagement = process.env.FIXTURE_ENGAGEMENT === "1";
 const showReposts = process.env.FIXTURE_REPOSTS === "1";
@@ -22,7 +25,7 @@ const demoThumb = "thumbs/76c9a372-7439-48dc-94ec-75a06cb6f1d7/385e21ab-7160-437
 const post = {
   id: video, user_id: creator, username: "loopmaker", caption: "Evening loop", comments_enabled: true,
   video_key: "test/clip.mp4", thumb_key: demoThumb, like_count: demoLikes, created_at: now,
-  instrument: "Grand Piano", duration_s: clipBytes ? 4 : undefined,
+  instrument: "Grand Piano", duration_s: process.env.FIXTURE_NO_DURATION === "1" ? undefined : clipBytes ? 4 : undefined,
   backing_enabled: process.env.FIXTURE_PLAY_ALONG === "1",
   view_count: countViews ? 7 : undefined,
   sound_setup: {
@@ -71,7 +74,10 @@ createServer((request, response) => {
     }
     response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(value));
   };
-  switch (url.pathname) {
+  const route = url.pathname.replace(/^\/cold-[^/]+(?=\/test\/)/, "");
+  switch (route) {
+    case "/__fixture/media-requests":
+      return send(mediaRequests);
     case "/__fixture/draft-upload-result": {
       if (!draftPosting || request.method !== "POST" || draftUploadStatus !== "checking") return response.writeHead(409).end();
       const result = url.searchParams.get("status");
@@ -117,14 +123,20 @@ createServer((request, response) => {
     case "/test/clip.mp4":
     case "/test/next-clip.mp4": {
       if (!clipBytes || !mediaAvailable) return response.writeHead(404).end();
+      mediaRequests.push(url.pathname);
       const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range ?? "");
       const start = range ? Number(range[1]) : 0;
       const end = range?.[2] ? Math.min(Number(range[2]), clipBytes.length - 1) : clipBytes.length - 1;
       if (start > end) return response.writeHead(416, { "Content-Range": `bytes */${clipBytes.length}` }).end();
       const headers = { "Content-Type": "video/mp4", "Accept-Ranges": "bytes", "Content-Length": end - start + 1 };
       if (range) headers["Content-Range"] = `bytes ${start}-${end}/${clipBytes.length}`;
-      response.writeHead(range ? 206 : 200, headers);
-      return response.end(request.method === "HEAD" ? undefined : clipBytes.subarray(start, end + 1));
+      const deliver = () => {
+        if (response.destroyed) return;
+        response.writeHead(range ? 206 : 200, headers);
+        response.end(request.method === "HEAD" ? undefined : clipBytes.subarray(start, end + 1));
+      };
+      if (mediaDelay) return void setTimeout(deliver, mediaDelay);
+      return deliver();
     }
     case "/auth/v1/otp": return send({});
     case "/auth/v1/verify": return send({
@@ -173,7 +185,8 @@ createServer((request, response) => {
         const key = id.toLowerCase();
         if (repost === true) reposted.add(key);
         if (repost === false) reposted.delete(key);
-        send([engagement(key)]);
+        if (engagementDelay) setTimeout(() => send([engagement(key)]), engagementDelay);
+        else send([engagement(key)]);
       });
       return;
     }
