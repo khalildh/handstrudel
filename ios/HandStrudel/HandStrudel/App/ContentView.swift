@@ -73,6 +73,9 @@ struct ContentView: View {
     /// A post whose notes to teach once the session opened with its sound is running.
     @State private var pendingLearn: LearnToPlayRequest?
     @State private var learnLoad: Task<Void, Never>?
+    /// A posted Pro sound the viewer tapped without Pro; shows the unlock screen.
+    @State private var lockedSound: LockedSoundOffer?
+    @State private var lastLockedSound: LockedSoundOffer?
     @State private var sharedSoundLoad: Task<Void, Never>?
     @State private var linkedComments: Video?
     @State private var linkedPerformance: Video?
@@ -411,6 +414,12 @@ struct ContentView: View {
             guard let request = notification.object as? LearnToPlayRequest else { return }
             pendingLearn = request
         }
+        .sheet(item: $lockedSound, onDismiss: resumeUnlockedSound) { offer in
+            proPaywall(storeManager: storeManager, title: offer.title, detail: offer.detail)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .environment(\.isSoundLocked) { setup in setup.isLocked(unlocked: storeManager.isUnlocked) }
     }
 
     private var destinations: some View {
@@ -514,6 +523,10 @@ struct ContentView: View {
 
     private func startSession(setup: SoundSetup? = nil, useCurrentSoundAsFallback: Bool = false) {
         guard !engine.isRunning, !startingSession else { return }
+        if let setup, !useCurrentSoundAsFallback, setup.isLocked(unlocked: storeManager.isUnlocked) {
+            offerUnlock(for: setup)
+            return
+        }
         let appliedSetup = setup.map { engine.applySoundSetup($0, store: storeManager) } ?? false
         if setup != nil, !appliedSetup, !useCurrentSoundAsFallback {
             soundError = "This setup is unavailable or requires a sound pack you don't own."
@@ -524,6 +537,31 @@ struct ContentView: View {
         destination = .music
         if !appliedSetup { engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true) }
         engine.start(config: DEFAULT_MAPPING, advanced: false, input: preferredInput)
+    }
+
+    /// Shows the Pro purchase screen for a posted sound instead of a dead-end error.
+    private func offerUnlock(for setup: SoundSetup) {
+        AppAnalytics.shared.record(.lockedSoundTapped)
+        let offer = LockedSoundOffer(setup: setup)
+        lastLockedSound = offer
+        // Let any sheet that started this (a creator's clip, the sound sheet) finish closing first.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard lastLockedSound?.id == offer.id, !engine.isRunning else { return }
+            lockedSound = offer
+        }
+    }
+
+    /// After the unlock screen closes, go straight into the sound if Pro is now unlocked.
+    private func resumeUnlockedSound() {
+        guard let offer = lastLockedSound else { return }
+        lastLockedSound = nil
+        guard !offer.setup.isLocked(unlocked: storeManager.isUnlocked) else {
+            pendingLearn = nil
+            return
+        }
+        AppAnalytics.shared.record(.lockedSoundUnlocked)
+        trySharedSound(offer.setup)
     }
 
     private func limitScaleToEntitlement() {
@@ -569,7 +607,8 @@ struct ContentView: View {
             return
         }
         startSession(setup: setup)
-        if !startingSession && !engine.isRunning { pendingLearn = nil }
+        // Keep a lesson waiting while its sound's unlock screen is up.
+        if !startingSession && !engine.isRunning && lastLockedSound == nil { pendingLearn = nil }
     }
 
     private func recordReviewMilestone(_ id: UUID) {
@@ -2622,5 +2661,16 @@ private struct JamStatus: View {
                 .background(.black.opacity(0.65), in: Capsule())
                 .allowsHitTesting(false)
         }
+    }
+}
+
+/// The Pro sound a viewer wanted to play, for the unlock screen's headline.
+struct LockedSoundOffer: Identifiable {
+    let id = UUID()
+    let setup: SoundSetup
+
+    var title: String { setup.instrumentName.map { "Unlock \($0)" } ?? "Unlock this sound" }
+    var detail: String {
+        "\(setup.presetDetails). This sound uses Pro: unlock every instrument, scale, and chord progression."
     }
 }

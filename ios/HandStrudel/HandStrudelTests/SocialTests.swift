@@ -2476,3 +2476,52 @@ final class SocialTests: XCTestCase {
         XCTAssertNil(store.postSubmission(for: draft.id, accountID: owner))
     }
 }
+
+/// Pro sounds in the feed: labelled, offered for unlock, and counted.
+final class ProSoundUnlockTests: XCTestCase {
+    private func sound(instrument: String, useSoundFont: Bool = true) -> SoundSetup {
+        SoundSetup(instrument: instrument, waveform: "sine", key: .D, scale: .minor,
+                   progression: "custom", customDegrees: [0, 3, 4], mode: .scalechordmelody,
+                   bpm: 100, useSoundFont: useSoundFont, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2)
+    }
+
+    func testOnlyValidSoundsNeedingAnUnownedPackAreLocked() throws {
+        let premium = try XCTUnwrap(SOUNDFONT_INSTRUMENTS.first { $0.packId != nil })
+        let free = try XCTUnwrap(SOUNDFONT_INSTRUMENTS.first { $0.packId == nil })
+        let pro = sound(instrument: premium.id)
+        XCTAssertTrue(pro.isLocked { _ in false })
+        XCTAssertFalse(pro.isLocked { _ in true }, "Owning the pack unlocks it.")
+        XCTAssertFalse(sound(instrument: free.id).isLocked { _ in false })
+        XCTAssertFalse(sound(instrument: premium.id, useSoundFont: false).isLocked { _ in false },
+                       "A synth sound doesn't need the unused sampler instrument.")
+        var broken = pro
+        broken.version = 99
+        XCTAssertFalse(broken.isLocked { _ in false }, "Invalid sounds keep the old error instead of a sales pitch.")
+    }
+
+    func testUnlockScreenNamesTheSoundTheViewerWanted() throws {
+        let premium = try XCTUnwrap(SOUNDFONT_INSTRUMENTS.first { $0.packId != nil })
+        let offer = LockedSoundOffer(setup: sound(instrument: premium.id))
+        XCTAssertEqual(offer.title, "Unlock \(premium.name)")
+        XCTAssertTrue(offer.detail.hasPrefix("D Minor"), offer.detail)
+        XCTAssertTrue(offer.detail.contains("This sound uses Pro"))
+        XCTAssertNotEqual(offer.id, LockedSoundOffer(setup: offer.setup).id)
+    }
+
+    @MainActor
+    func testLockedSoundEventsUseTheirDatabaseNamesAndRespectOptIn() throws {
+        XCTAssertEqual(AppAnalytics.Event.lockedSoundTapped.rawValue, "locked_sound_tapped")
+        XCTAssertEqual(AppAnalytics.Event.lockedSoundUnlocked.rawValue, "locked_sound_unlocked")
+        let suite = "locked-sound-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var sent: [AppAnalytics.Event] = []
+        let analytics = AppAnalytics(defaults: defaults) { sent.append($0) }
+        analytics.record(.lockedSoundTapped)
+        XCTAssertEqual(sent, [], "Nothing is sent without opt-in.")
+        defaults.set(true, forKey: AppAnalytics.optInKey)
+        analytics.record(.lockedSoundTapped)
+        analytics.record(.lockedSoundUnlocked)
+        XCTAssertEqual(sent, [.lockedSoundTapped, .lockedSoundUnlocked])
+    }
+}

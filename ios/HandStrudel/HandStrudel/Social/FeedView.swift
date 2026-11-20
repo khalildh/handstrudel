@@ -9,6 +9,31 @@ private enum PerformanceStart {
     case learn(LearnToPlayRequest)
 }
 
+private struct SoundLockedKey: EnvironmentKey {
+    static let defaultValue: (SoundSetup) -> Bool = { _ in false }
+}
+
+extension EnvironmentValues {
+    /// Whether a posted sound needs Pro on this device. Set by the app root from the store.
+    var isSoundLocked: (SoundSetup) -> Bool {
+        get { self[SoundLockedKey.self] }
+        set { self[SoundLockedKey.self] = newValue }
+    }
+}
+
+/// Small label shown on posted sounds the viewer can unlock with Pro.
+private struct ProSoundBadge: View {
+    var body: some View {
+        Label("Pro sound", systemImage: "lock.fill")
+            .font(.caption2.weight(.bold))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(.yellow.opacity(0.9), in: Capsule())
+            .foregroundStyle(.black)
+            .accessibilityIdentifier("pro-sound-badge")
+    }
+}
+
 /// Full-screen, vertically paged feed of public posts.
 /// Browsable signed out; liking, following, reporting and blocking need an account.
 struct FeedView<Navigation: View>: View {
@@ -1386,6 +1411,7 @@ private struct PerformanceListRow: View {
 
 private struct ClipPresetCard: View {
     @Environment(\.studioPalette) private var palette
+    @Environment(\.isSoundLocked) private var isSoundLocked
     let setup: SoundSetup
     let username: String?
     let onPlay: ((SoundSetup) -> Void)?
@@ -1396,17 +1422,21 @@ private struct ClipPresetCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: "waveform")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(palette.mediaAccent)
-                .lineLimit(1)
+            HStack(spacing: 6) {
+                Label(title, systemImage: "waveform")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(palette.mediaAccent)
+                    .lineLimit(1)
+                if isSoundLocked(setup) { ProSoundBadge() }
+            }
             Text(setup.presetDetails)
                 .font(.caption)
                 .lineLimit(2)
             HStack(spacing: 8) {
                 if let onPlay {
                     Button { onPlay(setup) } label: {
-                        Label("Play this sound", systemImage: "play.fill")
+                        Label(isSoundLocked(setup) ? "Unlock & play" : "Play this sound",
+                              systemImage: isSoundLocked(setup) ? "lock.open.fill" : "play.fill")
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .padding(.horizontal, 11)
@@ -1740,6 +1770,7 @@ private struct PerformanceAudioDownload: ViewModifier {
 
 private struct PerformanceLibraryView: View {
     @Environment(\.studioPalette) private var palette
+    @Environment(\.isSoundLocked) private var isSoundLocked
     enum Kind {
         case saved, challenge(WeeklyChallenge), remixes(Video)
 
@@ -1766,6 +1797,23 @@ private struct PerformanceLibraryView: View {
     @State private var removing: UUID?
     @State private var error: String?
 
+    /// The backing clip's own sound, to practise with before recording a take.
+    @ViewBuilder private func sourceSoundActions(_ source: Video) -> some View {
+        if let setup = source.soundSetup {
+            let locked = isSoundLocked(setup)
+            Button(locked ? "Unlock & play this sound" : "Play this sound",
+                   systemImage: locked ? "lock.open.fill" : "play.fill") { onPlay(.preset(setup)) }
+                .accessibilityIdentifier("challenge-play-sound")
+            if locked {
+                Text("This sound uses Pro.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        if let learn = LearnToPlayRequest(video: source) {
+            Button("Learn to play", systemImage: "graduationcap") { onPlay(.learn(learn)) }
+                .accessibilityIdentifier("challenge-learn-notes")
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -1779,6 +1827,7 @@ private struct PerformanceLibraryView: View {
                             Button("Watch the backing clip", systemImage: "play.rectangle") { selected = source }
                             Button("Play along", systemImage: "waveform") { onPlay(.backing(source)) }
                                 .fontWeight(.semibold)
+                            sourceSoundActions(source)
                         } else if !loading && error == nil {
                             Text("This challenge is no longer available.").foregroundStyle(.secondary)
                         }
@@ -1786,6 +1835,7 @@ private struct PerformanceLibraryView: View {
                 } else if case .remixes = kind, let source {
                     Button("Play along", systemImage: "waveform") { onPlay(.backing(source)) }
                         .fontWeight(.semibold)
+                    sourceSoundActions(source)
                 }
                 Section {
                     if let error {
@@ -2342,6 +2392,7 @@ private struct ClipPlaybackControls: View {
 
 private struct FeedSoundSheet: View {
     @Environment(\.studioPalette) private var palette
+    @Environment(\.isSoundLocked) private var isSoundLocked
     @Environment(\.dismiss) private var dismiss
     let video: Video
     let onStart: (PerformanceStart) -> Void
@@ -2362,10 +2413,17 @@ private struct FeedSoundSheet: View {
                             Text(setup.presetDetails)
                                 .font(.subheadline.monospaced())
                                 .foregroundStyle(palette.muted)
+                            if isSoundLocked(setup) {
+                                ProSoundBadge()
+                                Text("Unlock Pro to play this sound yourself.")
+                                    .font(.footnote)
+                                    .foregroundStyle(palette.muted)
+                            }
                         }
                     }
                     if let setup = video.soundSetup {
-                        Button("Play this sound", systemImage: "play.fill") { onStart(.preset(setup)) }
+                        Button(isSoundLocked(setup) ? "Unlock & play" : "Play this sound",
+                               systemImage: isSoundLocked(setup) ? "lock.open.fill" : "play.fill") { onStart(.preset(setup)) }
                             .buttonStyle(ProfileActionStyle(primary: true))
                             .accessibilityHint("Opens this setup in the Music tab")
                             .accessibilityIdentifier("play-clip-preset")

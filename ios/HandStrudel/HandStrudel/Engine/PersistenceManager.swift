@@ -336,6 +336,11 @@ struct SoundSetup: Codable, Equatable {
         [useSoundFont ? resolvedInstrument?.packId : resolvedWaveform?.packId,
          scale.packId, resolvedProgression?.packId].compactMap { $0 }
     }
+
+    /// A playable sound the viewer can't open until they unlock Pro.
+    func isLocked(unlocked: (String) -> Bool) -> Bool {
+        isValid && !requiredPacks.allSatisfy(unlocked)
+    }
 }
 
 extension EngineController {
