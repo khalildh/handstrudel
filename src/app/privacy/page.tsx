@@ -38,7 +38,7 @@ export default function Privacy() {
       <p>Public performance metrics also include a total of saves and completed in-app shares. Your Saved list stays private. We do not store who received a shared link.</p>
 
       <h2>Optional app usage analytics</h2>
-      <p>You can opt in from Account settings in the app. We count days the app is used, use on a later day, first notes played, and recordings started, saved to Private drafts, and posted. We store daily totals, not individual activity histories. The app does not send account or device IDs, played pitches, custom scale names, gestures, audio, or camera imagery with these events. Turn off Usage Analytics in Account settings to stop sending events.</p>
+      <p>You can opt in from Account settings in the app. We count days the app is used, use on a later day, first notes played, recordings started, saved to Private drafts, and posted, and Pro sounds opened from the feed and then unlocked. We store daily totals, not individual activity histories. The app does not send account or device IDs, played pitches, custom scale names, gestures, audio, or camera imagery with these events. Turn off Usage Analytics in Account settings to stop sending events.</p>
 
       <h2>Website analytics and download metrics</h2>
       <p>We use <a href="https://vercel.com/docs/analytics/privacy-policy">Vercel Web Analytics</a> to count visitors and page views and understand how people find the website. This includes information such as the page path, referrer, general location, and browser or device type. We remove query strings and fragments from reported page URLs. Analytics does not use third-party cookies or link visits to HandStrudel accounts.</p>

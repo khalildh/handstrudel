@@ -18,6 +18,7 @@ Legacy clips and profile photos keep using `media.handstrudel.com`.
 - `migrations/20261114050000_like_notifications.sql`: groups new likes by video, comment, or reply in the private in-app inbox. No historical backfill or push alerts. Older clients keep the comment/reply inbox.
 - `migrations/20261114060000_profile_avatars.sql`: exposes avatar keys on public creator profiles and restricts writes to the server.
 - `migrations/20261120000000_video_note_tracks.sql`: "Learn to play" note tracks (`videos.note_track`, at most 600 notes / 32 KB), written only by screened publication and only with a shared sound setup; feeds expose `has_note_track`.
+- `migrations/20261120010000_locked_sound_events.sql`: adds opt-in daily counters for Pro sounds opened from the feed (`locked_sound_tapped`) and unlocked from that screen (`locked_sound_unlocked`).
 - `tests/database/feed.test.sql`: pgTAP tests for RLS and triggers. Run them with `supabase test db`.
 - `tests/database/comments.test.sql`: pgTAP tests for comment permissions, thread visibility, and moderation.
 - `functions/sign-upload` and `functions/publish-upload`: reserve a private R2 upload and publish only after Sightengine clears the video and thumbnail. Set up the private bucket, secrets, and cutover using the [video upload release checklist](../docs/video-upload-release.md).

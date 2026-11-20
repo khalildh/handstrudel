@@ -753,28 +753,6 @@ private struct ProBadge: View {
     }
 }
 
-/// Build the paywall the sheet pickers should show when the user taps a
-/// locked row. All pickers gate against the single "pro" product, so the
-/// copy lives in one place.
-@MainActor
-private func proPaywall(storeManager: StoreManager) -> some View {
-    let resolved = StoreManager.productId(for: "pro")
-    let product = storeManager.products.first(where: { $0.productIdentifier == resolved })
-    return PaywallOverlay(
-        packId: resolved,
-        packName: "Pro Upgrade",
-        packDescription: "Unlock every instrument, scale, and chord progression.",
-        price: product?.localizedPriceString ?? "---",
-        items: [
-            "120+ additional GM instruments",
-            "Every scale — modes, harmonic minor, exotic",
-            "Every chord progression — jazz, cinematic, world, and more",
-            "One-time purchase",
-        ],
-        storeManager: storeManager
-    )
-}
-
 // MARK: - Instrument picker sheet
 
 struct InstrumentPickerSheet: View {

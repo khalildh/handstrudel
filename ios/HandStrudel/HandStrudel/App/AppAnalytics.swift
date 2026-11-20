@@ -20,6 +20,10 @@ final class AppAnalytics {
         case recordingStarted = "recording_started"
         case recordingSaved = "recording_saved"
         case recordingPosted = "recording_posted"
+        /// A Pro sound opened from the feed by someone without Pro.
+        case lockedSoundTapped = "locked_sound_tapped"
+        /// That sound unlocked (purchase or restore) from its unlock screen.
+        case lockedSoundUnlocked = "locked_sound_unlocked"
     }
 
     private let defaults: UserDefaults
@@ -86,7 +90,7 @@ struct UsageAnalyticsSettings: View {
                 Section {
                     Toggle("Share usage analytics", isOn: $optedIn)
                 } footer: {
-                    Text("Help improve HandStrudel by sharing counts of app use, first notes, and recordings. We don't send audio, camera or gesture data, custom scale names, or account or device IDs. You can turn this off at any time.")
+                    Text("Help improve HandStrudel by sharing counts of app use, first notes, recordings, and Pro sounds unlocked from the feed. We don't send audio, camera or gesture data, custom scale names, or account or device IDs. You can turn this off at any time.")
                 }
             }
             .navigationTitle("Usage Analytics")
