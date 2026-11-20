@@ -70,6 +70,9 @@ struct ContentView: View {
     @State private var showLoops = false
     @State private var showSetups = false
     @State private var soundError: String?
+    /// A post whose notes to teach once the session opened with its sound is running.
+    @State private var pendingLearn: LearnToPlayRequest?
+    @State private var learnLoad: Task<Void, Never>?
     @State private var sharedSoundLoad: Task<Void, Never>?
     @State private var linkedComments: Video?
     @State private var linkedPerformance: Video?
@@ -342,7 +345,12 @@ struct ContentView: View {
                     backingAutoplayPending = false
                     if scenePhase == .active { playBacking(backing) }
                 }
+                if let learn = pendingLearn {
+                    pendingLearn = nil
+                    beginLearnToPlay(learn)
+                }
             } else {
+                learnLoad?.cancel()
                 cancelCountdown()
                 backingLoad?.cancel()
                 stopBacking()
@@ -398,6 +406,10 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .toggleLoopRecording)) { _ in
             guard engine.isRunning else { return }
             toggleAudioLoop()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .learnToPlayPost)) { notification in
+            guard let request = notification.object as? LearnToPlayRequest else { return }
+            pendingLearn = request
         }
     }
 
@@ -526,12 +538,38 @@ struct ContentView: View {
         engine.setPlayInput(input)
     }
 
+    /// The session opened with the post's sound is running: load its notes and teach them.
+    private func beginLearnToPlay(_ request: LearnToPlayRequest) {
+        learnLoad?.cancel()
+        learnLoad = Task {
+            do {
+                guard let track = try await FeedService.noteTrack(for: request.videoID) else {
+                    throw SocialError.message("This performance doesn't have notes to learn.")
+                }
+                guard !Task.isCancelled, engine.isRunning else { return }
+                let setup = request.setup
+                let lanes = scaleNotes(key: setup.key, scale: setup.scale,
+                                       baseOctave: engine.gridBaseOctave, octaveRange: engine.gridOctaveRange)
+                guard let song = track.learnSong(title: request.title, key: setup.key, scale: setup.scale,
+                                                 bpm: setup.bpm, scaleNotes: lanes) else {
+                    throw SocialError.message("Couldn't turn this performance into a lesson.")
+                }
+                engine.switchMode(grid: false, drums: false, learn: true)
+                engine.loadLearnSong(song)
+            } catch {
+                if !Task.isCancelled { soundError = error.localizedDescription }
+            }
+        }
+    }
+
     private func trySharedSound(_ setup: SoundSetup) {
         guard !engine.isRunning, !startingSession else {
+            pendingLearn = nil
             soundError = "Close your current session, then open this sound again."
             return
         }
         startSession(setup: setup)
+        if !startingSession && !engine.isRunning { pendingLearn = nil }
     }
 
     private func recordReviewMilestone(_ id: UUID) {
@@ -2246,6 +2284,7 @@ struct ContentView: View {
                 } else {
                     recorderBusy = false
                     isRecording = true
+                    engine.noteCapture.start()
                     AppAnalytics.shared.record(.recordingStarted)
                     if scenePhase == .background { stopRecording(); return }
                     if draft.recordedAtHalfSpeed == true && !engine.supportsHalfSpeedRecording {
@@ -2272,8 +2311,11 @@ struct ContentView: View {
     }
 
     private func stopRecording() {
-        guard isRecording, !recorderBusy, let draft = activeDraft else { return }
+        guard isRecording, !recorderBusy, var take = activeDraft else { return }
         recorderBusy = true
+        let notes = engine.noteCapture.stop()
+        take.capturedNotes = notes.isEmpty ? nil : notes
+        let draft = take
         captureTask?.cancel()
         engine.setRecordingTempo(halfSpeed: false)
         let recorder = RPScreenRecorder.shared()
@@ -2316,6 +2358,7 @@ struct ContentView: View {
         }
         isRecording = false
         recorderBusy = false
+        _ = engine.noteCapture.stop()
         captureTask = nil
         activeDraft = nil
         watermarkView?.removeFromSuperview()

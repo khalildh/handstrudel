@@ -88,6 +88,8 @@ final class EngineController: ObservableObject {
     let handTracker = HandTrackingManager()
     let strudelBridge = StrudelBridge()
     let soundFontEngine = SoundFontEngine()
+    /// Notes played during a video take, saved with the draft for "Learn to play".
+    let noteCapture = PerformanceNoteCapture()
     let haptics = HapticManager()
     private let saveDetector = SaveGestureDetector()
 
@@ -306,6 +308,8 @@ final class EngineController: ObservableObject {
         }
         soundFontEngine.onNoteStarted = firstNote
         strudelBridge.onNoteStarted = firstNote
+        soundFontEngine.noteCapture = noteCapture
+        strudelBridge.noteCapture = noteCapture
         handTracker.onCameraAccessBlocked = { [weak self] in self?.fallBackToTouch() }
         jamSession.onRemoteEvent = { [weak self] event in self?.playJamEvent(event) }
         jamSession.onRemoteVoices = { [weak self] peer, voices in self?.playJamVoices(voices, peer: peer) }
@@ -706,11 +710,12 @@ final class EngineController: ObservableObject {
             let volume = velocity * (pitches.count > 1 ? 0.45 : 0.7)
             if let program, let sampler = jamSampler(for: program) {
                 for pitch in pitches {
-                    sampler.oneShot(midi: pitch, velocity: volume, duration: duration)
+                    sampler.oneShot(midi: pitch, velocity: volume, duration: duration, capture: .ignored)
                 }
             } else {
                 for pitch in pitches {
-                    strudelBridge.playNote(midi: pitch, waveform: waveform, velocity: volume, duration: duration)
+                    strudelBridge.playNote(midi: pitch, waveform: waveform, velocity: volume, duration: duration,
+                                           capture: .ignored)
                 }
             }
         case .drumHit(let hitType):
@@ -809,7 +814,7 @@ final class EngineController: ObservableObject {
                 releaseJamVoice("pad")
             case .chordAccent(let notes, _, let vel):
                 for midi in notes {
-                    soundFontEngine.oneShot(midi: midi, velocity: vel * 0.6, duration: 0.5)
+                    soundFontEngine.oneShot(midi: midi, velocity: vel * 0.6, duration: 0.5, capture: .chord)
                     loopRecorder.recordEvent(.noteOn(midi: midi, waveform: selectedWaveform, velocity: vel * 0.5), currentTime: elapsed)
                 }
                 shareJamNotes(notes, velocity: vel * 0.6, duration: 0.5, native: true)
@@ -853,7 +858,7 @@ final class EngineController: ObservableObject {
            currentBeat != lastChordMelodyBeat {
             lastChordMelodyBeat = currentBeat
             for midi in chordMelodyModeManager.currentChordMidi {
-                soundFontEngine.oneShot(midi: midi, velocity: 0.3, duration: 0.4)
+                soundFontEngine.oneShot(midi: midi, velocity: 0.3, duration: 0.4, capture: .chord)
             }
             shareJamNotes(chordMelodyModeManager.currentChordMidi, velocity: 0.3, duration: 0.4, native: true)
         }
@@ -965,7 +970,8 @@ final class EngineController: ObservableObject {
         for (event, volume) in events {
             switch event {
             case .noteOn(let midi, let waveform, let vel):
-                strudelBridge.playNote(midi: midi, waveform: waveform, velocity: vel * volume, duration: 0.2)
+                strudelBridge.playNote(midi: midi, waveform: waveform, velocity: vel * volume, duration: 0.2,
+                                       capture: .ignored)
             case .drumHit(let hitType):
                 strudelBridge.playHit(hitType)
             case .noteOff:

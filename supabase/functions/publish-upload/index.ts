@@ -2,6 +2,7 @@ import { admin, caller, deleteKeys, handler, HttpError, privateVideoBucketUrl, u
 import { screenUpload } from "../_shared/sightengine.ts";
 import { readPrivateVideo } from "../_shared/private-video.ts";
 import { videoUploadsEnabledFor } from "../_shared/video-rollout.ts";
+import { noteTrack } from "../_shared/note-track.ts";
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
@@ -28,7 +29,8 @@ function postFields(input: unknown) {
     instrument: typeof p.instrument === "string" ? p.instrument.slice(0, 150) : null,
     mode: typeof p.mode === "string" ? p.mode.slice(0, 150) : null,
     duration_s: p.duration_s, width: p.width, height: p.height,
-    sound_setup: p.sound_setup ?? null, comments_enabled: p.comments_enabled !== false,
+    sound_setup: p.sound_setup ?? null, note_track: p.sound_setup ? noteTrack(p.note_track) : null,
+    comments_enabled: p.comments_enabled !== false,
     backing_enabled: p.backing_enabled === true, source_video_id: p.source_video_id ?? null,
   };
 }

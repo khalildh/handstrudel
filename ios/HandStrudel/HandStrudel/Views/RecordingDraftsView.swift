@@ -16,9 +16,15 @@ struct RecordingDraft: Codable, Identifiable, Equatable {
     var trimEnd: Double?
     var title: String? = nil
     var postSubmissions: [UUID: DraftPostSubmission]? = nil
+    /// Notes played during the take, in seconds since capture started (before trim or speed changes).
+    var capturedNotes: [NoteTrack.Note]? = nil
 
     var displayTitle: String { title ?? instrument ?? "Performance" }
     var outputScale: Double { recordedAtHalfSpeed == true ? 0.5 : 1 }
+    /// The notes as they line up with the clip that gets posted.
+    var postedNoteTrack: NoteTrack? {
+        capturedNotes.flatMap { NoteTrack.posted(from: $0, trimStart: trimStart, trimEnd: trimEnd, outputScale: outputScale) }
+    }
 
     static func normalizedTitle(_ input: String) -> String? {
         let singleLine = input.split { character in
@@ -123,6 +129,8 @@ final class RecordingDrafts: ObservableObject {
         let url = videoURL(for: draft.id)
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard size > 0 else { throw DraftError.unreadable }
+        // Notes are only known once capture ends; keep them with the take.
+        if draft.capturedNotes != nil { try writeMetadata(draft) }
         if !drafts.contains(where: { $0.id == draft.id }) { drafts.insert(draft, at: 0) }
     }
 

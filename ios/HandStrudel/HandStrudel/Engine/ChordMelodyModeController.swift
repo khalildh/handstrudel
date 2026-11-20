@@ -87,7 +87,8 @@ final class ChordMelodyModeController: ModeController {
                 engine.releaseJamVoice("pad")
             case .chordAccent(let notes, _, let vel):
                 for midi in notes {
-                    strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: vel * 0.5, duration: 0.5)
+                    strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: vel * 0.5, duration: 0.5,
+                                           capture: .chord)
                     loopRecorder.recordEvent(.noteOn(midi: midi, waveform: engine.selectedWaveform, velocity: vel * 0.5), currentTime: elapsed)
                 }
                 engine.shareJamNotes(notes, velocity: vel * 0.5, duration: 0.5)
@@ -142,7 +143,8 @@ final class ChordMelodyModeController: ModeController {
            engine.currentBeat != lastBeat {
             lastBeat = engine.currentBeat
             for midi in chordMelodyModeManager.currentChordMidi {
-                strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.25, duration: 0.4)
+                strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.25, duration: 0.4,
+                                       capture: .chord)
             }
             engine.shareJamNotes(chordMelodyModeManager.currentChordMidi, velocity: 0.25, duration: 0.4)
         }

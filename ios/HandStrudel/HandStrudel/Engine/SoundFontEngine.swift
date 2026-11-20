@@ -28,6 +28,8 @@ final class SoundFontEngine {
     private let engine = AVAudioEngine()
     private let sampler = AVAudioUnitSampler()
     var onNoteStarted: (() -> Void)?
+    /// Records notes during a video take for "Learn to play". Set only on the main engine.
+    var noteCapture: PerformanceNoteCapture?
 
     /// Whether a `.sf2` was found and the audio graph started successfully.
     private(set) var isAvailable = false
@@ -151,6 +153,7 @@ final class SoundFontEngine {
         activeNotes[voice] = (note, channel)
         voiceVelocity[voice] = vel
         onNoteStarted?()
+        noteCapture?.noteOn(voice: voice, midi: Int(note), role: PerformanceNoteCapture.role(forVoice: voice))
     }
 
     /// Release a sustained voice.
@@ -158,6 +161,7 @@ final class SoundFontEngine {
         guard isAvailable, let active = activeNotes[voice] else { return }
         sampler.stopNote(active.midi, onChannel: active.channel)
         activeNotes[voice] = nil
+        noteCapture?.noteOff(voice: voice)
     }
 
     /// Remote voice IDs are temporary, so release their routing as well as the note.
@@ -174,6 +178,7 @@ final class SoundFontEngine {
     /// with 2-4s releases) don't linger and read as "still playing."
     func hardStop(voice: String) {
         guard isAvailable, let active = activeNotes.removeValue(forKey: voice) else { return }
+        noteCapture?.noteOff(voice: voice)
         let ch = active.channel
         sampler.stopNote(active.midi, onChannel: ch)
         // CC 120 = All Sound Off. Cuts the envelope tail on this channel
@@ -198,14 +203,16 @@ final class SoundFontEngine {
         let vel = voiceVelocity[voice] ?? clampVelocity(0.6)
         sampler.startNote(note, withVelocity: vel, onChannel: channel)
         activeNotes[voice] = (note, channel)
+        noteCapture?.slide(voice: voice, midi: Int(note))
     }
 
     /// Fire-and-forget note used for chord accents and auto-strum. Stops itself
     /// after `duration` seconds on a dedicated channel so it never interferes
     /// with the sustained pad/melody voices.
-    func oneShot(midi: Int, velocity: Double, duration: Double) {
+    func oneShot(midi: Int, velocity: Double, duration: Double, capture role: NoteCaptureRole = .melody) {
         guard isAvailable else { return }
         let note = clampMidi(midi)
+        noteCapture?.oneShot(midi: Int(note), duration: duration, role: role)
         let vel = clampVelocity(velocity)
         let strike = accentReleases.strike(note)
         if strike.replacesEarlierStrike { sampler.stopNote(note, onChannel: oneShotChannel) }
