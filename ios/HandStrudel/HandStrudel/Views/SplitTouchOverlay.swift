@@ -16,6 +16,8 @@ struct SplitTouchOverlay: UIViewRepresentable {
     let enabled: Bool
     let chordLabels: [String]
     let melodyLabels: [String]
+    /// Scale mode: the notes side has the same up/down octave band as the chords.
+    var melodyOctaveBand = false
 
     /// Fired when a touch enters a zone — either on touch-begin or after a
     /// drag crosses into a new zone. The voice ID is unique per touch+zone
@@ -27,7 +29,7 @@ struct SplitTouchOverlay: UIViewRepresentable {
     let onZoneExit: (String) -> Void
 
     @Binding var touchedChordSubzones: Set<ChordSubzone>
-    @Binding var touchedMelodyLanes: Set<Int>
+    @Binding var touchedMelodyNotes: Set<MelodySubzone>
 
     func makeUIView(context: Context) -> SplitTouchUIView {
         let v = SplitTouchUIView()
@@ -42,13 +44,14 @@ struct SplitTouchOverlay: UIViewRepresentable {
         uiView.zoneCount = zoneCount
         uiView.melodyCount = melodyCount
         uiView.swapHands = swapHands
+        uiView.melodyOctaveBand = melodyOctaveBand
         uiView.onZoneEnter = onZoneEnter
         uiView.onZoneExit = onZoneExit
         uiView.onActiveChordChanged = { zones in
             DispatchQueue.main.async { self.touchedChordSubzones = zones }
         }
-        uiView.onActiveMelodyChanged = { lanes in
-            DispatchQueue.main.async { self.touchedMelodyLanes = lanes }
+        uiView.onActiveMelodyChanged = { notes in
+            DispatchQueue.main.async { self.touchedMelodyNotes = notes }
         }
         uiView.updateAccessibleNotes(chords: chordLabels, melody: melodyLabels)
     }
@@ -65,10 +68,17 @@ struct ChordSubzone: Hashable {
     let octave: Int   // -1, 0, +1
 }
 
+/// A notes-side zone: the scale lane plus, in Scale mode, the octave band
+/// (−1 / 0 / +1) the touch is in. Other layouts always report octave 0.
+struct MelodySubzone: Hashable {
+    let lane: Int
+    var octave: Int = 0
+}
+
 /// The kind of zone a touch is currently over.
 enum SplitTouchZone: Hashable {
     case chord(ChordSubzone)
-    case melody(Int)   // lane
+    case melody(MelodySubzone)
 }
 
 private final class SplitAccessibilityNote: UIAccessibilityElement {
@@ -81,10 +91,11 @@ final class SplitTouchUIView: UIView {
     var zoneCount: Int = 7
     var melodyCount: Int = 9
     var swapHands: Bool = false
+    var melodyOctaveBand: Bool = false
     var onZoneEnter: ((String, SplitTouchZone) -> Void)?
     var onZoneExit: ((String) -> Void)?
     var onActiveChordChanged: ((Set<ChordSubzone>) -> Void)?
-    var onActiveMelodyChanged: ((Set<Int>) -> Void)?
+    var onActiveMelodyChanged: ((Set<MelodySubzone>) -> Void)?
 
     // Geometry mirrors the visual overlay: outer radius fits the shorter
     // dimension, deadzone is the rest hole, octaveR is the inner-band rim.
@@ -142,7 +153,7 @@ final class SplitTouchUIView: UIView {
                    wedge: index, count: chordLabels.count, right: swapHands)
         }
         for (index, label) in melodyLabels.enumerated() {
-            insert(.melody(index), label: "Note \(label)", id: "wheel-note-\(index)",
+            insert(.melody(MelodySubzone(lane: index)), label: "Note \(label)", id: "wheel-note-\(index)",
                    wedge: melodyLabels.count - 1 - index, count: melodyLabels.count, right: !swapHands)
         }
         if !(accessibilityElements as? [SplitAccessibilityNote] ?? []).elementsEqual(ordered, by: { $0 === $1 }) {
@@ -163,6 +174,16 @@ final class SplitTouchUIView: UIView {
                 UIAccessibilityCustomAction(name: "Play an octave higher") { [weak self] _ in
                     self?.preview(.chord(ChordSubzone(wedge: subzone.wedge, octave: 1))) ?? false
                 },
+            ]
+        } else if case let .melody(subzone) = zone {
+            // Only Scale mode has an octave band on the notes side.
+            func shifted(_ octave: Int) -> Bool {
+                guard melodyOctaveBand else { return false }
+                return preview(.melody(MelodySubzone(lane: subzone.lane, octave: octave)))
+            }
+            note.accessibilityCustomActions = [
+                UIAccessibilityCustomAction(name: "Play an octave lower") { _ in shifted(-1) },
+                UIAccessibilityCustomAction(name: "Play an octave higher") { _ in shifted(1) },
             ]
         }
         return note
@@ -190,7 +211,11 @@ final class SplitTouchUIView: UIView {
     // MARK: - Touch → zone
 
     private func zoneForTouch(_ touch: UITouch) -> SplitTouchZone? {
-        let p = touch.location(in: self)
+        zone(at: touch.location(in: self))
+    }
+
+    /// The zone under a point in this view's coordinates (nil in the rest hole).
+    func zone(at p: CGPoint) -> SplitTouchZone? {
         let dx = p.x - wheelCenter.x
         let dy = wheelCenter.y - p.y
         let r = (dx * dx + dy * dy).squareRoot()
@@ -212,7 +237,11 @@ final class SplitTouchUIView: UIView {
         // Melody side?
         if let wedge = probe.splitWedgeIndex(side: melodySide, angle: deg, count: melodyCount) {
             let lane = melodyCount - 1 - wedge   // invert so top = highest pitch
-            return .melody(lane)
+            // Scale mode's notes have the same outer up/down band as the chords.
+            let oct = melodyOctaveBand
+                ? probe.splitOctaveShift(side: melodySide, angle: deg, radius: radius, wedgeIndex: wedge, count: melodyCount)
+                : 0
+            return .melody(MelodySubzone(lane: lane, octave: oct))
         }
         return nil
     }
@@ -277,11 +306,11 @@ final class SplitTouchUIView: UIView {
 
     private func emit() {
         var chords: Set<ChordSubzone> = []
-        var melody: Set<Int> = []
+        var melody: Set<MelodySubzone> = []
         for zone in states.values.compactMap(\.zone) + Array(previewVoices.values) {
             switch zone {
             case .chord(let sub): chords.insert(sub)
-            case .melody(let lane): melody.insert(lane)
+            case .melody(let note): melody.insert(note)
             }
         }
         onActiveChordChanged?(chords)

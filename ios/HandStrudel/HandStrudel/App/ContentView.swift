@@ -120,7 +120,7 @@ struct ContentView: View {
     @State private var chromeVisible = true
     /// Touch-driven highlights for Split mode (UIKit multitouch overlay).
     @State private var splitTouchChordZones: Set<ChordSubzone> = []
-    @State private var splitTouchMelodyLanes: Set<Int> = []
+    @State private var splitTouchMelodyNotes: Set<MelodySubzone> = []
     /// Stack of currently-held chord touches (parent voice ID + chord data).
     /// The last entry is the "live" touch chord — it overrides the camera so
     /// the melody snap follows whatever the player is touching.
@@ -933,7 +933,8 @@ struct ContentView: View {
                                 octave: sub.octave, tones: absoluteTones)
             )
             syncSplitTouchChordToManager()
-        case .melody(let lane):
+        case .melody(let note):
+            let lane = note.lane
             let lanes: [Int]
             if scaleMode {
                 // Scale mode: one octave of the diatonic scale.
@@ -945,13 +946,12 @@ struct ContentView: View {
             }
             guard !lanes.isEmpty else { return }
             let safe = max(0, min(lanes.count - 1, lane))
-            // The touch UIView doesn't track the outer-band octave shift on
-            // the melody side yet — for now, a touch lands at base octave.
-            // The hand-tracked path still gets the ±1 octave from the radial
-            // band; touch is an explicit-tap experience.
+            // Scale mode's outer band shifts the note an octave, like the chord
+            // side and the hand-tracked melody. Other layouts always report 0.
+            let midi = lanes[safe] + (scaleMode ? note.octave * 12 : 0)
             let sv = "\(parentVoice)-m"
-            splitNoteOn(voice: sv, midi: lanes[safe], velocity: 0.75, native: native)
-            engine.holdJamVoice(parentVoice, pitches: [lanes[safe]], velocity: 0.75, native: native)
+            splitNoteOn(voice: sv, midi: midi, velocity: 0.75, native: native)
+            engine.holdJamVoice(parentVoice, pitches: [midi], velocity: 0.75, native: native)
             splitVoiceSubvoices[parentVoice] = (native, [sv])
         }
         engine.haptics.noteTrigger()
@@ -1119,9 +1119,10 @@ struct ContentView: View {
                     melodyResting: engine.chordMelodyModeManager.melodyResting,
                     swapHands: engine.chordMelodySwapHands,
                     touchedChordSubzones: splitTouchChordZones,
-                    touchedMelodyLanes: splitTouchMelodyLanes,
+                    touchedMelodyNotes: splitTouchMelodyNotes,
                     chordToneLanes: chordToneLanes,
-                    melodyOctaveShift: engine.chordMelodyModeManager.currentMelodyOctaveShift
+                    melodyOctaveShift: engine.chordMelodyModeManager.currentMelodyOctaveShift,
+                    scaleLayout: scaleMode
                 )
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
@@ -1136,10 +1137,11 @@ struct ContentView: View {
                     enabled: !engine.isPaused && scenePhase == .active,
                     chordLabels: chordNames,
                     melodyLabels: melodyMidis.map { midiNoteName($0) },
+                    melodyOctaveBand: scaleMode,
                     onZoneEnter: { voice, zone in splitTouchEnter(parentVoice: voice, zone: zone) },
                     onZoneExit: { voice in splitTouchExit(parentVoice: voice) },
                     touchedChordSubzones: $splitTouchChordZones,
-                    touchedMelodyLanes: $splitTouchMelodyLanes
+                    touchedMelodyNotes: $splitTouchMelodyNotes
                 )
                 .ignoresSafeArea()
             }
