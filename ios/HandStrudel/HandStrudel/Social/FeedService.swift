@@ -115,6 +115,14 @@ enum FeedService {
         return rows.first
     }
 
+    /// The notes behind "Learn to play", read only when a viewer opens it.
+    static func noteTrack(for video: UUID) async throws -> NoteTrack? {
+        struct Row: Decodable { let note_track: NoteTrack? }
+        let rows: [Row] = try await supabase.from("videos").select("note_track")
+            .eq("id", value: video).limit(1).execute().value
+        return rows.first?.note_track.flatMap { $0.isValid ? $0 : nil }
+    }
+
     static func bookmarks(after last: Video? = nil,
                           from: (String) -> PostgrestQueryBuilder = supabase.from) async throws -> [Video] {
         let query = from("saved_videos").select()
