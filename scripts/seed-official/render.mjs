@@ -55,6 +55,24 @@ if (!flag('--edit-only')) {
   log(`device ${dev.name} ${screen.width}x${screen.height}`);
 }
 
+const MAX_GAP = 1.0; // seconds without a new screen frame inside the take
+
+/** The longest stretch of the take with no new frame in the raw Simulator recording. */
+function longestFrameGap(run) {
+  const out = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'packet=pts_time',
+    '-of', 'csv=p=0', run.rawVideo], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  const start = run.offset;
+  // The last 1.5 s is the final chord ringing out with still hands, when the screen may not change.
+  const end = run.offset + Math.min(run.duration, 30) - 1.5;
+  const times = out.split('\n').map(Number).filter((t) => Number.isFinite(t) && t >= start && t <= end).sort((a, b) => a - b);
+  let seconds = 0, at = 0, prev = start;
+  for (const t of [...times, end]) {
+    if (t - prev > seconds) { seconds = t - prev; at = prev - start; }
+    prev = t;
+  }
+  return { seconds, at };
+}
+
 const failed = [];
 for (const post of posts) {
   try {
@@ -70,7 +88,15 @@ for (const post of posts) {
       const script = composeScript(song, { screenAspect: screen.aspect });
       fs.mkdirSync(runDir, { recursive: true });
       fs.writeFileSync(path.join(runDir, 'demo.json'), JSON.stringify(script, null, 1));
-      run = await recordRun({ dev, bundleId: config.bundleId, script, outDir: runDir, log });
+      // A busy Mac makes the Simulator's screen recorder skip frames, so the wheel freezes or
+      // falls behind the audio. Retry until no frame gap in the take is longer than MAX_GAP.
+      for (let attempt = 1; ; attempt++) {
+        run = await recordRun({ dev, bundleId: config.bundleId, script, outDir: runDir, log });
+        const gap = longestFrameGap(run);
+        if (gap.seconds <= MAX_GAP) break;
+        if (attempt === 3) throw new Error(`screen recording skipped ${gap.seconds.toFixed(1)}s at ${gap.at.toFixed(1)}s, 3 times`);
+        log(`recording skipped ${gap.seconds.toFixed(1)}s of frames at ${gap.at.toFixed(1)}s; retrying`);
+      }
     }
     if (!run.soundSetup || !run.postLabels) {
       throw new Error('the app did not export sound_setup.json / post_labels.json (rebuild without --skip-build)');

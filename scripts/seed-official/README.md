@@ -25,7 +25,7 @@ Learn-to-play `note_track` the app itself exported for that take, plus play-alon
 The rendered media are **not in git**. They live on the external drive:
 `/Volumes/PRO-G40/handstrudel-seed/media/<slug>/{video.mp4, thumb.jpg, post.json}`
 (override with `SEED_MEDIA_DIR`). A contact sheet is at
-`/Volumes/PRO-G40/handstrudel-seed/contact-sheet.jpg`.
+`/Volumes/PRO-G40/handstrudel-seed/contact-sheet.png`.
 
 ## Before you publish
 
@@ -134,6 +134,12 @@ screen, and cuts the post from the recording plus the app's offline SoundFont ca
 `sound_setup.json`, `note_track.json` and draft labels, which become the post's metadata.
 Build products and recordings stay under `/Volumes/PRO-G40/handstrudel-seed/media/.work`.
 
+When the Mac is busy, the Simulator's screen recorder can skip frames, so the wheel freezes or
+falls behind the audio. `render.mjs` checks every take and records it again (up to 3 times)
+if the recording has a gap of more than 1 s before the final chord. Check the result with
+`node scripts/seed-official/contact-sheet.mjs`. Close the simulator when you are done
+(`xcrun simctl shutdown <udid>`; delete it too if you made a clone for this).
+
 ## Testing locally
 
 `test/stack.sh` runs an isolated Supabase stack (`handstrudel-seed`, ports 594xx) from a copy
@@ -150,3 +156,17 @@ NODE_OPTIONS= node scripts/seed-official/test/verify.mjs --expect 20
 node scripts/seed-official/delete.mjs
 scripts/seed-official/test/stack.sh down
 ```
+
+To check *Play this sound* in the app against that stack (after publishing, before deleting), run
+the UI test `testSeededOfficialPostsPlayTheirSounds` with the stack's URLs:
+
+```bash
+TEST_RUNNER_HANDSTRUDEL_SEED_STACK_URL=$SUPABASE_URL TEST_RUNNER_HANDSTRUDEL_SEED_STACK_ANON_KEY=$SUPABASE_ANON_KEY \
+TEST_RUNNER_HANDSTRUDEL_SEED_MEDIA_URL=http://127.0.0.1:59490/media TEST_RUNNER_HANDSTRUDEL_SEED_CLIP_URL=http://127.0.0.1:59490/clips \
+NODE_OPTIONS= xcodebuild test -project ios/HandStrudel/HandStrudel.xcodeproj -scheme HandStrudel \
+  -destination "platform=iOS Simulator,name=iPhone 16e" \
+  -only-testing:HandStrudelUITests/HandStrudelUITests/testSeededOfficialPostsPlayTheirSounds
+```
+
+It opens @handstrudel's Sounds list and plays Upright Dorian Groove, then opens the newest feed
+post's *Play this sound* (Haunted Choir), and checks the Music card switches to each sound.

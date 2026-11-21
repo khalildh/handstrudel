@@ -86,6 +86,7 @@ down() {
   cd "$root" 2>/dev/null || return 0
   for f in mock.pid functions.pid; do [[ -f $f ]] && { kill "$(cat $f)" 2>/dev/null || true; rm -f $f; }; done
   supabase stop --no-backup || true
+  docker network rm "supabase_network_$project" >/dev/null 2>&1 || true
 }
 
 case ${1:-} in

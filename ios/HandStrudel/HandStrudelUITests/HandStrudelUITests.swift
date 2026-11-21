@@ -1646,6 +1646,65 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
     }
 
+    /// Runs against the seeded local stack from scripts/seed-official/test (see its README):
+    /// @handstrudel's posts open their own sounds, from the profile's Sounds list and from a
+    /// feed post's "Play this sound".
+    func testSeededOfficialPostsPlayTheirSounds() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let endpoint = env["HANDSTRUDEL_SEED_STACK_URL"], let key = env["HANDSTRUDEL_SEED_STACK_ANON_KEY"] else {
+            throw XCTSkip("Requires the seeded official-account stack (scripts/seed-official/test).")
+        }
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launchEnvironment["MEDIA_BASE_URL"] = env["HANDSTRUDEL_SEED_MEDIA_URL"]
+        app.launchEnvironment["CLIP_MEDIA_BASE_URL"] = env["HANDSTRUDEL_SEED_CLIP_URL"]
+        app.launch()
+        let contains = { [app] (text: String) in app!.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", text)).firstMatch }
+
+        // 1. Profile → Sounds → Upright Dorian Groove (Upright Bass, G Dorian, 100 BPM).
+        XCTAssertFalse(app.staticTexts["Upright Bass"].exists, "Start from a different sound")
+        element("tab-feed").tap()
+        let author = app.buttons["@handstrudel"].firstMatch
+        XCTAssertTrue(author.waitForExistence(timeout: 10))
+        author.tap()
+        let sounds = app.buttons["profile-sounds"]
+        XCTAssertTrue(sounds.waitForExistence(timeout: 5))
+        sounds.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.15)).tap()
+        let bass = app.buttons.matching(identifier: "profile-play-sound")
+            .containing(NSPredicate(format: "label CONTAINS %@", "Upright Bass, G Dorian · 100 BPM")).firstMatch
+        XCTAssertTrue(bass.waitForExistence(timeout: 8), app.buttons.matching(identifier: "profile-play-sound")
+            .allElementsBoundByIndex.map(\.label).joined(separator: " | "))
+        for _ in 0..<10 where !bass.isHittable { app.swipeUp(velocity: .slow) }
+        captureIfRequested("Seed-Official-Sounds")
+        bass.tap()
+        let close = element("close-button")
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "The sound should open a session")
+        captureIfRequested("Seed-Official-Bass-Session")
+        close.tap()
+        XCTAssertTrue(app.staticTexts["Upright Bass"].waitForExistence(timeout: 8))
+        XCTAssertTrue(contains("G Dorian").exists)
+        captureIfRequested("Seed-Official-Bass-Loaded")
+
+        // 2. Feed post → "Play this sound": the newest seed post is Haunted Choir (Choir Aahs, D Minor).
+        element("tab-feed").tap()
+        XCTAssertTrue(contains("Haunted choir in D minor").waitForExistence(timeout: 10))
+        let options = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(options.waitForExistence(timeout: 8))
+        options.tap()
+        let preset = app.buttons.matching(identifier: "play-clip-preset").firstMatch
+        XCTAssertTrue(preset.waitForExistence(timeout: 8))
+        XCTAssertEqual(preset.label, "Play this sound")
+        captureIfRequested("Seed-Official-Post-Sound")
+        preset.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "Play this sound should open a session")
+        captureIfRequested("Seed-Official-Choir-Session")
+        close.tap()
+        XCTAssertTrue(app.staticTexts["Choir Aahs"].waitForExistence(timeout: 8))
+        XCTAssertTrue(contains("D Minor").exists)
+        captureIfRequested("Seed-Official-Choir-Loaded")
+    }
+
     func testAccountProfileEditsDisplayNameAndKeepsEmptyState() throws {
         try launchWithProfileFixture()
         signInToProfile()

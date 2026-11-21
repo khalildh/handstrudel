@@ -145,7 +145,17 @@ export class Api {
   }
 
   // ---- Edge Functions, as the signed-in account (the same calls the app makes)
-  invoke(name, body, token) { return this.request('POST', `/functions/v1/${name}`, { body, token }); }
+  /** Retries 5xx (a busy or restarting function worker) a few times with backoff. */
+  async invoke(name, body, token) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.request('POST', `/functions/v1/${name}`, { body, token });
+      } catch (e) {
+        if (!(e.status >= 500) || attempt === 4) throw e;
+        await sleep(2000 * attempt);
+      }
+    }
+  }
 }
 
 /** PUT a file to a presigned R2 URL with the headers sign-upload signed. */
