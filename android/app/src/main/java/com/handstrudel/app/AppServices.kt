@@ -12,7 +12,7 @@ import com.handstrudel.engine.StudioEngine
 import com.handstrudel.social.AuthSession
 import com.handstrudel.social.SignedOutAuthSession
 import com.handstrudel.store.StoreGate
-import com.handstrudel.store.UnconfiguredStoreGate
+import com.handstrudel.store.StoreManager
 
 /**
  * The composition root's service bag. Owner: shell. Created once in
@@ -42,7 +42,7 @@ class AppServices(
             val prefsStore = SharedPrefsStore(app)
             val prefs = StoreBackedAppPrefs(prefsStore)
             val auth: AuthSession = SignedOutAuthSession()                 // social
-            val store: StoreGate = UnconfiguredStoreGate()                  // store
+            val store: StoreGate = StoreManager.create(app)                // store
             store.bind(auth.userId)
             val analytics = createAnalytics(prefs, prefsStore)              // shell
             val engine: StudioEngine = LegacyStudioEngine(EngineController(app)) // engine
