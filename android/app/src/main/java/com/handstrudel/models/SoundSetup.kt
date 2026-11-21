@@ -46,16 +46,30 @@ data class SoundSetup(
     val instrumentName: String? get() = if (useSoundFont) resolvedInstrument?.name else resolvedWaveform?.name
     val keyAndScale: String get() = "${key.displayName} ${scale.displayName}"
 
-    /// iOS `resolvedProgression`. TODO(engine): build custom progressions through the
-    /// ported `ChordProgression.parse` so name/emoji match iOS.
+    /// iOS `resolvedProgression`: custom degrees go through `ChordProgression.parse`.
     val resolvedProgression: ChordProgression?
         get() {
             if (progression == "custom") {
                 val degrees = customDegrees ?: return null
                 if (degrees.size !in 1..64 || degrees.any { it !in 0..6 }) return null
-                return ChordProgression("custom", degrees.joinToString("-") { (it + 1).toString() }, "✍️", degrees)
+                return ChordProgression.parse(degrees.joinToString(" ") { (it + 1).toString() })
             }
             return CHORD_PROGRESSIONS.firstOrNull { it.id == progression }
+        }
+
+    /// iOS `presetDetails`: "C Major · 120 BPM · Pop".
+    val presetDetails: String
+        get() {
+            val parts = mutableListOf(keyAndScale)
+            if (bpm in 20.0..400.0) parts += "${swiftRound(bpm)} BPM"
+            resolvedProgression?.let { p ->
+                parts += when {
+                    p.id == "free" -> "Free layout"
+                    p.isCustom -> p.degrees.joinToString("-") { (it + 1).toString() }
+                    else -> p.name
+                }
+            }
+            return parts.joinToString(" · ")
         }
 
     /// iOS `isValid`, field for field.

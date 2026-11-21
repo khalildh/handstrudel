@@ -58,6 +58,12 @@ sealed interface ScaleSelection {
         is BuiltIn -> scale.rawValue
         is Custom -> "Custom"
     }
+    /** iOS `Scale.id`: the custom scale's uppercase UUID, else the raw name. */
+    val id: String get() = when (this) {
+        is BuiltIn -> scale.rawValue
+        is Custom -> scale.id.toString().uppercase()
+    }
+    val customScale: CustomScale? get() = (this as? Custom)?.scale
     val displayName: String get() = when (this) {
         is BuiltIn -> scale.displayName
         is Custom -> scale.name
@@ -74,6 +80,8 @@ sealed interface ScaleSelection {
 
     companion object {
         val PENTATONIC: ScaleSelection = BuiltIn(Scale.PENTATONIC)
+        /** iOS `Scale.allCases`: the 23 built-ins. */
+        val allBuiltIn: List<ScaleSelection> get() = Scale.entries.map(::BuiltIn)
     }
 }
 

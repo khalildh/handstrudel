@@ -53,4 +53,12 @@ fun Scale.toCoreScale(): CoreScale = when (this) {
     Scale.CHROMATIC -> CoreScale.CHROMATIC
     Scale.HUNGARIAN_MINOR -> CoreScale.HUNGARIAN_MINOR
     Scale.HIRAJOSHI -> CoreScale.HIRAJOSHI
+    Scale.MINOR_PENTATONIC -> CoreScale.MINOR_PENTATONIC
+    Scale.MAJOR_BLUES -> CoreScale.MAJOR_BLUES
+    Scale.PHRYGIAN_DOMINANT -> CoreScale.PHRYGIAN_DOMINANT
+    Scale.DIMINISHED -> CoreScale.DIMINISHED
+    Scale.HARMONIC_MAJOR -> CoreScale.HARMONIC_MAJOR
+    Scale.LYDIAN_DOMINANT -> CoreScale.LYDIAN_DOMINANT
+    Scale.ALTERED -> CoreScale.ALTERED
+    Scale.DOMINANT_BEBOP -> CoreScale.DOMINANT_BEBOP
 }

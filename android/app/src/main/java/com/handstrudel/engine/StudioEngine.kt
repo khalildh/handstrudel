@@ -19,8 +19,11 @@ import java.util.UUID
  * names: observables are [StateFlow]s, actions are functions. All calls are on
  * the main thread unless noted.
  *
- * Phase 0 implementation: [LegacyStudioEngine] (adapter over today's
- * [EngineController]); engine WS replaces it.
+ * Implementation: [HandStrudelEngine] (exposed through [LegacyStudioEngine]
+ * until studio-ui drops its Phase 0 cast).
+ *
+ * Members added after Phase 0 have default bodies so other workstreams'
+ * fakes keep compiling.
  */
 interface StudioEngine {
 
@@ -96,6 +99,12 @@ interface StudioEngine {
     fun setGridBaseOctave(octave: Int)
     val gridOctaveRange: StateFlow<Int>
     fun setGridOctaveRange(range: Int)
+    /** iOS `chordMode` (melodic "Chords" pill): the pattern plays the degree's triad. */
+    val chordMode: StateFlow<Boolean> get() = FALSE_FLOW
+    fun setChordMode(enabled: Boolean) {}
+    /** iOS `circleOfFifthsEnabled` ("Circle of 5ths" pill): left-hand X picks the key. */
+    val circleOfFifthsEnabled: StateFlow<Boolean> get() = FALSE_FLOW
+    fun setCircleOfFifths(enabled: Boolean) {}
 
     /** Drums 1 (iOS `selectedDrumLoop`, `drumVolume`, `drumBPM`). */
     val drumTrack1: StateFlow<DrumTrackState>
@@ -115,6 +124,10 @@ interface StudioEngine {
     fun setManualValue(paramId: String, value: Double)
     fun toggleLock(paramId: String)
     val smoothedParams: StateFlow<Map<String, Double>>
+    /** iOS `manualValues`: the slider value of a locked param. */
+    val manualValues: StateFlow<Map<String, Double>> get() = EMPTY_PARAMS_FLOW
+    /** iOS `bpmIsMapped`: true when a hand axis drives BPM (the BPM slider is then hidden). */
+    val bpmIsMapped: Boolean get() = true
 
     /** Persisted visual selections (`lastFilterId`, hand theme id); drawing them is studio-ui's job. */
     val selectedFilter: StateFlow<String>
@@ -134,7 +147,7 @@ interface StudioEngine {
 
     // ---- Learn --------------------------------------------------------------------
     val learn: StateFlow<LearnDisplay>
-    /** Id from the engine's learn-song catalog (`models/LearnSongs.kt`). */
+    /** Id from the engine's learn-song catalog (`models/LearnSongs.kt`: `BUNDLED_SONGS` ids or `PRACTICE_SONG_IDS`). */
     fun loadLearnSong(songId: String)
     fun updateLearnViewport(widthPx: Float, heightPx: Float)
     fun tapLearnLane(lane: Int)
@@ -155,11 +168,13 @@ interface StudioEngine {
     fun zonesTouchEnterMelody(touchId: String, lane: Int)
     fun zonesTouchExit(touchId: String)
     /** Grid lanes: on / slide / off per touch (iOS `GridTouchOverlay`). */
+    /** [lane] is the visual row from the top (iOS `GridTouchOverlay`); the note is `gridNotes[count - 1 - lane]`. */
     fun gridLaneTouchOn(touchId: String, lane: Int)
     fun gridLaneTouchSlide(touchId: String, lane: Int)
     fun gridLaneTouchOff(touchId: String)
     fun drumLaneTap(lane: Int)
-    /** Drum XY pad: intensity (x) and complexity (y), 0…1. */
+    /** Drum XY pad: intensity (x) and complexity (y), 0…1. (iOS draws complexity on the
+     *  horizontal axis and intensity rising upwards: pass `x = 1 - padY`, `y = padX` for that layout.) */
     fun drumPad(x: Double, y: Double)
 
     // ---- Presets ------------------------------------------------------------------
@@ -221,9 +236,18 @@ interface StudioEngine {
      */
     val strudelWebView: StateFlow<WebView?>
 
+    // ---- Previews (studio-ui home and onboarding) ------------------------------------
+    /** iOS `StartOverlayView.playPreview`: plays [notes] on [instrument] (idle only). False when unavailable. */
+    fun previewInstrument(instrument: SoundFontInstrument, notes: List<Int>): Boolean = false
+    fun stopInstrumentPreview() {}
+    /** iOS `ContentView.playFirstNote` (onboarding): one note on the Scale instrument. */
+    fun playFirstNote(midi: Int) {}
+
     companion object {
         const val MAX_LOOPS = 20
         const val MAX_LOOP_SECONDS = 90.0
+        private val FALSE_FLOW: StateFlow<Boolean> = kotlinx.coroutines.flow.MutableStateFlow(false)
+        private val EMPTY_PARAMS_FLOW: StateFlow<Map<String, Double>> = kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
     }
 }
 
