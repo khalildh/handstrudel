@@ -1,0 +1,15 @@
+{
+  "description": "Remote config keys apps understand. Types: bool, number, string, string_array, version (a string in the versions.json format). Apps ignore unknown keys and wrongly typed values, keeping the default. null means no value.",
+  "keys": {
+    "feed.enabled": { "type": "bool", "default": true, "doc": "Kill switch for the social feed tab." },
+    "feed.page_size": { "type": "number", "default": 10, "min": 5, "max": 30, "doc": "Posts per page for Latest, Following, profile and play-along lists (Discover is fixed at 24). Read once per launch." },
+    "store.pro_title": { "type": "string", "default": "HandStrudel Pro", "max_length": 40, "doc": "Store headline for Pro." },
+    "store.pro_features": { "type": "string_array", "default": ["120+ instruments", "Every scale — modes, harmonic minor, exotic", "Every chord progression", "One-time purchase"], "max_items": 6, "max_length": 80, "doc": "Pro feature bullets." },
+    "store.pro_note": { "type": "string", "default": "", "max_length": 80, "doc": "Optional line under the Pro bullets. Hidden when empty. Never a price." },
+    "update.minimum_version": { "type": "version", "default": null, "doc": "Older versions are blocked with an App Store button." },
+    "update.recommended_version": { "type": "version", "default": null, "doc": "Older versions see a dismissible update banner." },
+    "update.message": { "type": "string", "default": "", "max_length": 200, "doc": "Optional text on the update banner and blocker." },
+    "update.app_store_url": { "type": "string", "default": "https://apps.apple.com/app/id6764415289", "doc": "Update button target. Must start with https://apps.apple.com/." },
+    "instruments.remote_enabled": { "type": "bool", "default": true, "doc": "Show downloaded instruments and fetch the catalog." }
+  }
+}

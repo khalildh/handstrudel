@@ -4,7 +4,8 @@ import Supabase
 /// Reads the public feed and performs the social actions on it.
 /// Social writes act as the caller; public view reports use an anonymous receipt.
 enum FeedService {
-    static let pageSize = 10
+    /// Posts per page (`feed.page_size`), fixed at launch so paging stays consistent.
+    static let pageSize = RemoteConfig.launchFeedPageSize
     static let commentPageSize = 20
     static let activityPageSize = 25
 

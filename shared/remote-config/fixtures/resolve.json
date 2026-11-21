@@ -1,0 +1,48 @@
+{
+  "description": "Resolution on the device. rows are what app_config_for() returns (already filtered by platform and app version). For each key: order rows by priority desc, then id desc; skip rows whose value has the wrong type for the key or whose rollout excludes the install; take the first one left, else the key's default. Numbers are clamped to min/max, strings and arrays cut to their limits. Keys not in keys.json are ignored. expect lists resolved values for some keys (null = no value).",
+  "cases": [
+    {
+      "name": "no rows means every default",
+      "install_id": "2F6C9A7E-1B4D-4C11-9E0A-5D2B7C3E8F10",
+      "rows": [],
+      "expect": { "feed.enabled": true, "feed.page_size": 10, "store.pro_title": "HandStrudel Pro", "store.pro_note": "", "update.minimum_version": null, "instruments.remote_enabled": true }
+    },
+    {
+      "name": "targeting, priority, rollout and types",
+      "install_id": "2F6C9A7E-1B4D-4C11-9E0A-5D2B7C3E8F10",
+      "rows": [
+        { "id": 1, "key": "feed.enabled", "value": false, "rollout_percent": 100, "priority": 0 },
+        { "id": 2, "key": "feed.page_size", "value": 20, "rollout_percent": 50, "priority": 0 },
+        { "id": 3, "key": "feed.page_size", "value": 15, "rollout_percent": 30, "priority": 0 },
+        { "id": 4, "key": "store.pro_note", "value": "Holiday sale", "rollout_percent": 50, "priority": 0 },
+        { "id": 5, "key": "store.pro_title", "value": 42, "rollout_percent": 100, "priority": 2 },
+        { "id": 6, "key": "store.pro_title", "value": "Pro", "rollout_percent": 100, "priority": 1 },
+        { "id": 7, "key": "store.pro_title", "value": "Newer but lower priority", "rollout_percent": 100, "priority": 0 },
+        { "id": 8, "key": "unknown.key", "value": true, "rollout_percent": 100, "priority": 0 },
+        { "id": 9, "key": "update.minimum_version", "value": "1.0.x", "rollout_percent": 100, "priority": 0 },
+        { "id": 10, "key": "update.recommended_version", "value": "1.0.3", "rollout_percent": 100, "priority": 0 },
+        { "id": 11, "key": "instruments.remote_enabled", "value": false, "rollout_percent": 0, "priority": 0 }
+      ],
+      "expect": { "feed.enabled": false, "feed.page_size": 20, "store.pro_note": "", "store.pro_title": "Pro", "update.minimum_version": null, "update.recommended_version": "1.0.3", "instruments.remote_enabled": true }
+    },
+    {
+      "name": "clamps and limits",
+      "install_id": "00000000-0000-4000-8000-000000000000",
+      "rows": [
+        { "id": 1, "key": "feed.page_size", "value": 100, "rollout_percent": 100, "priority": 0 },
+        { "id": 2, "key": "store.pro_features", "value": ["a", "b", "c", "d", "e", "f", "g"], "rollout_percent": 100, "priority": 0 },
+        { "id": 3, "key": "update.app_store_url", "value": "https://example.com/evil", "rollout_percent": 100, "priority": 0 }
+      ],
+      "expect": { "feed.page_size": 30, "store.pro_features": ["a", "b", "c", "d", "e", "f"], "update.app_store_url": "https://apps.apple.com/app/id6764415289" }
+    },
+    {
+      "name": "a mixed array is the wrong type",
+      "install_id": "00000000-0000-4000-8000-000000000000",
+      "rows": [
+        { "id": 1, "key": "store.pro_features", "value": ["a", 2], "rollout_percent": 100, "priority": 0 },
+        { "id": 2, "key": "feed.page_size", "value": 12.6, "rollout_percent": 100, "priority": 0 }
+      ],
+      "expect": { "store.pro_features": ["120+ instruments", "Every scale — modes, harmonic minor, exotic", "Every chord progression", "One-time purchase"], "feed.page_size": 13 }
+    }
+  ]
+}
