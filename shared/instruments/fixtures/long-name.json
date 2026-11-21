@@ -1,0 +1,38 @@
+{
+  "description": "Names are trimmed and cut to 40 characters.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 1,
+    "id": "builtin.scale-wheel",
+    "name": "  Extremely Long Instrument Name That Keeps Going  ",
+    "description": "7th chords on one half, the whole scale on the other. Reach into either rim to play an octave up or down.",
+    "surface": {
+      "type": "split_wheel",
+      "radius": 1.0,
+      "rest_radius": 0.36,
+      "octave_band_radius": 0.8
+    },
+    "chords": {
+      "side": "left",
+      "voicing": "seventh"
+    },
+    "notes": {
+      "source": "scale_one_octave",
+      "octave_band": true,
+      "highlight_chord_tones": true
+    }
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "name_trimmed"
+    ],
+    "surface": {
+      "radius": 1.0,
+      "rest_radius": 0.36,
+      "octave_band_radius": 0.8
+    },
+    "name": "Extremely Long Instrument Name That Keep",
+    "has_sound": false
+  }
+}

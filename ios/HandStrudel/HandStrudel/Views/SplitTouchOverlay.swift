@@ -7,8 +7,9 @@ import UIKit
 /// starts a voice when a touch enters a new zone, and reports the set of
 /// currently-touched zones back so the visual overlay can light them up.
 ///
-/// Geometry constants come from `ChordMelodyModeManager`, so the touch math
-/// stays aligned with the rendering / hand-tracking math.
+/// Geometry comes from the playing instrument file (`WheelGeometry`) and the
+/// wedge math from `ChordMelodyModeManager`, so the touch math stays aligned
+/// with the rendering / hand-tracking math.
 struct SplitTouchOverlay: UIViewRepresentable {
     let zoneCount: Int
     let melodyCount: Int
@@ -18,6 +19,8 @@ struct SplitTouchOverlay: UIViewRepresentable {
     let melodyLabels: [String]
     /// Scale mode: the notes side has the same up/down octave band as the chords.
     var melodyOctaveBand = false
+    /// Wheel radii from the playing instrument file.
+    var geometry: WheelGeometry = .standard
 
     /// Fired when a touch enters a zone — either on touch-begin or after a
     /// drag crosses into a new zone. The voice ID is unique per touch+zone
@@ -45,6 +48,7 @@ struct SplitTouchOverlay: UIViewRepresentable {
         uiView.melodyCount = melodyCount
         uiView.swapHands = swapHands
         uiView.melodyOctaveBand = melodyOctaveBand
+        uiView.geometry = geometry
         uiView.onZoneEnter = onZoneEnter
         uiView.onZoneExit = onZoneExit
         uiView.onActiveChordChanged = { zones in
@@ -92,6 +96,12 @@ final class SplitTouchUIView: UIView {
     var melodyCount: Int = 9
     var swapHands: Bool = false
     var melodyOctaveBand: Bool = false
+    var geometry: WheelGeometry = .standard {
+        didSet {
+            probe.geometry = geometry
+            if geometry != oldValue { setNeedsLayout() }
+        }
+    }
     var onZoneEnter: ((String, SplitTouchZone) -> Void)?
     var onZoneExit: ((String) -> Void)?
     var onActiveChordChanged: ((Set<ChordSubzone>) -> Void)?
@@ -99,7 +109,7 @@ final class SplitTouchUIView: UIView {
 
     // Geometry mirrors the visual overlay: outer radius fits the shorter
     // dimension, deadzone is the rest hole, octaveR is the inner-band rim.
-    private var outerR: CGFloat { min(bounds.width, bounds.height) / 2 * CGFloat(ChordMelodyModeManager.splitRadiusFraction) }
+    private var outerR: CGFloat { min(bounds.width, bounds.height) / 2 * CGFloat(geometry.radius) }
     private var wheelCenter: CGPoint { CGPoint(x: bounds.width / 2, y: bounds.height / 2) }
 
     /// Per-touch state: (current voice ID, current zone). When a touch is
@@ -133,7 +143,7 @@ final class SplitTouchUIView: UIView {
     private func layoutAccessibleNotes() {
         guard isUserInteractionEnabled, outerR > 0 else { accessibilityElements = []; return }
         var ordered: [SplitAccessibilityNote] = []
-        let radius = outerR * (ChordMelodyModeManager.splitDeadzone + ChordMelodyModeManager.splitOctaveBandThreshold) / 2
+        let radius = outerR * (geometry.restRadius + geometry.octaveBandRadius) / 2
 
         func insert(_ zone: SplitTouchZone, label: String, id: String, wedge: Int, count: Int, right: Bool) {
             let note = accessibleNotes[zone] ?? makeAccessibleNote(zone)
@@ -222,7 +232,7 @@ final class SplitTouchUIView: UIView {
         guard outerR > 0 else { return nil }
         let radius = min(1.0, Double(r / outerR))
         // Inside the rest hole — nothing selected, but keep dragging
-        guard radius >= Double(ChordMelodyModeManager.splitDeadzone) else { return nil }
+        guard radius >= geometry.restRadius else { return nil }
         var deg = 90 - atan2(Double(dy), Double(dx)) * 180 / .pi
         deg = deg.truncatingRemainder(dividingBy: 360)
         if deg < 0 { deg += 360 }

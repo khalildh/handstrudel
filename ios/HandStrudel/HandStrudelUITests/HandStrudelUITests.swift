@@ -1939,6 +1939,49 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertFalse(note.exists)
     }
 
+    /// Prototype instrument files: the wheel switches from the built-in Scale
+    /// wheel file to Moon Pentatonic (5 notes, chords on the right) and plays.
+    func testWheelPlaysFromAnInstrumentFile() {
+        app.launchArguments = ["--uitesting", "--reset-studio-input", "--uitest-camera-denied", "-hasSeenOnboarding", "YES"]
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["wheel-note-0"].waitForExistence(timeout: 5), "Scale wheel file")
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(app.buttons["wheel-chord-0"].frame.midX, window.midX, "Scale wheel file: chords on the left")
+        add(screenshotAttachment("1-scale-wheel"))
+
+        element("settings-button").tap()
+        selectMusicSettingsSection("play")
+        let picker = app.buttons["instrument-file-picker"].firstMatch
+        revealInMusicSettings(picker)
+        XCTAssertEqual(picker.label, "Scale Wheel")
+        picker.tap()
+        let moon = app.buttons["Moon Pentatonic"].firstMatch
+        XCTAssertTrue(moon.waitForExistence(timeout: 5))
+        moon.tap()
+        XCTAssertTrue(app.buttons["instrument-file-picker"].firstMatch.label == "Moon Pentatonic")
+        closeMusicSettings()
+
+        XCTAssertTrue(app.buttons["wheel-note-4"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["wheel-note-5"].exists, "Moon Pentatonic: one wedge per pentatonic note")
+        XCTAssertTrue(app.buttons["wheel-note-0"].label.hasPrefix("Note D"), app.buttons["wheel-note-0"].label)
+        XCTAssertGreaterThan(app.buttons["wheel-chord-0"].frame.midX, window.midX, "Moon Pentatonic: chords on the right")
+        app.buttons["wheel-chord-1"].tap()
+        app.buttons["wheel-note-2"].tap()
+        XCTAssertTrue(element("close-button").exists)
+        add(screenshotAttachment("2-moon-pentatonic"))
+    }
+
+    private func screenshotAttachment(_ name: String) -> XCTAttachment {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        return attachment
+    }
+
     func testTouchOnlySettingRemembersChoice() {
         app.launchArguments = ["--reset-studio-input"]
         launchToSession()

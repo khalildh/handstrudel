@@ -1,0 +1,21 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 1,
+  "id": "builtin.split-wheel",
+  "name": "Split Wheel",
+  "description": "Chords on one half, the held chord's notes over three octaves on the other.",
+  "surface": {
+    "type": "split_wheel",
+    "radius": 1.0,
+    "rest_radius": 0.36,
+    "octave_band_radius": 0.8
+  },
+  "chords": {
+    "side": "left",
+    "voicing": "triad"
+  },
+  "notes": {
+    "source": "chord_tones_three_octaves",
+    "octave_band": false
+  }
+}

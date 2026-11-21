@@ -160,7 +160,7 @@ struct ContentView: View {
                             let midi = notes.isEmpty ? 60 : notes[notes.count / 2]
                             OnboardingView(hasSeenOnboarding: $hasSeenOnboarding,
                                            noteName: pitchClassName(midi), melodyLaneCount: notes.count,
-                                           swapHands: engine.chordMelodySwapHands,
+                                           swapHands: engine.wheelSwapHands,
                                            cameraEnabled: engine.playInput == .air, tracker: engine.handTracker) {
                                 playFirstNote(midi)
                             }
@@ -808,34 +808,25 @@ struct ContentView: View {
 
     /// Lettered chord names per zone, with a "⁷" suffix in Scale mode to
     /// signal the 7th-chord voicing.
-    private func splitChordNames(zoneDegrees: [Int], scaleMode: Bool) -> [String] {
+    private func splitChordNames(zoneDegrees: [Int], rules: WheelRules) -> [String] {
         zoneDegrees.map {
-            chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
-                + (scaleMode ? "⁷" : "")
+            chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0) + rules.chordNameSuffix
         }
     }
 
     /// MIDI notes the melody side maps to. Split: triad × 3 octaves (9 notes,
     /// chord-tone snap). Scale: one octave of the full diatonic scale (7).
-    private func splitMelodyMidis(melodyDegree: Int, scaleMode: Bool) -> [Int] {
-        if scaleMode {
-            return scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
-        }
-        let triad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
-        return (0..<3).flatMap { oct in triad.map { $0 + oct * 12 } }.sorted()
+    private func splitMelodyMidis(melodyDegree: Int, rules: WheelRules) -> [Int] {
+        rules.noteLanes(key: engine.selectedKey, scale: engine.selectedScale, chordDegree: melodyDegree)
     }
 
     /// Lane indices that are chord tones of the active chord (Scale mode only).
     /// The overlay colors these with the chord accent so the player can see
     /// safe targets — Split returns an empty set since every lane is already
     /// a chord tone.
-    private func splitChordToneLanes(melodyMidis: [Int], melodyDegree: Int, scaleMode: Bool) -> Set<Int> {
-        guard scaleMode else { return [] }
-        let triad7 = chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
-        let toneClasses = Set(triad7.map { $0 % 12 })
-        return Set(melodyMidis.enumerated().compactMap { idx, midi in
-            toneClasses.contains(midi % 12) ? idx : nil
-        })
+    private func splitChordToneLanes(melodyMidis: [Int], melodyDegree: Int, rules: WheelRules) -> Set<Int> {
+        rules.chordToneLanes(key: engine.selectedKey, scale: engine.selectedScale,
+                             chordDegree: melodyDegree, lanes: melodyMidis)
     }
 
     // MARK: - Split mode touch handlers
@@ -907,15 +898,13 @@ struct ContentView: View {
     /// them under `parentVoice` so the matching `splitTouchExit` can stop them.
     private func splitTouchEnter(parentVoice: String, zone: SplitTouchZone) {
         guard engine.isRunning, !engine.isPaused, scenePhase == .active else { return }
-        let scaleMode = engine.scaleChordMelodyModeEnabled
+        let rules = engine.wheelRules
         let native = splitUsesSoundFont && engine.soundFontEngine.startIfNeeded(program: engine.selectedSoundFontInstrument.program)
         switch zone {
         case .chord(let sub):
             let degree = engine.chordMelodyModeManager.degreeForZone(sub.wedge)
-            // Scale mode voices the chord as a 7th — root / 3rd / 5th / 7th.
-            let voicing = scaleMode
-                ? chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-                : chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
+            // The instrument picks the voicing (the Scale wheel plays 7ths).
+            let voicing = rules.chordTones(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
             let absoluteTones = voicing.map { $0 + sub.octave * 12 }
             engine.holdJamVoice(parentVoice, pitches: absoluteTones, velocity: 0.7, native: native)
             var subs: [String] = []
@@ -935,20 +924,13 @@ struct ContentView: View {
             syncSplitTouchChordToManager()
         case .melody(let note):
             let lane = note.lane
-            let lanes: [Int]
-            if scaleMode {
-                // Scale mode: one octave of the diatonic scale.
-                lanes = scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
-            } else {
-                let degree = splitMelodySnapDegree
-                let triad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-                lanes = (0..<3).flatMap { oct in triad.map { $0 + oct * 12 } }.sorted()
-            }
+            let lanes = rules.noteLanes(key: engine.selectedKey, scale: engine.selectedScale,
+                                        chordDegree: splitMelodySnapDegree)
             guard !lanes.isEmpty else { return }
             let safe = max(0, min(lanes.count - 1, lane))
-            // Scale mode's outer band shifts the note an octave, like the chord
-            // side and the hand-tracked melody. Other layouts always report 0.
-            let midi = lanes[safe] + (scaleMode ? note.octave * 12 : 0)
+            // With a note octave band the rim shifts the note an octave, like
+            // the chord side and the hand-tracked melody.
+            let midi = lanes[safe] + (rules.notesOctaveBand ? note.octave * 12 : 0)
             let sv = "\(parentVoice)-m"
             splitNoteOn(voice: sv, midi: midi, velocity: 0.75, native: native)
             engine.holdJamVoice(parentVoice, pitches: [midi], velocity: 0.75, native: native)
@@ -1097,14 +1079,15 @@ struct ContentView: View {
             // takes the same shape either way; what differs is the melody
             // labels + the count.
             if engine.splitChordMelodyModeEnabled || engine.scaleChordMelodyModeEnabled {
-                let scaleMode = engine.scaleChordMelodyModeEnabled
+                let rules = engine.wheelRules
+                let swapHands = engine.wheelSwapHands
                 let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
-                let chordNames = splitChordNames(zoneDegrees: zoneDegrees, scaleMode: scaleMode)
+                let chordNames = splitChordNames(zoneDegrees: zoneDegrees, rules: rules)
                 let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
-                let melodyMidis = splitMelodyMidis(melodyDegree: melodyDegree, scaleMode: scaleMode)
+                let melodyMidis = splitMelodyMidis(melodyDegree: melodyDegree, rules: rules)
                 let melodyNames = melodyMidis.map { pitchClassName($0) }
                 let melodyCount = melodyMidis.count
-                let chordToneLanes = splitChordToneLanes(melodyMidis: melodyMidis, melodyDegree: melodyDegree, scaleMode: scaleMode)
+                let chordToneLanes = splitChordToneLanes(melodyMidis: melodyMidis, melodyDegree: melodyDegree, rules: rules)
                 SplitChordMelodyOverlayView(
                     zoneDegrees: zoneDegrees,
                     chordNames: chordNames,
@@ -1117,12 +1100,13 @@ struct ContentView: View {
                     melodyLane: engine.chordMelodyMelodyLane,
                     melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
                     melodyResting: engine.chordMelodyModeManager.melodyResting,
-                    swapHands: engine.chordMelodySwapHands,
+                    swapHands: swapHands,
                     touchedChordSubzones: splitTouchChordZones,
                     touchedMelodyNotes: splitTouchMelodyNotes,
                     chordToneLanes: chordToneLanes,
                     melodyOctaveShift: engine.chordMelodyModeManager.currentMelodyOctaveShift,
-                    scaleLayout: scaleMode
+                    scaleLayout: rules.notesOctaveBand,
+                    geometry: rules.geometry
                 )
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
@@ -1133,11 +1117,12 @@ struct ContentView: View {
                 SplitTouchOverlay(
                     zoneCount: max(1, zoneDegrees.count),
                     melodyCount: melodyCount,
-                    swapHands: engine.chordMelodySwapHands,
+                    swapHands: swapHands,
                     enabled: !engine.isPaused && scenePhase == .active,
                     chordLabels: chordNames,
                     melodyLabels: melodyMidis.map { midiNoteName($0) },
-                    melodyOctaveBand: scaleMode,
+                    melodyOctaveBand: rules.notesOctaveBand,
+                    geometry: rules.geometry,
                     onZoneEnter: { voice, zone in splitTouchEnter(parentVoice: voice, zone: zone) },
                     onZoneExit: { voice in splitTouchExit(parentVoice: voice) },
                     touchedChordSubzones: $splitTouchChordZones,

@@ -289,6 +289,37 @@ struct ControlSheet: View {
         }
     }
 
+    #if DEBUG
+    /// Prototype: play the wheel from any bundled instrument file
+    /// (`shared/instruments/library/`). Debug builds only until 1.0.3.
+    private var instrumentFilePicker: some View {
+        HStack {
+            Text("Instrument file")
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundColor(.primary.opacity(0.8))
+            Spacer()
+            Menu {
+                ForEach(InstrumentLibrary.all, id: \.id) { instrument in
+                    Button {
+                        engine.playInstrument(instrument, store: storeManager)
+                    } label: {
+                        if instrument.id == engine.wheelInstrument.id {
+                            Label(instrument.name, systemImage: "checkmark")
+                        } else {
+                            Text(instrument.name)
+                        }
+                    }
+                    .accessibilityIdentifier("instrument-file-\(instrument.id)")
+                }
+            } label: {
+                Text(engine.wheelInstrument.name)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+            }
+            .accessibilityIdentifier("instrument-file-picker")
+        }
+    }
+    #endif
+
     // MARK: - Mode
 
     private enum AppMode: String { case melodic, flow, hybrid, lead, grid, drums, learn, chordMelody, radialChordMelody, splitChordMelody, scaleChordMelody, soundFont }
@@ -390,6 +421,12 @@ struct ControlSheet: View {
                             .foregroundColor(.primary.opacity(0.8))
                     }
                     .tint(palette.accent)
+
+                    #if DEBUG
+                    if currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
+                        instrumentFilePicker
+                    }
+                    #endif
 
                     Toggle(isOn: $engine.chordMelodyAutoStrum) {
                         Text("Auto-strum (re-articulate on each beat)")
