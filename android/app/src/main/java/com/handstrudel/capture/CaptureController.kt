@@ -25,6 +25,12 @@ interface CaptureController {
     fun onSessionEnded()
     /** App went to background: stop recording and save the partial take. */
     fun onAppBackgrounded()
+
+    /**
+     * Shell calls this once after creating the navigator (play-along starts a session,
+     * posting shows notices and opens the new post). Additive in WS4; default no-op.
+     */
+    fun attach(navigator: com.handstrudel.ui.nav.AppNavigator) = Unit
 }
 
 data class CaptureState(
