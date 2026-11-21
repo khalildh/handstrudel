@@ -24,42 +24,22 @@ interface StoreGate {
     /** iOS `restorePurchases(for:)`; null when a restore is already running. */
     suspend fun restore(packId: String? = null): RestoreOutcome?
 
+    /**
+     * Reloads products, the current offering and customer info (iOS `loadProducts`).
+     * The store screen calls it on appear. Default no-op so test fakes needn't implement it.
+     */
+    suspend fun refresh() {}
+
     suspend fun logIn(appUserId: String)
     suspend fun logOut()
     /** Shell calls this once in `AppServices` wiring; store follows sign-in/out (RevenueCat logIn/logOut). */
     fun bind(userId: StateFlow<UUID?>)
 }
 
-/** Store UI state. */
-data class StoreState(
-    val products: List<StoreProduct> = emptyList(),
-    val isLoading: Boolean = false,
-    val isRestoring: Boolean = false,
-    val purchasingProductId: String? = null,
-    /** Active entitlement ids: `pro`, `plus_features`, `studio_pack`, `party_pack`, `kit_808`, `kit_electronic`. */
-    val activeEntitlements: Set<String> = emptySet(),
-    val lastError: String? = null,
-)
-
-data class StoreProduct(
-    val id: String,
-    val title: String,
-    val description: String,
-    val displayPrice: String,
-    val isSubscription: Boolean,
-)
-
-sealed interface PurchaseResult {
-    data object Success : PurchaseResult
-    data object Cancelled : PurchaseResult
-    data object Pending : PurchaseResult
-    data class Failed(val message: String) : PurchaseResult
-}
-
-/** iOS `StoreManager.RestoreOutcome`. */
-enum class RestoreOutcome { ACCESS_AVAILABLE, NO_ACTIVE_PURCHASES, REQUESTED_ITEM_UNAVAILABLE, CANCELLED, FAILED }
-
-/** Phase 0 stub == the "no RevenueCat key" behaviour. Store WS replaces it with `StoreManager`. */
+/**
+ * The "no RevenueCat key" behaviour as a plain fake (handy in other workstreams' tests).
+ * The app uses [StoreManager.create], which behaves the same way when the key is blank.
+ */
 class UnconfiguredStoreGate : StoreGate {
     override val isConfigured: Boolean = false
     override val state: StateFlow<StoreState> = MutableStateFlow(StoreState())
@@ -68,7 +48,7 @@ class UnconfiguredStoreGate : StoreGate {
     override val hasPlusFeatures: Boolean = false
     override val hasSubscription: Boolean = false
     override suspend fun purchase(activity: Activity, productId: String): PurchaseResult =
-        PurchaseResult.Failed("Purchases aren't available in this build")
+        PurchaseResult.Failed(StoreCopy.UNAVAILABLE)
     override suspend fun restore(packId: String?): RestoreOutcome = RestoreOutcome.FAILED
     override suspend fun logIn(appUserId: String) = Unit
     override suspend fun logOut() = Unit
