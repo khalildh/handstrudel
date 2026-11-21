@@ -2031,6 +2031,25 @@ final class HandStrudelUITests: XCTestCase {
         closeMusicSettings()
     }
 
+    func testChordVoicingCanBeSwitchedFromMusicSettings() {
+        launchToSession()
+        element("settings-button").tap()
+        selectMusicSettingsSection("sound")
+        let picker = app.buttons["chord-voicing-picker"].firstMatch
+        revealInMusicSettings(picker)
+        let initial = picker.label.contains("7ths") ? "7ths" : "Triads"
+        let other = initial == "7ths" ? "Triads" : "7ths"
+        picker.tap()
+        let option = app.buttons[other].firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 3))
+        option.tap()
+        XCTAssertTrue(picker.label.contains(other), picker.label)
+        picker.tap()
+        app.buttons[initial].firstMatch.tap()
+        XCTAssertTrue(picker.label.contains(initial), picker.label)
+        closeMusicSettings()
+    }
+
     func testControlSheet_showsHarmonySection() {
         launchToSession()
         element("settings-button").tap()

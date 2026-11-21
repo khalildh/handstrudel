@@ -231,6 +231,9 @@ final class EngineController: ObservableObject {
     @Published var chordMelodyMelodyLane: Int? = nil
     @Published var chordMelodyOctaveShift: Int = 0        // -1, 0, +1 from chord hand Y
     @Published var chordMelodyAutoStrum: Bool = false     // re-articulate chord on each beat
+    /// Chord voicing the player picked, per mode. No entry = the mode's
+    /// default (`defaultChordVoicing(for:)`). Read through `chordVoicing`.
+    @Published var chordVoicingOverrides: [SoundSetup.Mode: ChordVoicing] = [:]
 
     /// Currently selected chord progression (subset of diatonic degrees the
     /// chord hand cycles through). Defaults to "Free" — all 7 diatonic chords.
@@ -758,12 +761,8 @@ final class EngineController: ObservableObject {
 
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         let scaleMode = scaleChordMelodyModeEnabled
-
         let chordTones: (Int) -> [Int] = { [weak self] degree in
-            guard let self else { return [] }
-            return scaleMode
-                ? chordNotesWithSeventh(key: self.selectedKey, scale: self.selectedScale, degree: degree)
-                : chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
+            self?.wheelChordTones(degree: degree) ?? []
         }
         let melodyTones: (Int) -> [Int] = { [weak self] degree in
             guard let self else { return [] }
@@ -1414,6 +1413,39 @@ final class EngineController: ObservableObject {
             soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
         }
         jamSession.replayRemoteVoices()
+    }
+
+    /// The Scale wheel voices 7ths by default; every other mode voices triads.
+    func defaultChordVoicing(for mode: SoundSetup.Mode) -> ChordVoicing {
+        .defaultFor(scaleWheel: mode == .scalechordmelody)
+    }
+
+    func chordVoicing(for mode: SoundSetup.Mode) -> ChordVoicing {
+        chordVoicingOverrides[mode] ?? defaultChordVoicing(for: mode)
+    }
+
+    /// Choosing the mode's default clears the override, so presets saved
+    /// with the default keep following it.
+    func setChordVoicing(_ voicing: ChordVoicing?, for mode: SoundSetup.Mode) {
+        chordVoicingOverrides[mode] = voicing == defaultChordVoicing(for: mode) ? nil : voicing
+    }
+
+    /// The voicing every wheel chord in the current mode uses (camera and
+    /// touch, sound and labels).
+    var chordVoicing: ChordVoicing {
+        get { SoundSetup.Mode(rawValue: currentModeString).map(chordVoicing(for:)) ?? .triad }
+        set { if let mode = SoundSetup.Mode(rawValue: currentModeString) { setChordVoicing(newValue, for: mode) } }
+    }
+
+    /// The notes of the wheel chord on `degree`, voiced the player's way.
+    /// Hand-tracked pads, accents, auto-strum and touch chords all use this.
+    func wheelChordTones(degree: Int) -> [Int] {
+        chordVoicing.notes(key: selectedKey, scale: selectedScale, degree: degree)
+    }
+
+    /// A wheel wedge's chord name, with "⁷" when the voicing is 7ths.
+    func wheelChordName(degree: Int) -> String {
+        chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree) + chordVoicing.chordNameSuffix
     }
 
     /// Persisted/loop-record label for the current mode.

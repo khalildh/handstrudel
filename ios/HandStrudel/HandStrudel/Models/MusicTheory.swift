@@ -272,6 +272,27 @@ func chordNotesWithSeventh(key: MusicKey, scale: Scale, degree: Int) -> [Int] {
     return triad + [seventh]
 }
 
+/// How the chord+melody wheels voice a chord. A player setting: each wheel
+/// has a default (`defaultFor`), which the player can override.
+enum ChordVoicing: String, Codable, CaseIterable, Equatable {
+    case triad, seventh
+
+    /// The Scale wheel plays 7ths; every other chord wheel plays triads.
+    static func defaultFor(scaleWheel: Bool) -> ChordVoicing { scaleWheel ? .seventh : .triad }
+
+    var displayName: String { self == .triad ? "Triads" : "7ths" }
+
+    /// Appended to wheel chord names so the player can see 7th voicing.
+    var chordNameSuffix: String { self == .seventh ? "⁷" : "" }
+
+    func notes(key: MusicKey, scale: Scale, degree: Int) -> [Int] {
+        switch self {
+        case .triad: return chordNotes(key: key, scale: scale, degree: degree)
+        case .seventh: return chordNotesWithSeventh(key: key, scale: scale, degree: degree)
+        }
+    }
+}
+
 /// One octave of scale notes starting at the given MIDI octave. Used by Scale
 /// mode's melody side, where the 7 wedges fan one diatonic octave.
 func scaleNotesOneOctave(key: MusicKey, scale: Scale, octave: Int = 4) -> [Int] {

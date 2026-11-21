@@ -295,6 +295,9 @@ struct SoundSetup: Codable, Equatable {
     let padVolume: Double
     let gridOctave: Int
     let gridRange: Int
+    /// The player's chord voicing, only when it differs from the mode's
+    /// default. Missing (older presets and posts) = the mode's default.
+    var chordVoicing: ChordVoicing? = nil
 
     enum Mode: String, Codable {
         case melodic, flow, hybrid, lead, grid, drum, chordmelody, radialchordmelody
@@ -312,6 +315,7 @@ struct SoundSetup: Codable, Equatable {
             if progression.id == "free" { parts.append("Free layout") }
             else { parts.append(progression.isCustom ? progression.degrees.map { String($0 + 1) }.joined(separator: "-") : progression.name) }
         }
+        if let chordVoicing { parts.append(chordVoicing.displayName) }
         return parts.joined(separator: " · ")
     }
 
@@ -360,7 +364,8 @@ extension EngineController {
                           customDegrees: chordMelodyProgression.isCustom ? chordMelodyProgression.degrees : nil,
                           mode: mode, bpm: manualBPM, useSoundFont: useSoundFont,
                           autoStrum: chordMelodyAutoStrum, padVolume: chordMelodyPadVolume,
-                          gridOctave: gridBaseOctave, gridRange: gridOctaveRange)
+                          gridOctave: gridBaseOctave, gridRange: gridOctaveRange,
+                          chordVoicing: chordVoicingOverrides[mode])
     }
 
     private var activeSoundFontRouting: Bool {
@@ -387,6 +392,7 @@ extension EngineController {
         chordMelodyPadVolume = setup.padVolume
         gridBaseOctave = setup.gridOctave
         gridOctaveRange = setup.gridRange
+        setChordVoicing(setup.chordVoicing, for: mode)
         switchMode(grid: mode == .grid, drums: mode == .drum, learn: false, chordMelody: mode == .chordmelody,
                    lead: mode == .lead, hybrid: mode == .hybrid, flow: mode == .flow, soundFont: mode == .soundfont,
                    radialChordMelody: mode == .radialchordmelody, splitChordMelody: mode == .splitchordmelody,
