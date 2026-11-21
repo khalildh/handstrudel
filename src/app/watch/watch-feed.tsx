@@ -1,12 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { creatorHref, describeClipChords, describeClipScale, formatVideoViews, isVideoID, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicVideo } from "../../lib/public-feed";
+import { startWheelAudio } from "../../lib/instruments/audio";
 import { useVideoViews } from "../../lib/use-video-views";
 import WatchComments from "./watch-comments";
 import { clipDuration, clipTitle, WatchArtwork, WatchFooter, WatchHeader, WatchIcon, WatchThumbnail } from "./watch-design";
+
+const PostInstrumentPlayer = dynamic(() => import("../../components/instruments/PostInstrumentPlayer"), {
+  ssr: false,
+  loading: () => <p className="watch-player-loading" role="status">Opening the player…</p>,
+});
 
 export default function WatchFeed() {
   const router = useRouter();
@@ -29,6 +36,8 @@ export default function WatchFeed() {
   const [embedFor, setEmbedFor] = useState<string>();
   const embedInput = useRef<HTMLTextAreaElement>(null);
   const player = useRef<HTMLVideoElement>(null);
+  const [instrumentFor, setInstrumentFor] = useState<string>();
+  const instrumentDialog = useRef<HTMLDialogElement>(null);
   const stage = useRef<HTMLElement>(null);
   const paging = useRef<AbortController | null>(null);
   const listed = videos.find((video) => video.id === id);
@@ -170,6 +179,22 @@ export default function WatchFeed() {
     }
   }
 
+  // The in-page player keeps the visitor on /watch?v= (no navigation), so the
+  // universal link and the app buttons below behave exactly as before.
+  function playInBrowser(video: PublicVideo) {
+    void startWheelAudio().catch(() => {});
+    player.current?.pause();
+    setInstrumentFor(video.id);
+  }
+
+  useEffect(() => {
+    const dialog = instrumentDialog.current;
+    if (!dialog) return;
+    if (instrumentFor && instrumentFor === selected?.id) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) dialog.close();
+  }, [instrumentFor, selected?.id]);
+
   function retryVideo() {
     const target = player.current;
     if (!target || !selected) return;
@@ -308,6 +333,11 @@ export default function WatchFeed() {
                 )}
                 {isVideoID(selected.id) && (
                   <div className="watch-sound-actions">
+                    {(setup || selected.has_instrument) && (
+                      <button type="button" className="watch-action watch-primary watch-play-web" onClick={() => playInBrowser(selected)}>
+                        <WatchIcon name="play" /> Play this in your browser
+                      </button>
+                    )}
                     <a className="watch-action watch-primary watch-open-ios" href={`handstrudel://watch/${selected.id}`}>Open in HandStrudel <WatchIcon name="arrow" /></a>
                     {setup && <a className="watch-action watch-primary" href={`handstrudel://sound/${selected.id}`}><WatchIcon name="play" /> Play this sound in the app</a>}
                     {selected.backing_enabled && <a className="watch-action" href={`handstrudel://play/${selected.id}`}>Play along</a>}
@@ -316,6 +346,18 @@ export default function WatchFeed() {
                 )}
               </div>
               <WatchComments key={`comments-${selected.id}`} video={selected} />
+              <dialog ref={instrumentDialog} className="watch-player-dialog" aria-label="Play in your browser"
+                onClose={() => setInstrumentFor(undefined)}>
+                <div className="watch-player-dialog-top">
+                  <button type="button" className="watch-action" onClick={() => setInstrumentFor(undefined)}>
+                    <WatchIcon name="close" /> Close
+                  </button>
+                </div>
+                {instrumentFor === selected.id && (
+                  <PostInstrumentPlayer key={selected.id} post={selected} audioStarted
+                    onClose={() => setInstrumentFor(undefined)} />
+                )}
+              </dialog>
             </>
           ) : (
             <div className="watch-state" role="status">

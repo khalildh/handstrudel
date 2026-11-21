@@ -1,0 +1,101 @@
+/* In-browser instrument player (watch page and Web Studio). The wheel sits on
+   a dark stage, like the iOS wheel over the camera feed; the chrome around it
+   uses the site's paper-and-ink style. */
+
+.instrument-player {
+  --player-ink: #20243a;
+  --player-muted: #565c73;
+  --player-line: #dedee7;
+  --player-blue: #263ed4;
+  --player-surface: #fffefa;
+  --player-stage: #0e1122;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  color: var(--player-ink);
+}
+.instrument-player-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.instrument-player-head > div:first-child { min-width: 0; }
+.instrument-player-eyebrow { margin: 0 0 4px; color: var(--player-blue); font-size: 10px; font-weight: 850; letter-spacing: .1em; }
+.instrument-player h2 {
+  margin: 0; font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(22px, 3vw, 30px);
+  font-weight: 600; letter-spacing: -.02em; overflow-wrap: anywhere;
+}
+.instrument-player-sound { margin: 4px 0 0; color: var(--player-muted); font-size: 13px; font-weight: 750; }
+.instrument-player-note { margin: 2px 0 0; color: var(--player-muted); font-size: 12px; }
+.instrument-player-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.instrument-player-controls [aria-pressed="true"] { border-color: var(--player-blue); color: var(--player-blue); background: #eaeefe; }
+
+.instrument-player-stage {
+  position: relative; isolation: isolate; overflow: hidden;
+  height: min(72vh, 640px); min-height: 320px;
+  border-radius: 22px; background: radial-gradient(circle at 50% 45%, #1d2347, var(--player-stage) 70%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06);
+}
+.instrument-player-video, .instrument-player-skeleton {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none;
+}
+.instrument-player-video { transform: scaleX(-1); opacity: 0; transition: opacity .3s; }
+.instrument-player-stage[data-camera="on"] .instrument-player-video { opacity: .55; }
+.instrument-player-skeleton { z-index: 1; }
+.instrument-player-start {
+  position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; gap: 10px; text-align: center;
+  color: #fff; background: rgba(14, 17, 34, .55); font-size: 13px;
+}
+.instrument-player-hint { margin: 0; color: var(--player-muted); font-size: 12px; }
+.instrument-player-status { margin: 0; color: var(--player-muted); font-size: 13px; font-weight: 700; }
+
+.wheel-stage { position: absolute; inset: 0; z-index: 2; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+.wheel-stage[data-disabled] { cursor: default; }
+.wheel-svg { display: block; overflow: visible; }
+.wheel-zone { outline: none; }
+.wheel-zone:focus-visible path { stroke: #fff; stroke-width: 2.5; }
+.wheel-zone path { transition: fill .12s, stroke .12s; }
+.wheel-outlined { paint-order: stroke; }
+.wheel-label, .wheel-arrow, .wheel-held {
+  pointer-events: none; text-anchor: middle; dominant-baseline: central;
+  font-family: ui-rounded, "SF Pro Rounded", var(--font-manrope), system-ui, sans-serif;
+  paint-order: stroke; stroke: rgba(0, 0, 0, .55); stroke-width: 3px; stroke-linejoin: round;
+}
+.wheel-chord-label { font-size: 14px; font-weight: 900; }
+.wheel-note-label { font-size: 12px; font-weight: 900; }
+.wheel-arrow { font-size: 11px; font-weight: 800; stroke-width: 2px; }
+.wheel-arrow-small { font-size: 9px; }
+.wheel-held { font-weight: 900; fill: #e9fff0; stroke-width: 4px; }
+.wheel-cursor { fill: rgba(255, 255, 255, .25); stroke: #fff; stroke-width: 2; pointer-events: none; }
+.wheel-cursor[data-pinching] { fill: rgba(52, 199, 89, .55); stroke: #34c759; }
+
+.instrument-player-card {
+  position: sticky; bottom: 12px; z-index: 5; box-shadow: 0 14px 40px rgba(14, 17, 34, .22);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 18px; border: 1px solid #dce1f8; border-radius: 16px;
+  background: linear-gradient(112deg, #faf9f0 9%, #eef1fd 100%);
+}
+.instrument-player-card strong { font-size: 15px; }
+.instrument-player-card p { margin: 3px 0 0; color: var(--player-muted); font-size: 13px; }
+.instrument-player-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.watch-clear-link { border: 0; background: none; color: var(--player-blue); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+
+/* Watch page: the player opens in a dialog over the page. */
+.watch-player-dialog {
+  margin: auto;
+  width: min(1040px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 18px clamp(14px, 3vw, 26px) 20px;
+  border: 1px solid var(--player-line, #dedee7); border-radius: 24px; background: #f7f6f1; color: #20243a;
+  overflow: auto;
+}
+.watch-player-dialog::backdrop { background: rgba(14, 17, 34, .55); }
+.watch-player-dialog .instrument-player-stage { height: clamp(320px, calc(100dvh - 250px), 620px); }
+.watch-player-dialog-top { display: flex; justify-content: flex-end; }
+.watch-player-loading { min-height: 240px; display: grid; place-items: center; font-weight: 750; }
+
+/* Web Studio with a post's instrument. */
+.post-studio { min-height: 100dvh; padding: 0 max(16px, calc((100% - 1100px) / 2)) 26px; background: #f7f6f1; }
+.post-studio .instrument-player-stage { height: min(74vh, 720px); }
+.post-studio-links { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; font-size: 13px; font-weight: 800; }
+.post-studio-links a { color: #263ed4; text-decoration: none; }
+
+@media (max-width: 560px) {
+  .instrument-player-stage { height: min(70vh, 520px); border-radius: 18px; }
+  .wheel-chord-label { font-size: 12px; }
+  .wheel-note-label { font-size: 11px; }
+}
