@@ -9,7 +9,14 @@ data class ChordProgression(
     val name: String,
     val emoji: String,
     val degrees: List<Int>,
-)
+) {
+    /// iOS `ChordProgression.isCustom`: user-typed progressions have ids starting "custom".
+    val isCustom: Boolean get() = id.startsWith("custom")
+
+    /// TODO(engine): port the iOS rule `category != .essentials && !isCustom → "pro"`
+    /// with the 145-entry catalog. Every progression in today's short list is free.
+    val packId: String? get() = null
+}
 
 val CHORD_PROGRESSIONS: List<ChordProgression> = listOf(
     ChordProgression("free", "Free", "🎛️", listOf(0, 1, 2, 3, 4, 5, 6)),

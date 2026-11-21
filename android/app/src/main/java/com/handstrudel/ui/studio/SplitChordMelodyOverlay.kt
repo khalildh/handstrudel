@@ -1,4 +1,4 @@
-package com.handstrudel.ui
+package com.handstrudel.ui.studio
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box

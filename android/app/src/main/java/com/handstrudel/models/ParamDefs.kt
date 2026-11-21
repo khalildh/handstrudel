@@ -86,17 +86,4 @@ val DRUM_LOOPS = listOf(
         """stack($PUNCH_KICK.struct("x ~ ~ x"), $RIMSHOT.struct("~ ~ x ~"), $CLAVE.struct("~ x ~ ~"))"""),
 )
 
-data class Waveform(
-    val id: String,
-    val name: String,
-    val emoji: String,
-    val isPremium: Boolean = false,
-    val packId: String? = null
-)
-
-val WAVEFORMS = listOf(
-    Waveform("sawtooth", "Saw", "\uD83E\uDE9A"),
-    Waveform("square", "Square", "\u2B1C"),
-    Waveform("triangle", "Triangle", "\uD83D\uDD3A"),
-    Waveform("sine", "Sine", "\uD83D\uDD2E"),
-)
+// Waveform / WAVEFORMS moved to Waveforms.kt (full iOS catalog).

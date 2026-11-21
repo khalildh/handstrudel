@@ -9,7 +9,11 @@ data class SoundFontInstrument(
     val name: String,
     val emoji: String,
     val program: Int,
-)
+) {
+    /// TODO(engine): port `FREE_SOUNDFONT_INSTRUMENT_IDS` with the 128-instrument
+    /// GM catalog (`isPremium → "pro"`). Today's curated list is treated as free.
+    val packId: String? get() = null
+}
 
 /// Curated subset of the GM bank — one or two per family so the picker stays
 /// scannable. Order roughly follows the GM program-number layout so the rows

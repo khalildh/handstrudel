@@ -24,6 +24,15 @@ enum class Scale(val displayName: String, val intervals: List<Int>, val isPremiu
     HIRAJOSHI("Hirajoshi", listOf(0, 2, 3, 7, 8), true);
 
     val packId: String? get() = if (isPremium) "pro" else null
+
+    /// iOS `BuiltInScale.rawValue`: the wire name used in `SoundSetup` JSON and
+    /// persistence. Equal to `displayName` today; engine WS splits the two when it
+    /// ports the iOS display names ("Major Pentatonic", "Minor Blues").
+    val rawValue: String get() = displayName
+
+    companion object {
+        fun fromRaw(raw: String): Scale? = entries.firstOrNull { it.rawValue == raw }
+    }
 }
 
 private val NOTE_NAMES = listOf("C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B")

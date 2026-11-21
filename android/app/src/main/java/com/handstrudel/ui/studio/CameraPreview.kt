@@ -1,4 +1,4 @@
-package com.handstrudel.ui
+package com.handstrudel.ui.studio
 
 import android.graphics.Bitmap
 import android.graphics.Matrix

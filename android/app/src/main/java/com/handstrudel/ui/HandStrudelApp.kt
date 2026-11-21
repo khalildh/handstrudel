@@ -2,296 +2,140 @@ package com.handstrudel.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import android.util.Log
-import com.handstrudel.engine.EngineController
-import com.handstrudel.engine.HandsState
-import com.handstrudel.models.PRESETS
-import com.handstrudel.models.Preset
-import uniffi.handstrudel_core.MusicKey as CoreKey
-import uniffi.handstrudel_core.Scale as CoreScale
-import uniffi.handstrudel_core.chordDisplayName
-import uniffi.handstrudel_core.chordNotes
-import uniffi.handstrudel_core.midiNoteName
+import androidx.compose.ui.viewinterop.AndroidView
+import com.handstrudel.app.AppServices
+import com.handstrudel.app.LocalAppServices
+import com.handstrudel.social.SocialEntryPoints
+import com.handstrudel.ui.nav.DefaultAppNavigator
+import com.handstrudel.ui.nav.Destination
+import com.handstrudel.ui.nav.LocalAppNavigator
+import com.handstrudel.ui.studio.StudioEntryPoints
+import com.handstrudel.ui.theme.LocalStudioPalette
 
+/**
+ * Composition root (iOS `ContentView` body). Owner: shell. Phase 0: three tabs,
+ * the Stage takeover while running, the hidden Strudel WebView host, notices,
+ * errors and deep-link sheets.
+ */
 @Composable
-fun HandStrudelApp() {
-    val context = LocalContext.current
-    var isRunning by remember { mutableStateOf(false) }
-    val engine = remember { EngineController(context) }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (!isRunning) {
-            StartScreen(
-                onStart = { preset ->
-                    engine.start(preset)
-                    isRunning = true
-                }
-            )
-        } else {
-            PerformanceScreen(engine = engine)
-        }
-    }
-}
-
-@Composable
-fun PerformanceScreen(engine: EngineController) {
-    val handsState by engine.handsState.collectAsState()
-    val beat by engine.currentBeat.collectAsState()
-    var showSettings by remember { mutableStateOf(false) }
-
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        // Camera preview (full screen)
-        CameraPreview(
-            modifier = Modifier.fillMaxSize(),
-            handTracker = engine.handTracker
-        )
-
-        // Split chord+melody overlay — the app's default playable surface.
-        // Sits under the hand skeleton so finger tracking stays visible.
-        if (engine.chordMelodyModeEnabled) {
-            SplitChordMelodyOverlay(engine = engine, modifier = Modifier.fillMaxSize())
-        }
-
-        // Hand skeleton overlay
-        HandOverlay(
-            handsState = handsState,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // Top bar — logo + mode indicator
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 50.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                "handstrudel",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.White.copy(alpha = 0.8f)
-            )
-
-            // Beat dots
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(top = 8.dp)
-            ) {
-                for (i in 0..3) {
-                    Box(
-                        modifier = Modifier
-                            .size(if (i == beat) 10.dp else 6.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (i == beat) Color(0xFF00FF9E)
-                                else Color.White.copy(alpha = 0.2f)
-                            )
-                    )
-                }
-            }
-        }
-
-        // Bottom controls
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 40.dp, start = 20.dp, end = 20.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Mode indicator
-            val modeText = when {
-                engine.gridModeEnabled -> "GRID"
-                engine.drumModeEnabled -> "DRUMS"
-                engine.chordMelodyModeEnabled -> "SPLIT"
-                else -> "MELODIC"
-            }
-            Text(
-                modeText,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF00FF9E),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF00FF9E).copy(alpha = 0.15f))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            )
-
-            // BPM
-            Text(
-                "${engine.manualBPM.toInt()}",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF00FF9E)
-            )
-
-            // Preset name
-            Text(
-                engine.selectedPreset?.emoji ?: "",
-                fontSize = 24.sp
-            )
-        }
-
-        // Floating settings button — sits above the mode pill so it doesn't
-        // crowd the beat dots. Tapping opens the Split control sheet.
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 100.dp)
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.10f))
-                .clickable { showSettings = true },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("⚙", fontSize = 22.sp, color = Color.White.copy(alpha = 0.85f))
-        }
-    }
-
-    if (showSettings) {
-        SplitSettingsSheet(engine = engine, onDismiss = { showSettings = false })
-    }
-}
-
-@Composable
-fun StartScreen(onStart: (Preset) -> Unit) {
-    var selectedPreset by remember { mutableStateOf<Preset?>(null) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(horizontal = 20.dp)
-            .padding(top = 60.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+fun HandStrudelApp(services: AppServices, navigator: DefaultAppNavigator) {
+    val theme by services.prefs.studioTheme.collectAsState()
+    CompositionLocalProvider(
+        LocalAppServices provides services,
+        LocalAppNavigator provides navigator,
+        LocalStudioPalette provides theme.palette,
     ) {
-        // Logo
-        Text(
-            text = "handstrudel",
-            fontSize = 36.sp,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            letterSpacing = (-1).sp
-        )
-        Text(
-            text = "your hands are the instrument",
-            fontSize = 14.sp,
-            color = Color.White.copy(alpha = 0.5f),
-            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
-        )
+        val palette = theme.palette
+        val destination by navigator.destination.collectAsState()
+        val running by services.engine.isRunning.collectAsState()
+        val webView by services.engine.strudelWebView.collectAsState()
+        val socialConfigured = services.auth.isConfigured
 
+        Box(Modifier.fillMaxSize().background(palette.background)) {
+            // Strudel WebView stays attached for the app lifetime (iOS keeps it in the hierarchy).
+            webView?.let { view -> AndroidView(factory = { view }, modifier = Modifier.size(1.dp)) }
 
-        // Section header
-        Text(
-            text = "PICK A VIBE",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.3f),
-            letterSpacing = 3.sp,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // Preset grid
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            items(PRESETS) { preset ->
-                PresetCard(
-                    preset = preset,
-                    isSelected = selectedPreset?.id == preset.id,
-                    onTap = { selectedPreset = preset }
+            if (socialConfigured) {
+                SocialEntryPoints.FeedTab(
+                    isActive = destination == Destination.Feed && !running,
+                    onFullscreenChanged = {},
+                    tabBar = { overVideo -> DestinationTabs(destination, overVideo, navigator::select) },
                 )
             }
-        }
+            if (running) {
+                StudioEntryPoints.Stage()
+            } else {
+                when (destination) {
+                    Destination.Music -> StudioEntryPoints.MusicHome()
+                    Destination.Account -> if (socialConfigured) SocialEntryPoints.AccountTab() else SocialUnavailable()
+                    Destination.Feed -> if (!socialConfigured) SocialUnavailable()
+                }
+                if (destination != Destination.Feed || !socialConfigured) {
+                    Box(Modifier.align(Alignment.BottomCenter)) {
+                        DestinationTabs(destination, overVideo = false, onSelect = navigator::select)
+                    }
+                }
+            }
 
-        // Start button
-        Button(
-            onClick = { selectedPreset?.let { onStart(it) } },
-            enabled = selectedPreset != null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 20.dp)
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF00FF9E),
-                contentColor = Color.Black,
-                disabledContainerColor = Color.White.copy(alpha = 0.1f),
-                disabledContentColor = Color.White.copy(alpha = 0.3f)
-            )
-        ) {
-            Text(
-                "LET'S GO",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Black
-            )
-        }
-    }
-}
-
-@Composable
-fun PresetCard(preset: Preset, isSelected: Boolean, onTap: () -> Unit) {
-    val bgColor = if (isSelected) Color(0xFF00FF9E).copy(alpha = 0.08f) else Color.White.copy(alpha = 0.04f)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(bgColor)
-            .clickable { onTap() }
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(preset.emoji, fontSize = 28.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                preset.name,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isSelected) Color(0xFF00FF9E) else Color.White
-            )
-            Text(
-                preset.description,
-                fontSize = 11.sp,
-                color = Color.White.copy(alpha = 0.5f),
-                textAlign = TextAlign.Center
-            )
-
-            if (preset.isPremium) {
-                Spacer(modifier = Modifier.height(4.dp))
+            val notice by navigator.notice.collectAsState()
+            notice?.let {
                 Text(
-                    "PRO",
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.White.copy(alpha = 0.15f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                    it.text,
+                    color = palette.ink,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 56.dp)
+                        .clip(RoundedCornerShape(12.dp)).background(palette.surface)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                 )
             }
         }
+
+        val sheet by navigator.sheet.collectAsState()
+        when (val s = sheet) {
+            is DefaultAppNavigator.Sheet.Post -> SocialEntryPoints.CreatorVideoSheet(s.video, navigator::dismissSheet)
+            is DefaultAppNavigator.Sheet.Comments -> SocialEntryPoints.CommentsSheet(s.video, navigator::dismissSheet)
+            null -> Unit
+        }
+        val error by navigator.error.collectAsState()
+        error?.let { e ->
+            AlertDialog(
+                onDismissRequest = navigator::dismissError,
+                confirmButton = { TextButton(onClick = navigator::dismissError) { Text("OK") } },
+                title = { Text(e.title) },
+                text = { Text(e.message) },
+            )
+        }
+    }
+}
+
+/** Feed / Music / Account. Music gets the filled accent capsule (iOS `destinationTabs`). */
+@Composable
+fun DestinationTabs(selected: Destination, overVideo: Boolean, onSelect: (Destination) -> Unit) {
+    val palette = LocalStudioPalette.current
+    Row(
+        Modifier.fillMaxWidth().padding(bottom = 32.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+    ) {
+        Destination.entries.forEach { d ->
+            val isSelected = d == selected
+            val ink = if (overVideo) Color.White else palette.ink
+            Text(
+                d.name,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = if (isSelected) palette.onAccent else ink.copy(alpha = 0.7f),
+                modifier = Modifier.clip(RoundedCornerShape(50))
+                    .background(if (isSelected) palette.accent else Color.Transparent)
+                    .clickable { onSelect(d) }
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+            )
+        }
+    }
+}
+
+/** Placeholder for Feed/Account when social is unconfigured. */
+@Composable
+fun SocialUnavailable() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Not available in this build.", color = LocalStudioPalette.current.muted)
     }
 }
