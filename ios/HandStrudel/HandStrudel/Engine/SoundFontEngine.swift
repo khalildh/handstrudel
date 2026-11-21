@@ -154,6 +154,9 @@ final class SoundFontEngine {
         voiceVelocity[voice] = vel
         onNoteStarted?()
         noteCapture?.noteOn(voice: voice, midi: Int(note), role: PerformanceNoteCapture.role(forVoice: voice))
+        #if DEBUG
+        UITestNoteLog.shared.noteOn(voice: voice, midi: Int(note))
+        #endif
     }
 
     /// Release a sustained voice.
@@ -357,6 +360,33 @@ extension SoundFontEngine {
     func stopCapture() {
         demoCaptureFile = nil // closes + flushes the file
         log("capture stopped")
+    }
+}
+#endif
+
+#if DEBUG
+/// UI tests launched with `--uitest-note-log` read back the notes the app
+/// actually sent to its synths (SoundFont sampler and WebView), so they can
+/// assert what was played rather than what was drawn.
+final class UITestNoteLog: @unchecked Sendable {
+    static let shared = UITestNoteLog()
+    static let isEnabled = ProcessInfo.processInfo.arguments.contains("--uitest-note-log")
+
+    private let lock = NSLock()
+    private var entries: [String] = []
+
+    func noteOn(voice: String, midi: Int) {
+        guard Self.isEnabled else { return }
+        lock.lock(); defer { lock.unlock() }
+        entries.append("\(voice)=\(midi)")
+        print("[uitest-note] \(voice)=\(midi)")
+        if entries.count > 200 { entries.removeFirst(entries.count - 200) }
+    }
+
+    /// Space-separated `voice=midi` entries, oldest first.
+    var snapshot: String {
+        lock.lock(); defer { lock.unlock() }
+        return entries.joined(separator: " ")
     }
 }
 #endif

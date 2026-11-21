@@ -806,13 +806,10 @@ struct ContentView: View {
 
     // MARK: - Split / Scale overlay data helpers
 
-    /// Lettered chord names per zone, with a "⁷" suffix in Scale mode to
-    /// signal the 7th-chord voicing.
-    private func splitChordNames(zoneDegrees: [Int], scaleMode: Bool) -> [String] {
-        zoneDegrees.map {
-            chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
-                + (scaleMode ? "⁷" : "")
-        }
+    /// Lettered chord names per zone, with a "⁷" suffix when the player's
+    /// voicing is 7ths (Scale mode's default).
+    private func splitChordNames(zoneDegrees: [Int]) -> [String] {
+        zoneDegrees.map { engine.wheelChordName(degree: $0) }
     }
 
     /// MIDI notes the melody side maps to. Split: triad × 3 octaves (9 notes,
@@ -829,10 +826,11 @@ struct ContentView: View {
     /// The overlay colors these with the chord accent so the player can see
     /// safe targets — Split returns an empty set since every lane is already
     /// a chord tone.
-    private func splitChordToneLanes(melodyMidis: [Int], melodyDegree: Int, scaleMode: Bool) -> Set<Int> {
+    private func splitChordToneLanes(melodyMidis: [Int], melodyDegree: Int, scaleMode: Bool,
+                                     voicing: ChordVoicing) -> Set<Int> {
         guard scaleMode else { return [] }
-        let triad7 = chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
-        let toneClasses = Set(triad7.map { $0 % 12 })
+        let chord = voicing.notes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
+        let toneClasses = Set(chord.map { $0 % 12 })
         return Set(melodyMidis.enumerated().compactMap { idx, midi in
             toneClasses.contains(midi % 12) ? idx : nil
         })
@@ -912,11 +910,8 @@ struct ContentView: View {
         switch zone {
         case .chord(let sub):
             let degree = engine.chordMelodyModeManager.degreeForZone(sub.wedge)
-            // Scale mode voices the chord as a 7th — root / 3rd / 5th / 7th.
-            let voicing = scaleMode
-                ? chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-                : chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-            let absoluteTones = voicing.map { $0 + sub.octave * 12 }
+            // The player's voicing: 7ths in Scale mode by default, else triads.
+            let absoluteTones = engine.wheelChordTones(degree: degree).map { $0 + sub.octave * 12 }
             engine.holdJamVoice(parentVoice, pitches: absoluteTones, velocity: 0.7, native: native)
             var subs: [String] = []
             for (i, note) in absoluteTones.enumerated() {
@@ -1035,6 +1030,21 @@ struct ContentView: View {
                 .allowsHitTesting(false)
                 .opacity(isRecording && hideSkeletonWhenRecording ? 0 : 1)
 
+            #if DEBUG
+            if UITestNoteLog.isEnabled {
+                // Exposes the notes actually sent to the synths to UI tests.
+                TimelineView(.periodic(from: .now, by: 0.2)) { _ in
+                    Text("notes")
+                        .font(.system(size: 2))
+                        .opacity(0.02)
+                        .accessibilityIdentifier("uitest-note-log")
+                        .accessibilityValue(UITestNoteLog.shared.snapshot)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .allowsHitTesting(false)
+            }
+            #endif
+
             // Grid mode note lanes overlay (tappable for one-hand play)
             if engine.gridModeEnabled {
                 noteGridOverlay
@@ -1056,7 +1066,8 @@ struct ContentView: View {
                     currentChordZone: engine.chordMelodyChordHandLane,
                     chordHandPinching: engine.chordMelodyModeManager.isChordHandPinching,
                     currentOctaveShift: engine.chordMelodyOctaveShift,
-                    currentChordName: engine.chordMelodyCurrentChordName,
+                    currentChordName: engine.chordMelodyCurrentChordName.isEmpty ? ""
+                        : engine.chordMelodyCurrentChordName + engine.chordVoicing.chordNameSuffix,
                     melodyLane: engine.chordMelodyMelodyLane,
                     melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
                     melodyLaneCount: 9,
@@ -1069,9 +1080,7 @@ struct ContentView: View {
             // outer ring, melody on the inner ring, rest in the middle).
             if engine.radialChordMelodyModeEnabled {
                 let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
-                let chordNames = zoneDegrees.map {
-                    chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
-                }
+                let chordNames = splitChordNames(zoneDegrees: zoneDegrees)
                 let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
                 let melodyTriad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
                 let melodyMidis = (0..<3).flatMap { oct in melodyTriad.map { $0 + oct * 12 } }.sorted()
@@ -1099,12 +1108,14 @@ struct ContentView: View {
             if engine.splitChordMelodyModeEnabled || engine.scaleChordMelodyModeEnabled {
                 let scaleMode = engine.scaleChordMelodyModeEnabled
                 let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
-                let chordNames = splitChordNames(zoneDegrees: zoneDegrees, scaleMode: scaleMode)
+                let voicing = engine.chordVoicing
+                let chordNames = splitChordNames(zoneDegrees: zoneDegrees)
                 let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
                 let melodyMidis = splitMelodyMidis(melodyDegree: melodyDegree, scaleMode: scaleMode)
                 let melodyNames = melodyMidis.map { pitchClassName($0) }
                 let melodyCount = melodyMidis.count
-                let chordToneLanes = splitChordToneLanes(melodyMidis: melodyMidis, melodyDegree: melodyDegree, scaleMode: scaleMode)
+                let chordToneLanes = splitChordToneLanes(melodyMidis: melodyMidis, melodyDegree: melodyDegree,
+                                                         scaleMode: scaleMode, voicing: voicing)
                 SplitChordMelodyOverlayView(
                     zoneDegrees: zoneDegrees,
                     chordNames: chordNames,

@@ -26,13 +26,9 @@ final class ChordMelodyModeController: ModeController {
 
         let scaleMode = engine.scaleChordMelodyModeEnabled
 
-        // Triad in Split / Radial / Chord+Melody; 7th-chord in Scale (so V → V7,
+        // The player's voicing: triads by default, 7ths in Scale (so V → V7,
         // ii → ii⁷, I → Imaj7, etc.).
-        let chordTones: (Int) -> [Int] = { degree in
-            scaleMode
-                ? chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-                : chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-        }
+        let chordTones: (Int) -> [Int] = { degree in engine.wheelChordTones(degree: degree) }
 
         // Split / Radial / Chord+Melody: triad expanded across 3 octaves (9
         // lanes of chord tones). Scale: one octave of the full diatonic
