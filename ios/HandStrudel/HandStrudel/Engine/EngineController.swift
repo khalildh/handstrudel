@@ -233,7 +233,12 @@ final class EngineController: ObservableObject {
     @Published var chordMelodyAutoStrum: Bool = false     // re-articulate chord on each beat
     /// Chord voicing the player picked, per mode. No entry = the mode's
     /// default (`defaultChordVoicing(for:)`). Read through `chordVoicing`.
-    @Published var chordVoicingOverrides: [SoundSetup.Mode: ChordVoicing] = [:]
+    /// Persisted, so the pick survives relaunch.
+    @Published var chordVoicingOverrides: [SoundSetup.Mode: ChordVoicing] = PersistenceManager.shared.chordVoicingOverrides {
+        didSet {
+            if chordVoicingOverrides != oldValue { PersistenceManager.shared.chordVoicingOverrides = chordVoicingOverrides }
+        }
+    }
 
     /// Currently selected chord progression (subset of diatonic degrees the
     /// chord hand cycles through). Defaults to "Free" — all 7 diatonic chords.
@@ -436,7 +441,8 @@ final class EngineController: ObservableObject {
         delayedWebFixture = arguments.contains("--uitest-delayed-web-audio")
         let realWebFixture = arguments.contains("--uitest-real-web-audio")
         if realWebFixture { switchMode(grid: false, drums: false, learn: false) }
-        if arguments.contains("--uitesting"), !delayedWebFixture, !realWebFixture {
+        // Scripted hands (DemoDirector) need the real session loop.
+        if arguments.contains("--uitesting"), !delayedWebFixture, !realWebFixture, DemoDirector.shared == nil {
             startCameraIfRequested()
             isRunning = true
             return
@@ -531,6 +537,9 @@ final class EngineController: ObservableObject {
             if ProcessInfo.processInfo.arguments.contains("--uitest-camera-denied") {
                 handTracker.simulatePermissionDeniedForUITest()
             }
+            // Scripted hands (DemoDirector) stand in for the camera, so UI
+            // tests can drive real hand-tracked chords.
+            if DemoDirector.shared != nil { handTracker.startSession() }
             return
         }
         #endif

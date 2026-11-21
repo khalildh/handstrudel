@@ -551,6 +551,26 @@ final class MusicTheoryTests: XCTestCase {
 /// other wheel to triads, and the player's pick changes notes and labels.
 @MainActor
 final class ChordVoicingTests: XCTestCase {
+    override func setUp() { PersistenceManager.shared.chordVoicingOverrides = [:] }
+    override func tearDown() { PersistenceManager.shared.chordVoicingOverrides = [:] }
+
+    func testPickSurvivesRelaunch() {
+        let suite = "ChordVoicingTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PersistenceManager(defaults: defaults)
+        XCTAssertTrue(store.chordVoicingOverrides.isEmpty)
+        store.chordVoicingOverrides = [.scalechordmelody: .triad, .splitchordmelody: .seventh]
+        XCTAssertEqual(PersistenceManager(defaults: defaults).chordVoicingOverrides,
+                       [.scalechordmelody: .triad, .splitchordmelody: .seventh])
+
+        let first = engine(scale: true)
+        first.chordVoicing = .triad
+        let relaunched = engine(scale: true)
+        XCTAssertEqual(relaunched.chordVoicing, .triad, "A new engine reads the saved pick")
+        relaunched.chordVoicing = .seventh
+        XCTAssertTrue(PersistenceManager.shared.chordVoicingOverrides.isEmpty, "Back to the default clears it")
+    }
     private func engine(scale: Bool) -> EngineController {
         let engine = EngineController()
         engine.selectedKey = .C
@@ -603,9 +623,10 @@ final class ChordVoicingTests: XCTestCase {
 
         // Each wheel keeps its own pick; choosing the default clears it.
         split.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true)
-        XCTAssertEqual(split.chordVoicing, .seventh)
+        XCTAssertEqual(split.chordVoicing, .triad, "Scale keeps the Triads picked above")
         split.chordVoicing = .seventh
         split.switchMode(grid: false, drums: false, learn: false, splitChordMelody: true)
+        XCTAssertEqual(split.chordVoicing, .seventh, "Split keeps its own 7ths")
         split.chordVoicing = .triad
         XCTAssertTrue(split.chordVoicingOverrides.isEmpty)
     }

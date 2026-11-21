@@ -1030,6 +1030,21 @@ struct ContentView: View {
                 .allowsHitTesting(false)
                 .opacity(isRecording && hideSkeletonWhenRecording ? 0 : 1)
 
+            #if DEBUG
+            if UITestNoteLog.isEnabled {
+                // Exposes the notes actually sent to the synths to UI tests.
+                TimelineView(.periodic(from: .now, by: 0.2)) { _ in
+                    Text("notes")
+                        .font(.system(size: 2))
+                        .opacity(0.02)
+                        .accessibilityIdentifier("uitest-note-log")
+                        .accessibilityValue(UITestNoteLog.shared.snapshot)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .allowsHitTesting(false)
+            }
+            #endif
+
             // Grid mode note lanes overlay (tappable for one-hand play)
             if engine.gridModeEnabled {
                 noteGridOverlay

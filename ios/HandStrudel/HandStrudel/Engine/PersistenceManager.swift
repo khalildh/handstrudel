@@ -146,6 +146,23 @@ final class PersistenceManager {
         set { defaults.set(newValue, forKey: "lastQuantizeDiv") }
     }
 
+    /// The player's chord voicing per mode (only modes that differ from
+    /// their default). Survives relaunch like key and scale.
+    var chordVoicingOverrides: [SoundSetup.Mode: ChordVoicing] {
+        get {
+            let raw = defaults.dictionary(forKey: "chordVoicingOverrides") as? [String: String] ?? [:]
+            return raw.reduce(into: [:]) { result, entry in
+                if let mode = SoundSetup.Mode(rawValue: entry.key), let voicing = ChordVoicing(rawValue: entry.value) {
+                    result[mode] = voicing
+                }
+            }
+        }
+        set {
+            defaults.set(Dictionary(uniqueKeysWithValues: newValue.map { ($0.key.rawValue, $0.value.rawValue) }),
+                         forKey: "chordVoicingOverrides")
+        }
+    }
+
     // MARK: - Loops
 
     var lastLoopBars: Int {

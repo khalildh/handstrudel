@@ -255,6 +255,9 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         webView.evaluateJavaScript("noteOn('\(hand)',\(safeMidi),'\(waveform)',\(String(format: "%.2f", safeVel)))", completionHandler: nil)
         if isReady, !hand.hasPrefix("jam-") { onNoteStarted?() }
         noteCapture?.noteOn(voice: hand, midi: safeMidi, role: PerformanceNoteCapture.role(forVoice: hand))
+        #if DEBUG
+        UITestNoteLog.shared.noteOn(voice: hand, midi: safeMidi)
+        #endif
     }
 
     func noteOff(hand: String) {
