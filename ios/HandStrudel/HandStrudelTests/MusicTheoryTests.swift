@@ -546,3 +546,197 @@ final class MusicTheoryTests: XCTestCase {
         }
     }
 }
+
+/// The chord+melody wheels' voicing setting: Scale defaults to 7ths, every
+/// other wheel to triads, and the player's pick changes notes and labels.
+@MainActor
+final class ChordVoicingTests: XCTestCase {
+    override func setUp() { PersistenceManager.shared.chordVoicingOverrides = [:] }
+    override func tearDown() { PersistenceManager.shared.chordVoicingOverrides = [:] }
+
+    func testPickSurvivesRelaunch() {
+        let suite = "ChordVoicingTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PersistenceManager(defaults: defaults)
+        XCTAssertTrue(store.chordVoicingOverrides.isEmpty)
+        store.chordVoicingOverrides = [.scalechordmelody: .triad, .splitchordmelody: .seventh]
+        XCTAssertEqual(PersistenceManager(defaults: defaults).chordVoicingOverrides,
+                       [.scalechordmelody: .triad, .splitchordmelody: .seventh])
+
+        let first = engine(scale: true)
+        first.chordVoicing = .triad
+        let relaunched = engine(scale: true)
+        XCTAssertEqual(relaunched.chordVoicing, .triad, "A new engine reads the saved pick")
+        relaunched.chordVoicing = .seventh
+        XCTAssertTrue(PersistenceManager.shared.chordVoicingOverrides.isEmpty, "Back to the default clears it")
+    }
+    private func engine(scale: Bool) -> EngineController {
+        let engine = EngineController()
+        engine.selectedKey = .C
+        engine.selectedScale = .major
+        engine.switchMode(grid: false, drums: false, learn: false,
+                          splitChordMelody: !scale, scaleChordMelody: scale)
+        return engine
+    }
+
+    private func setup(mode: SoundSetup.Mode, voicing: ChordVoicing?) -> SoundSetup {
+        SoundSetup(instrument: DEFAULT_SOUNDFONT_INSTRUMENT.id, waveform: "sine", key: .C, scale: .major,
+                   progression: "custom", customDegrees: [0, 3, 4], mode: mode,
+                   bpm: 100, useSoundFont: true, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
+                   chordVoicing: voicing)
+    }
+
+    func testDefaultsMatchEachWheel() {
+        let e = EngineController()
+        XCTAssertEqual(e.defaultChordVoicing(for: .scalechordmelody), .seventh)
+        for mode: SoundSetup.Mode in [.splitchordmelody, .radialchordmelody, .chordmelody, .soundfont] {
+            XCTAssertEqual(e.defaultChordVoicing(for: mode), .triad, "\(mode)")
+            XCTAssertEqual(e.chordVoicing(for: mode), .triad, "\(mode)")
+        }
+        XCTAssertEqual(engine(scale: true).chordVoicing, .seventh)
+        XCTAssertEqual(engine(scale: false).chordVoicing, .triad)
+        XCTAssertTrue(e.chordVoicingOverrides.isEmpty)
+    }
+
+    func testDefaultVoicingKeepsTodaysNotesAndNames() {
+        let scale = engine(scale: true)
+        XCTAssertEqual(scale.wheelChordTones(degree: 4),
+                       chordNotesWithSeventh(key: .C, scale: .major, degree: 4))
+        XCTAssertEqual(scale.wheelChordName(degree: 4), chordDisplayName(key: .C, scale: .major, degree: 4) + "⁷")
+        let split = engine(scale: false)
+        XCTAssertEqual(split.wheelChordTones(degree: 4), chordNotes(key: .C, scale: .major, degree: 4))
+        XCTAssertEqual(split.wheelChordName(degree: 4), chordDisplayName(key: .C, scale: .major, degree: 4))
+    }
+
+    func testOverrideChangesTouchChordNotesAndLabels() {
+        let scale = engine(scale: true)
+        scale.chordVoicing = .triad
+        XCTAssertEqual(scale.wheelChordTones(degree: 4), [55, 59, 62], "G B D")
+        XCTAssertEqual(scale.wheelChordName(degree: 4), chordDisplayName(key: .C, scale: .major, degree: 4))
+        XCTAssertEqual(scale.chordVoicingOverrides, [.scalechordmelody: .triad])
+
+        let split = engine(scale: false)
+        split.chordVoicing = .seventh
+        XCTAssertEqual(split.wheelChordTones(degree: 4), [55, 59, 62, 65], "G B D F")
+        XCTAssertTrue(split.wheelChordName(degree: 4).hasSuffix("⁷"))
+
+        // Each wheel keeps its own pick; choosing the default clears it.
+        split.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true)
+        XCTAssertEqual(split.chordVoicing, .triad, "Scale keeps the Triads picked above")
+        split.chordVoicing = .seventh
+        split.switchMode(grid: false, drums: false, learn: false, splitChordMelody: true)
+        XCTAssertEqual(split.chordVoicing, .seventh, "Split keeps its own 7ths")
+        split.chordVoicing = .triad
+        XCTAssertTrue(split.chordVoicingOverrides.isEmpty)
+    }
+
+    func testOverrideChangesHandTrackedPadNotes() {
+        func padNotes(_ engine: EngineController) -> [Int]? {
+            let manager = ChordMelodyModeManager()
+            manager.layout = .scale
+            let hand = HandData(x: 0.22, y: 0.45, spread: 0.5, pinch: 1, pinchX: 0.22, pinchY: 0.45,
+                                fist: 0, rotation: 0.5, thumbCurl: 0.5, indexCurl: 0.5, middleCurl: 0.5,
+                                ringCurl: 0.5, pinkyCurl: 0.5, landmarks: [])
+            for _ in 0..<6 {
+                let actions = manager.tick(hands: HandsState(left: hand, right: nil),
+                                           chordTones: engine.wheelChordTones(degree:), melodyTones: { _ in [] })
+                for case .padOn(let notes, _) in actions { return notes }
+            }
+            return nil
+        }
+        let e = engine(scale: true)
+        XCTAssertEqual(padNotes(e)?.count, 4, "Scale pads are 7ths by default")
+        e.chordVoicing = .triad
+        XCTAssertEqual(padNotes(e)?.count, 3)
+        e.switchMode(grid: false, drums: false, learn: false, splitChordMelody: true)
+        XCTAssertEqual(padNotes(e)?.count, 3)
+        e.chordVoicing = .seventh
+        XCTAssertEqual(padNotes(e)?.count, 4)
+    }
+
+    func testMelodyHandFollowsTheVoicingOnChordToneWheels() {
+        let e = engine(scale: false)
+        // C major, degree 0: C E G (+ B for 7ths).
+        XCTAssertEqual(e.wheelMelodyLanes(degree: 0), [48, 52, 55, 60, 64, 67, 72, 76, 79])
+        e.chordVoicing = .seventh
+        XCTAssertEqual(e.wheelMelodyLanes(degree: 0), [48, 52, 55, 59, 60, 64, 67, 71, 72, 76, 79, 83])
+
+        // Play the melody hand across the whole melody arc and collect the
+        // pitch classes it actually sounds.
+        func melodyPitchClasses() -> Set<Int> {
+            var played = Set<Int>()
+            for step in 0...40 {
+                let y = 0.02 + Double(step) * 0.024
+                let manager = ChordMelodyModeManager()
+                manager.layout = .split
+                let melody = HandData(x: 0.8, y: y, spread: 0.5, pinch: 1, pinchX: 0.8, pinchY: y,
+                                      fist: 0, rotation: 0.5, thumbCurl: 0.5, indexCurl: 0.5, middleCurl: 0.5,
+                                      ringCurl: 0.5, pinkyCurl: 0.5, landmarks: [])
+                for _ in 0..<4 {
+                    let actions = manager.tick(hands: HandsState(left: nil, right: melody),
+                                               chordTones: e.wheelChordTones(degree:),
+                                               melodyTones: e.wheelMelodyLanes(degree:))
+                    for case .melodyOn(_, let midi, _, _) in actions { played.insert(midi % 12) }
+                }
+            }
+            return played
+        }
+        let sevenths = melodyPitchClasses()
+        XCTAssertTrue(sevenths.contains(11), "7ths put the 7th (B) on the melody arc: \(sevenths.sorted())")
+        e.chordVoicing = .triad
+        let triads = melodyPitchClasses()
+        XCTAssertFalse(triads.isEmpty)
+        XCTAssertTrue(triads.isSubset(of: [0, 4, 7]), "Triads keep the melody on C E G: \(triads.sorted())")
+
+        // Six-note scales: the 7th lands on the next root, so no duplicate lane.
+        e.selectedScale = .wholeTone
+        e.chordVoicing = .seventh
+        let lanes = e.wheelMelodyLanes(degree: 0)
+        XCTAssertEqual(lanes.count, Set(lanes).count)
+    }
+
+    func testSoundSetupRoundTripsWithAndWithoutVoicing() throws {
+        for voicing in [nil, ChordVoicing.triad, .seventh] {
+            let sound = setup(mode: .scalechordmelody, voicing: voicing)
+            let data = try JSONEncoder().encode(sound)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            XCTAssertEqual(json["chordVoicing"] as? String, voicing?.rawValue)
+            let decoded = try JSONDecoder().decode(SoundSetup.self, from: data)
+            XCTAssertEqual(decoded, sound)
+            XCTAssertTrue(decoded.isValid)
+        }
+        XCTAssertEqual(setup(mode: .splitchordmelody, voicing: nil).presetDetails, "C Major · 100 BPM · 1-4-5")
+        XCTAssertEqual(setup(mode: .splitchordmelody, voicing: .seventh).presetDetails, "C Major · 100 BPM · 1-4-5 · 7ths")
+
+        let pack = try SoundPresetPack.decode(SoundPresetPack([
+            NamedSoundSetup(id: UUID(), name: "Sevenths", sound: setup(mode: .splitchordmelody, voicing: .seventh)),
+        ]).encoded())
+        XCTAssertEqual(pack.presets.first?.sound.chordVoicing, .seventh)
+    }
+
+    func testOldPayloadWithoutVoicingKeepsTheModeDefault() throws {
+        let old = """
+        {"version":1,"instrument":"\(DEFAULT_SOUNDFONT_INSTRUMENT.id)","waveform":"sine","key":"C","scale":"Major",
+         "progression":"custom","customDegrees":[0,3,4],"mode":"scalechordmelody","bpm":100,"useSoundFont":true,
+         "autoStrum":false,"padVolume":0.3,"gridOctave":3,"gridRange":2}
+        """
+        let decoded = try JSONDecoder().decode(SoundSetup.self, from: Data(old.utf8))
+        XCTAssertNil(decoded.chordVoicing)
+        XCTAssertTrue(decoded.isValid)
+
+        let store = StoreManager()
+        let e = engine(scale: false)
+        e.setChordVoicing(.seventh, for: .scalechordmelody)
+        XCTAssertTrue(e.applySoundSetup(decoded, store: store))
+        XCTAssertEqual(e.chordVoicing, .seventh, "Scale's default")
+        XCTAssertNil(e.chordVoicingOverrides[.scalechordmelody])
+
+        XCTAssertTrue(e.applySoundSetup(setup(mode: .scalechordmelody, voicing: .triad), store: store))
+        XCTAssertEqual(e.chordVoicing, .triad)
+        XCTAssertEqual(e.currentSoundSetup?.chordVoicing, .triad)
+        XCTAssertTrue(e.applySoundSetup(setup(mode: .splitchordmelody, voicing: nil), store: store))
+        XCTAssertEqual(e.chordVoicing, .triad)
+        XCTAssertNil(e.currentSoundSetup?.chordVoicing)
+    }
+}

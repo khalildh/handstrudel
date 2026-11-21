@@ -1631,6 +1631,37 @@ final class HandStrudelUITests: XCTestCase {
         captureIfRequested("Artist-Profile-Largest-Text")
     }
 
+    /// Run the profile fixture with FIXTURE_SOUND_MODE=scalechordmelody, and
+    /// set HANDSTRUDEL_FIXTURE_CHORD_VOICING to what the post carries:
+    /// "triad" (FIXTURE_CHORD_VOICING=triad) must play triads on the Scale
+    /// wheel, whose own default is 7ths; "none" (an older post without the
+    /// field) must keep that default.
+    func testPlayThisSoundFromFeedReproducesChordVoicing() throws {
+        let posted = ProcessInfo.processInfo.environment["HANDSTRUDEL_FIXTURE_CHORD_VOICING"]
+        guard posted == "triad" || posted == "none" else {
+            throw XCTSkip("Requires the profile fixture serving a Scale-wheel sound (see the doc comment).")
+        }
+        let triads = posted == "triad"
+        app.launchArguments = ["--uitest-note-log", "--uitest-camera-denied"]
+        app.launchEnvironment["MEDIA_BASE_URL"] = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"]
+        try launchWithProfileFixture()
+        element("tab-feed").tap()
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 8))
+        sound.tap()
+        let preset = app.buttons.matching(identifier: "play-clip-preset").firstMatch
+        XCTAssertTrue(preset.waitForExistence(timeout: 8))
+        preset.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
+        let gotIt = element("onboarding-got-it")
+        if gotIt.waitForExistence(timeout: 1) { gotIt.tap() }
+        let chord = playTouchChord(0)
+        XCTAssertEqual(chord.notes.count, triads ? 3 : 4, "Feed sound's chord: \(chord.notes)")
+        XCTAssertEqual(chord.label.hasSuffix("⁷"), !triads, chord.label)
+        XCTAssertEqual(chord.notes.first.map { $0 % 12 }, rootPitchClass(chord.label))
+        assertChordVoicingSetting(triads ? "Triads" : "7ths")
+    }
+
     func testPlayThisSoundFromFeedOpensMusicSession() throws {
         app.launchEnvironment["MEDIA_BASE_URL"] = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"]
         try launchWithProfileFixture()
@@ -2029,6 +2060,251 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.switches["Include microphone (solo takes)"].isHittable)
         captureIfRequested("Music-Settings-Capture")
         closeMusicSettings()
+    }
+
+    // MARK: - Chord voicing (asserts the MIDI notes actually sent to the synths)
+
+    private static let pitchNames = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
+
+    /// `voice=midi` note-ons the app sent to its synths (`--uitest-note-log`).
+    private func noteLog() -> [(voice: String, midi: Int)] {
+        let log = element("uitest-note-log")
+        guard log.waitForExistence(timeout: 5) else { return [] }
+        return ((log.value as? String) ?? "").split(separator: " ").compactMap { entry in
+            let parts = entry.split(separator: "=")
+            guard parts.count == 2, let midi = Int(parts[1]) else { return nil }
+            return (String(parts[0]), midi)
+        }
+    }
+
+    private func waitForNotes(_ notes: () -> [Int], timeout: TimeInterval = 5) -> [Int] {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let found = notes()
+            if !found.isEmpty { return found }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        } while Date() < deadline
+        return []
+    }
+
+    /// Taps a chord wedge (a real touch) and returns the notes that touch sent.
+    private func playTouchChord(_ index: Int) -> (label: String, notes: [Int]) {
+        let wedge = app.buttons["wheel-chord-\(index)"]
+        XCTAssertTrue(wedge.waitForExistence(timeout: 5))
+        let label = wedge.label
+        let before = Set(noteLog().map(\.voice))
+        wedge.tap()
+        let notes = waitForNotes {
+            let fresh = noteLog().filter {
+                !before.contains($0.voice) && $0.voice.range(of: #"^splittouch-\d+-c\d+$"#, options: .regularExpression) != nil
+            }
+            guard let last = fresh.last, let cut = last.voice.range(of: "-c", options: .backwards) else { return [] }
+            let parent = String(last.voice[..<cut.lowerBound])
+            return fresh.filter { $0.voice.hasPrefix(parent + "-c") }.map(\.midi)
+        }
+        print("[voicing-ui] touch \(label) -> \(notes)")
+        return (label, notes)
+    }
+
+    /// Taps a melody wedge (a real touch) and returns the note that touch sent.
+    private func playTouchNote(_ index: Int) -> Int? {
+        let wedge = app.buttons["wheel-note-\(index)"]
+        XCTAssertTrue(wedge.waitForExistence(timeout: 5))
+        let before = Set(noteLog().map(\.voice))
+        wedge.tap()
+        let notes = waitForNotes {
+            noteLog().filter {
+                !before.contains($0.voice) && $0.voice.range(of: #"^splittouch-\d+-m$"#, options: .regularExpression) != nil
+            }.map(\.midi)
+        }
+        print("[voicing-ui] touch melody note \(index) -> \(notes)")
+        return notes.last
+    }
+
+    private var melodyWedgeCount: Int {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'wheel-note-'")).count
+    }
+
+    /// Root pitch class of a wedge label such as "Chord Ebmaj⁷".
+    private func rootPitchClass(_ label: String) -> Int? {
+        let name = label.replacingOccurrences(of: "Chord ", with: "")
+        let two = String(name.prefix(2)), one = String(name.prefix(1))
+        return Self.pitchNames.firstIndex(of: two) ?? Self.pitchNames.firstIndex(of: one)
+    }
+
+    /// Opens Music settings on the Sound section. A tap that lands while the
+    /// wheel is finishing a touch can be swallowed, so retry once.
+    private func openSoundSettings() {
+        let section = app.buttons["music-settings-sound"]
+        element("settings-button").tap()
+        if !section.waitForExistence(timeout: 4) {
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "settings-tap-swallowed"
+            shot.lifetime = .keepAlways
+            add(shot)
+            element("settings-button").tap()
+        }
+        selectMusicSettingsSection("sound")
+    }
+
+    private func chooseChordVoicing(_ name: String) {
+        openSoundSettings()
+        let picker = app.buttons["chord-voicing-picker"].firstMatch
+        revealInMusicSettings(picker)
+        let option = app.buttons[name].firstMatch
+        let picked = NSPredicate(format: "label CONTAINS %@", name)
+        // A menu tap can be swallowed while the wheel is animating; retry the
+        // pick until the setting reads back.
+        for _ in 0..<3 where !picked.evaluate(with: picker) {
+            // The sheet can still be settling, which makes the row briefly
+            // report "not hittable"; tap its centre instead.
+            picker.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            guard option.waitForExistence(timeout: 3) else { continue }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: picked, object: picker)], timeout: 3)
+        }
+        XCTAssertTrue(picked.evaluate(with: picker), picker.label)
+        closeMusicSettings()
+    }
+
+    private func assertChordVoicingSetting(_ name: String) {
+        openSoundSettings()
+        let picker = app.buttons["chord-voicing-picker"].firstMatch
+        revealInMusicSettings(picker)
+        XCTAssertTrue(picker.label.contains(name), picker.label)
+        closeMusicSettings()
+    }
+
+    private func launchTouchSession(_ extra: [String] = []) {
+        app.launchArguments = ["--uitesting", "--uitest-note-log", "--uitest-camera-denied"] + extra
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
+        let gotIt = element("onboarding-got-it")
+        if gotIt.waitForExistence(timeout: 1) { gotIt.tap() }
+    }
+
+    func testChordVoicingChangesTheNotesTouchChordsPlay() {
+        // Split wheel: its melody arc is the held chord's tones.
+        launchTouchSession()
+        element("settings-button").tap()
+        switchToMode("mode-splitChordMelody")
+        closeMusicSettings()
+        chooseChordVoicing("7ths")
+        let sevenths = playTouchChord(0)
+        XCTAssertEqual(sevenths.notes.count, 4, "7ths play root, 3rd, 5th and 7th: \(sevenths.notes)")
+        XCTAssertTrue(sevenths.label.hasSuffix("⁷"), sevenths.label)
+        XCTAssertEqual(sevenths.notes.first.map { $0 % 12 }, rootPitchClass(sevenths.label))
+
+        chooseChordVoicing("Triads")
+        let triads = playTouchChord(0)
+        XCTAssertEqual(triads.notes, Array(sevenths.notes.prefix(3)), "Same chord without its 7th")
+        XCTAssertFalse(triads.label.hasSuffix("⁷"), triads.label)
+
+        // The melody arc offers the held chord's tones, so it follows too:
+        // 3 octaves of the triad (9 wedges), or of the 7th chord (12).
+        func lanes(_ chord: [Int]) -> [Int] { Array(Set((0..<3).flatMap { o in chord.map { $0 + o * 12 } })).sorted() }
+        let triadLanes = lanes(triads.notes)
+        XCTAssertEqual(melodyWedgeCount, triadLanes.count)
+        XCTAssertEqual(playTouchNote(3), triadLanes[3], "Triads: the 4th melody note is the root an octave up")
+        chooseChordVoicing("7ths")
+        _ = playTouchChord(0)
+        let seventhLanes = lanes(sevenths.notes)
+        XCTAssertEqual(melodyWedgeCount, seventhLanes.count)
+        let seventhLane = try! XCTUnwrap(seventhLanes.firstIndex(of: sevenths.notes[3]))
+        XCTAssertEqual(playTouchNote(seventhLane), sevenths.notes[3], "7ths: the melody arc offers the chord's 7th")
+    }
+
+    /// Scripted hands (the DEBUG DemoDirector) pinch a Scale-wheel chord wedge
+    /// through the real hand pipeline. C major, so every pad must be a
+    /// diatonic triad or 7th chord of C major.
+    private func playScriptedHandChord() -> [Int] {
+        let script: [String: Any] = [
+            "name": "voicing", "duration": 6, "startDelay": 1, "key": "C", "scale": "Major", "progression": "free",
+            "left": [["t": 0, "x": 0.2, "y": 0.5, "pinch": 0], ["t": 1, "x": 0.2, "y": 0.5, "pinch": 1],
+                     ["t": 6, "x": 0.2, "y": 0.5, "pinch": 1]],
+            "right": [["t": 0, "x": 0.8, "y": 0.5, "pinch": 0, "visible": false]],
+        ]
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("voicing-\(UUID().uuidString).json")
+        XCTAssertNoThrow(try JSONSerialization.data(withJSONObject: script).write(to: url))
+        app.launchArguments = ["--uitesting", "--uitest-note-log", "--reset-studio-input"]
+        app.launchEnvironment["HANDSTRUDEL_DEMO_SCRIPT"] = url.path
+        app.launch()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10), "Demo opens the Scale wheel")
+        let notes = waitForNotes(timeout: 15) {
+            let pads = noteLog().filter { $0.voice.range(of: #"^pad\d$"#, options: .regularExpression) != nil }
+            guard let start = pads.lastIndex(where: { $0.voice == "pad0" }) else { return [] }
+            return pads[start...].map(\.midi)
+        }
+        app.launchEnvironment["HANDSTRUDEL_DEMO_SCRIPT"] = nil
+        print("[voicing-ui] hand-tracked pad -> \(notes)")
+        return notes
+    }
+
+    private func diatonicChordPitchClasses(size: Int) -> [Set<Int>] {
+        let major = [0, 2, 4, 5, 7, 9, 11]
+        return (0..<7).map { degree in Set((0..<size).map { major[(degree + 2 * $0) % 7] }) }
+    }
+
+    func testChordVoicingPersistsAndChangesHandTrackedChords() {
+        // Pick Triads on the Scale wheel (default 7ths), then relaunch.
+        launchTouchSession()
+        element("settings-button").tap()
+        switchToMode("mode-scaleChordMelody")
+        closeMusicSettings()
+        chooseChordVoicing("Triads")
+        app.terminate()
+
+        let triad = playScriptedHandChord()
+        XCTAssertEqual(triad.count, 3, "Hand-tracked pad after relaunch: \(triad)")
+        XCTAssertTrue(diatonicChordPitchClasses(size: 3).contains(Set(triad.map { $0 % 12 })), "\(triad)")
+        assertChordVoicingSetting("Triads")
+
+        chooseChordVoicing("7ths")
+        app.terminate()
+        let seventh = playScriptedHandChord()
+        XCTAssertEqual(seventh.count, 4, "Hand-tracked pad after relaunch: \(seventh)")
+        XCTAssertTrue(diatonicChordPitchClasses(size: 4).contains(Set(seventh.map { $0 % 12 })), "\(seventh)")
+        assertChordVoicingSetting("7ths")
+    }
+
+    func testSavedPresetReproducesItsChordVoicing() {
+        launchTouchSession()
+        chooseChordVoicing("Triads")
+        let saved = playTouchChord(0)
+        XCTAssertEqual(saved.notes.count, 3)
+        let name = "Voicing \(UUID().uuidString.prefix(6))"
+        element("studio-presets-button").tap()
+        let field = app.textFields["preset-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(name)
+        app.buttons["Save current preset"].tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
+        app.navigationBars.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(element("settings-button").waitForExistence(timeout: 5))
+        chooseChordVoicing("7ths")
+        XCTAssertEqual(playTouchChord(0).notes.count, 4)
+
+        app.terminate()
+        app.launchArguments = ["--uitesting", "--uitest-note-log", "--uitest-camera-denied"]
+        app.launch()
+        let presets = element("music-presets-button")
+        XCTAssertTrue(presets.waitForExistence(timeout: 5))
+        if !presets.isHittable { app.swipeUp() }
+        presets.tap()
+        let preset = app.staticTexts[name]
+        XCTAssertTrue(preset.waitForExistence(timeout: 5))
+        preset.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
+        let gotIt = element("onboarding-got-it")
+        if gotIt.waitForExistence(timeout: 1) { gotIt.tap() }
+        let replayed = playTouchChord(0)
+        XCTAssertEqual(replayed.notes, saved.notes, "The preset brings back Triads")
+        assertChordVoicingSetting("Triads")
     }
 
     func testControlSheet_showsHarmonySection() {

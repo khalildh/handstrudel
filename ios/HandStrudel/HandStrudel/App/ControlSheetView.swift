@@ -741,6 +741,8 @@ struct ControlSheet: View {
                             StudioSettingRow("Chords", value: engine.chordMelodyProgression.name, icon: "music.note.list")
                         }
                         .buttonStyle(.plain)
+                        StudioSettingsDivider()
+                        chordVoicingMenu
                     }
                 }
             }
@@ -749,6 +751,26 @@ struct ControlSheet: View {
                 VStack(alignment: .leading, spacing: 3) { harmonyToggles }
             }
         }
+    }
+
+    /// Triads or 7ths for the wheel's chords. Each mode keeps its own pick;
+    /// Scale defaults to 7ths, the others to triads.
+    private var chordVoicingMenu: some View {
+        Menu {
+            ForEach(ChordVoicing.allCases, id: \.self) { voicing in
+                Button {
+                    engine.chordVoicing = voicing
+                } label: {
+                    if engine.chordVoicing == voicing { Label(voicing.displayName, systemImage: "checkmark") }
+                    else { Text(voicing.displayName) }
+                }
+                .accessibilityIdentifier("chord-voicing-\(voicing.rawValue)")
+            }
+        } label: {
+            StudioSettingRow("Chord voicing", value: engine.chordVoicing.displayName, icon: "pianokeys.inverse",
+                             chevron: "chevron.up.chevron.down")
+        }
+        .accessibilityIdentifier("chord-voicing-picker")
     }
 
     @ViewBuilder private var harmonyToggles: some View {
