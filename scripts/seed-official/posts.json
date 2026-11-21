@@ -1,0 +1,238 @@
+{
+  "account": {
+    "username": "handstrudel",
+    "displayName": "HandStrudel"
+  },
+  "posts": [
+    {
+      "slug": "dreamy-piano",
+      "song": "dreamy-piano",
+      "caption": "Four chords, one slow melody. Grand Piano in C major, played with two hands in the air.",
+      "daily": {
+        "day": 1,
+        "title": "Dreamy Piano",
+        "note": "The classic four chords on Grand Piano. Hold a chord with your left hand and sing a melody with your right."
+      }
+    },
+    {
+      "slug": "lofi-rhodes",
+      "song": "lofi-rhodes",
+      "caption": "Lo-fi Rhodes in A minor for your study playlist. Play this sound and loop your own.",
+      "daily": {
+        "day": 2,
+        "title": "Lo-fi Rhodes",
+        "note": "Warm Rhodes in A minor at 74 BPM. Keep it slow and leave space between notes."
+      }
+    },
+    {
+      "slug": "campfire-nylon",
+      "song": "campfire-nylon",
+      "caption": "Campfire nylon guitar in D major. Simple enough to learn tonight.",
+      "daily": {
+        "day": 3,
+        "title": "Campfire Nylon",
+        "note": "Nylon guitar in D major. Try strumming the chords and answering with short melody runs."
+      }
+    },
+    {
+      "slug": "cinematic-strings",
+      "song": "cinematic-strings",
+      "caption": "Strings Ensemble in D minor. Every movie trailer starts somewhere.",
+      "daily": {
+        "day": 4,
+        "title": "Cinematic Strings",
+        "note": "Big strings in D minor. Long notes, slow hands, then go up an octave for the ending."
+      }
+    },
+    {
+      "slug": "sunday-piano",
+      "song": "sunday-piano",
+      "caption": "Sunday morning in G major. Coffee, sunlight, Grand Piano.",
+      "daily": {
+        "day": 5,
+        "title": "Sunday Piano",
+        "note": "A bright G major piano tune. Take it at your own tempo."
+      }
+    },
+    {
+      "slug": "neo-soul-rhodes",
+      "song": "neo-soul-rhodes",
+      "caption": "D Dorian on Rhodes. That raised sixth is where the soul lives.",
+      "daily": {
+        "day": 6,
+        "title": "Neo-Soul Rhodes",
+        "note": "Rhodes in D Dorian, rocking between the one and four chords. Lean on the 7th."
+      }
+    },
+    {
+      "slug": "fiddle-jig",
+      "song": "fiddle-jig",
+      "caption": "Front porch fiddle in D major. Hands up, feet tapping.",
+      "daily": {
+        "day": 7,
+        "title": "Front Porch Fiddle",
+        "note": "A quick violin tune in D major at 120 BPM. Eighth notes, big smile."
+      }
+    },
+    {
+      "slug": "pocket-choir",
+      "song": "pocket-choir",
+      "caption": "A whole choir in your pocket. C minor, Choir Aahs, no singers needed.",
+      "daily": {
+        "day": 8,
+        "title": "Pocket Choir",
+        "note": "Choir Aahs in C minor. Hold each note and let the chords breathe."
+      }
+    },
+    {
+      "slug": "bossa-nylon",
+      "song": "bossa-nylon",
+      "caption": "A little bossa nova on nylon guitar, A minor at 108.",
+      "daily": {
+        "day": 9,
+        "title": "Bossa Nylon",
+        "note": "Nylon guitar in A minor with a bossa lilt. Play the melody a little ahead of the beat."
+      }
+    },
+    {
+      "slug": "rainy-piano",
+      "song": "rainy-piano",
+      "caption": "Rain on the window, E minor on the piano.",
+      "daily": {
+        "day": 10,
+        "title": "Rainy Window Piano",
+        "note": "Grand Piano in E minor at 72 BPM. Quiet, slow, a little sad."
+      }
+    },
+    {
+      "slug": "indie-guitar",
+      "song": "indie-guitar",
+      "caption": "Indie clean guitar in E minor. Same four chords as half your playlist.",
+      "daily": {
+        "day": 11,
+        "title": "Indie Clean Guitar",
+        "note": "Clean electric guitar in E minor. Arpeggiate up the wheel, then hold the high note."
+      }
+    },
+    {
+      "slug": "walking-bass",
+      "song": "walking-bass",
+      "caption": "Walking upright bass in F. One note per beat, never stops moving.",
+      "daily": {
+        "day": 12,
+        "title": "Walking Upright Bass",
+        "note": "Upright Bass in F major. One note per beat, stepping toward the next chord."
+      }
+    },
+    {
+      "slug": "sad-violin",
+      "song": "sad-violin",
+      "caption": "The world’s smallest violin, now in B minor.",
+      "daily": {
+        "day": 13,
+        "title": "Sad Violin",
+        "note": "Solo violin in B minor. Slide slowly between the notes for the full effect."
+      }
+    },
+    {
+      "slug": "golden-hour-rhodes",
+      "song": "golden-hour-rhodes",
+      "caption": "Golden hour Rhodes in F major. Starts on the four chord so it never quite lands.",
+      "daily": {
+        "day": 14,
+        "title": "Golden Hour Rhodes",
+        "note": "Rhodes in F major starting on IV. A warm, unresolved loop."
+      }
+    },
+    {
+      "slug": "anthem-strings",
+      "song": "anthem-strings",
+      "caption": "Anthem strings in B-flat. Big notes, bigger feelings.",
+      "daily": {
+        "day": 15,
+        "title": "Anthem Strings",
+        "note": "Strings Ensemble in B-flat major. Hold every note for two beats and go high at the end."
+      }
+    },
+    {
+      "slug": "dorian-guitar",
+      "song": "dorian-guitar",
+      "caption": "A Dorian on clean guitar, the classic one-to-four groove.",
+      "daily": {
+        "day": 16,
+        "title": "Dorian Guitar",
+        "note": "Clean guitar in A Dorian, moving between the one and four chords. Bluesy but bright."
+      }
+    },
+    {
+      "slug": "jazz-vibes",
+      "song": "jazz-vibes",
+      "caption": "Late-night vibraphone. ii–V–I in B-flat, the jazz handshake."
+    },
+    {
+      "slug": "marimba-bounce",
+      "song": "marimba-bounce",
+      "caption": "Marimba bounce in G major. Hard not to dance to this one."
+    },
+    {
+      "slug": "kalimba-study",
+      "song": "kalimba-study",
+      "caption": "Kalimba in E major. Soft, sparkly and very calming."
+    },
+    {
+      "slug": "main-character-trumpet",
+      "song": "main-character-trumpet",
+      "caption": "Main character trumpet in B-flat. Play it walking into a room."
+    },
+    {
+      "slug": "cathedral-choir",
+      "song": "cathedral-choir",
+      "caption": "Cathedral choir in F major. Long notes and a lot of echo.",
+      "daily": {
+        "day": 17,
+        "title": "Cathedral Choir",
+        "note": "Choir Aahs in F major. Two beats per note, no rush."
+      }
+    },
+    {
+      "slug": "upright-dorian",
+      "song": "upright-dorian",
+      "caption": "Upright bass groove in G Dorian. Bass players, this one is yours.",
+      "daily": {
+        "day": 18,
+        "title": "Upright Dorian Groove",
+        "note": "Upright Bass in G Dorian. A funky one-to-four riff with ghosted repeats."
+      }
+    },
+    {
+      "slug": "midnight-rhodes",
+      "song": "midnight-rhodes",
+      "caption": "Midnight Rhodes in C minor. Lights low, volume lower.",
+      "daily": {
+        "day": 19,
+        "title": "Midnight Rhodes",
+        "note": "Rhodes in C minor at 70 BPM. Let the minor 7th ring."
+      }
+    },
+    {
+      "slug": "violin-hope",
+      "song": "violin-hope",
+      "caption": "Violin sunrise in A major. Slow start, big finish.",
+      "daily": {
+        "day": 20,
+        "title": "Violin Sunrise",
+        "note": "Solo violin in A major. Build from low and slow to the high C-sharp."
+      }
+    },
+    {
+      "slug": "haunted-choir",
+      "song": "haunted-choir",
+      "caption": "Haunted choir in D minor. Play it with the lights off.",
+      "daily": {
+        "day": 21,
+        "title": "Haunted Choir",
+        "note": "Choir Aahs in D minor at 60 BPM. Slow, dark, and just a bit spooky."
+      }
+    }
+  ]
+}

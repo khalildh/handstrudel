@@ -767,8 +767,32 @@ struct ContentView: View {
         if let prog = CHORD_PROGRESSIONS.first(where: { $0.id == progId }) {
             engine.chordMelodyProgression = prog
         }
-        demo.onBeginCapture = { [engine] url in engine.soundFontEngine.startCapture(to: url) }
-        demo.onEndCapture = { [engine] in engine.soundFontEngine.stopCapture() }
+        if let bpm = s.bpm, (20...400).contains(bpm) { engine.manualBPM = bpm }
+        engine.scaleUseSoundFont = true
+        demo.onBeginCapture = { [engine] url in
+            engine.soundFontEngine.startCapture(to: url)
+            engine.noteCapture.start()
+        }
+        demo.onEndCapture = { [engine] in
+            engine.soundFontEngine.stopCapture()
+            // What a real post of this take would carry: its sound setup and Learn-to-play notes,
+            // timed from the script start (= the start of the trimmed promo footage).
+            let notes = engine.noteCapture.stop()
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            if let setup = engine.currentSoundSetup, let data = try? encoder.encode(setup) {
+                try? data.write(to: demo.outputDir.appendingPathComponent("sound_setup.json"))
+            }
+            // The draft labels a real post sends as `instrument` and `mode`.
+            let labels = ["instrument": engine.selectedSoundFontInstrument.name, "mode": self.currentModeName]
+            if let data = try? encoder.encode(labels) {
+                try? data.write(to: demo.outputDir.appendingPathComponent("post_labels.json"))
+            }
+            if let track = NoteTrack.posted(from: notes, trimStart: 0, trimEnd: s.duration, outputScale: 1),
+               let data = try? encoder.encode(track) {
+                try? data.write(to: demo.outputDir.appendingPathComponent("note_track.json"))
+            }
+        }
         engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true)
         engine.start(config: DEFAULT_MAPPING, advanced: false)
     }

@@ -504,6 +504,8 @@ final class DemoDirector {
         /// Chord progression id; defaults to "free" (all 7 diatonic chords,
         /// zone index == scale degree), which the promo composer assumes.
         let progression: String?
+        /// Tempo for the take; recorded in the exported sound setup.
+        let bpm: Double?
         let left: [Keyframe]
         let right: [Keyframe]
     }

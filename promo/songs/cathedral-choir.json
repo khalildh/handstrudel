@@ -1,0 +1,19 @@
+{
+  "name": "Cathedral Choir",
+  "instrument": "choir",
+  "key": "F",
+  "scale": "Major",
+  "bpm": 72,
+  "beatsPerChord": 4,
+  "chords": [
+    "I",
+    "IV",
+    "I",
+    "V",
+    "vi",
+    "IV",
+    "V",
+    "I"
+  ],
+  "melody": "3:2 5:2  6:2 4:2  5:3 3:1  2:4  3:2 1:2  4:2 6:2  5:2 7:2  8:4"
+}
