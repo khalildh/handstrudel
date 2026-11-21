@@ -1,5 +1,5 @@
 // Offline checks for the eval runner (no key needed):
-//   node --test scripts/instrument-evals/
+//   npm run test:instrument-ai
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SEED_INSTRUMENTS } from "../../supabase/functions/_shared/instrument-ai/assets.generated.ts";

@@ -29,6 +29,6 @@ jobs:
       - name: Generator copy of the schema and seeds is up to date
         run: node scripts/instrument-ai/sync-assets.mjs --check
       - name: Generator and eval tests (mocked model)
-        run: node --test scripts/instrument-evals/ supabase/functions/_shared/instrument-ai/
+        run: node --test 'scripts/instrument-evals/*_test.ts' 'supabase/functions/_shared/instrument-ai/*_test.ts'
       - name: Offline eval run
         run: node scripts/instrument-evals/run.ts --mock

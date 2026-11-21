@@ -11,7 +11,7 @@
     "test:ios-web-audio": "node --test ios/strudel-audio-startup.test.mjs",
     "gen:config": "node scripts/gen-music-config.mjs",
     "verify:config": "node scripts/gen-music-config.mjs && git diff --exit-code -- src/lib/music-data.generated.ts ios/HandStrudel/HandStrudel/Models/MusicConfig.generated.swift",
-    "test:instrument-ai": "node --test scripts/instrument-evals/ supabase/functions/_shared/instrument-ai/",
+    "test:instrument-ai": "node --test 'scripts/instrument-evals/*_test.ts' 'supabase/functions/_shared/instrument-ai/*_test.ts'",
     "evals:instruments": "node scripts/instrument-evals/run.ts",
     "sync:instrument-ai": "node scripts/instrument-ai/sync-assets.mjs"
   },

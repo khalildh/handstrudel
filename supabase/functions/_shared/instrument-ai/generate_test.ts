@@ -1,5 +1,5 @@
 // Offline tests for "Make your own instrument" with a mocked model.
-//   node --test supabase/functions/_shared/instrument-ai/
+//   npm run test:instrument-ai
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
