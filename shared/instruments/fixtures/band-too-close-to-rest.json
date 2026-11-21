@@ -13,8 +13,7 @@
       "octave_band_radius": 0.6
     },
     "chords": {
-      "side": "left",
-      "voicing": "seventh"
+      "side": "left"
     },
     "notes": {
       "source": "scale_one_octave",

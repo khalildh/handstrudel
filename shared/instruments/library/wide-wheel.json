@@ -3,7 +3,7 @@
   "format_version": 1,
   "id": "demo.wide-wheel",
   "name": "Wide Wheel",
-  "description": "Bigger zones for small screens or busy hands: a smaller rest hole, a deeper octave rim, and plain triads. Plays in whatever key, scale and sound you've chosen.",
+  "description": "Bigger zones for small screens or busy hands: a smaller rest hole and a deeper octave rim. Plays in whatever key, scale, chords and sound you've chosen.",
   "surface": {
     "type": "split_wheel",
     "radius": 1.0,
@@ -11,8 +11,7 @@
     "octave_band_radius": 0.7
   },
   "chords": {
-    "side": "left",
-    "voicing": "triad"
+    "side": "left"
   },
   "notes": {
     "source": "scale_one_octave",

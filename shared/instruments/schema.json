@@ -41,8 +41,7 @@
     "chords": {
       "type": "object",
       "required": [
-        "side",
-        "voicing"
+        "side"
       ],
       "additionalProperties": false,
       "properties": {
@@ -52,16 +51,9 @@
             "right"
           ],
           "description": "Which half of the wheel holds the chords for a right-handed player. The player's swap-hands setting mirrors it."
-        },
-        "voicing": {
-          "enum": [
-            "triad",
-            "seventh"
-          ],
-          "description": "triad: root, 3rd, 5th. seventh: adds the 7th."
         }
       },
-      "description": "Chord wedges follow the player's progression: one per chord."
+      "description": "Chord wedges follow the player's progression, one per chord, voiced by the player's sound settings."
     },
     "notes": {
       "type": "object",

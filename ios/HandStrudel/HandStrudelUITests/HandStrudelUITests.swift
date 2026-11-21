@@ -1941,7 +1941,7 @@ final class HandStrudelUITests: XCTestCase {
 
     /// Prototype instrument files: switching from the built-in Scale wheel
     /// file to Wide Wheel changes the wheel's layout but keeps the player's
-    /// key, scale and chords — the same notes, in bigger zones.
+    /// music — the same notes and chords, in bigger zones.
     func testWheelPlaysFromAnInstrumentFile() {
         app.launchArguments = ["--uitesting", "--reset-studio-input", "--uitest-camera-denied", "-hasSeenOnboarding", "YES"]
         app.launch()
@@ -1952,8 +1952,7 @@ final class HandStrudelUITests: XCTestCase {
         let firstNote = app.buttons["wheel-note-0"]
         XCTAssertTrue(firstNote.waitForExistence(timeout: 5), "Scale wheel file")
         let noteLabels = (0..<12).map { app.buttons["wheel-note-\($0)"] }.filter(\.exists).map(\.label)
-        let chord = app.buttons["wheel-chord-0"].label
-        XCTAssertTrue(chord.hasSuffix("⁷"), "Scale wheel file plays 7th chords: \(chord)")
+        let chordLabels = (0..<12).map { app.buttons["wheel-chord-\($0)"] }.filter(\.exists).map(\.label)
         add(screenshotAttachment("1-scale-wheel"))
 
         element("settings-button").tap()
@@ -1971,7 +1970,8 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(firstNote.waitForExistence(timeout: 5))
         XCTAssertEqual((0..<12).map { app.buttons["wheel-note-\($0)"] }.filter(\.exists).map(\.label), noteLabels,
                        "Same scale notes: the instrument adapts to the player's settings")
-        XCTAssertEqual(app.buttons["wheel-chord-0"].label, String(chord.dropLast()), "Triads instead of 7ths")
+        XCTAssertEqual((0..<12).map { app.buttons["wheel-chord-\($0)"] }.filter(\.exists).map(\.label), chordLabels,
+                       "Same chords: the instrument doesn't choose the music")
         app.buttons["wheel-chord-1"].tap()
         app.buttons["wheel-note-2"].tap()
         XCTAssertTrue(element("close-button").exists)

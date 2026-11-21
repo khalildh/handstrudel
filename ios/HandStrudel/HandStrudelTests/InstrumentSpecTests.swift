@@ -139,7 +139,8 @@ final class InstrumentSpecTests: XCTestCase {
         XCTAssertEqual(manager.geometry, WheelGeometry(radius: 1.0, restRadius: 0.26, octaveBandRadius: 0.7))
         let tones = engine.chordMelodyTones(key: engine.selectedKey, scale: engine.selectedScale)
         XCTAssertEqual(tones.melody(0).count, 5, "One wedge per note of the player's pentatonic scale.")
-        XCTAssertEqual(tones.chord(0).count, 3, "Wide Wheel plays triads.")
+        XCTAssertEqual(tones.chord(0), chordNotesWithSeventh(key: .D, scale: .pentatonic, degree: 0),
+                       "Chords keep the Scale wheel's voicing; the instrument doesn't choose it.")
 
         // Changing the player's scale reshapes the same instrument.
         engine.selectedScale = .major

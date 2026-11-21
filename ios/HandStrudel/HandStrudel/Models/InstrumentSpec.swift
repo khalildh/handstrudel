@@ -2,10 +2,12 @@ import Foundation
 
 /// A playable on-screen instrument described as data (`shared/instruments/`).
 ///
-/// An instrument is structure, not sound: its zones are defined relative to
+/// An instrument is structure, not music: its zones are defined relative to
 /// the player's current key, scale and progression (one note wedge per scale
 /// note, one chord wedge per progression chord), so it adapts to whatever
-/// sound is selected and never picks one itself.
+/// music is selected and never picks it. Anything that would make the same
+/// zone sound different with the same settings — key, scale, chord voicing,
+/// sound — is a music setting and stays out of the file.
 ///
 /// The JSON Schema in `shared/instruments/schema.json` is the spec; this type
 /// mirrors it. Nothing in an instrument file is executed — the app's own code
@@ -61,9 +63,7 @@ struct InstrumentSpec: Codable, Equatable {
 
     struct Chords: Codable, Equatable {
         enum Side: String, Codable { case left, right }
-        enum Voicing: String, Codable { case triad, seventh }
         var side: Side
-        var voicing: Voicing
     }
 
     struct Notes: Codable, Equatable {
@@ -91,7 +91,8 @@ struct InstrumentSpec: Codable, Equatable {
     var rules: WheelRules {
         WheelRules(geometry: WheelGeometry(radius: surface.radius, restRadius: surface.restRadius,
                                            octaveBandRadius: surface.octaveBandRadius),
-                   chordsOnRight: chords.side == .right, voicing: chords.voicing,
+                   chordsOnRight: chords.side == .right,
+                   voicing: ChordVoicing.wheelDefault(for: notes.source),
                    noteSource: notes.source, notesOctaveBand: notes.octaveBand,
                    highlightChordTones: notes.highlightChordTones ?? false)
     }
@@ -208,11 +209,23 @@ struct WheelGeometry: Equatable {
     static let standard = WheelGeometry(radius: 1.0, restRadius: 0.36, octaveBandRadius: 0.80)
 }
 
-/// What the wheel engine, overlay and touch layer need from an instrument.
+/// How chords are voiced. A music setting, not part of an instrument: until
+/// it becomes a player setting, each wheel keeps the voicing it always had.
+enum ChordVoicing: Equatable {
+    case triad, seventh
+
+    /// The Scale wheel (scale notes) plays 7ths; the Split wheel plays triads.
+    static func wheelDefault(for source: InstrumentSpec.Notes.Source) -> ChordVoicing {
+        source == .scaleOneOctave ? .seventh : .triad
+    }
+}
+
+/// What the wheel engine, overlay and touch layer need from an instrument
+/// (plus the voicing the player's music implies).
 struct WheelRules: Equatable {
     var geometry: WheelGeometry
     var chordsOnRight: Bool
-    var voicing: InstrumentSpec.Chords.Voicing
+    var voicing: ChordVoicing
     var noteSource: InstrumentSpec.Notes.Source
     var notesOctaveBand: Bool
     var highlightChordTones: Bool
@@ -281,12 +294,12 @@ enum InstrumentLibrary {
     private static let fallbackScaleWheel = InstrumentSpec(
         format: InstrumentSpec.formatName, formatVersion: 1, id: scaleWheelID, name: "Scale Wheel", description: nil,
         surface: .init(type: .splitWheel, radius: 1.0, restRadius: 0.36, octaveBandRadius: 0.8),
-        chords: .init(side: .left, voicing: .seventh),
+        chords: .init(side: .left),
         notes: .init(source: .scaleOneOctave, octaveBand: true, highlightChordTones: true))
 
     private static let fallbackSplitWheel = InstrumentSpec(
         format: InstrumentSpec.formatName, formatVersion: 1, id: splitWheelID, name: "Split Wheel", description: nil,
         surface: .init(type: .splitWheel, radius: 1.0, restRadius: 0.36, octaveBandRadius: 0.8),
-        chords: .init(side: .left, voicing: .triad),
+        chords: .init(side: .left),
         notes: .init(source: .chordTonesThreeOctaves, octaveBand: false, highlightChordTones: nil))
 }

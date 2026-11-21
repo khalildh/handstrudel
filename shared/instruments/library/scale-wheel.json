@@ -3,7 +3,7 @@
   "format_version": 1,
   "id": "builtin.scale-wheel",
   "name": "Scale Wheel",
-  "description": "7th chords on one half, the whole scale on the other. Reach into either rim to play an octave up or down.",
+  "description": "Chords on one half, every note of your scale on the other. Reach into either rim to play an octave up or down.",
   "surface": {
     "type": "split_wheel",
     "radius": 1.0,
@@ -11,8 +11,7 @@
     "octave_band_radius": 0.8
   },
   "chords": {
-    "side": "left",
-    "voicing": "seventh"
+    "side": "left"
   },
   "notes": {
     "source": "scale_one_octave",

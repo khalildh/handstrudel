@@ -903,7 +903,7 @@ struct ContentView: View {
         switch zone {
         case .chord(let sub):
             let degree = engine.chordMelodyModeManager.degreeForZone(sub.wedge)
-            // The instrument picks the voicing (the Scale wheel plays 7ths).
+            // Voicing comes from the music, not the instrument (the Scale wheel plays 7ths).
             let voicing = rules.chordTones(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
             let absoluteTones = voicing.map { $0 + sub.octave * 12 }
             engine.holdJamVoice(parentVoice, pitches: absoluteTones, velocity: 0.7, native: native)

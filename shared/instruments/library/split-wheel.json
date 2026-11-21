@@ -11,8 +11,7 @@
     "octave_band_radius": 0.8
   },
   "chords": {
-    "side": "left",
-    "voicing": "triad"
+    "side": "left"
   },
   "notes": {
     "source": "chord_tones_three_octaves",
