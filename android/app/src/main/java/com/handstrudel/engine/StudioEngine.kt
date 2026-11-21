@@ -99,6 +99,11 @@ interface StudioEngine {
     fun setGridBaseOctave(octave: Int)
     val gridOctaveRange: StateFlow<Int>
     fun setGridOctaveRange(range: Int)
+    /** iOS `fingerOctaveEnabled` (grid quick bar): the free hand's finger count (1–5) sets the base octave (2–6). */
+    val fingerOctaveEnabled: StateFlow<Boolean> get() = FALSE_FLOW
+    fun setFingerOctaveEnabled(enabled: Boolean) {}
+    /** iOS `currentFingerCount`, shown as dots while finger octave is on. */
+    val currentFingerCount: StateFlow<Int> get() = ZERO_FLOW
     /** iOS `chordMode` (melodic "Chords" pill): the pattern plays the degree's triad. */
     val chordMode: StateFlow<Boolean> get() = FALSE_FLOW
     fun setChordMode(enabled: Boolean) {}
@@ -247,6 +252,7 @@ interface StudioEngine {
         const val MAX_LOOPS = 20
         const val MAX_LOOP_SECONDS = 90.0
         private val FALSE_FLOW: StateFlow<Boolean> = kotlinx.coroutines.flow.MutableStateFlow(false)
+        private val ZERO_FLOW: StateFlow<Int> = kotlinx.coroutines.flow.MutableStateFlow(0)
         private val EMPTY_PARAMS_FLOW: StateFlow<Map<String, Double>> = kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
     }
 }

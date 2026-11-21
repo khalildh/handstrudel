@@ -8,6 +8,7 @@ internal class GridModeController : ModeController {
     override fun tick(engine: HandStrudelEngine) {
         val grid = engine.gridManager
         grid.setAspects(engine.handTracker.videoAspect, engine.screenAspect)
+        if (engine.fingerOctaveEnabled.value) applyFingerOctave(engine)
         val notes = engine.gridNotes()
         val hands = engine.currentHands.core()
         val actions = grid.checkNotes(hands, notes, engine.quantizeOn, engine.quantize.boundaryCrossed(engine.nowSeconds()))
@@ -34,5 +35,22 @@ internal class GridModeController : ModeController {
             )
         }
         engine.evaluateDrumLoopsIfChanged("grid")
+    }
+
+    /** iOS: the non-pinching hand's raised fingers (1–5) set the base octave (2–6). */
+    private fun applyFingerOctave(engine: HandStrudelEngine) {
+        val grid = engine.gridManager
+        val left = engine.currentHands.left
+        val right = engine.currentHands.right
+        val lp = grid.isLeftPinching()
+        val rp = grid.isRightPinching()
+        val hand = when {
+            lp && !rp -> right
+            rp && !lp -> left
+            !lp && !rp -> if ((left?.fingersUp ?: 0) >= (right?.fingersUp ?: 0)) left else right
+            else -> null
+        } ?: return
+        engine._fingerCount.value = hand.fingersUp
+        if (hand.fingersUp in 1..5 && hand.fingersUp + 1 != engine.gridBaseOctave.value) engine.setGridBaseOctave(hand.fingersUp + 1)
     }
 }

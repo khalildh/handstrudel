@@ -410,6 +410,11 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     override val gridBaseOctave: StateFlow<Int> = _gridBaseOctave
     private val _gridOctaveRange = MutableStateFlow(persistence.lastGridOctaveRange)
     override val gridOctaveRange: StateFlow<Int> = _gridOctaveRange
+    private val _fingerOctave = MutableStateFlow(false)
+    override val fingerOctaveEnabled: StateFlow<Boolean> = _fingerOctave
+    override fun setFingerOctaveEnabled(enabled: Boolean) { _fingerOctave.value = enabled }
+    internal val _fingerCount = MutableStateFlow(0)
+    override val currentFingerCount: StateFlow<Int> = _fingerCount
     private val _chordMode = MutableStateFlow(false)
     override val chordMode: StateFlow<Boolean> = _chordMode
     private val _circleOfFifths = MutableStateFlow(false)
@@ -468,6 +473,7 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     override fun setProgression(progression: ChordProgression) {
         _progression.value = progression
         chordMelodyManager.setZoneDegrees(progression.degrees)
+        _chordMelody.value = _chordMelody.value.copy(zoneDegrees = progression.degrees)
     }
 
     override fun setManualBPM(bpm: Double) {
@@ -1181,6 +1187,7 @@ class HandStrudelEngine(context: Context) : StudioEngine {
 
     init {
         chordMelodyManager.setZoneDegrees(_progression.value.degrees)
+        _chordMelody.value = ChordMelodyDisplay(zoneDegrees = _progression.value.degrees)
         quantize.enabled = _quantizeEnabled.value
         quantize.div = _quantizeDiv.value.toDouble()
         val firstNote: () -> Unit = { notifyFirstNote() }
