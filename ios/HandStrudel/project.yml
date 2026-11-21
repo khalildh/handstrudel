@@ -49,6 +49,7 @@ targets:
     entitlements:
       path: HandStrudel/HandStrudel.entitlements
       properties:
+        aps-environment: development
         com.apple.developer.group-session: true
         com.apple.developer.associated-domains: [applinks:handstrudel.com]
     info:

@@ -5,6 +5,7 @@ import RevenueCat
 @main
 struct HandStrudelApp: App {
     @AppStorage(StudioTheme.storageKey) private var theme: StudioTheme = .volt
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
 
     init() {
         restoreInstrumentAudio()

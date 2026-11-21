@@ -175,6 +175,7 @@ struct PostComposerView: View {
             func leaveComposer() {
                 handedOff = true
                 onSubmissionAccepted()
+                PushManager.shared.askAfterMilestone()
                 dismiss()
             }
             let posted = await uploader.post(clip: clip, draftID: draftID, accountID: accountID, store: drafts,

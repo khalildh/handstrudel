@@ -19,6 +19,8 @@ Legacy clips and profile photos keep using `media.handstrudel.com`.
 - `migrations/20261114060000_profile_avatars.sql`: exposes avatar keys on public creator profiles and restricts writes to the server.
 - `migrations/20261120000000_video_note_tracks.sql`: "Learn to play" note tracks (`videos.note_track`, at most 600 notes / 32 KB), written only by screened publication and only with a shared sound setup; feeds expose `has_note_track`.
 - `migrations/20261120010000_locked_sound_events.sql`: adds opt-in daily counters for Pro sounds opened from the feed (`locked_sound_tapped`) and unlocked from that screen (`locked_sound_unlocked`).
+- `migrations/20261121000000_push_notifications.sql`: push notifications. `device_tokens` (each account manages only its own), `notification_preferences` (per type, all on by default), and the `notifications` queue/log, filled by triggers on new posts, play-alongs, comments, likes (batched to one push per post per hour), and weekly challenges when their window opens. A pg_cron job wakes `send-push` every minute when something is due. Take replies call `push_internal.notify_take_reply(reply_video, replied_to_video)` from their own trigger.
+- `functions/send-push`: drains the queue through APNs (token-based .p8 auth, ES256 JWT, HTTP/2), skips blocked pairs, turned-off types and your own actions, and deletes tokens APNs reports as gone (410 or `BadDeviceToken`).
 - `tests/database/feed.test.sql`: pgTAP tests for RLS and triggers. Run them with `supabase test db`.
 - `tests/database/comments.test.sql`: pgTAP tests for comment permissions, thread visibility, and moderation.
 - `functions/sign-upload` and `functions/publish-upload`: reserve a private R2 upload and publish only after Sightengine clears the video and thumbnail. Set up the private bucket, secrets, and cutover using the [video upload release checklist](../docs/video-upload-release.md).
@@ -46,6 +48,25 @@ To use the local stack, set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MEDIA_BASE_URL
    - Connect the custom domain `media.handstrudel.com` (the zone must be on Cloudflare).
    - Add a CORS rule allowing `PUT` (only needed for web clients).
 5. Put the project URL and anon key into `ios/HandStrudel/HandStrudel/Social/SocialConfig.swift`. Social features stay hidden until those values are filled in.
+
+## Push notifications setup (one time)
+Do these in order. Nothing is sent until step 4 is done.
+
+1. **APNs key (Apple Developer portal):** in Certificates, Identifiers & Profiles → Keys, create a key with **Apple Push Notifications service (APNs)** enabled (environment: Sandbox & Production; scope: team). Download `AuthKey_<KEY_ID>.p8` (it can be downloaded only once) and note the Key ID. Then in Identifiers → `com.handstrudel.app`, enable **Push Notifications** and regenerate the app's provisioning profiles so they carry `aps-environment`.
+2. **Function secrets:** generate a dispatch secret with `openssl rand -hex 32`, then:
+   ```bash
+   supabase secrets set APNS_KEY_ID=<KEY_ID> APNS_TEAM_ID=TVAG3T3Y65 APNS_BUNDLE_ID=com.handstrudel.app APNS_ENV=production PUSH_DISPATCH_SECRET=<secret>
+   supabase secrets set APNS_PRIVATE_KEY="$(cat AuthKey_<KEY_ID>.p8)"
+   ```
+   `APNS_ENV=production` delivers to App Store and TestFlight installs. Use `sandbox` to test with builds run from Xcode; the app records which environment each token belongs to, and the function only sends to tokens that match.
+3. **Migration and function:** preview with `supabase db push --dry-run`, apply with `supabase db push`, then `supabase functions deploy send-push` (its `verify_jwt = false` is in `config.toml`; it checks `PUSH_DISPATCH_SECRET` instead).
+4. **Turn on the cron wake-up:** in the SQL Editor, store the function URL and the same secret in Vault:
+   ```sql
+   select vault.create_secret('https://eygrtqbtbhktptphqdnn.supabase.co/functions/v1/send-push', 'push_dispatch_url');
+   select vault.create_secret('<secret>', 'push_dispatch_secret');
+   ```
+   Until both exist, the `send-push-notifications` cron job does nothing.
+5. **Check:** sign in on a device, post or follow someone, and allow notifications. Confirm a row in `public.device_tokens`, have a second account like the post, and watch `public.notifications` move from `pending` to `sent` within a minute. Failures keep the APNs reason in `last_error`; `select * from cron.job_run_details order by start_time desc limit 5` shows the wake-ups.
 
 ## Comment moderation
 Before enabling public comments, assign a reviewer to check `public.comment_reports` in the Supabase dashboard and monitor the community support inbox. Reports are never visible to clients. Three reports from distinct accounts hide a comment and its replies; moderators can set `comments.hidden` to hide or restore a comment after reviewing it. The server checks links and configured harmful phrases in `comment_internal.blocked_patterns` before posting. Treat this as a starter filter, not a replacement for review.
