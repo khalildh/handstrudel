@@ -61,6 +61,14 @@ export async function presignPut(key: string, contentType: string, contentLength
   return signed.url;
 }
 
+/** A short-lived read URL for one object (moderation review of hidden clips). */
+export async function presignGet(key: string, bucket: string, seconds = 900) {
+  const url = new URL(`${bucket}/${key}`);
+  url.searchParams.set("X-Amz-Expires", String(seconds));
+  const signed = await bucketClient(bucket).sign(new Request(url, { method: "GET" }), { aws: { signQuery: true } });
+  return signed.url;
+}
+
 export async function deleteKeys(keys: string[], bucket = bucketUrl()) {
   const client = bucketClient(bucket);
   await Promise.all(
