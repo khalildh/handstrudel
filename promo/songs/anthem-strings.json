@@ -1,0 +1,19 @@
+{
+  "name": "Anthem Strings",
+  "instrument": "strings",
+  "key": "Bb",
+  "scale": "Major",
+  "bpm": 76,
+  "beatsPerChord": 4,
+  "chords": [
+    "I",
+    "V",
+    "vi",
+    "IV",
+    "I",
+    "V",
+    "IV",
+    "I"
+  ],
+  "melody": "1:2 5:2  2:2 5:1 7:1  8:3 6:1  4:2 6:2  5:2 8:2  7:2 5:2  6:1 8:1 6:1 4:1  8:4"
+}

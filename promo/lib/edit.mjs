@@ -77,6 +77,23 @@ export function renderAppPreview({ run, out }) {
   return out;
 }
 
+/**
+ * Feed post cut: what the app would upload for this take. 720x1280 (9:16) H.264,
+ * the full app screen letterboxed on black, app audio only, no captions or voice.
+ */
+export function renderPost({ run, out, maxSeconds = 30 }) {
+  const D = Math.min(run.duration, maxSeconds);
+  const g = [
+    `[0:v]fps=30,setpts=PTS-STARTPTS,trim=duration=${D.toFixed(3)},scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,setsar=1,format=yuv420p[v]`,
+    `[1:a]aresample=48000,apad,atrim=0:${D.toFixed(3)},afade=t=out:st=${(D - 1.2).toFixed(3)}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]`,
+  ];
+  ff(['-ss', Math.max(0, run.offset).toFixed(3), '-t', (D + 0.5).toFixed(3), '-i', run.rawVideo, '-i', run.audio,
+    '-filter_complex', g.join(';'), '-map', '[v]', '-map', '[a]',
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '21', '-r', '30', '-profile:v', 'high', '-level', '4.0',
+    '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2', '-movflags', '+faststart', '-t', D.toFixed(3), out]);
+  return { out, duration: D };
+}
+
 export function thumbnail(video, at, out) {
   ff(['-ss', String(at), '-i', video, '-frames:v', '1', '-q:v', '2', out]);
   return out;

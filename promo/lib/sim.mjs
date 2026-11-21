@@ -119,10 +119,18 @@ export async function recordRun({ dev, bundleId, script, outDir, log }) {
   const meta = JSON.parse(fs.readFileSync(path.join(demoOut, 'meta.json'), 'utf8'));
   const audio = path.join(outDir, 'audio.caf');
   fs.copyFileSync(path.join(demoOut, 'audio.caf'), audio);
+  // DEBUG builds also export the take's sound setup and Learn-to-play notes, as a real post would carry.
+  const extras = {};
+  for (const [k, f] of [['soundSetup', 'sound_setup.json'], ['noteTrack', 'note_track.json'], ['postLabels', 'post_labels.json']]) {
+    if (fs.existsSync(path.join(demoOut, f))) {
+      fs.copyFileSync(path.join(demoOut, f), path.join(outDir, f));
+      extras[k] = path.join(outDir, f);
+    }
+  }
   try { sh('xcrun', ['simctl', 'terminate', dev.udid, bundleId]); } catch { /* ignore */ }
 
   const offset = meta.startEpoch - recStart;
-  const info = { rawVideo, audio, offset, duration: script.duration, recStart, startEpoch: meta.startEpoch };
+  const info = { rawVideo, audio, offset, duration: script.duration, recStart, startEpoch: meta.startEpoch, ...extras };
   fs.writeFileSync(path.join(outDir, 'run.json'), JSON.stringify(info, null, 2));
   log(`recorded (video→script offset ${offset.toFixed(2)}s)`);
   return info;
