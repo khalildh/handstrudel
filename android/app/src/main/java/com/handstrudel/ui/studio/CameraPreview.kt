@@ -19,12 +19,16 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.handstrudel.engine.HandTrackingManager
+import com.handstrudel.ui.studio.visual.CAMERA_FILTERS
+import com.handstrudel.ui.studio.visual.CameraFilter
+import com.handstrudel.ui.studio.visual.applyCameraFilter
 import java.util.concurrent.Executors
 
 @Composable
 fun CameraPreview(
     modifier: Modifier = Modifier,
-    handTracker: HandTrackingManager
+    handTracker: HandTrackingManager,
+    filter: CameraFilter = CAMERA_FILTERS[0],
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -72,7 +76,8 @@ fun CameraPreview(
             }, ContextCompat.getMainExecutor(ctx))
 
             previewView
-        }
+        },
+        update = { view -> applyCameraFilter(view, filter) },
     )
 
     DisposableEffect(Unit) {
