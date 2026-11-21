@@ -275,7 +275,7 @@ internal fun DraftEditor(
         if (controller.canPost) {
             PostAction(
                 submission = submission,
-                checking = uploader.isBusy && uploadPhase != VideoUploader.Phase.Idle,
+                checking = uploadPhase == VideoUploader.Phase.Preparing || uploadPhase is VideoUploader.Phase.Uploading || uploadPhase == VideoUploader.Phase.Checking,
                 canExport = canExport && !busy,
                 onCheck = {
                     val account = userId ?: return@PostAction

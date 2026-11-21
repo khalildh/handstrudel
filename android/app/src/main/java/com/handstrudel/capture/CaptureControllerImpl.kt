@@ -80,6 +80,8 @@ class CaptureControllerImpl(
         /** The take to review right after recording (iOS `reviewingDraft`). */
         val reviewingDraftId: UUID? = null,
         val consent: ConsentStep? = null,
+        /** Identifies [consent]; each request is launched once even if several activity instances observe it. */
+        val consentRequestId: Int = 0,
         val showBackingMixer: Boolean = false,
         /** Bumped to ask open draft sheets to close (posting returns to Music / opens the post). */
         val closeDraftsToken: Int = 0,
@@ -124,6 +126,7 @@ class CaptureControllerImpl(
 
     // Consent
     private var consentResult: CompletableDeferred<Any?>? = null
+    private var launchedConsentId = 0
     private var explainerShown = false
 
     private val uploaders = mutableMapOf<UUID, VideoUploader>()
@@ -132,7 +135,10 @@ class CaptureControllerImpl(
         DraftExport.sweep(context)
         (context.applicationContext as? Application)?.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) { startedActivities++ }
-            override fun onActivityStopped(activity: Activity) { startedActivities = max(0, startedActivities - 1) }
+            override fun onActivityStopped(activity: Activity) {
+                startedActivities = max(0, startedActivities - 1)
+                if (startedActivities == 0) handleBackgrounded()
+            }
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
             override fun onActivityResumed(activity: Activity) = Unit
             override fun onActivityPaused(activity: Activity) = Unit
@@ -184,6 +190,13 @@ class CaptureControllerImpl(
     }
 
     override fun onAppBackgrounded() {
+        // Shell calls this from onStop. Another instance of the activity may still be visible
+        // (the "Share one app" picker relaunches the main activity), so only act when none is.
+        if (startedActivities > 1) return
+        handleBackgrounded()
+    }
+
+    private fun handleBackgrounded() {
         backingLoad?.cancel()
         backingAutoplayPending = false
         backing?.pause()
@@ -207,18 +220,32 @@ class CaptureControllerImpl(
 
     // ---- Consent (MediaProjection + RECORD_AUDIO) --------------------------------------
 
+    /**
+     * The consent UI calls this before launching a system dialog. True only for the first
+     * caller of a request: the "Share one app" picker relaunches the app's main activity,
+     * whose composition must not ask again.
+     */
+    fun claimConsentLaunch(requestId: Int): Boolean {
+        if (requestId == 0 || requestId == launchedConsentId) return false
+        launchedConsentId = requestId
+        return true
+    }
+
     /** The consent UI reports each step's result here. */
     fun onConsentStepResult(result: Any?) {
+        Log.d(TAG, "consent step ${_ui.value.consent} -> ${(result as? Pair<*, *>)?.first ?: result}")
         _ui.update { it.copy(consent = null) }
-        consentResult?.complete(result)
+        // Clear first: completing resumes the asker inline, which may install the next step.
+        val pending = consentResult
         consentResult = null
+        pending?.complete(result)
     }
 
     private suspend fun ask(step: ConsentStep): Any? {
         val deferred = CompletableDeferred<Any?>()
         consentResult?.complete(null)
         consentResult = deferred
-        _ui.update { it.copy(consent = step) }
+        _ui.update { it.copy(consent = step, consentRequestId = it.consentRequestId + 1) }
         return deferred.await()
     }
 
@@ -237,6 +264,7 @@ class CaptureControllerImpl(
         val code = result.first as? Int ?: return null
         val data = result.second as? Intent
         if (code != Activity.RESULT_OK || data == null) return null
+        Log.d(TAG, "screen capture granted; starting the projection service")
         val started = CaptureProjection.beginStart()
         CaptureService.start(context, code, data)
         return try {

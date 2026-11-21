@@ -207,7 +207,8 @@ private fun ConsentFlow() {
     val screenCapture = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         controller.onConsentStepResult(result.resultCode to result.data)
     }
-    LaunchedEffect(ui.consent) {
+    LaunchedEffect(ui.consentRequestId) {
+        if (ui.consent == null || !controller.claimConsentLaunch(ui.consentRequestId)) return@LaunchedEffect
         when (ui.consent) {
             ConsentStep.AUDIO_PERMISSION -> audioPermission.launch(Manifest.permission.RECORD_AUDIO)
             ConsentStep.SCREEN_CAPTURE -> {

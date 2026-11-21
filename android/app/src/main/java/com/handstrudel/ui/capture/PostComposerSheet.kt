@@ -21,6 +21,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -87,7 +88,7 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
     var sharing by remember { mutableStateOf(PostSharingOptions()) }
     var commentsEnabled by remember { mutableStateOf(true) }
     var hasAudio by remember { mutableStateOf<Boolean?>(null) }
-    val busy = uploader.isBusy
+    val busy = phase == VideoUploader.Phase.Preparing || phase is VideoUploader.Phase.Uploading || phase == VideoUploader.Phase.Checking
     val credit = draft.backingCredit
     val checkingAudio = credit == null && hasAudio == null
     val locked = busy || submission != null
@@ -135,6 +136,11 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
                     placeholder = { Text("Say something about it…") },
                     enabled = !locked,
                     minLines = 1, maxLines = 3,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = palette.ink, unfocusedTextColor = palette.ink, disabledTextColor = palette.muted,
+                        cursorColor = palette.accent, focusedBorderColor = palette.accent, unfocusedBorderColor = palette.border,
+                        focusedPlaceholderColor = palette.muted, unfocusedPlaceholderColor = palette.muted,
+                    ),
                     modifier = Modifier.fillMaxWidth().testTag("post-caption"),
                 )
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
