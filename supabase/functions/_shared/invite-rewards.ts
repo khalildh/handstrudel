@@ -5,6 +5,17 @@
 export const REWARD_ENTITLEMENTS = ["plus_features", "pro"] as const;
 const API = "https://api.revenuecat.com/v1";
 
+/**
+ * The RevenueCat REST base URL. Production uses the real API; `REVENUECAT_API_URL` points a local
+ * stack at a mock for end-to-end tests. Only an http(s) URL is accepted.
+ */
+export function revenueCatBaseURL(override: string | undefined | null) {
+  if (!override) return API;
+  const url = new URL(override);
+  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("Invalid REVENUECAT_API_URL");
+  return url.toString().replace(/\/$/, "");
+}
+
 export type ClaimedGrant = {
   id: string;
   recipient_id: string;
@@ -41,15 +52,17 @@ export function revenueCatUserId(supabaseUserId: string) {
 export class RevenueCat {
   private secretKey: string;
   private fetchImpl: Fetch;
+  private baseURL: string;
 
-  constructor(secretKey: string, fetchImpl: Fetch = fetch) {
+  constructor(secretKey: string, fetchImpl: Fetch = fetch, baseURL = API) {
     if (!secretKey) throw new Error("missing env REVENUECAT_SECRET_KEY");
     this.secretKey = secretKey;
     this.fetchImpl = fetchImpl;
+    this.baseURL = baseURL;
   }
 
   private request(path: string, init: RequestInit = {}) {
-    return this.fetchImpl(`${API}${path}`, {
+    return this.fetchImpl(`${this.baseURL}${path}`, {
       ...init,
       headers: {
         Authorization: `Bearer ${this.secretKey}`,

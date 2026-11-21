@@ -207,8 +207,8 @@ select is(public.redeem_invite_code(null, '00000000-0000-0000-0000-0000000003a1'
   'self_invite', 'you cannot pick yourself');
 select is(public.redeem_invite_code(null, '00000000-0000-0000-0000-0000000009ff')->>'reason',
   'not_found', 'an unknown introducer is rejected');
-select is(public.redeem_invite_code(null, '00000000-0000-0000-0000-0000000000a1')->>'ok',
-  'true', 'a new account can name its introducer by @username');
+select is(public.redeem_invite_code(introducer => '00000000-0000-0000-0000-0000000000a1')->>'ok',
+  'true', 'a new account can name its introducer by @username, sending only that argument as the app does');
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000003a2","role":"authenticated"}', true);
 select is(public.redeem_invite_code(null, '00000000-0000-0000-0000-0000000000a1')->>'ok',
   'true', 'a second person met in person can name the same introducer');

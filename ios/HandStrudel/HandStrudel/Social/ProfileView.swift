@@ -272,7 +272,11 @@ struct ProfileView: View {
             .padding(.horizontal, 21)
             .padding(.bottom, 24)
         }
-        .refreshable { await portfolio.load(for: profile.id) }
+        .refreshable {
+            async let invites: Void = InviteManager.shared.loadSummary()
+            await portfolio.load(for: profile.id)
+            await invites
+        }
         .task(id: profile.id) { await portfolio.load(for: profile.id) }
     }
 

@@ -136,7 +136,8 @@ grant execute on function public.my_invite() to authenticated;
 -- Records who introduced the caller's account, by invite code or, when `introducer` is given
 -- instead, by the introducer's account (picked by @username). Returns
 -- {"ok": true, "inviter": "<username>", "inviter_rewarded": bool} or {"ok": false, "reason": "<code>"}.
-create function public.redeem_invite_code(invite_code text, introducer uuid default null)
+-- Both arguments default to null: clients send only the one they use.
+create function public.redeem_invite_code(invite_code text default null, introducer uuid default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();

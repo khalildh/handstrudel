@@ -49,6 +49,9 @@ final class InviteRewardsTests: XCTestCase {
         XCTAssertEqual(try summary(joined: 3).joinedText, "3 friends joined")
         XCTAssertFalse(try summary(joined: 9, rewarded: 9).reachedLimit)
         XCTAssertTrue(try summary(joined: 12, rewarded: 10).reachedLimit)
+        let text = try summary(joined: 0).shareText
+        XCTAssertTrue(text.hasSuffix(" https://handstrudel.com/invite?c=ABCD2345"), "the shared text always carries the link")
+        XCTAssertTrue(text.contains("we both get a week"))
     }
 
     func testCelebrationNamesTheFriend() {

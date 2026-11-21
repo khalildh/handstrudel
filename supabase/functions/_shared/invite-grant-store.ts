@@ -1,6 +1,6 @@
 // The invite reward queue in Postgres (see migration 20261121030000_invite_rewards.sql).
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { type ClaimedGrant, type GrantStore, processInviteRewards, RevenueCat } from "./invite-rewards.ts";
+import { type ClaimedGrant, type GrantStore, processInviteRewards, RevenueCat, revenueCatBaseURL } from "./invite-rewards.ts";
 import { admin } from "./r2.ts";
 
 export function supabaseGrantStore(db: SupabaseClient): GrantStore {
@@ -32,7 +32,7 @@ export async function grantInviteRewardsFor(userId: string) {
   const key = Deno.env.get("REVENUECAT_SECRET_KEY");
   if (!key) return;
   try {
-    await processInviteRewards(supabaseGrantStore(admin()), new RevenueCat(key), userId);
+    await processInviteRewards(supabaseGrantStore(admin()), new RevenueCat(key, fetch, revenueCatBaseURL(Deno.env.get("REVENUECAT_API_URL"))), userId);
   } catch (error) {
     console.error("Invite rewards deferred", error instanceof Error ? error.message : "unknown error");
   }

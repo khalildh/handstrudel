@@ -76,6 +76,14 @@ struct InviteSummary: Decodable, Equatable {
     }
 
     var url: URL { InviteCode.url(for: code) }
+
+    /// What the Invite button shares: the pitch, the code, and the link.
+    var shareText: String {
+        let pitch = reachedLimit
+            ? "Play music with your hands on HandStrudel. Use my invite code \(code) when you sign up to get a week of HandStrudel+."
+            : "Play music with your hands on HandStrudel. Use my invite code \(code) when you sign up and we both get a week of HandStrudel+."
+        return "\(pitch) \(url.absoluteString)"
+    }
     var reachedLimit: Bool { friendsRewarded >= rewardLimit }
 
     /// "3 friends joined" — nil before anyone has.
@@ -317,16 +325,20 @@ final class InviteManager: ObservableObject {
 
     /// Asks the server to grant anything queued for this account, then shows rewards that landed.
     func refreshRewards() async {
-        guard accountID != nil, celebration == nil else { return }
+        guard accountID != nil else { return }
         let id = accountID
-        try? await supabase.functions.invoke("grant-invite-rewards")
-        let rows: [InviteCelebration]? = try? await supabase.rpc("unseen_invite_rewards").execute().value
-        guard id == accountID, let first = rows?.first else { return }
-        // Pick up the new entitlement now instead of waiting for RevenueCat's cache to expire.
-        Purchases.shared.invalidateCustomerInfoCache()
-        _ = try? await Purchases.shared.customerInfo()
-        celebration = first
-        await loadSummary()
+        if celebration == nil {
+            try? await supabase.functions.invoke("grant-invite-rewards")
+            let rows: [InviteCelebration]? = try? await supabase.rpc("unseen_invite_rewards").execute().value
+            if id == accountID, let first = rows?.first {
+                // Pick up the new entitlement now instead of waiting for RevenueCat's cache to expire.
+                Purchases.shared.invalidateCustomerInfoCache()
+                _ = try? await Purchases.shared.customerInfo()
+                celebration = first
+            }
+        }
+        // Friends can join at any time, so the tally is refreshed whenever rewards are.
+        if id == accountID { await loadSummary() }
     }
 
     func finishCelebration(_ shown: InviteCelebration) {
@@ -402,6 +414,8 @@ struct IntroducerEntry: View {
                 Text("When you post your first take, you and your friend each get 7 days of HandStrudel+, free. Optional: leave it empty to skip.")
             }
         }
+        // Once open (including via a pre-filled code), stay open while the field is edited or cleared.
+        .onAppear { if !code.isEmpty || picked != nil { expanded = true } }
         .onChange(of: mode) { newMode in
             expanded = true  // keep the section open while switching, even after clearing the code
             if newMode == .code { picked = nil } else { code = "" }
@@ -469,6 +483,7 @@ struct InviteFriendsCard: View {
     @State private var opened: OpenedProfile?
     @State private var afterDismiss: (() -> Void)?
     @State private var showAll = false
+    @State private var sharing = false
 
     private struct OpenedProfile: Identifiable { let id: UUID }
 
@@ -491,6 +506,11 @@ struct InviteFriendsCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
             .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border) }
+            .task { await invites.loadSummary() }  // fresh tally each time Profile shows
+            .sheet(isPresented: $sharing) {
+                ShareSheet(activityItems: [summary.shareText])
+                    .presentationDetents([.medium, .large])
+            }
             .sheet(item: $opened, onDismiss: {
                 let action = afterDismiss
                 afterDismiss = nil
@@ -525,9 +545,9 @@ struct InviteFriendsCard: View {
                 }
             }
             HStack {
-                ShareLink(item: summary.url, message: Text(summary.reachedLimit
-                    ? "Play music with your hands on HandStrudel. Use my invite code \(summary.code) when you sign up to get a week of HandStrudel+."
-                    : "Play music with your hands on HandStrudel. Use my invite code \(summary.code) when you sign up and we both get a week of HandStrudel+.")) {
+                // One string with the link inside, so Copy and every share target keep the URL
+                // (ShareLink's separate `message:` is dropped by Copy).
+                Button { sharing = true } label: {
                     Label("Invite", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(ProfileActionStyle())
@@ -626,7 +646,12 @@ struct PublicIntroBadge: View {
 
     var body: some View {
         Group {
-            if let text = stats?.badgeText { IntroBadgeChip(text: text) }
+            if let text = stats?.badgeText {
+                IntroBadgeChip(text: text)
+            } else {
+                // A real (zero-size) view, so `.task` runs: it never fires on an empty Group.
+                Color.clear.frame(width: 0, height: 0)
+            }
         }
         .task(id: userID) {
             let rows: [IntroStats]? = try? await supabase.rpc("intro_stats",

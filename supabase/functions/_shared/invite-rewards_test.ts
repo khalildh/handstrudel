@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { type ClaimedGrant, type GrantStore, processInviteRewards, RevenueCat, revenueCatUserId } from "./invite-rewards.ts";
+import { type ClaimedGrant, type GrantStore, processInviteRewards, RevenueCat, revenueCatBaseURL, revenueCatUserId } from "./invite-rewards.ts";
 
 const USER = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const RC_USER = USER.toUpperCase();
@@ -138,4 +138,10 @@ Deno.test("a stale claim can't overwrite the newer attempt's result", async () =
 
 Deno.test("refuses to run without the RevenueCat secret key", () => {
   assert.throws(() => new RevenueCat(""), /REVENUECAT_SECRET_KEY/);
+});
+
+Deno.test("uses the real RevenueCat API unless a local mock URL is configured", () => {
+  assert.equal(revenueCatBaseURL(undefined), "https://api.revenuecat.com/v1");
+  assert.equal(revenueCatBaseURL("http://host.docker.internal:4700/v1/"), "http://host.docker.internal:4700/v1");
+  assert.throws(() => revenueCatBaseURL("file:///etc/passwd"));
 });

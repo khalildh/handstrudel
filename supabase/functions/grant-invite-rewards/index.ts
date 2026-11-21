@@ -2,7 +2,7 @@
 // With `X-Invite-Worker-Token: $INVITE_WORKER_TOKEN`, processes the whole queue (for a cron retry).
 // Safe to call repeatedly: rows are claimed atomically and retries check RevenueCat first.
 import { admin, caller, handler, HttpError } from "../_shared/r2.ts";
-import { processInviteRewards, RevenueCat } from "../_shared/invite-rewards.ts";
+import { processInviteRewards, RevenueCat, revenueCatBaseURL } from "../_shared/invite-rewards.ts";
 import { supabaseGrantStore } from "../_shared/invite-grant-store.ts";
 
 Deno.serve(handler(async (req) => {
@@ -19,5 +19,5 @@ Deno.serve(handler(async (req) => {
   const key = Deno.env.get("REVENUECAT_SECRET_KEY");
   // Leave grants queued until the key is configured; they are granted on a later call.
   if (!key) return { claimed: 0, granted: 0, failed: 0, configured: false };
-  return await processInviteRewards(supabaseGrantStore(admin()), new RevenueCat(key), forUser);
+  return await processInviteRewards(supabaseGrantStore(admin()), new RevenueCat(key, fetch, revenueCatBaseURL(Deno.env.get("REVENUECAT_API_URL"))), forUser);
 }));
