@@ -180,7 +180,7 @@ class CaptureControllerImpl(
         stopBacking()
         if (activeLoop != null) finishAudioLoop()
         if (recording) stopRecording()
-        if (!engine.isRunning.value && !recording && activeLoop == null) CaptureService.stop(context)
+        releaseProjectionIfIdle()
     }
 
     override fun onAppBackgrounded() {
@@ -191,7 +191,8 @@ class CaptureControllerImpl(
         when {
             recording -> stopRecording(interrupted = true)
             _state.value.isLoopCapturing && activeLoop != null -> finishAudioLoop()
-            !busy -> cancelCountdown()
+            // The consent and permission dialogs are activities too; don't cancel while they're up.
+            !busy && _ui.value.consent == null -> cancelCountdown()
         }
     }
 
@@ -410,6 +411,7 @@ class CaptureControllerImpl(
             val heardSound = active.heardSound
             val hadAudio = active.hasAudio
             finishRecordingUI()
+            releaseProjectionIfIdle()
             val completed = runCatching { completeLiveRecording(draft) }.isSuccess
             when {
                 !completed -> {
@@ -426,6 +428,11 @@ class CaptureControllerImpl(
                 }
             }
         }
+    }
+
+    /** Release the projection if the session ended while a take or loop was finishing. */
+    private fun releaseProjectionIfIdle() {
+        if (!engine.isRunning.value && !recording && activeLoop == null) CaptureService.stop(context)
     }
 
     private fun completeLiveRecording(draft: RecordingDraft) {
@@ -537,6 +544,7 @@ class CaptureControllerImpl(
             activeLoop = null
             engine.updateLoopCapture(isRecording = false, busy = false, progress = 0.0)
             _state.update { it.copy(isLoopCapturing = false, loopProgress = 0.0) }
+            releaseProjectionIfIdle()
             val duration = result.getOrElse { e ->
                 capture.file.delete()
                 recordingError("Couldn't save the loop. ${e.message ?: ""}".trim())
