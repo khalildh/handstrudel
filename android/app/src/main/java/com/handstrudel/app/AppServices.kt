@@ -5,7 +5,7 @@ import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.handstrudel.BuildConfig
 import com.handstrudel.capture.CaptureController
-import com.handstrudel.capture.NoopCaptureController
+import com.handstrudel.capture.CaptureControllerImpl
 import com.handstrudel.engine.EngineController
 import com.handstrudel.engine.LegacyStudioEngine
 import com.handstrudel.engine.StudioEngine
@@ -47,14 +47,17 @@ class AppServices(
             val analytics = createAnalytics(prefs, prefsStore)              // shell
             val engine: StudioEngine = LegacyStudioEngine(EngineController(app)) // engine
             engine.onFirstNote = { analytics.record(AppAnalyticsEvent.FIRST_NOTE) }
+            val reviewPrompt = PlayReviewPrompt(prefs, BuildConfig.VERSION_NAME) // shell
+            val capture: CaptureController =                                  // capture
+                CaptureControllerImpl(app, prefs, engine, store, auth, analytics, reviewPrompt)
             return AppServices(
                 prefs = prefs,
                 analytics = analytics,
                 engine = engine,
                 store = store,
                 auth = auth,
-                capture = NoopCaptureController(),                          // capture
-                reviewPrompt = PlayReviewPrompt(prefs, BuildConfig.VERSION_NAME), // shell
+                capture = capture,
+                reviewPrompt = reviewPrompt,
             )
         }
 

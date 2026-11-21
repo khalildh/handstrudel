@@ -13,5 +13,7 @@ class HandStrudelApplication : Application() {
     private val appScope = MainScope()
 
     val services: AppServices by lazy { AppServices.create(this) }
-    val navigator: DefaultAppNavigator by lazy { DefaultAppNavigator(services, appScope, this) }
+    val navigator: DefaultAppNavigator by lazy {
+        DefaultAppNavigator(services, appScope, this).also { services.capture.attach(it) }
+    }
 }
