@@ -227,6 +227,9 @@ final class EngineController: ObservableObject {
     /// wheel is playing. Nil plays the built-in wheel for the current mode.
     /// Cleared by every mode switch.
     @Published private(set) var customInstrument: InstrumentSpec?
+    /// The file behind `customInstrument` and the post it came from, when it was opened from a
+    /// post, My instruments or a file. Posted with takes so viewers can play the same instrument.
+    @Published private(set) var customInstrumentSource: PostedInstrument?
     @Published var chordMelodyPadVolume: Double = 0.6   // sustained chord pad gain (100% of the 0…0.6 slider range)
     let chordMelodyModeManager = ChordMelodyModeManager()
     @Published var chordMelodyCurrentDegree: Int? = nil
@@ -1394,6 +1397,31 @@ final class EngineController: ObservableObject {
         customInstrument = instrument.isBuiltIn ? nil : instrument
     }
 
+    /// Play a validated instrument file, remembering the document (with fields this version
+    /// doesn't read, such as the AI marker) and the post it came from for credit.
+    /// Like `playInstrument(_:)`, it keeps the player's sound.
+    func playInstrument(_ document: InstrumentDocument, sourceVideoID: UUID?) {
+        playInstrument(document.spec)
+        customInstrumentSource = customInstrument == nil ? nil
+            : PostedInstrument(document: document, sourceVideoID: sourceVideoID)
+    }
+
+    /// Route the wheel the instrument runs on through the SoundFont sampler or the synth, as a
+    /// posted sound asks ("Play this exactly").
+    func routeWheelSound(useSoundFont: Bool) {
+        if scaleChordMelodyModeEnabled { scaleUseSoundFont = useSoundFont }
+        if splitChordMelodyModeEnabled { splitUseSoundFont = useSoundFont }
+    }
+
+    /// The instrument a take records with. Bundled and downloaded catalog instruments ship with
+    /// the app, so they're not posted; files from posts, My instruments or generation are.
+    var instrumentForPosting: PostedInstrument? {
+        guard let customInstrument else { return nil }
+        if let source = customInstrumentSource, source.document.spec == customInstrument { return source }
+        if InstrumentCatalog.shared.all.contains(customInstrument) { return nil }
+        return PostedInstrument(document: InstrumentDocument(spec: customInstrument), sourceVideoID: nil)
+    }
+
     /// Call when switching modes to stop lingering sounds
     func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
                     lead: Bool = false, hybrid: Bool = false, flow: Bool = false,
@@ -1402,6 +1430,7 @@ final class EngineController: ObservableObject {
                     scaleChordMelody: Bool = false) {
         silenceAll()
         customInstrument = nil
+        customInstrumentSource = nil
         gridModeEnabled = grid
         drumModeEnabled = drums
         learnModeEnabled = learn

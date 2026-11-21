@@ -53,6 +53,7 @@ struct StartOverlayView: View {
     let onDrafts: () -> Void
     let onLoops: () -> Void
     let onSetups: () -> Void
+    var onInstruments: (() -> Void)? = nil
 
     @State private var showSounds = false
     @State private var showAppearance = false
@@ -125,6 +126,10 @@ struct StartOverlayView: View {
                 .accessibilityIdentifier("music-presets-button")
             libraryShortcut("Loops", icon: "repeat", action: onLoops)
                 .accessibilityIdentifier("music-loop-shelf")
+            if let onInstruments {
+                libraryShortcut("Instruments", icon: "circle.circle", action: onInstruments)
+                    .accessibilityIdentifier("my-instruments-button")
+            }
         }
         .font(.subheadline.weight(.semibold))
         .buttonStyle(.plain)

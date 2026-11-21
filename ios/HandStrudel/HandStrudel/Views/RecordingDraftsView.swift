@@ -18,6 +18,8 @@ struct RecordingDraft: Codable, Identifiable, Equatable {
     var postSubmissions: [UUID: DraftPostSubmission]? = nil
     /// Notes played during the take, in seconds since capture started (before trim or speed changes).
     var capturedNotes: [NoteTrack.Note]? = nil
+    /// The instrument file the take was played on (structure only; the sound is `soundSetup`).
+    var playedInstrument: PostedInstrument? = nil
 
     var displayTitle: String { title ?? instrument ?? "Performance" }
     var outputScale: Double { recordedAtHalfSpeed == true ? 0.5 : 1 }
@@ -110,11 +112,13 @@ final class RecordingDrafts: ObservableObject {
 
     // Create metadata before capture, so a completed file is discoverable after an app restart.
     func begin(instrument: String?, mode: String?, soundSetup: SoundSetup? = nil,
-               backingCredit: BackingCredit? = nil, halfSpeed: Bool = false) throws -> RecordingDraft {
+               backingCredit: BackingCredit? = nil, halfSpeed: Bool = false,
+               playedInstrument: PostedInstrument? = nil) throws -> RecordingDraft {
         try prepareDirectory()
-        let draft = RecordingDraft(id: UUID(), createdAt: Date(), instrument: instrument, mode: mode,
+        var draft = RecordingDraft(id: UUID(), createdAt: Date(), instrument: instrument, mode: mode,
                                    soundSetup: soundSetup, backingCredit: backingCredit,
                                    recordedAtHalfSpeed: halfSpeed ? true : nil)
+        draft.playedInstrument = playedInstrument
         try files.createDirectory(at: folder(for: draft.id), withIntermediateDirectories: false)
         do {
             try writeMetadata(draft)

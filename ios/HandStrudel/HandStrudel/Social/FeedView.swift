@@ -59,6 +59,7 @@ struct FeedView<Navigation: View>: View {
     @State private var creatorVideo: Video?
     @State private var sourceVideo: Video?
     @State private var soundVideo: Video?
+    @State private var instrumentVideo: Video?
     @State private var remixVideo: Video?
     @State private var showSaved = false
     @State private var showSearch = false
@@ -79,7 +80,7 @@ struct FeedView<Navigation: View>: View {
 
     private var allowsFeedPlayback: Bool {
         isActive && scenePhase == .active && commenting == nil && !showActivity && creatorVideo == nil
-            && sourceVideo == nil && soundVideo == nil && remixVideo == nil && sharing == nil
+            && sourceVideo == nil && soundVideo == nil && instrumentVideo == nil && remixVideo == nil && sharing == nil
             && !showSaved && !showSearch && openChallenge == nil && !showSignIn
             && reporting == nil && deleting == nil && confirmingAudioPermission == nil
     }
@@ -115,7 +116,8 @@ struct FeedView<Navigation: View>: View {
                              creator: { creatorVideo = video },
                              advance: { advanceAfterClip(video.id) },
                              showSound: { soundVideo = video },
-                             source: { id in Task { await openSource(id) } })
+                             source: { id in Task { await openSource(id) } },
+                             showInstrument: { instrumentVideo = video })
                         .environment(\.studioPalette, palette)
                         .environment(\.colorScheme, .dark)
                         .ignoresSafeArea(.container, edges: [.top, .bottom])
@@ -277,6 +279,9 @@ struct FeedView<Navigation: View>: View {
                 pendingStart = .preset(sound)
                 sourceVideo = nil
             })
+        }
+        .sheet(item: $instrumentVideo, onDismiss: resumePerformance) { video in
+            if let summary = video.postInstrument { PostInstrumentSheet(video: video, summary: summary) }
         }
         .sheet(item: $soundVideo, onDismiss: resumePerformance) { video in
             FeedSoundSheet(video: video) { start in
@@ -1545,9 +1550,11 @@ private struct PerformanceDetail: View {
     @State private var audioDownload: Video?
     @State private var canDownloadAudio = false
     @State private var sharing = false
+    @State private var showInstrument = false
 
     private var isCurrent: Bool {
         detailIsVisible && playerIsOnScreen && scenePhase == .active && !showComments && audioDownload == nil && !sharing
+            && !showInstrument
     }
 
     var body: some View {
@@ -1602,6 +1609,9 @@ private struct PerformanceDetail: View {
             }
         }
         .sheet(isPresented: $sharing) { VideoShareSheet(video: video) }
+        .sheet(isPresented: $showInstrument) {
+            if let summary = video.postInstrument { PostInstrumentSheet(video: video, summary: summary) }
+        }
         .sheet(isPresented: $showComments) {
             CommentsView(video: video, auth: auth, targetComment: notification?.commentId)
         }
@@ -1655,6 +1665,9 @@ private struct PerformanceDetail: View {
                 })
             } else if let instrument = video.instrument {
                 Label(instrument, systemImage: "waveform").font(.caption).foregroundStyle(.secondary)
+            }
+            if let instrument = video.postInstrument {
+                PostInstrumentChip(video: video, summary: instrument, onMedia: false) { showInstrument = true }
             }
             if !video.caption.isEmpty { Text(verbatim: video.caption) }
             if let notification { notificationCard(notification) }
@@ -2018,6 +2031,7 @@ private struct FeedCell: View {
     let advance: () -> Bool
     let showSound: () -> Void
     let source: (UUID) -> Void
+    var showInstrument: () -> Void = {}
 
     private var isCurrent: Bool { playbackGate.selectedVideoID == video.id }
 
@@ -2062,6 +2076,9 @@ private struct FeedCell: View {
                     Label(instrument, systemImage: "waveform")
                         .font(.caption.monospaced())
                         .foregroundStyle(palette.mediaAccent)
+                }
+                if let instrument = video.postInstrument {
+                    PostInstrumentChip(video: video, summary: instrument, action: showInstrument)
                 }
                 if let id = video.sourceVideoId, let username = video.sourceUsername {
                     Button("Inspired by @\(username)") { source(id) }
