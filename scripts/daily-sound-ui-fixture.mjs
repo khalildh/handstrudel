@@ -15,8 +15,14 @@ const now = new Date();
 const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 const day = (offset) => new Date(startOfDay.getTime() + offset * 86_400_000);
 const isoDay = (date) => date.toISOString().slice(0, 10);
+// A random free sound per run, so the test can tell it was really applied (GET /__fixture/daily).
+const pick = (items) => items[Math.floor(Math.random() * items.length)];
+const [instrumentID, instrumentName] = pick([["grand_piano", "Grand Piano"], ["electric_piano_1", "Rhodes EP"],
+  ["nylon_guitar", "Nylon Guitar"], ["clean_guitar", "Clean Guitar"], ["acoustic_bass", "Upright Bass"],
+  ["violin", "Violin"], ["strings", "Strings Ensemble"], ["choir", "Choir Aahs"]]);
 const setup = {
-  version: 1, instrument: "grand_piano", waveform: "sine", key: "Eb", scale: "Major", progression: "pop",
+  version: 1, instrument: instrumentID, waveform: "sine", key: pick(["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]),
+  scale: pick(["Major", "Minor", "Dorian"]), progression: pick(["pop", "fifties", "jazz", "blues"]),
   mode: "scalechordmelody", bpm: 92, useSoundFont: true, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
 };
 const clip = (index, username, caption, likes) => ({
@@ -50,6 +56,8 @@ createServer((request, response) => {
   const send = (value, status = 200) => response.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(value));
   request.resume();
   switch (url.pathname) {
+    case "/__fixture/daily":
+      return send({ instrument: instrumentName, key: setup.key });
     case "/rest/v1/rpc/daily_sound_today":
       return send(payload(signedIn.has(token)));
     case "/rest/v1/rpc/daily_streak_profile":

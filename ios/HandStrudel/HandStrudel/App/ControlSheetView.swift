@@ -1157,6 +1157,9 @@ struct ControlSheet: View {
                         }
                         .opacity(locked ? 0.5 : 1.0)
                     }
+                    .accessibilityIdentifier("hand-theme-\(theme.id)")
+                    .accessibilityValue(locked ? "Locked" : "Unlocked")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
         }

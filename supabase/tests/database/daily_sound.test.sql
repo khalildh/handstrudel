@@ -1,6 +1,6 @@
 -- Daily sound picking, take counting and streaks.  Run: supabase test db
 begin;
-select plan(74);
+select plan(80);
 
 -- Fixed weeks in the future so tests never depend on today's date: d(0) is a Monday (UTC).
 create function pg_temp.d(n int) returns date language sql as $$
@@ -242,6 +242,28 @@ select throws_ok($$ select public.schedule_daily_sound(current_setting('test.d15
 select throws_ok($$ select public.schedule_daily_sound(current_setting('test.d26')::date, '10000000-0000-0000-0000-000000000003') $$,
   'P0001', 'DAILY_SOUND_VIDEO_UNAVAILABLE', 'hidden posts cannot be scheduled');
 reset role;
+
+-- ------------------------------------------- real path, at the real current time
+-- The owner schedules today's sound, then a take goes through the same functions the upload
+-- endpoints call: reserve (sign-upload), then publish after screening (publish-upload).
+set local role service_role;
+select is((public.schedule_daily_sound((now() at time zone 'UTC')::date, '10000000-0000-0000-0000-000000000001', 'Real path')).source,
+  'scheduled', 'the owner schedules a post for today, replacing the automatic pick');
+select set_config('test.upload', public.reserve_video_upload('00000000-0000-0000-0000-0000000000e1', 100, 20)::text, true);
+update public.pending_video_uploads set status = 'checking' where id = current_setting('test.upload')::uuid;
+select lives_ok(format($$ select public.publish_screened_video(%L, %L, 0) $$, current_setting('test.upload'),
+  jsonb_build_object('duration_s', 8, 'width', 720, 'height', 1280, 'caption', 'my take',
+                     'sound_setup', pg_temp.setup('grand_piano', 'C') || '{"bpm":130}')), 'the screened take publishes');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000e1');
+set local role authenticated;
+select is((public.daily_sound_today()->'sound'->>'title'), 'Real path', 'the scheduled sound is today''s sound');
+select ok((public.daily_sound_today()->'takes') @> jsonb_build_array(jsonb_build_object('id', current_setting('test.upload'))),
+  'the published take is in today''s takes');
+select is((public.daily_sound_today()->'streak'->>'current')::int, 1, 'publishing the take starts the poster''s streak');
+select is((public.daily_sound_today()->'streak'->>'posted_today')::boolean, true, 'and marks today as done');
+reset role;
+select set_config('request.jwt.claims', '', true);
 
 select * from finish();
 rollback;

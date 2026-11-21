@@ -23,7 +23,7 @@ struct DailySoundCard: View {
             }
         }
         // ContentView loads it at launch and on sign-in; this refreshes when the card reappears.
-        .task(id: auth.userId) { await store.refresh(viewer: auth.userId, maxAge: 30) }
+        .task(id: auth.userId) { await store.refresh(viewer: auth.userId, maxAge: 5) }
         .sheet(item: $watching, onDismiss: {
             switch afterDismiss {
             case .sound(let setup): onPlay(setup)

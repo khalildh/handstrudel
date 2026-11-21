@@ -2345,25 +2345,30 @@ extension HandStrudelUITests {
         guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_DAILY_FIXTURE_URL"] else {
             throw XCTSkip("Requires the daily sound fixture.")
         }
+        let today = try fetchJSON(URL(string: "\(endpoint)/__fixture/daily")!)
+        let instrument = try XCTUnwrap(today["instrument"] as? String)
+        let key = try XCTUnwrap(today["key"] as? String)
         app.launchArguments.append("--uitesting")
-        for key in ["SUPABASE_URL", "MEDIA_BASE_URL", "CLIP_MEDIA_BASE_URL"] { app.launchEnvironment[key] = endpoint }
+        for name in ["SUPABASE_URL", "MEDIA_BASE_URL", "CLIP_MEDIA_BASE_URL"] { app.launchEnvironment[name] = endpoint }
         app.launchEnvironment["SUPABASE_ANON_KEY"] = "daily-fixture-key"
         app.launch()
-        signOutOfDailyFixture()
+        signOutOfDaily()
 
         let card = element("daily-sound-card")
         XCTAssertTrue(card.waitForExistence(timeout: 10), "Today's sound sits at the top of the Music home")
         XCTAssertTrue(app.staticTexts["Night Drive"].exists)
         XCTAssertTrue(app.buttons["daily-sound-creator"].exists)
         XCTAssertEqual(element("daily-take-count").label, "3 takes today")
+        for taker in ["cara", "dan_plays", "eve"] {
+            XCTAssertTrue(app.buttons["Take by @\(taker)"].exists, "Today's takes are on the card")
+        }
         XCTAssertTrue((element("daily-time-left").label).hasPrefix("New sound in"))
         XCTAssertTrue(app.buttons["daily-streak-sign-in"].exists, "Signed out, the card invites a sign-in")
         captureIfRequested("Daily-Sound-Guest")
 
         signInToProfile()
         XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 12))
-        let profileStreak = element("profile-daily-streak")
-        XCTAssertTrue(profileStreak.waitForExistence(timeout: 5), "The profile shows the streak and badges")
+        XCTAssertTrue(element("profile-daily-streak").waitForExistence(timeout: 5), "The profile shows the streak and badges")
         element("tab-music").tap()
 
         let current = element("daily-streak-current")
@@ -2380,25 +2385,205 @@ extension HandStrudelUITests {
         captureIfRequested("Daily-Sound-Streak")
         app.swipeDown(velocity: .slow)
 
-        let play = app.buttons["daily-play-sound"]
-        XCTAssertEqual(play.label, "Play today's sound")
-        play.tap()
-        let close = element("close-button")
-        XCTAssertTrue(close.waitForExistence(timeout: 10), "Play today's sound opens the studio")
-        close.tap()
-        signOutOfDailyFixture()
+        playTodaysSoundAndCheckStudio(instrument: instrument, key: key)
+        // The lent theme (Royal) is unlocked in the studio's hand themes; the others stay locked.
+        checkHandTheme("purple_gold", is: "Unlocked")
+        checkHandTheme("matrix", is: "Locked")
+        closeMusicSettings()
+        element("close-button").tap()
+        signOutOfDaily()
     }
 
-    /// Leaves the fixture account so the next run starts signed out.
-    private func signOutOfDailyFixture() {
+    /// The whole feature against a real local Supabase stack seeded by
+    /// `scripts/daily-sound-e2e-seed.sh` (see its header). Needs HANDSTRUDEL_DAILY_E2E_* from the
+    /// seed, plus _URL, _ANON_KEY, _SERVICE_KEY and _MAILPIT_URL for that stack.
+    func testDailySoundEndToEndAgainstLocalSupabase() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let api = env["HANDSTRUDEL_DAILY_E2E_URL"], let anon = env["HANDSTRUDEL_DAILY_E2E_ANON_KEY"],
+              let service = env["HANDSTRUDEL_DAILY_E2E_SERVICE_KEY"], let mailpit = env["HANDSTRUDEL_DAILY_E2E_MAILPIT_URL"],
+              let email = env["HANDSTRUDEL_DAILY_E2E_EMAIL"], let viewer = env["HANDSTRUDEL_DAILY_E2E_VIEWER_ID"],
+              let title = env["HANDSTRUDEL_DAILY_E2E_TITLE"], let creator = env["HANDSTRUDEL_DAILY_E2E_CREATOR"],
+              let taker = env["HANDSTRUDEL_DAILY_E2E_TAKER"], let instrument = env["HANDSTRUDEL_DAILY_E2E_INSTRUMENT"],
+              let key = env["HANDSTRUDEL_DAILY_E2E_KEY"], let setup = env["HANDSTRUDEL_DAILY_E2E_SETUP"] else {
+            throw XCTSkip("Requires a local Supabase stack seeded by scripts/daily-sound-e2e-seed.sh.")
+        }
+        app.launchArguments.append("--uitesting")
+        for name in ["SUPABASE_URL", "MEDIA_BASE_URL", "CLIP_MEDIA_BASE_URL"] { app.launchEnvironment[name] = api }
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = anon
+        app.launch()
+        signOutOfDaily()
+
+        // The owner's scheduled post is today's sound, with the seeded take on the card.
+        let card = element("daily-sound-card")
+        XCTAssertTrue(card.waitForExistence(timeout: 15))
+        XCTAssertEqual(element("daily-sound-title").label, title, "The scheduled sound is today's")
+        XCTAssertEqual(app.buttons["daily-sound-creator"].label, "Watch @\(creator)'s performance")
+        XCTAssertEqual(element("daily-take-count").label, "1 take today")
+        XCTAssertTrue(app.buttons["Take by @\(taker)"].exists, "The published take is on the card")
+
+        // Sign in with the code the local stack emailed.
+        let sentAfter = Date()
+        element("tab-account").tap()
+        let signIn = app.buttons["Sign in"]
+        XCTAssertTrue(signIn.waitForExistence(timeout: 5))
+        signIn.tap()
+        let emailField = app.textFields["you@example.com"]
+        XCTAssertTrue(emailField.waitForExistence(timeout: 5))
+        emailField.tap()
+        emailField.typeText(email)
+        app.buttons["Email me a code"].tap()
+        let codeField = app.textFields["6-digit code"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10))
+        codeField.tap()
+        codeField.typeText(try signInCode(mailpit: mailpit, to: email, after: sentAfter))
+        app.buttons["verify-sign-in-code"].tap()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 15))
+        element("tab-music").tap()
+
+        // Six earlier days with one missed day: the freeze keeps the streak alive at 6.
+        let current = element("daily-streak-current")
+        XCTAssertTrue(current.waitForExistence(timeout: 10))
+        XCTAssertEqual(current.label, "6-day streak")
+        XCTAssertTrue(element("daily-streak-status").label.hasPrefix("Post a take"))
+        XCTAssertFalse(element("daily-theme-loan").exists)
+
+        // Before the reward: the + hand theme is locked in the studio.
+        playTodaysSoundAndCheckStudio(instrument: instrument, key: key)
+        checkHandTheme("fire_ice", is: "Locked")
+        closeMusicSettings()
+        element("close-button").tap()
+
+        // The server publishes the viewer's screened take with today's sound.
+        let upload = try serviceRPC(api, key: service, "reserve_video_upload",
+                                    ["uploader": viewer, "video_size": 100, "thumb_size": 20]) as? String
+        let uploadID = try XCTUnwrap(upload)
+        try serviceRequest(api, key: service, method: "PATCH", path: "/rest/v1/pending_video_uploads?id=eq.\(uploadID)",
+                           body: ["status": "checking"])
+        let fields: [String: Any] = ["duration_s": 8, "width": 720, "height": 1280, "caption": "My daily take",
+                                     "sound_setup": try JSONSerialization.jsonObject(with: Data(setup.utf8))]
+        _ = try serviceRPC(api, key: service, "publish_screened_video",
+                           ["upload_id": uploadID, "fields": fields, "checked_attempt": 0])
+
+        // Coming back to Music shows the take counted, the streak at 7 and the reward.
+        element("tab-account").tap()
+        element("tab-music").tap()
+        let seven = NSPredicate(format: "label == %@", "7-day streak")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: seven, object: current)], timeout: 15), .completed,
+                       "Publishing today's take extends the streak: \(current.label)")
+        XCTAssertEqual(element("daily-streak-status").label, "Today's take counted. Come back tomorrow.")
+        XCTAssertEqual(element("daily-take-count").label, "2 takes today")
+        XCTAssertTrue(element("daily-theme-loan").label.contains("Fire & Ice hand theme unlocked"), element("daily-theme-loan").label)
+        XCTAssertEqual(element("daily-streak-badges").label, "Streak badges: 3 days, 7 days")
+
+        // After the reward: StoreManager unlocks that theme, and choosing it works.
+        playTodaysSoundAndCheckStudio(instrument: instrument, key: key, expectChange: false)
+        checkHandTheme("fire_ice", is: "Unlocked")
+        checkHandTheme("ocean", is: "Locked")
+        let fireIce = element("hand-theme-fire_ice")
+        fireIce.tap()
+        XCTAssertTrue(fireIce.isSelected, "The lent theme can be chosen without a purchase")
+        closeMusicSettings()
+        element("close-button").tap()
+        signOutOfDaily()
+    }
+
+    /// Taps "Play today's sound" and checks the studio opened with that instrument and key.
+    private func playTodaysSoundAndCheckStudio(instrument: String, key: String, expectChange: Bool = true) {
+        let artwork = element("sound-artwork")
+        if expectChange, artwork.waitForExistence(timeout: 5) {
+            let before = (artwork.value as? String) ?? ""
+            XCTAssertFalse(before.hasPrefix("\(instrument), \(key) "),
+                           "The studio already had today's sound (\(before)); rerun so the check means something")
+        }
+        let play = app.buttons["daily-play-sound"]
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        XCTAssertEqual(play.label, "Play today's sound")
+        play.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10), "Play today's sound opens the studio")
+        element("settings-button").tap()
+        let sound = app.buttons["music-settings-sound"]
+        XCTAssertTrue(sound.waitForExistence(timeout: 5))
+        if !sound.isSelected { sound.tap() }
+        // The "Current sound" header: the instrument, then "<key> <scale> / <progression>".
+        XCTAssertTrue(element("studio-current-sound").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts[instrument].exists, "The studio plays today's instrument, \(instrument)")
+        let keyLine = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", "\(key) ", " / ")).firstMatch
+        XCTAssertTrue(keyLine.exists, "The studio is in today's key, \(key)")
+    }
+
+    /// Opens the Capture settings and checks a hand theme's lock state.
+    private func checkHandTheme(_ id: String, is state: String) {
+        let capture = app.buttons["music-settings-capture"]
+        XCTAssertTrue(capture.waitForExistence(timeout: 5))
+        if !capture.isSelected { capture.tap() }
+        let theme = element("hand-theme-\(id)")
+        revealInMusicSettings(theme)
+        XCTAssertEqual(theme.value as? String, state, "Hand theme \(id)")
+    }
+
+    /// Leaves any account so the next run starts signed out.
+    private func signOutOfDaily() {
         let account = element("tab-account")
         XCTAssertTrue(account.waitForExistence(timeout: 10))
         account.tap()
-        if app.buttons["Edit profile"].waitForExistence(timeout: 4) {
+        // Also covers a stale session from another backend ("Couldn't load your profile").
+        if !app.buttons["Sign in"].waitForExistence(timeout: 4) {
             app.buttons["Account settings"].tap()
-            app.buttons["Sign out"].tap()
+            let signOut = app.buttons["Sign out"]
+            if signOut.waitForExistence(timeout: 3) { signOut.tap() }
             XCTAssertTrue(app.buttons["Sign in"].waitForExistence(timeout: 8))
         }
         element("tab-music").tap()
+    }
+
+    private func fetchJSON(_ url: URL) throws -> [String: Any] {
+        try XCTUnwrap(try JSONSerialization.jsonObject(with: try syncRequest(URLRequest(url: url))) as? [String: Any])
+    }
+
+    /// The 6-digit sign-in code from the local stack's Mailpit inbox.
+    private func signInCode(mailpit: String, to email: String, after: Date) throws -> String {
+        let deadline = Date().addingTimeInterval(20)
+        let search = URL(string: "\(mailpit)/api/v1/search?query=" + "to:\(email)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        while Date() < deadline {
+            if let messages = try fetchJSON(search)["messages"] as? [[String: Any]], let id = messages.first?["ID"] as? String {
+                let message = try fetchJSON(URL(string: "\(mailpit)/api/v1/message/\(id)")!)
+                let text = (message["Text"] as? String ?? "") + (message["HTML"] as? String ?? "")
+                if let range = text.range(of: #"\b\d{6}\b"#, options: .regularExpression) { return String(text[range]) }
+            }
+            Thread.sleep(forTimeInterval: 1)
+        }
+        throw XCTSkip("No sign-in email reached Mailpit after \(after).")
+    }
+
+    @discardableResult
+    private func serviceRPC(_ api: String, key: String, _ function: String, _ body: [String: Any]) throws -> Any? {
+        let data = try serviceRequest(api, key: key, method: "POST", path: "/rest/v1/rpc/\(function)", body: body)
+        return data.isEmpty ? nil : try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
+    }
+
+    @discardableResult
+    private func serviceRequest(_ api: String, key: String, method: String, path: String, body: [String: Any]) throws -> Data {
+        var request = URLRequest(url: URL(string: api + path)!)
+        request.httpMethod = method
+        request.setValue(key, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try syncRequest(request)
+    }
+
+    private func syncRequest(_ request: URLRequest) throws -> Data {
+        var result: Result<Data, Error> = .failure(URLError(.timedOut))
+        let done = expectation(description: request.url?.absoluteString ?? "request")
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error { result = .failure(error) }
+            else if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                result = .failure(NSError(domain: "HTTP", code: http.statusCode,
+                                          userInfo: [NSLocalizedDescriptionKey: String(decoding: data ?? Data(), as: UTF8.self)]))
+            } else { result = .success(data ?? Data()) }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 20)
+        return try result.get()
     }
 }
