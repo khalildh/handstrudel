@@ -563,7 +563,7 @@ final class HandStrudelUITests: XCTestCase {
         sound.tap()
         let playAlong = app.buttons["play-along"].firstMatch
         XCTAssertTrue(playAlong.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.navigationBars["Sound options"].exists)
+        XCTAssertTrue(app.navigationBars["Sound"].exists)
         XCTAssertTrue(app.buttons["save-clip-preset"].exists)
         captureIfRequested("Feed-Sound-Options")
         playAlong.tap()
@@ -831,6 +831,50 @@ final class HandStrudelUITests: XCTestCase {
         copy.tap()
         let recorded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "5 shares"), object: share)
         XCTAssertEqual(XCTWaiter.wait(for: [recorded], timeout: 7), .completed)
+    }
+
+    func testFeedSoundRowOpensSoundPageWithTakes() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_SOUND_PAGE_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with FIXTURE_SOUND_PAGES=1.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "sound-page-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        element("tab-feed").tap()
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 8))
+        let counted = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "Sound: Grand Piano · D Minor · 2 takes"), object: sound)
+        XCTAssertEqual(XCTWaiter.wait(for: [counted], timeout: 8), .completed, sound.label)
+        captureIfRequested("Feed-Sound-Row")
+        sound.tap()
+
+        XCTAssertTrue(app.navigationBars["Sound"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["sound-page-title"].label, "Grand Piano")
+        let takeCount = app.staticTexts["sound-page-take-count"]
+        XCTAssertTrue(takeCount.waitForExistence(timeout: 5))
+        XCTAssertEqual(takeCount.label, "2 takes")
+        let original = app.buttons["sound-page-original"]
+        XCTAssertTrue(original.waitForExistence(timeout: 5))
+        XCTAssertEqual(original.label, "Original sound by @loopmaker")
+        XCTAssertEqual(app.buttons["play-clip-preset"].label, "Play this sound")
+        XCTAssertTrue(app.buttons["sound-page-share"].exists)
+        let takes = app.buttons.matching(identifier: "sound-take")
+        XCTAssertTrue(takes.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(takes.count, 2)
+        XCTAssertTrue(takes.element(boundBy: 0).label.hasPrefix("Original by @loopmaker"), takes.element(boundBy: 0).label)
+        captureIfRequested("Sound-Page-Top")
+
+        app.segmentedControls["sound-take-order"].buttons["Recent"].tap()
+        let newestFirst = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label BEGINSWITH %@", "Take by @secondartist"), object: takes.element(boundBy: 0))
+        XCTAssertEqual(XCTWaiter.wait(for: [newestFirst], timeout: 5), .completed)
+        captureIfRequested("Sound-Page-Recent")
+
+        takes.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["Second performance"].firstMatch.waitForExistence(timeout: 5))
     }
 
     func testFeedRemixesOpensPublishedPlayAlongClips() throws {

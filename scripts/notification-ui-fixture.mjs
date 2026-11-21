@@ -19,6 +19,8 @@ const thumbnailRequests = [];
 const countViews = process.env.FIXTURE_VIEW_COUNTS === "1";
 const showEngagement = process.env.FIXTURE_ENGAGEMENT === "1";
 const showReposts = process.env.FIXTURE_REPOSTS === "1";
+// Sound pages: the first two clips share one sound (the second is a take on the first).
+const soundPages = process.env.FIXTURE_SOUND_PAGES === "1";
 let shareCount = 4;
 const counted = new Set();
 let mediaAvailable = !canControlMedia;
@@ -204,6 +206,30 @@ createServer((request, response) => {
         else send([engagement(key)]);
       });
       return;
+    }
+    case "/rest/v1/rpc/sound_summary":
+    case "/rest/v1/rpc/sound_take_counts": {
+      if (!soundPages) return response.writeHead(404, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ code: "PGRST202", message: "Missing sound function" }));
+      let body = "";
+      request.on("data", (chunk) => { body += chunk; });
+      request.on("end", () => {
+        const { target_video, target_videos } = JSON.parse(body);
+        const takes = [post.id, secondPost.id];
+        if (route.endsWith("sound_summary")) {
+          return send(takes.includes(target_video.toLowerCase())
+            ? [{ sound_id: post.id, take_count: takes.length, original_video_id: post.id }] : []);
+        }
+        send(target_videos.map((id) => id.toLowerCase()).filter((id) => takes.includes(id))
+          .map((video_id) => ({ video_id, sound_id: post.id, take_count: takes.length })));
+      });
+      return;
+    }
+    case "/rest/v1/sound_takes": {
+      if (!soundPages) return send([]);
+      const top = (url.searchParams.get("order") ?? "").startsWith("like_count");
+      const takes = [post, secondPost].map((item) => ({ ...item, sound_id: post.id, is_original: item.id === post.id }));
+      return send(top ? takes : takes.reverse());
     }
     case "/rest/v1/rpc/record_video_share":
       if (!showEngagement) return response.writeHead(404).end();
