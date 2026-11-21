@@ -1,0 +1,26 @@
+{
+  "description": "Surfaces other than the split wheel need format_version 2.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 1,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "grid",
+      "rows": 2,
+      "columns": 2
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0
+      }
+    ]
+  },
+  "expect": {
+    "accepted": false,
+    "issues": [
+      "malformed"
+    ]
+  }
+}

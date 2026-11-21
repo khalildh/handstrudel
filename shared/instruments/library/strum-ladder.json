@@ -1,0 +1,78 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.strum-ladder",
+  "name": "Strum Ladder",
+  "description": "Chords on the bottom rungs for one hand, the held chord's notes on the top rungs to strum with the other.",
+  "surface": {
+    "type": "strips",
+    "orientation": "vertical"
+  },
+  "zones": [
+    {
+      "role": "chord",
+      "slot": 0,
+      "hand": "left"
+    },
+    {
+      "role": "chord",
+      "slot": 1,
+      "hand": "left"
+    },
+    {
+      "role": "chord",
+      "slot": 2,
+      "hand": "left"
+    },
+    {
+      "role": "chord",
+      "slot": 3,
+      "hand": "left"
+    },
+    {
+      "role": "chord_tone",
+      "tone": 0,
+      "hand": "right",
+      "behavior": "retrigger"
+    },
+    {
+      "role": "chord_tone",
+      "tone": 1,
+      "hand": "right",
+      "behavior": "retrigger"
+    },
+    {
+      "role": "chord_tone",
+      "tone": 2,
+      "hand": "right",
+      "behavior": "retrigger"
+    },
+    {
+      "role": "chord_tone",
+      "tone": 0,
+      "octave": 1,
+      "hand": "right",
+      "behavior": "retrigger"
+    },
+    {
+      "role": "chord_tone",
+      "tone": 1,
+      "octave": 1,
+      "hand": "right",
+      "behavior": "retrigger"
+    },
+    {
+      "role": "chord_tone",
+      "tone": 2,
+      "octave": 1,
+      "hand": "right",
+      "behavior": "retrigger"
+    }
+  ],
+  "visuals": {
+    "palette": "theme",
+    "shape": "rounded",
+    "effect": "ripple",
+    "labels": "notes"
+  }
+}

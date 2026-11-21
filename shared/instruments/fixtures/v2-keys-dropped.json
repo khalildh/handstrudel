@@ -1,0 +1,58 @@
+{
+  "description": "Keys that would be narrower than 44 points are dropped: at most 7 across, 10 up.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "keys",
+      "orientation": "horizontal"
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0
+      },
+      {
+        "role": "note",
+        "degree": 1
+      },
+      {
+        "role": "note",
+        "degree": 2
+      },
+      {
+        "role": "note",
+        "degree": 3
+      },
+      {
+        "role": "note",
+        "degree": 4
+      },
+      {
+        "role": "note",
+        "degree": 5
+      },
+      {
+        "role": "note",
+        "degree": 6
+      },
+      {
+        "role": "note",
+        "degree": 7
+      },
+      {
+        "role": "note",
+        "degree": 8
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "zones_dropped"
+    ],
+    "zone_count": 7
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "description": "Zones split between the hands can reach 16 each.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "grid",
+      "rows": 4,
+      "columns": 5
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 1,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 2,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 3,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 4,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 5,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 6,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 7,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 8,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 9,
+        "hand": "left"
+      },
+      {
+        "role": "note",
+        "degree": 0,
+        "hand": "right"
+      },
+      {
+        "role": "note",
+        "degree": 1,
+        "hand": "right"
+      },
+      {
+        "role": "note",
+        "degree": 2,
+        "hand": "right"
+      },
+      {
+        "role": "note",
+        "degree": 3,
+        "hand": "right"
+      },
+      {
+        "role": "note",
+        "degree": 4,
+        "hand": "right"
+      },
+      {
+        "role": "note",
+        "degree": 5,
+        "hand": "right"
+      },
+      {
+        "role": "note",
+        "degree": 6,
+        "hand": "right"
+      },
+      {
+        "role": "note",
+        "degree": 7,
+        "hand": "right"
+      },
+      {
+        "role": "note",
+        "degree": 8,
+        "hand": "right"
+      },
+      {
+        "role": "note",
+        "degree": 9,
+        "hand": "right"
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [],
+    "zone_count": 20
+  }
+}

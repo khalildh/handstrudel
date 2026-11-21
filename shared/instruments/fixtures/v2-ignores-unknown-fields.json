@@ -1,0 +1,45 @@
+{
+  "description": "Unknown fields (a sound, a tempo) are ignored; instruments never choose music.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "radial"
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0
+      },
+      {
+        "role": "note",
+        "degree": 1
+      },
+      {
+        "role": "note",
+        "degree": 2
+      }
+    ],
+    "sound": {
+      "key": "D",
+      "scale": "Dorian",
+      "instrument": "strings"
+    },
+    "tempo": 128,
+    "visuals": {
+      "palette": "ember",
+      "sparkle": true
+    }
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [],
+    "values": {
+      "surface.inner_radius": 0.35,
+      "visuals.palette": "ember"
+    },
+    "zone_count": 3
+  }
+}

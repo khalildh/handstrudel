@@ -88,6 +88,7 @@ final class RemoteConfig: ObservableObject {
     var updateMessage: String? { string(RemoteConfigKeys.updateMessage).nilIfEmpty }
     var appStoreURL: URL { URL(string: string(RemoteConfigKeys.appStoreURL)) ?? RemoteConfigKeys.defaultAppStoreURL }
     var remoteInstrumentsEnabled: Bool { bool(RemoteConfigKeys.remoteInstruments) }
+    var instrumentSurfacesEnabled: Bool { bool(RemoteConfigKeys.instrumentSurfaces) }
 
     var updateRequirement: UpdateRequirement {
         UpdateRequirement(current: appVersion, minimum: minimumVersion, recommended: recommendedVersion)
@@ -180,6 +181,7 @@ enum RemoteConfigKeys {
     static let updateMessage = "update.message"
     static let appStoreURL = "update.app_store_url"
     static let remoteInstruments = "instruments.remote_enabled"
+    static let instrumentSurfaces = "instruments.surfaces_enabled"
 
     static let defaultAppStoreURL = URL(string: "https://apps.apple.com/app/id6764415289")!
 
@@ -212,6 +214,7 @@ enum RemoteConfigKeys {
         updateMessage: .init(kind: .string(maxLength: 200), defaultValue: .string("")),
         appStoreURL: .init(kind: .string(maxLength: nil), defaultValue: .string(defaultAppStoreURL.absoluteString)),
         remoteInstruments: .init(kind: .bool, defaultValue: .bool(true)),
+        instrumentSurfaces: .init(kind: .bool, defaultValue: .bool(false)),
     ]
 
     static let defaults: [String: JSONValue] = definitions.mapValues(\.defaultValue)

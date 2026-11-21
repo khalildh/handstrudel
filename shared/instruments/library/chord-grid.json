@@ -1,0 +1,46 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.chord-grid",
+  "name": "Chord Grid",
+  "description": "The first four chords of your progression as four big squares. Hold one to sustain it.",
+  "surface": {
+    "type": "grid",
+    "rows": 2,
+    "columns": 2
+  },
+  "zones": [
+    {
+      "role": "chord",
+      "slot": 0
+    },
+    {
+      "role": "chord",
+      "slot": 1
+    },
+    {
+      "role": "chord",
+      "slot": 2
+    },
+    {
+      "role": "chord",
+      "slot": 3
+    }
+  ],
+  "gestures": {
+    "play": "pinch",
+    "expressions": [
+      {
+        "hand": "right",
+        "input": "x",
+        "parameter": "filter"
+      }
+    ]
+  },
+  "visuals": {
+    "palette": "ember",
+    "shape": "rounded",
+    "effect": "glow",
+    "labels": "notes"
+  }
+}

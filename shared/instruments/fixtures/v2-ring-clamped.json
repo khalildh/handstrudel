@@ -1,0 +1,38 @@
+{
+  "description": "Radial rings are clamped so the ring stays at least 0.3 deep.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "radial",
+      "inner_radius": 0.9,
+      "outer_radius": 0.5
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0
+      },
+      {
+        "role": "note",
+        "degree": 1
+      },
+      {
+        "role": "note",
+        "degree": 2
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "surface_clamped"
+    ],
+    "values": {
+      "surface.outer_radius": 0.6,
+      "surface.inner_radius": 0.3
+    }
+  }
+}

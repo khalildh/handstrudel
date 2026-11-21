@@ -1,0 +1,34 @@
+{
+  "description": "Arc angles are clamped into −100…100 degrees with at least 60 degrees between them.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "arc",
+      "start_angle": -150,
+      "end_angle": -80
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0
+      },
+      {
+        "role": "note",
+        "degree": 1
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "surface_clamped"
+    ],
+    "values": {
+      "surface.start_angle": -100,
+      "surface.end_angle": -40
+    }
+  }
+}

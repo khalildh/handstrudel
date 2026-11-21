@@ -1,0 +1,32 @@
+{
+  "description": "A split wheel in format 2 behaves exactly like format 1.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.wheel",
+    "name": "Wheel",
+    "surface": {
+      "type": "split_wheel",
+      "radius": 1.0,
+      "rest_radius": 0.36,
+      "octave_band_radius": 0.8
+    },
+    "chords": {
+      "side": "left"
+    },
+    "notes": {
+      "source": "scale_one_octave",
+      "octave_band": true,
+      "highlight_chord_tones": true
+    }
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [],
+    "values": {
+      "surface.type": "split_wheel",
+      "surface.rest_radius": 0.36,
+      "notes.source": "scale_one_octave"
+    }
+  }
+}

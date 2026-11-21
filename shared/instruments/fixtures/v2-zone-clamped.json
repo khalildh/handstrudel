@@ -1,0 +1,39 @@
+{
+  "description": "Role values out of range are clamped: degree 0–20, octave −2…2, slot 0–7, tone 0–3.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "keys"
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 40,
+        "octave": 5
+      },
+      {
+        "role": "chord",
+        "slot": -3
+      },
+      {
+        "role": "chord_tone",
+        "tone": 9
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "zone_clamped"
+    ],
+    "values": {
+      "zones.0.degree": 20,
+      "zones.0.octave": 2,
+      "zones.1.slot": 0,
+      "zones.2.tone": 3
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "description": "A format 2 grid with notes, a chord and gestures loads cleanly.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "grid",
+      "rows": 2,
+      "columns": 2
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0
+      },
+      {
+        "role": "note",
+        "degree": 2,
+        "octave": 1
+      },
+      {
+        "role": "chord",
+        "slot": 1
+      },
+      {
+        "role": "chord_tone",
+        "tone": 2
+      }
+    ],
+    "gestures": {
+      "play": "pinch",
+      "expressions": [
+        {
+          "hand": "right",
+          "input": "rotation",
+          "parameter": "filter"
+        }
+      ]
+    },
+    "visuals": {
+      "palette": "aurora",
+      "shape": "rounded",
+      "effect": "glow",
+      "labels": "notes"
+    }
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [],
+    "values": {
+      "surface.type": "grid",
+      "surface.rows": 2,
+      "zones.1.octave": 1,
+      "gestures.expressions.0.parameter": "filter"
+    },
+    "zone_count": 4
+  }
+}

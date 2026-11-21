@@ -75,13 +75,13 @@ final class InstrumentCatalogTests: XCTestCase {
 
     func testFutureFormatFilesAreSkipped() {
         let rows = [
-            Self.row("community.future", version: 2),
-            // A row that claims format 1 but carries a format 2 file.
-            Self.row("community.sneaky", version: 1, body: Self.body(id: "community.sneaky", version: 2)),
+            Self.row("community.future", version: 3),
+            // A row that claims format 1 but carries a format 3 file.
+            Self.row("community.sneaky", version: 1, body: Self.body(id: "community.sneaky", version: 3)),
         ]
         let result = InstrumentCatalog.accept(rows, bundledIDs: bundledIDs)
         XCTAssertTrue(result.instruments.isEmpty)
-        XCTAssertEqual(result.skipped.map { $0.reason }, [.newerFormat(2), .rejected([.unsupportedVersion])])
+        XCTAssertEqual(result.skipped.map { $0.reason }, [.newerFormat(3), .rejected([.unsupportedVersion])])
     }
 
     func testOutOfRangeValuesAreRepairedLikeBundledFiles() throws {
@@ -136,7 +136,7 @@ final class InstrumentCatalogTests: XCTestCase {
     func testDownloadedFilesAreCachedAndRevalidated() async {
         let catalog = makeCatalog { version in
             XCTAssertEqual(version, "1.0.3")
-            return Self.encode([Self.row("community.big-wheel"), Self.row("community.future", version: 2)])
+            return Self.encode([Self.row("community.big-wheel"), Self.row("community.future", version: 3)])
         }
         await catalog.refresh()
         XCTAssertEqual(catalog.remote.map(\.id), ["community.big-wheel"])

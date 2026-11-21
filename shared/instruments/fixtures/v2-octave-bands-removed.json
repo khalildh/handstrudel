@@ -1,0 +1,72 @@
+{
+  "description": "Octave bands are removed where a band would be under 44 points (ten stacked strips are 48 points each).",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "strips",
+      "orientation": "vertical"
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0,
+        "octave_bands": true
+      },
+      {
+        "role": "note",
+        "degree": 1,
+        "octave_bands": true
+      },
+      {
+        "role": "note",
+        "degree": 2,
+        "octave_bands": true
+      },
+      {
+        "role": "note",
+        "degree": 3,
+        "octave_bands": true
+      },
+      {
+        "role": "note",
+        "degree": 4,
+        "octave_bands": true
+      },
+      {
+        "role": "note",
+        "degree": 5,
+        "octave_bands": true
+      },
+      {
+        "role": "note",
+        "degree": 6,
+        "octave_bands": true
+      },
+      {
+        "role": "note",
+        "degree": 7,
+        "octave_bands": true
+      },
+      {
+        "role": "note",
+        "degree": 8,
+        "octave_bands": true
+      },
+      {
+        "role": "note",
+        "degree": 9,
+        "octave_bands": true
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "octave_bands_removed"
+    ],
+    "zone_count": 10
+  }
+}

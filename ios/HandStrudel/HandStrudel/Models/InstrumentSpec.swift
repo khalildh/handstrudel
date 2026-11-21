@@ -18,9 +18,15 @@ import Foundation
 /// so another implementation (the web app) can be checked against them.
 ///
 /// Version 1 has one surface, the split wheel that Scale and Split modes use.
+/// Version 2 adds general surfaces (radial, grid, keys/strips, pads, arc,
+/// orbs) whose zones, gestures and visuals live in `layout`
+/// (`InstrumentLayout`); a split wheel keeps `surface`, `chords` and `notes`
+/// in either version.
 struct InstrumentSpec: Codable, Equatable {
     static let formatName = "handstrudel.instrument"
-    static let formatVersion = 1
+    /// The newest format this app reads.
+    static let formatVersion = 2
+    static let supportedVersions = 1...formatVersion
     static let nameLimit = 40
     static let descriptionLimit = 200
     static let byteLimit = 16 * 1024
@@ -30,9 +36,13 @@ struct InstrumentSpec: Codable, Equatable {
     var id: String
     var name: String
     var description: String?
+    /// The split wheel. For a format 2 instrument with another surface this
+    /// is the standard wheel and unused; `layout` describes the instrument.
     var surface: SplitWheel
     var chords: Chords
     var notes: Notes
+    /// Format 2 surfaces other than the split wheel. Nil for wheels.
+    var layout: InstrumentLayout? = nil
 
     enum CodingKeys: String, CodingKey {
         case format, formatVersion = "format_version", id, name, description, surface, chords, notes
@@ -82,6 +92,12 @@ struct InstrumentSpec: Codable, Equatable {
 
     var isBuiltIn: Bool { id.hasPrefix("builtin.") }
 
+    /// Played by the generic instrument renderer rather than the Scale/Split wheel.
+    var isSurfaceInstrument: Bool { layout != nil }
+
+    /// The surface's type name as it appears in the file.
+    var surfaceType: String { layout?.surface.type.rawValue ?? SplitWheel.Kind.splitWheel.rawValue }
+
     /// The wheel mode this instrument runs in. Scale-note instruments use the
     /// Scale mode slot, chord-tone ones the Split slot.
     var baseMode: SoundSetup.Mode {
@@ -98,6 +114,59 @@ struct InstrumentSpec: Codable, Equatable {
     }
 }
 
+// MARK: - Coding
+
+extension InstrumentSpec {
+    private enum SurfaceTypeKey: String, CodingKey { case type }
+
+    /// A split wheel decodes into `surface`/`chords`/`notes` (format 1 or 2);
+    /// any other surface needs format 2 and decodes into `layout`.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        format = try container.decode(String.self, forKey: .format)
+        formatVersion = try container.decode(Int.self, forKey: .formatVersion)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        let type = try container.nestedContainer(keyedBy: SurfaceTypeKey.self, forKey: .surface)
+            .decode(String.self, forKey: .type)
+        if type == SplitWheel.Kind.splitWheel.rawValue {
+            surface = try container.decode(SplitWheel.self, forKey: .surface)
+            chords = try container.decode(Chords.self, forKey: .chords)
+            notes = try container.decode(Notes.self, forKey: .notes)
+            layout = nil
+        } else {
+            guard formatVersion >= 2 else {
+                throw DecodingError.dataCorruptedError(forKey: .surface, in: container,
+                                                       debugDescription: "\(type) needs format_version 2")
+            }
+            layout = try InstrumentLayout(from: decoder)
+            surface = Self.unusedWheel
+            chords = Chords(side: .left)
+            notes = Notes(source: .scaleOneOctave, octaveBand: false, highlightChordTones: nil)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(format, forKey: .format)
+        try container.encode(formatVersion, forKey: .formatVersion)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(description, forKey: .description)
+        if let layout {
+            try layout.encode(to: encoder)
+        } else {
+            try container.encode(surface, forKey: .surface)
+            try container.encode(chords, forKey: .chords)
+            try container.encode(notes, forKey: .notes)
+        }
+    }
+
+    /// Placeholder wheel for instruments that aren't wheels.
+    static let unusedWheel = SplitWheel(type: .splitWheel, radius: 1.0, restRadius: 0.36, octaveBandRadius: 0.8)
+}
+
 // MARK: - Loading and validation
 
 /// Why an instrument was rejected or changed while loading. Raw values match
@@ -110,12 +179,23 @@ enum InstrumentIssue: String, Equatable {
     case unsupportedVersion = "unsupported_version"
     case idInvalid = "id_invalid"
     case nameMissing = "name_missing"
+    case zonesMissing = "zones_missing"
+    case zoneInvalid = "zone_invalid"
+    case zonesOverlap = "zones_overlap"
     // Repairs
     case nameTrimmed = "name_trimmed"
     case descriptionTrimmed = "description_trimmed"
     case radiusClamped = "radius_clamped"
     case restRadiusClamped = "rest_radius_clamped"
     case octaveBandRadiusClamped = "octave_band_radius_clamped"
+    case surfaceClamped = "surface_clamped"
+    case zoneClamped = "zone_clamped"
+    case zoneMoved = "zone_moved"
+    case zoneResized = "zone_resized"
+    case zonesDropped = "zones_dropped"
+    case octaveBandsRemoved = "octave_bands_removed"
+    case labelTrimmed = "label_trimmed"
+    case gestureDropped = "gesture_dropped"
 }
 
 struct InstrumentLoadResult: Equatable {
@@ -142,7 +222,7 @@ extension InstrumentSpec {
             return .init(spec: nil, issues: [.malformed])
         }
         guard header.format == formatName else { return .init(spec: nil, issues: [.unsupportedFormat]) }
-        guard header.formatVersion == formatVersion else { return .init(spec: nil, issues: [.unsupportedVersion]) }
+        guard let version = header.formatVersion, supportedVersions.contains(version) else { return .init(spec: nil, issues: [.unsupportedVersion]) }
         guard let spec = try? decoder.decode(InstrumentSpec.self, from: data) else {
             return .init(spec: nil, issues: [.malformed])
         }
@@ -166,6 +246,16 @@ extension InstrumentSpec {
             }
         }
 
+        if let layout {
+            switch layout.validated() {
+            case .rejected(let issue):
+                return .init(spec: nil, issues: [issue])
+            case .accepted(let repaired, let layoutIssues):
+                spec.layout = repaired
+                return .init(spec: spec, issues: issues + layoutIssues)
+            }
+        }
+
         typealias Wheel = SplitWheel
         let radius = Self.clamp(surface.radius, Wheel.radiusRange)
         if radius != surface.radius { spec.surface.radius = radius; issues.append(.radiusClamped) }
@@ -178,22 +268,22 @@ extension InstrumentSpec {
         return .init(spec: spec, issues: issues)
     }
 
-    private static func isValidID(_ id: String) -> Bool {
+    static func isValidID(_ id: String) -> Bool {
         id.range(of: #"^[a-z0-9][a-z0-9._-]{0,79}$"#, options: .regularExpression) != nil
     }
 
     /// Trim whitespace, cut to `limit` characters, then trim again.
-    private static func trim(_ text: String, limit: Int) -> String {
+    static func trim(_ text: String, limit: Int) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return String(trimmed.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func clamp(_ value: Double, _ range: ClosedRange<Double>) -> Double {
+    static func clamp(_ value: Double, _ range: ClosedRange<Double>) -> Double {
         min(range.upperBound, max(range.lowerBound, value))
     }
 
     /// Keep sums like 0.5 + 0.25 exact so repaired files round-trip cleanly.
-    private static func rounded(_ value: Double) -> Double { (value * 1_000_000).rounded() / 1_000_000 }
+    static func rounded(_ value: Double) -> Double { (value * 1_000_000).rounded() / 1_000_000 }
 }
 
 // MARK: - Runtime rules
@@ -288,7 +378,10 @@ enum InstrumentLibrary {
             #endif
             return result.spec
         }
-        return specs.sorted { ($0.isBuiltIn ? 0 : 1, $0.name) < ($1.isBuiltIn ? 0 : 1, $1.name) }
+        // Built-ins first, wheels before other surfaces, then by name.
+        return specs.sorted {
+            ($0.isBuiltIn ? 0 : 1, $0.isSurfaceInstrument ? 1 : 0, $0.name) < ($1.isBuiltIn ? 0 : 1, $1.isSurfaceInstrument ? 1 : 0, $1.name)
+        }
     }
 
     private static let fallbackScaleWheel = InstrumentSpec(

@@ -289,10 +289,38 @@ struct ControlSheet: View {
         }
     }
 
-    #if DEBUG
-    /// Prototype: play the wheel from any bundled instrument file
-    /// (`shared/instruments/library/`) or downloaded one (`InstrumentCatalog`).
-    /// Debug builds only until 1.0.3.
+    /// Play any bundled instrument file (`shared/instruments/library/`) or
+    /// downloaded one (`InstrumentCatalog`), grouped by surface. Debug builds
+    /// always; release builds only when `instruments.surfaces_enabled` is on.
+    private var instrumentFilesVisible: Bool {
+        #if DEBUG
+        return true
+        #else
+        return RemoteConfig.shared.instrumentSurfacesEnabled
+        #endif
+    }
+
+    private var showsInstrumentFilePicker: Bool {
+        instrumentFilesVisible
+            && (currentMode == .splitChordMelody || currentMode == .scaleChordMelody || engine.surfaceInstrument != nil)
+    }
+
+    private static let surfaceOrder = ["split_wheel", "radial", "grid", "keys", "strips", "pads", "arc", "orbs"]
+
+    private static func surfaceTitle(_ type: String) -> String {
+        switch type {
+        case "split_wheel": return "Wheels"
+        case "radial": return "Radial"
+        case "grid": return "Grids"
+        case "keys": return "Keys"
+        case "strips": return "Strips"
+        case "pads": return "Pads"
+        case "arc": return "Arcs"
+        case "orbs": return "Orbs"
+        default: return type
+        }
+    }
+
     private var instrumentFilePicker: some View {
         HStack {
             Text("Instrument file")
@@ -300,17 +328,23 @@ struct ControlSheet: View {
                 .foregroundColor(.primary.opacity(0.8))
             Spacer()
             Menu {
-                ForEach(InstrumentCatalog.shared.all, id: \.id) { instrument in
-                    Button {
-                        engine.playInstrument(instrument)
-                    } label: {
-                        if instrument.id == engine.wheelInstrument.id {
-                            Label(instrument.name, systemImage: "checkmark")
-                        } else {
-                            Text(instrument.name)
+                let all = InstrumentCatalog.shared.all
+                let types = Self.surfaceOrder.filter { type in all.contains { $0.surfaceType == type } }
+                ForEach(types, id: \.self) { type in
+                    Section(Self.surfaceTitle(type)) {
+                        ForEach(all.filter { $0.surfaceType == type }, id: \.id) { instrument in
+                            Button {
+                                engine.playInstrument(instrument)
+                            } label: {
+                                if instrument.id == engine.wheelInstrument.id {
+                                    Label(instrument.name, systemImage: "checkmark")
+                                } else {
+                                    Text(instrument.name)
+                                }
+                            }
+                            .accessibilityIdentifier("instrument-file-\(instrument.id)")
                         }
                     }
-                    .accessibilityIdentifier("instrument-file-\(instrument.id)")
                 }
             } label: {
                 Text(engine.wheelInstrument.name)
@@ -319,7 +353,6 @@ struct ControlSheet: View {
             .accessibilityIdentifier("instrument-file-picker")
         }
     }
-    #endif
 
     // MARK: - Mode
 
@@ -368,7 +401,7 @@ struct ControlSheet: View {
              .soundFont, .grid:
             return true
         default:
-            return false
+            return engine.surfaceInstrument != nil
         }
     }
 
@@ -400,6 +433,12 @@ struct ControlSheet: View {
 
     private var modeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if showsInstrumentFilePicker && engine.surfaceInstrument != nil {
+                Text("Plays in your key, scale, chords and sound.")
+                    .font(.footnote)
+                    .foregroundStyle(palette.muted)
+                instrumentFilePicker
+            }
             if currentMode == .chordMelody || currentMode == .radialChordMelody || currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
                 quantizeRow
                 VStack(alignment: .leading, spacing: 10) {
@@ -423,11 +462,9 @@ struct ControlSheet: View {
                     }
                     .tint(palette.accent)
 
-                    #if DEBUG
-                    if currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
+                    if showsInstrumentFilePicker {
                         instrumentFilePicker
                     }
-                    #endif
 
                     Toggle(isOn: $engine.chordMelodyAutoStrum) {
                         Text("Auto-strum (re-articulate on each beat)")

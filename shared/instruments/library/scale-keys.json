@@ -1,0 +1,64 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.scale-keys",
+  "name": "Scale Keys",
+  "description": "Seven keys, one per scale note. Reach the top of a key for an octave up, the bottom for an octave down.",
+  "surface": {
+    "type": "keys",
+    "orientation": "horizontal"
+  },
+  "zones": [
+    {
+      "role": "note",
+      "degree": 0,
+      "octave_bands": true
+    },
+    {
+      "role": "note",
+      "degree": 1,
+      "octave_bands": true
+    },
+    {
+      "role": "note",
+      "degree": 2,
+      "octave_bands": true
+    },
+    {
+      "role": "note",
+      "degree": 3,
+      "octave_bands": true
+    },
+    {
+      "role": "note",
+      "degree": 4,
+      "octave_bands": true
+    },
+    {
+      "role": "note",
+      "degree": 5,
+      "octave_bands": true
+    },
+    {
+      "role": "note",
+      "degree": 6,
+      "octave_bands": true
+    }
+  ],
+  "gestures": {
+    "play": "pinch",
+    "expressions": [
+      {
+        "hand": "left",
+        "input": "spread",
+        "parameter": "delay"
+      }
+    ]
+  },
+  "visuals": {
+    "palette": "mono",
+    "shape": "rounded",
+    "effect": "glow",
+    "labels": "notes"
+  }
+}

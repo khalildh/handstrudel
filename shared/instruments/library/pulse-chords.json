@@ -1,0 +1,65 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.pulse-chords",
+  "name": "Pulse Chords",
+  "description": "Four breathing chord orbs. Tap to latch a chord on, tap again to let it go.",
+  "surface": {
+    "type": "orbs",
+    "motion": "pulse",
+    "amount": 0.03,
+    "period": 4
+  },
+  "zones": [
+    {
+      "role": "chord",
+      "slot": 0,
+      "behavior": "latch",
+      "frame": {
+        "x": 0.06,
+        "y": 0.1,
+        "w": 0.4,
+        "h": 0.25
+      }
+    },
+    {
+      "role": "chord",
+      "slot": 1,
+      "behavior": "latch",
+      "frame": {
+        "x": 0.54,
+        "y": 0.1,
+        "w": 0.4,
+        "h": 0.25
+      }
+    },
+    {
+      "role": "chord",
+      "slot": 2,
+      "behavior": "latch",
+      "frame": {
+        "x": 0.06,
+        "y": 0.55,
+        "w": 0.4,
+        "h": 0.25
+      }
+    },
+    {
+      "role": "chord",
+      "slot": 3,
+      "behavior": "latch",
+      "frame": {
+        "x": 0.54,
+        "y": 0.55,
+        "w": 0.4,
+        "h": 0.25
+      }
+    }
+  ],
+  "visuals": {
+    "palette": "ember",
+    "shape": "round",
+    "effect": "ripple",
+    "labels": "notes"
+  }
+}
