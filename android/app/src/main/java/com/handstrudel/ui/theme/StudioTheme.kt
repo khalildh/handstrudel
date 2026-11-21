@@ -1,23 +1,14 @@
 package com.handstrudel.ui.theme
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import com.handstrudel.app.LocalAppServices
 
 /**
  * iOS `StudioTheme` (`Views/StudioTheme.swift`). Owner: shell. Stored under pref
@@ -77,26 +68,56 @@ data class StudioPalette(
 
 val LocalStudioPalette: ProvidableCompositionLocal<StudioPalette> = staticCompositionLocalOf { StudioTheme.VOLT.palette }
 
-/** iOS `StudioThemePicker`. Used by studio-ui (Music home) and social (Account → Appearance). Phase 0: plain list. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** The active theme (for code that needs [StudioTheme.isLight], e.g. system bar icons). */
+val LocalStudioTheme: ProvidableCompositionLocal<StudioTheme> = staticCompositionLocalOf { StudioTheme.VOLT }
+
+/**
+ * Material 3 colours derived from a palette, so stock components (sheets, dialogs,
+ * switches, text fields) follow the studio theme the way iOS `.tint(palette.accent)` and
+ * `preferredColorScheme` do. [light] = iOS `colorScheme == .light` (Paper only).
+ */
+fun StudioPalette.materialColorScheme(light: Boolean): ColorScheme {
+    val base = if (light) lightColorScheme() else darkColorScheme()
+    return base.copy(
+        primary = accent,
+        onPrimary = onAccent,
+        primaryContainer = glow,
+        onPrimaryContainer = ink,
+        secondary = overtone,
+        onSecondary = onAccent,
+        tertiary = mediaAccent,
+        onTertiary = mediaOnAccent,
+        background = background,
+        onBackground = ink,
+        surface = background,
+        onSurface = ink,
+        surfaceVariant = surface,
+        onSurfaceVariant = muted,
+        surfaceContainerLowest = background,
+        surfaceContainerLow = surface,
+        surfaceContainer = surface,
+        surfaceContainerHigh = surface,
+        surfaceContainerHighest = surface,
+        surfaceBright = surface,
+        surfaceDim = background,
+        inverseSurface = ink,
+        inverseOnSurface = background,
+        outline = muted,
+        outlineVariant = border,
+        error = recording,
+        onError = Color.White,
+        scrim = Color.Black,
+    )
+}
+
+/**
+ * Provides [LocalStudioPalette], [LocalStudioTheme] and a matching [MaterialTheme].
+ * [forceDark] mirrors iOS forcing `.dark` over feed video.
+ */
 @Composable
-fun StudioThemePickerSheet(onDismiss: () -> Unit) {
-    val prefs = LocalAppServices.current.prefs
-    val current by prefs.studioTheme.collectAsState()
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(bottom = 24.dp)) {
-            StudioTheme.entries.forEach { theme ->
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { prefs.setStudioTheme(theme) }
-                        .background(if (theme == current) Color.Gray.copy(alpha = 0.2f) else Color.Transparent)
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
-                ) {
-                    Text(theme.title, fontWeight = FontWeight.Bold)
-                    Text(theme.subtitle)
-                }
-            }
-        }
+fun StudioMaterialTheme(theme: StudioTheme, forceDark: Boolean = false, content: @Composable () -> Unit) {
+    val palette = theme.palette
+    CompositionLocalProvider(LocalStudioPalette provides palette, LocalStudioTheme provides theme) {
+        MaterialTheme(colorScheme = palette.materialColorScheme(light = theme.isLight && !forceDark), content = content)
     }
 }

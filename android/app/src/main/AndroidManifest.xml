@@ -16,6 +16,7 @@
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
 
     <application
+        android:name=".app.HandStrudelApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="HandStrudel"
@@ -27,7 +28,7 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboard|keyboardHidden|navigation|uiMode"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -54,6 +55,7 @@
                 <data android:scheme="https" />
                 <data android:host="handstrudel.com" />
                 <data android:path="/watch" />
+                <data android:path="/watch/" />
             </intent-filter>
         </activity>
 

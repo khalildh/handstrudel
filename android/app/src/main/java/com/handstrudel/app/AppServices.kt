@@ -3,6 +3,7 @@ package com.handstrudel.app
 import android.content.Context
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.handstrudel.BuildConfig
 import com.handstrudel.capture.CaptureController
 import com.handstrudel.capture.NoopCaptureController
 import com.handstrudel.engine.EngineController
@@ -32,24 +33,38 @@ class AppServices(
 ) {
     companion object {
         /**
-         * Phase 0 wiring: real prefs, stub everything else. At integration (3.8 step 2)
-         * each WS's constructor replaces its stub here; keep one line per service.
+         * Called once per process by `HandStrudelApplication` (services outlive the activity).
+         * Shell's prefs/analytics/review prompt are real; at integration (3.8 step 2) each
+         * other WS's constructor replaces its stub here; keep one line per service.
          */
         fun create(context: Context): AppServices {
             val app = context.applicationContext
-            val prefs = StoreBackedAppPrefs(SharedPrefsStore(app))
+            val prefsStore = SharedPrefsStore(app)
+            val prefs = StoreBackedAppPrefs(prefsStore)
             val auth: AuthSession = SignedOutAuthSession()                 // social
             val store: StoreGate = UnconfiguredStoreGate()                  // store
             store.bind(auth.userId)
+            val analytics = createAnalytics(prefs, prefsStore)              // shell
+            val engine: StudioEngine = LegacyStudioEngine(EngineController(app)) // engine
+            engine.onFirstNote = { analytics.record(AppAnalyticsEvent.FIRST_NOTE) }
             return AppServices(
                 prefs = prefs,
-                analytics = NoopAppAnalytics(prefs),                        // shell
-                engine = LegacyStudioEngine(EngineController(app)),         // engine
+                analytics = analytics,
+                engine = engine,
                 store = store,
                 auth = auth,
                 capture = NoopCaptureController(),                          // capture
-                reviewPrompt = NoopReviewPrompt(),                          // shell
+                reviewPrompt = PlayReviewPrompt(prefs, BuildConfig.VERSION_NAME), // shell
             )
+        }
+
+        private fun createAnalytics(prefs: AppPrefs, prefsStore: PrefsStore): AppAnalytics {
+            val sender = UsageEventSender(
+                supabaseUrl = BuildConfig.SUPABASE_URL,
+                anonKey = BuildConfig.SUPABASE_ANON_KEY,
+                isOptedIn = { prefs.appUsageAnalyticsEnabled.value },
+            )
+            return DefaultAppAnalytics(prefs, prefsStore, send = sender)
         }
     }
 }

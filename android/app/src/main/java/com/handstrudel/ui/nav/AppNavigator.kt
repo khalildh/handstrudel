@@ -40,6 +40,13 @@ interface AppNavigator {
 
     /** Global alert. */
     fun showError(title: String, message: String)
+
+    /**
+     * Asks for a runtime permission (e.g. `RECORD_AUDIO` when capture turns on mic
+     * recording) through the activity, and reports whether it is granted. Calls back
+     * immediately with true when it already is. Fakes may keep the default.
+     */
+    fun requestPermission(permission: String, onResult: (granted: Boolean) -> Unit) = onResult(false)
 }
 
 val LocalAppNavigator: ProvidableCompositionLocal<AppNavigator> =
