@@ -60,6 +60,9 @@
 		90224DD8E3719A286A3B008A /* strudel-engine.html in Resources */ = {isa = PBXBuildFile; fileRef = BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */; };
 		9428BDE6E6BECDC9EAA5FC3B /* VideoUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F27BAFEE657ED1D0F721C12 /* VideoUploader.swift */; };
 		9B6081609E3BF5FDD39821DA /* SocialModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60394D480F9BC9261829DBBB /* SocialModels.swift */; };
+		5A1D0C0E0F1A2B3C4D5E6017 /* InstrumentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1D0C0E0F1A2B3C4D5E6016 /* InstrumentViews.swift */; };
+		5A1D0C0E0F1A2B3C4D5E6015 /* MyInstruments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1D0C0E0F1A2B3C4D5E6014 /* MyInstruments.swift */; };
+		5A1D0C0E0F1A2B3C4D5E6013 /* PostInstruments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1D0C0E0F1A2B3C4D5E6012 /* PostInstruments.swift */; };
 		9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F66A4286F922F3805EADFE /* ParamDefs.swift */; };
 		A1B2C3D4E5F600000000FF02 /* PinchDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000FF01 /* PinchDetector.swift */; };
 		A1B2C3D4E5F600000000FF11 /* MusicConfig.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000FF10 /* MusicConfig.generated.swift */; };
@@ -116,10 +119,13 @@
 		WEAVEVIEW0000000000001 /* WeaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WEAVEVIEW0000000000002 /* WeaveView.swift */; };
 		7E3C0F1A2B4D4E5F8A9B0001 /* RemoteConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B0002 /* RemoteConfig.swift */; };
 		7E3C0F1A2B4D4E5F8A9B0003 /* InstrumentCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B0004 /* InstrumentCatalog.swift */; };
+		5A1D0C0E0F1A2B3C4D5E6011 /* InstrumentDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1D0C0E0F1A2B3C4D5E6010 /* InstrumentDocument.swift */; };
 		7E3C0F1A2B4D4E5F8A9B0005 /* RemoteUpdateGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B0006 /* RemoteUpdateGate.swift */; };
 		7E3C0F1A2B4D4E5F8A9B0007 /* RemoteConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B0008 /* RemoteConfigTests.swift */; };
 		7E3C0F1A2B4D4E5F8A9B0009 /* InstrumentCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B000A /* InstrumentCatalogTests.swift */; };
+		5A1D0C0E0F1A2B3C4D5E6019 /* PostInstrumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1D0C0E0F1A2B3C4D5E6018 /* PostInstrumentTests.swift */; };
 		7E3C0F1A2B4D4E5F8A9B000B /* RemoteConfigUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B000C /* RemoteConfigUITests.swift */; };
+		5A1D0C0E0F1A2B3C4D5E601B /* PostInstrumentUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1D0C0E0F1A2B3C4D5E601A /* PostInstrumentUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -176,6 +182,9 @@
 		5F0E9E5A8B7C40119EE3B006 /* soundfonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources/soundfonts; sourceTree = "<group>"; };
 		5F0E9E5A8B7C40119EE3B008 /* SoundFontInstrumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFontInstrumentTests.swift; sourceTree = "<group>"; };
 		60394D480F9BC9261829DBBB /* SocialModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialModels.swift; sourceTree = "<group>"; };
+		5A1D0C0E0F1A2B3C4D5E6016 /* InstrumentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstrumentViews.swift; sourceTree = "<group>"; };
+		5A1D0C0E0F1A2B3C4D5E6014 /* MyInstruments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyInstruments.swift; sourceTree = "<group>"; };
+		5A1D0C0E0F1A2B3C4D5E6012 /* PostInstruments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostInstruments.swift; sourceTree = "<group>"; };
 		6B7D7F4F5C7AF55B5D8BD8F6 /* LoopSharingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopSharingManager.swift; sourceTree = "<group>"; };
 		6C89256347633541234267B8 /* SaveGestureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGestureDetector.swift; sourceTree = "<group>"; };
 		6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverlayView.swift; sourceTree = "<group>"; };
@@ -251,10 +260,13 @@
 		WEAVEVIEW0000000000002 /* WeaveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeaveView.swift; sourceTree = "<group>"; };
 		7E3C0F1A2B4D4E5F8A9B0002 /* RemoteConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteConfig.swift; sourceTree = "<group>"; };
 		7E3C0F1A2B4D4E5F8A9B0004 /* InstrumentCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstrumentCatalog.swift; sourceTree = "<group>"; };
+		5A1D0C0E0F1A2B3C4D5E6010 /* InstrumentDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstrumentDocument.swift; sourceTree = "<group>"; };
 		7E3C0F1A2B4D4E5F8A9B0006 /* RemoteUpdateGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteUpdateGate.swift; sourceTree = "<group>"; };
 		7E3C0F1A2B4D4E5F8A9B0008 /* RemoteConfigTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteConfigTests.swift; sourceTree = "<group>"; };
 		7E3C0F1A2B4D4E5F8A9B000A /* InstrumentCatalogTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InstrumentCatalogTests.swift; sourceTree = "<group>"; };
+		5A1D0C0E0F1A2B3C4D5E6018 /* PostInstrumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostInstrumentTests.swift; sourceTree = "<group>"; };
 		7E3C0F1A2B4D4E5F8A9B000C /* RemoteConfigUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteConfigUITests.swift; sourceTree = "<group>"; };
+		5A1D0C0E0F1A2B3C4D5E601A /* PostInstrumentUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostInstrumentUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -394,6 +406,7 @@
 				A7E1D3C5B9F2400A8C6D1E02 /* NoteTrack.swift */,
 				1A5B0C0D0E0F4A1B8C2D3E02 /* InstrumentSpec.swift */,
 				7E3C0F1A2B4D4E5F8A9B0004 /* InstrumentCatalog.swift */,
+				5A1D0C0E0F1A2B3C4D5E6010 /* InstrumentDocument.swift */,
 				7E3C0F1A2B4D4E5F8A9B0002 /* RemoteConfig.swift */,
 				CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */,
 				5F0E9E5A8B7C40119EE3B004 /* SoundFontInstrument.swift */,
@@ -433,6 +446,7 @@
 			children = (
 				AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */,
 				7E3C0F1A2B4D4E5F8A9B000C /* RemoteConfigUITests.swift */,
+				5A1D0C0E0F1A2B3C4D5E601A /* PostInstrumentUITests.swift */,
 			);
 			path = HandStrudelUITests;
 			sourceTree = "<group>";
@@ -457,6 +471,7 @@
 				A7E1D3C5B9F2400A8C6D1E04 /* NoteTrackTests.swift */,
 				1A5B0C0D0E0F4A1B8C2D3E04 /* InstrumentSpecTests.swift */,
 				7E3C0F1A2B4D4E5F8A9B000A /* InstrumentCatalogTests.swift */,
+				5A1D0C0E0F1A2B3C4D5E6018 /* PostInstrumentTests.swift */,
 				7E3C0F1A2B4D4E5F8A9B0008 /* RemoteConfigTests.swift */,
 			);
 			path = HandStrudelTests;
@@ -472,6 +487,9 @@
 				7944BC24ED82EBCC08239937 /* SignInView.swift */,
 				8FA2A33806A43063DD48DD26 /* SocialConfig.swift */,
 				60394D480F9BC9261829DBBB /* SocialModels.swift */,
+				5A1D0C0E0F1A2B3C4D5E6016 /* InstrumentViews.swift */,
+				5A1D0C0E0F1A2B3C4D5E6014 /* MyInstruments.swift */,
+				5A1D0C0E0F1A2B3C4D5E6012 /* PostInstruments.swift */,
 				0F27BAFEE657ED1D0F721C12 /* VideoUploader.swift */,
 				2E5A25B5F3A32C16D8AA1825 /* FeedService.swift */,
 				18C138C66B358C6656F91075 /* FeedView.swift */,
@@ -645,6 +663,7 @@
 				A7E1D3C5B9F2400A8C6D1E01 /* NoteTrack.swift in Sources */,
 				1A5B0C0D0E0F4A1B8C2D3E01 /* InstrumentSpec.swift in Sources */,
 				7E3C0F1A2B4D4E5F8A9B0003 /* InstrumentCatalog.swift in Sources */,
+				5A1D0C0E0F1A2B3C4D5E6011 /* InstrumentDocument.swift in Sources */,
 				7E3C0F1A2B4D4E5F8A9B0001 /* RemoteConfig.swift in Sources */,
 				73E81C762C77D3DB08064674 /* LearnSongPicker.swift in Sources */,
 				31732217DB10380B3787DE51 /* LiveActivityManager.swift in Sources */,
@@ -681,6 +700,9 @@
 				F8F0949B1485DEA5CC67EAA8 /* SignInView.swift in Sources */,
 				D429318FDB3402202042EFF1 /* SocialConfig.swift in Sources */,
 				9B6081609E3BF5FDD39821DA /* SocialModels.swift in Sources */,
+				5A1D0C0E0F1A2B3C4D5E6017 /* InstrumentViews.swift in Sources */,
+				5A1D0C0E0F1A2B3C4D5E6015 /* MyInstruments.swift in Sources */,
+				5A1D0C0E0F1A2B3C4D5E6013 /* PostInstruments.swift in Sources */,
 				9428BDE6E6BECDC9EAA5FC3B /* VideoUploader.swift in Sources */,
 				E1591791628BC7B6856F32FF /* FeedService.swift in Sources */,
 				BB7B62E284871FE2BC2ADED4 /* FeedView.swift in Sources */,
@@ -709,6 +731,7 @@
 				A7E1D3C5B9F2400A8C6D1E03 /* NoteTrackTests.swift in Sources */,
 				1A5B0C0D0E0F4A1B8C2D3E03 /* InstrumentSpecTests.swift in Sources */,
 				7E3C0F1A2B4D4E5F8A9B0009 /* InstrumentCatalogTests.swift in Sources */,
+				5A1D0C0E0F1A2B3C4D5E6019 /* PostInstrumentTests.swift in Sources */,
 				7E3C0F1A2B4D4E5F8A9B0007 /* RemoteConfigTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -719,6 +742,7 @@
 			files = (
 				BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */,
 				7E3C0F1A2B4D4E5F8A9B000B /* RemoteConfigUITests.swift in Sources */,
+				5A1D0C0E0F1A2B3C4D5E601B /* PostInstrumentUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

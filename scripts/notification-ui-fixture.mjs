@@ -19,6 +19,15 @@ const thumbnailRequests = [];
 const countViews = process.env.FIXTURE_VIEW_COUNTS === "1";
 const showEngagement = process.env.FIXTURE_ENGAGEMENT === "1";
 const showReposts = process.env.FIXTURE_REPOSTS === "1";
+// Posts played on an instrument file: the first post made it, the second remixed it.
+const showInstruments = process.env.FIXTURE_INSTRUMENTS === "1";
+const instrumentSpec = {
+  format: "handstrudel.instrument", format_version: 1, id: "loopmaker.fixture-wheel", name: "Fixture Wheel",
+  ai_generated: true, description: "A wide wheel from the UI fixture.",
+  surface: { type: "split_wheel", radius: 1, rest_radius: 0.26, octave_band_radius: 0.7 },
+  chords: { side: "left" }, notes: { source: "scale_one_octave", octave_band: true, highlight_chord_tones: true },
+};
+const myInstruments = [];
 let shareCount = 4;
 const counted = new Set();
 let mediaAvailable = !canControlMedia;
@@ -30,9 +39,14 @@ const post = {
   backing_enabled: process.env.FIXTURE_PLAY_ALONG === "1",
   view_count: countViews ? 7 : undefined,
   sound_setup: {
-    version: 1, instrument: "grand_piano", waveform: "sine", key: "D", scale: "Minor", progression: "free",
-    mode: "soundfont", bpm: 96, useSoundFont: true, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
+    version: 1, instrument: showInstruments ? "violin" : "grand_piano", waveform: "sine", key: "D", scale: "Minor",
+    progression: "free", mode: showInstruments ? "scalechordmelody" : "soundfont", bpm: 96, useSoundFont: true,
+    autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
   },
+  ...(showInstruments ? {
+    has_instrument: true, instrument_spec_name: instrumentSpec.name, instrument_kind: "own",
+    instrument_remixes_allowed: true, instrument_ai_generated: true, instrument_remix_count: 1,
+  } : {}),
 };
 const secondPost = {
   ...post, id: "30000000-0000-0000-0000-000000000002", username: "secondartist",
@@ -40,6 +54,11 @@ const secondPost = {
   video_key: "test/next-clip.mp4",
   source_video_id: process.env.FIXTURE_REMIXES === "1" ? video : undefined,
   source_username: process.env.FIXTURE_REMIXES === "1" ? post.username : undefined,
+  ...(showInstruments ? {
+    instrument_spec_name: "Fixture Wheel remix", instrument_kind: "remix", instrument_remixes_allowed: false,
+    instrument_ai_generated: true, instrument_source_id: video, instrument_source_username: post.username,
+    instrument_remix_count: 0,
+  } : {}),
 };
 const sequencePosts = process.env.FIXTURE_SEQUENCE_CLIPS === "1" ? [3, 4].map((index) => ({
   ...post,
@@ -182,6 +201,12 @@ createServer((request, response) => {
       }
       return response.writeHead(415).end();
     case "/rest/v1/videos":
+      if (showInstruments && url.searchParams.get("select") === "instrument_spec") {
+        const id = url.searchParams.get("id")?.slice(3).toLowerCase();
+        const spec = id === video ? instrumentSpec
+          : id === secondPost.id ? { ...instrumentSpec, id: "loopmaker.fixture-wheel.remix-1", name: "Fixture Wheel remix" } : null;
+        return send(spec ? [{ instrument_spec: spec }] : []);
+      }
       return send(process.env.FIXTURE_ACCOUNT_CLIPS === "1"
         ? [post, secondPost].map((clip) => ({ ...clip, user_id: viewer, username: "viewer" }))
         : []);
@@ -234,6 +259,43 @@ createServer((request, response) => {
         if (save) saved.add(id.toLowerCase());
         else saved.delete(id.toLowerCase());
         response.writeHead(204).end();
+      });
+      return;
+    }
+    case "/rest/v1/rpc/instrument_remix_chain": {
+      if (!showInstruments) return response.writeHead(404).end();
+      let body = "";
+      request.on("data", (chunk) => { body += chunk; });
+      request.on("end", () => {
+        const target = JSON.parse(body).target_video.toLowerCase();
+        const original = { depth: 0, video_id: video, username: post.username, instrument_name: instrumentSpec.name, instrument_kind: "own" };
+        send(target === secondPost.id
+          ? [{ depth: 0, video_id: secondPost.id, username: secondPost.username, instrument_name: "Fixture Wheel remix",
+               instrument_kind: "remix" }, { ...original, depth: 1 }]
+          : [original]);
+      });
+      return;
+    }
+    case "/rest/v1/my_instruments": {
+      let body = "";
+      request.on("data", (chunk) => { body += chunk; });
+      request.on("end", () => {
+        const id = url.searchParams.get("id")?.slice(3).toLowerCase();
+        if (request.method === "POST") {
+          const row = JSON.parse(body);
+          myInstruments.push({ ...row, id: row.id.toLowerCase(), created_at: now, updated_at: now });
+          return response.writeHead(201).end();
+        }
+        if (request.method === "PATCH") {
+          const row = myInstruments.find((item) => item.id === id);
+          if (row) Object.assign(row, JSON.parse(body), { updated_at: new Date().toISOString() });
+          return response.writeHead(204).end();
+        }
+        if (request.method === "DELETE") {
+          myInstruments.splice(0, myInstruments.length, ...myInstruments.filter((item) => item.id !== id));
+          return response.writeHead(204).end();
+        }
+        send(myInstruments);
       });
       return;
     }

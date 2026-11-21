@@ -8,6 +8,8 @@ extension URL: @retroactive Identifiable {
 struct PostSharingOptions {
     var sharePlayablePreset = true
     var allowPlayAlong = true
+    var shareInstrument = true
+    var allowRemixes = true
 
     func sharedPreset(_ setup: SoundSetup?) -> SoundSetup? {
         guard sharePlayablePreset, let setup, setup.isValid else { return nil }
@@ -18,6 +20,11 @@ struct PostSharingOptions {
     func sharedNotes(_ track: NoteTrack?, setup: SoundSetup?) -> NoteTrack? {
         guard sharedPreset(setup) != nil, let track, track.isValid else { return nil }
         return track
+    }
+
+    /// The instrument travels on its own: with or without the playable preset, never inside it.
+    func sharedInstrument(_ instrument: PostedInstrument?) -> PostedInstrument? {
+        shareInstrument ? instrument : nil
     }
 
     static func canShareBacking(hasAudio: Bool, backingCredit: BackingCredit?) -> Bool {
@@ -62,6 +69,7 @@ struct PostComposerView: View {
 
     private var checkingAudio: Bool { backingCredit == nil && hasAudio == nil }
     private var noteTrack: NoteTrack? { drafts.drafts.first { $0.id == draftID }?.postedNoteTrack }
+    private var playedInstrument: PostedInstrument? { drafts.drafts.first { $0.id == draftID }?.playedInstrument }
 
     var body: some View {
         NavigationStack {
@@ -90,6 +98,26 @@ struct PostComposerView: View {
                             Text(sharing.sharePlayablePreset
                                  ? soundSetup.presetDetails + (noteTrack == nil ? "" : " · Learn to play")
                                  : "Your instrument settings and notes won't be shared.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if let playedInstrument {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("Share instrument: \(playedInstrument.document.name)", isOn: $sharing.shareInstrument)
+                                .font(.subheadline)
+                                .disabled(uploader.isBusy || submission != nil)
+                                .accessibilityIdentifier("share-post-instrument")
+                            if sharing.shareInstrument {
+                                Toggle("Allow remixes", isOn: $sharing.allowRemixes)
+                                    .font(.subheadline)
+                                    .disabled(uploader.isBusy || submission != nil)
+                                    .accessibilityIdentifier("allow-instrument-remixes")
+                            }
+                            Text(sharing.shareInstrument
+                                 ? (sharing.allowRemixes ? "Viewers can play, save and remix this instrument, with credit to you."
+                                                         : "Viewers can play this instrument but not save or remix it.")
+                                 : "Your instrument won't be shared.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -169,6 +197,8 @@ struct PostComposerView: View {
         guard let accountID = auth.userId, submission != nil || !checkingAudio else { return }
         let preset = sharing.sharedPreset(soundSetup)
         let notes = sharing.sharedNotes(noteTrack, setup: soundSetup)
+        let sharedInstrument = sharing.sharedInstrument(playedInstrument)
+        let allowRemixes = sharing.allowRemixes
         let allowBacking = sharing.sharesBacking(hasAudio: hasAudio == true, backingCredit: backingCredit)
         Task {
             var handedOff = false
@@ -179,7 +209,8 @@ struct PostComposerView: View {
             }
             let posted = await uploader.post(clip: clip, draftID: draftID, accountID: accountID, store: drafts,
                                              caption: caption, instrument: instrument, mode: mode,
-                                             soundSetup: preset, noteTrack: notes, commentsEnabled: commentsEnabled,
+                                             soundSetup: preset, noteTrack: notes, playedInstrument: sharedInstrument,
+                                             allowRemixes: allowRemixes, commentsEnabled: commentsEnabled,
                                              backingEnabled: allowBacking, backingCredit: backingCredit) {
                 guard auth.userId == accountID else { return }
                 leaveComposer()

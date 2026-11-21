@@ -74,6 +74,20 @@ targets:
         LSApplicationQueriesSchemes:
           - instagram-stories
           - instagram
+        # Instruments travel as .handstrudel-instrument files (the instrument JSON itself).
+        LSSupportsOpeningDocumentsInPlace: false
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: HandStrudel Instrument
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [com.handstrudel.instrument]
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.handstrudel.instrument
+            UTTypeDescription: HandStrudel Instrument
+            UTTypeConformsTo: [public.json]
+            UTTypeTagSpecification:
+              public.filename-extension: [handstrudel-instrument]
+              public.mime-type: [application/vnd.handstrudel.instrument+json]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.handstrudel.app

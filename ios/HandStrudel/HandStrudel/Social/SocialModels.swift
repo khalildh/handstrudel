@@ -71,6 +71,9 @@ struct Video: Codable, Equatable, Identifiable {
     var repostedByID: UUID?
     /// Whether the post saved its notes for "Learn to play" (nil when the source didn't say).
     var hasNoteTrack: Bool?
+    /// The instrument the take was played on: the chip's details. The file itself is fetched
+    /// only when a viewer plays, saves or remixes it.
+    var postInstrument: PostInstrumentSummary?
 
     enum CodingKeys: String, CodingKey {
         case id, caption, instrument, mode, width, height, hidden, username
@@ -102,6 +105,7 @@ struct Video: Codable, Equatable, Identifiable {
 
     init(from decoder: Decoder) throws {
         let row = try decoder.container(keyedBy: CodingKeys.self)
+        postInstrument = try? PostInstrumentSummary(from: decoder)
         id = try row.decode(UUID.self, forKey: .id)
         userId = try row.decode(UUID.self, forKey: .userId)
         videoKey = try row.decode(String.self, forKey: .videoKey)
@@ -162,15 +166,35 @@ struct VideoPostFields: Codable, Equatable {
     var commentsEnabled: Bool? = nil
     var backingEnabled: Bool? = nil
     var sourceVideoId: UUID? = nil
+    /// The instrument file (structure only; the sound is `soundSetup`), shared with or without it.
+    var instrumentSpec: InstrumentDocument? = nil
+    /// The post the instrument came from; the server decides copy or remix and credits it.
+    var instrumentSourceId: UUID? = nil
+    var instrumentRemixesAllowed: Bool? = nil
+    var instrumentAIGenerated: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
         case caption, instrument, mode, width, height
         case durationS = "duration_s"
         case soundSetup = "sound_setup"
         case noteTrack = "note_track"
+        case instrumentSpec = "instrument_spec"
+        case instrumentSourceId = "instrument_source_id"
+        case instrumentRemixesAllowed = "instrument_remixes_allowed"
+        case instrumentAIGenerated = "instrument_ai_generated"
         case commentsEnabled = "comments_enabled"
         case backingEnabled = "backing_enabled"
         case sourceVideoId = "source_video_id"
+    }
+}
+
+extension VideoPostFields {
+    /// Add the take's instrument: the file, its source post for credit, "Allow remixes" and the AI flag.
+    mutating func attach(_ played: PostedInstrument?, allowRemixes: Bool) {
+        instrumentSpec = played?.document
+        instrumentSourceId = played?.sourceVideoID
+        instrumentRemixesAllowed = played == nil ? nil : allowRemixes
+        instrumentAIGenerated = played?.document.isAIGenerated == true ? true : nil
     }
 }
 

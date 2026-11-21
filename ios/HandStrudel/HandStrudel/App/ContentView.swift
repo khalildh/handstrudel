@@ -74,6 +74,10 @@ struct ContentView: View {
     /// A post whose notes to teach once the session opened with its sound is running.
     @State private var pendingLearn: LearnToPlayRequest?
     @State private var learnLoad: Task<Void, Never>?
+    /// A post's instrument to play once the session opened for it is running.
+    @State private var pendingInstrument: PlayInstrumentRequest?
+    @State private var showInstruments = false
+    @State private var instrumentsNotice: String?
     /// A posted Pro sound the viewer tapped without Pro; shows the unlock screen.
     @State private var lockedSound: LockedSoundOffer?
     @State private var lastLockedSound: LockedSoundOffer?
@@ -356,6 +360,10 @@ struct ContentView: View {
                     pendingLearn = nil
                     beginLearnToPlay(learn)
                 }
+                if let instrument = pendingInstrument {
+                    pendingInstrument = nil
+                    playInstrument(instrument)
+                }
             } else {
                 learnLoad?.cancel()
                 cancelCountdown()
@@ -414,6 +422,22 @@ struct ContentView: View {
             guard engine.isRunning else { return }
             toggleAudioLoop()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .playPostInstrument)) { notification in
+            guard let request = notification.object as? PlayInstrumentRequest else { return }
+            openInstrument(request)
+        }
+        .sheet(isPresented: $showInstruments, onDismiss: { instrumentsNotice = nil }) {
+            MyInstrumentsView(notice: instrumentsNotice)
+        }
+        .task(id: auth.userId) {
+            MyInstrumentsStore.shared.setAccount(auth.userId)
+            #if DEBUG
+            if let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_OPEN_FILE"] {
+                openSocialLink(URL(fileURLWithPath: path))
+            }
+            #endif
+            await MyInstrumentsStore.shared.sync()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .learnToPlayPost)) { notification in
             guard let request = notification.object as? LearnToPlayRequest else { return }
             pendingLearn = request
@@ -447,7 +471,8 @@ struct ContentView: View {
                         onStart: { startSession() },
                         onDrafts: { showDrafts = true },
                         onLoops: { showLoops = true },
-                        onSetups: { showSetups = true }
+                        onSetups: { showSetups = true },
+                        onInstruments: { showInstruments = true }
                     )
                 case .account:
                     if SocialConfig.isConfigured {
@@ -569,6 +594,7 @@ struct ContentView: View {
         lastLockedSound = nil
         guard !offer.setup.isLocked(unlocked: storeManager.isUnlocked) else {
             pendingLearn = nil
+            pendingInstrument = nil
             return
         }
         AppAnalytics.shared.record(.lockedSoundUnlocked)
@@ -614,6 +640,7 @@ struct ContentView: View {
     private func trySharedSound(_ setup: SoundSetup) {
         guard !engine.isRunning, !startingSession else {
             pendingLearn = nil
+            pendingInstrument = nil
             soundError = "Close your current session, then open this sound again."
             return
         }
@@ -688,8 +715,44 @@ struct ContentView: View {
     }
 
     private func openSocialLink(_ url: URL) {
+        if InstrumentDocument.isInstrumentFile(url) { return openInstrumentFile(url) }
         guard let link = PerformanceLink(url: url) else { return }
         openPerformance(link)
+    }
+
+    /// "Play this instrument" / "Play this exactly" from a post, or Play in My instruments.
+    private func openInstrument(_ request: PlayInstrumentRequest) {
+        showInstruments = false
+        linkedPerformance = nil
+        dismissAllSheets {
+            guard !engine.isRunning else { return playInstrument(request) }
+            pendingInstrument = request
+            if let sound = request.sound { trySharedSound(sound) } else { startSession() }
+        }
+    }
+
+    /// The instrument changes only the layout; the sound changes only for "Play this exactly".
+    private func playInstrument(_ request: PlayInstrumentRequest) {
+        let sound = request.sound.flatMap { engine.applySoundSetup($0, store: storeManager) ? $0 : nil }
+        if request.sound != nil && sound == nil {
+            soundError = "This setup is unavailable or requires a sound pack you don't own."
+        }
+        engine.playInstrument(request.document, sourceVideoID: request.sourceVideoID)
+        if let sound { engine.routeWheelSound(useSoundFont: sound.useSoundFont) }
+    }
+
+    /// A `.handstrudel-instrument` file opened from Files, AirDrop or Messages.
+    private func openInstrumentFile(_ url: URL) {
+        do {
+            let item = try MyInstrumentsStore.shared.importFile(at: url)
+            instrumentsNotice = "Added \(item.name) to My instruments."
+            Task { await MyInstrumentsStore.shared.sync() }
+        } catch {
+            instrumentsNotice = error.localizedDescription
+        }
+        guard !engine.isRunning else { return soundError = instrumentsNotice }
+        destination = .music
+        showInstruments = true
     }
 
     private func viewDraftPost(_ id: UUID) {
@@ -1397,6 +1460,8 @@ struct ContentView: View {
             .accessibilityHidden(true)
 
             Spacer(minLength: 8)
+
+            StageInstrumentChip(engine: engine)
 
             Button { showSetups = true } label: {
                 Image(systemName: "square.stack")
@@ -2279,7 +2344,8 @@ struct ContentView: View {
         do {
             let sound = engine.currentSoundSetup
             draft = try drafts.begin(instrument: sound?.instrumentName, mode: currentModeName, soundSetup: sound,
-                                     backingCredit: backing?.credit, halfSpeed: recordAtHalfSpeed)
+                                     backingCredit: backing?.credit, halfSpeed: recordAtHalfSpeed,
+                                     playedInstrument: engine.instrumentForPosting)
         } catch {
             recordingError = "Couldn’t create a private draft. \(error.localizedDescription)"
             return
