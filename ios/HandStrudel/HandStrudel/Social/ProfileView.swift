@@ -107,6 +107,7 @@ struct ProfileView: View {
     @State private var showBlocked = false
     @State private var showAppearance = false
     @State private var showUsageAnalytics = false
+    @State private var showNotifications = false
     @State private var showEdit = false
     @State private var deleteError = false
 
@@ -152,6 +153,7 @@ struct ProfileView: View {
         .sheet(isPresented: $showBlocked) { BlockedUsersView(auth: auth) }
         .sheet(isPresented: $showAppearance) { StudioThemePicker() }
         .sheet(isPresented: $showUsageAnalytics) { UsageAnalyticsSettings() }
+        .sheet(isPresented: $showNotifications) { NotificationSettingsView(auth: auth) }
         .sheet(isPresented: $showEdit) { EditCreatorProfileView(auth: auth) }
         .fullScreenCover(item: $playing, onDismiss: {
             let action = pendingAction
@@ -200,6 +202,7 @@ struct ProfileView: View {
             Menu {
                 Button("Appearance", systemImage: "paintpalette") { showAppearance = true }
                 Button("Usage Analytics", systemImage: "chart.bar") { showUsageAnalytics = true }
+                Button("Notifications", systemImage: "bell") { showNotifications = true }
                 if auth.isSignedIn {
                     Button("Blocked users") { showBlocked = true }
                     Button("Sign out") { Task { await auth.signOut() } }

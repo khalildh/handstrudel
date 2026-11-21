@@ -256,6 +256,10 @@ struct ContentView: View {
             }
         }
         .onOpenURL(perform: openSocialLink)
+        .onReceive(PushManager.shared.$pendingLink.compactMap { $0 }) { url in
+            PushManager.shared.pendingLink = nil
+            openSocialLink(url)
+        }
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { openSocialLink(url) }
         }

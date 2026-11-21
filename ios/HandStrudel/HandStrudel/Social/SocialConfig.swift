@@ -19,6 +19,9 @@ enum SocialConfig {
     private static func value(_ key: String, _ fallback: String) -> String {
         #if DEBUG
         if let v = ProcessInfo.processInfo.environment[key], !v.isEmpty { return v }
+        // Also from simulator defaults, so a launch from a notification tap (which gets no
+        // scheme environment) can use a local stack: `xcrun simctl spawn … defaults write`.
+        if let v = UserDefaults.standard.string(forKey: key), !v.isEmpty { return v }
         #endif
         return fallback
     }
