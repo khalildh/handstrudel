@@ -53,6 +53,8 @@ struct StartOverlayView: View {
     let onDrafts: () -> Void
     let onLoops: () -> Void
     let onSetups: () -> Void
+    /// "Today's sound", shown under the title when social features are available.
+    var dailyCard: AnyView? = nil
 
     @State private var showSounds = false
     @State private var showAppearance = false
@@ -102,6 +104,7 @@ struct StartOverlayView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 title
+                if let dailyCard { dailyCard }
                 heroCard
                 libraryShortcuts
             }

@@ -266,6 +266,16 @@ final class StoreManager: ObservableObject {
         }
     }
 
+    /// A HandStrudel+ hand theme lent for a week by a 7-day daily-sound streak. The server
+    /// grants and times it (`daily_theme_grants`); DailySoundStore passes it in.
+    @Published var streakThemeLoan: StreakThemeLoan?
+
+    func isUnlocked(theme: HandTheme) -> Bool {
+        guard theme.isPremium else { return true }
+        if let packId = theme.packId, isUnlocked(packId) { return true }
+        return streakThemeLoan?.isActive(for: theme.id) == true
+    }
+
     func isUnlocked(_ offer: Offer) -> Bool {
         switch offer {
         case .pro: return hasProAccess
