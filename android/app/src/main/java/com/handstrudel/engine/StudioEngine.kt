@@ -133,6 +133,8 @@ interface StudioEngine {
     val manualValues: StateFlow<Map<String, Double>> get() = EMPTY_PARAMS_FLOW
     /** iOS `bpmIsMapped`: true when a hand axis drives BPM (the BPM slider is then hidden). */
     val bpmIsMapped: Boolean get() = true
+    /** Param ids driven by a hand axis in the active mapping (iOS `config` values minus none/save), sorted. */
+    val mappedParamIds: List<String> get() = emptyList()
 
     /** Persisted visual selections (`lastFilterId`, hand theme id); drawing them is studio-ui's job. */
     val selectedFilter: StateFlow<String>
@@ -170,6 +172,8 @@ interface StudioEngine {
     fun radialTouchExit(touchId: String)
     /** Chord+Melody zones (and SoundFont mode) lanes. */
     fun zonesTouchEnterChord(touchId: String, zone: Int)
+    /** Zones chord touch with an octave shift (−1, 0, +1). */
+    fun zonesTouchEnterChord(touchId: String, zone: Int, octave: Int) = zonesTouchEnterChord(touchId, zone)
     fun zonesTouchEnterMelody(touchId: String, lane: Int)
     fun zonesTouchExit(touchId: String)
     /** Grid lanes: on / slide / off per touch (iOS `GridTouchOverlay`). */
@@ -247,6 +251,15 @@ interface StudioEngine {
     fun stopInstrumentPreview() {}
     /** iOS `ContentView.playFirstNote` (onboarding): one note on the Scale instrument. */
     fun playFirstNote(midi: Int) {}
+    /** Manual preview voice (studio-ui drives the phrase timing): load [instrument] on the native sampler, idle only. */
+    fun previewStart(instrument: SoundFontInstrument): Boolean = false
+    fun previewNoteOn(midi: Int, velocity: Double) {}
+    fun previewStop() {}
+    /** Decode/validate a preset pack without importing it (iOS import confirmation). */
+    fun previewPresetPack(bytes: ByteArray): Result<List<NamedSoundSetup>> =
+        Result.failure(PresetPackException(PresetPackException.Kind.WRONG_FORMAT))
+    /** Live camera frame aspect (width / height) for overlay aspect-fill; 0.75 until frames arrive. */
+    val cameraAspect: Double get() = 0.75
 
     companion object {
         const val MAX_LOOPS = 20

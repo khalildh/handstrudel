@@ -579,6 +579,8 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     private val _smoothedParams = MutableStateFlow<Map<String, Double>>(emptyMap())
     override val smoothedParams: StateFlow<Map<String, Double>> = _smoothedParams
     override val bpmIsMapped: Boolean get() = config.bpmIsMapped
+    override val mappedParamIds: List<String>
+        get() = (config.left.values + config.right.values).filter { it in PARAM_MAP }.toSet().sorted()
 
     override fun setManualValue(paramId: String, value: Double) {
         _manualValues.value = _manualValues.value + (paramId to value)
@@ -928,6 +930,7 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     override fun radialTouchExit(touchId: String) = wheelTouchExit(touchId)
     override fun zonesTouchEnterChord(touchId: String, zone: Int) = wheelTouchEnterChord(touchId, zone, 0)
     override fun zonesTouchEnterMelody(touchId: String, lane: Int) = wheelTouchEnterMelody(touchId, lane)
+    override fun zonesTouchEnterChord(touchId: String, zone: Int, octave: Int) = wheelTouchEnterChord(touchId, zone, octave)
     override fun zonesTouchExit(touchId: String) = wheelTouchExit(touchId)
 
     /** iOS `GridTouchOverlay.noteInfo`: `lane` is the visual row from the top. */
@@ -1155,6 +1158,26 @@ class HandStrudelEngine(context: Context) : StudioEngine {
         }
         return true
     }
+
+    override fun previewStart(instrument: SoundFontInstrument): Boolean {
+        if (_isRunning.value) return false
+        stopInstrumentPreview()
+        if (!soundFont.startIfNeeded(instrument.program)) return false
+        soundFont.setInstrument(instrument.program)
+        return true
+    }
+
+    override fun previewNoteOn(midi: Int, velocity: Double) {
+        if (!_isRunning.value) soundFont.noteOn(PREVIEW_VOICE, midi, velocity)
+    }
+
+    override fun previewStop() = stopInstrumentPreview()
+
+    override fun previewPresetPack(bytes: ByteArray): Result<List<NamedSoundSetup>> = runCatching {
+        SoundPresetPack.decode(bytes).presets.map { NamedSoundSetup(UUID.randomUUID(), it.name, it.sound) }
+    }
+
+    override val cameraAspect: Double get() = handTracker.videoAspect
 
     override fun stopInstrumentPreview() {
         previewJob?.cancel()

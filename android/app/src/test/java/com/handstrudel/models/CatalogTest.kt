@@ -97,10 +97,10 @@ class CatalogTest {
         val scarborough = BUNDLED_SONGS.last()
         assertEquals(ScaleSelection.BuiltIn(Scale.MINOR), scarborough.suggestedScale)
         assertEquals(MusicKey.A, scarborough.suggestedKey)
-        assertEquals(10, learnSong("practice_ascending")!!.degreeNotes.size)
-        assertEquals(14, learnSong("practice_arpeggio")!!.degreeNotes.size)
-        assertEquals(listOf(0, 2, 4, 7, 9, 11, 14, 7, 9, 11, 14, 16, 18, 21), learnSong("practice_arpeggio")!!.degreeNotes.map { it.degree })
-        assertEquals(12, learnSong("practice_random")!!.degreeNotes.size)
+        assertEquals(10, learnSong("ascending_10")!!.degreeNotes.size)
+        assertEquals(14, learnSong("arpeggio_14")!!.degreeNotes.size)
+        assertEquals(listOf(0, 2, 4, 7, 9, 11, 14, 7, 9, 11, 14, 16, 18, 21), learnSong("arpeggio_14")!!.degreeNotes.map { it.degree })
+        assertEquals(12, learnSong("random_12")!!.degreeNotes.size)
         PRACTICE_SONG_IDS.forEach { assertTrue(learnSong(it) != null) }
         assertNull(learnSong("nope"))
     }

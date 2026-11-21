@@ -48,12 +48,12 @@ data class LearnSong(
 
     companion object {
         fun ascending(noteCount: Int, bpm: Double = 120.0) = LearnSong(
-            "practice_ascending", "Ascending $noteCount", "⬆️", bpm,
+            "ascending_$noteCount", "Ascending $noteCount", "⬆️", bpm,
             (0 until noteCount).map { LearnDegreeNote(it, it.toDouble(), 1.0) }, LearnSongCategory.PRACTICE,
         )
 
         fun descending(noteCount: Int, bpm: Double = 120.0) = LearnSong(
-            "practice_descending", "Descending $noteCount", "⬇️", bpm,
+            "descending_$noteCount", "Descending $noteCount", "⬇️", bpm,
             (0 until noteCount).map { LearnDegreeNote(noteCount - 1 - it, it.toDouble(), 1.0) }, LearnSongCategory.PRACTICE,
         )
 
@@ -62,7 +62,7 @@ data class LearnSong(
             val notes = mutableListOf<LearnDegreeNote>()
             for (i in 0..peak) notes += LearnDegreeNote(i, notes.size.toDouble(), 1.0)
             for (i in peak - 1 downTo 0) notes += LearnDegreeNote(i, notes.size.toDouble(), 1.0)
-            return LearnSong("practice_updown", "Up & Down $noteCount", "⛰️", bpm, notes, LearnSongCategory.PRACTICE)
+            return LearnSong("updown_$noteCount", "Up & Down $noteCount", "⛰️", bpm, notes, LearnSongCategory.PRACTICE)
         }
 
         fun arpeggio(noteCount: Int, bpm: Double = 120.0): LearnSong {
@@ -70,11 +70,11 @@ data class LearnSong(
             val notes = (0 until noteCount).map { i ->
                 LearnDegreeNote(steps[i % steps.size] + (i / steps.size) * 7, i.toDouble(), 1.0)
             }
-            return LearnSong("practice_arpeggio", "Arpeggio $noteCount", "🎶", bpm, notes, LearnSongCategory.PRACTICE)
+            return LearnSong("arpeggio_$noteCount", "Arpeggio $noteCount", "🎶", bpm, notes, LearnSongCategory.PRACTICE)
         }
 
         fun random(noteCount: Int, bpm: Double = 120.0, rng: kotlin.random.Random = kotlin.random.Random.Default) = LearnSong(
-            "practice_random", "Random $noteCount", "🎲", bpm,
+            "random_$noteCount", "Random $noteCount", "🎲", bpm,
             (0 until noteCount).map { LearnDegreeNote(rng.nextInt(noteCount), it.toDouble(), 1.0) }, LearnSongCategory.PRACTICE,
         )
     }
@@ -132,17 +132,17 @@ val BUNDLED_SONGS: List<LearnSong> = listOf(
 )
 
 /** The picker's Practice row (iOS `LearnSongPicker`): label → generator. */
-val PRACTICE_SONG_IDS: List<String> = listOf("practice_ascending", "practice_descending", "practice_arpeggio", "practice_random")
+val PRACTICE_SONG_IDS: List<String> = listOf("ascending_10", "descending_10", "arpeggio_14", "random_12")
 
 /**
  * Look up a song by id. Practice ids build a fresh song each time (Random
  * reshuffles, like tapping it again on iOS).
  */
 fun learnSong(id: String): LearnSong? = BUNDLED_SONGS.firstOrNull { it.id == id } ?: when (id) {
-    "practice_ascending" -> LearnSong.ascending(10)
-    "practice_descending" -> LearnSong.descending(10)
-    "practice_arpeggio" -> LearnSong.arpeggio(14)
-    "practice_random" -> LearnSong.random(12)
-    "practice_updown" -> LearnSong.ascendingDescending(10)
+    "ascending_10" -> LearnSong.ascending(10)
+    "descending_10" -> LearnSong.descending(10)
+    "arpeggio_14" -> LearnSong.arpeggio(14)
+    "random_12" -> LearnSong.random(12)
+    "updown_10" -> LearnSong.ascendingDescending(10)
     else -> null
 }
