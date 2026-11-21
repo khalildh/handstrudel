@@ -67,5 +67,20 @@ select day, event, events from public.app_usage_daily order by day desc, event;
 
 `active_day` counts one foreground day per opted-in install. `return_day` counts an active day after any earlier observed day on the same install; it is not a Day 1 or Day 7 cohort. `first_note` counts once per opted-in install. Recording events count successful starts, completed private drafts, and posts confirmed by the app. These are best-effort client signals, not exact totals or user histories.
 
+Since 1.0.2, rows also have a `detail` (`''` for most events): the product (`pro`, `plus_monthly`, `plus_yearly`) for `purchase_started`/`purchase_completed`, and the push type for `notification_opened`. The funnel events and their allow-list are in `20261121070000_crash_diagnostics_funnel.sql`; `AppAnalytics.Event` must match it (a unit test reads the migration). For step-by-step conversion over a date range:
+
+```sh
+SUPABASE_URL=https://<project>.supabase.co SUPABASE_SERVICE_ROLE_KEY=… node scripts/funnel-report.mjs --from 2026-11-21 --to 2026-12-05
+```
+
+## Crash and hang reports
+Opted-in installs upload MetricKit crash, hang, CPU and disk-write diagnostics to `public.app_diagnostics` (insert-only for the app; only the service role can read). Summarise them, optionally symbolicating app frames with the build's dSYM from the archive:
+
+```sh
+SUPABASE_URL=https://<project>.supabase.co SUPABASE_SERVICE_ROLE_KEY=… node scripts/diagnostics-report.mjs --version 1.0.2 --dsym ~/Library/Developer/Xcode/Archives/…/dSYMs/HandStrudel.app.dSYM
+```
+
+To prune old reports: `delete from public.app_diagnostics where received_at < now() - interval '180 days';`
+
 ## iOS Universal Links
 Deploy the site with `public/.well-known/apple-app-site-association` and `vercel.json`, and verify the file returns HTTPS 200 with JSON and no redirect. Enable Associated Domains for the iOS app ID in Apple's developer portal, then rebuild with a matching provisioning profile and test a `https://handstrudel.com/watch?v=…` link from Messages on a physical iPhone. The website remains the fallback.

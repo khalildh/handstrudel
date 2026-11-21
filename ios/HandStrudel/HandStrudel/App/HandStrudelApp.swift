@@ -12,6 +12,9 @@ struct HandStrudelApp: App {
         // Configure RevenueCat
         Purchases.logLevel = .error
         Purchases.configure(withAPIKey: "appl_AtnBabtuGJDXfdcQzvFykpDHfwf")
+
+        // Crash and hang reports (MetricKit), sent only with Usage Analytics turned on.
+        CrashDiagnostics.shared.start()
     }
 
     var body: some Scene {

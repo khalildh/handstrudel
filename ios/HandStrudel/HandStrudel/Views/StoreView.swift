@@ -54,6 +54,7 @@ struct StoreView: View {
         .tint(palette.accent)
         .foregroundStyle(palette.ink)
         .task { await storeManager.loadProducts() }
+        .onAppear { Funnel.storeViewed() }
         .onChange(of: isTargetUnlocked) { unlocked in
             if unlocked { dismiss() }
         }
@@ -424,6 +425,7 @@ struct RestorePurchasesButton: View {
 
     var body: some View {
         Button {
+            Funnel.restoreTapped()
             onRestoreStarted?()
             Task {
                 guard let result = await storeManager.restorePurchases(for: packId) else { return }

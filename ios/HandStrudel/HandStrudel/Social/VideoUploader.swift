@@ -140,7 +140,10 @@ final class VideoUploader: ObservableObject {
             switch status {
             case .published:
                 let changed = try store.replacePostSubmission(submission, with: .published(id: id), draftID: draftID, accountID: accountID)
-                if changed { AppAnalytics.shared.record(.recordingPosted) }
+                if changed {
+                    AppAnalytics.shared.record(.recordingPosted)
+                    Funnel.postPublished()
+                }
                 phase = .done
                 return changed
             case .held, .failed:
