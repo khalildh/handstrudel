@@ -83,6 +83,7 @@
 		A7E1D3C5B9F2400A8C6D1E03 /* NoteTrackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E1D3C5B9F2400A8C6D1E04 /* NoteTrackTests.swift */; };
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
 		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
+		A7F100000000000000000005 /* PushNotificationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F100000000000000000006 /* PushNotificationUITests.swift */; };
 		BB7B62E284871FE2BC2ADED4 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C138C66B358C6656F91075 /* FeedView.swift */; };
 		41E77ED1FB1145CD9E24A8D1 /* CommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDF2811984345419B3AA17D /* CommentsView.swift */; };
 		BF459746DBE08887CD29CFF3 /* SaveGestureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C89256347633541234267B8 /* SaveGestureDetector.swift */; };
@@ -207,6 +208,7 @@
 		A4D6E49EC2BD40C4448C835E /* SpatialAudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAudioManager.swift; sourceTree = "<group>"; };
 		A9F505B00217A74555C8E226 /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
 		AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelUITests.swift; sourceTree = "<group>"; };
+		A7F100000000000000000006 /* PushNotificationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationUITests.swift; sourceTree = "<group>"; };
 		AC0DDE0000000000CF09FEF1 /* ChordProgressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordProgressionTests.swift; sourceTree = "<group>"; };
 		ADED664F31AC3AE45ADB9DFC /* HandStrudel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HandStrudel.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE98AF54FEB607CE395267C8 /* CameraFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraFilter.swift; sourceTree = "<group>"; };
@@ -413,6 +415,7 @@
 			isa = PBXGroup;
 			children = (
 				AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */,
+				A7F100000000000000000006 /* PushNotificationUITests.swift */,
 			);
 			path = HandStrudelUITests;
 			sourceTree = "<group>";
@@ -691,6 +694,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */,
+				A7F100000000000000000005 /* PushNotificationUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

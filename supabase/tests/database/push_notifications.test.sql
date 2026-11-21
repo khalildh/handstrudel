@@ -1,5 +1,5 @@
 begin;
-select plan(41);
+select plan(44);
 
 insert into auth.users (id, email) values
   ('a7000000-0000-0000-0000-000000000001', 'push-alice@test.dev'),
@@ -153,6 +153,32 @@ insert into claimed select * from public.claim_push_notifications(100, 'producti
 select is((select array_agg(kind order by kind) from claimed), array['following_post'],
           'pushes turned off after queueing are skipped');
 select is((select count(*) from public.notifications where status = 'skipped'), 1::bigint, 'skipped pushes are logged');
+
+-- ------------------------------------------------------------ changes after queueing
+update public.notifications set status = 'sent' where status = 'sending';
+insert into public.videos (id, user_id, video_key, thumb_key) values
+  ('a7100000-0000-0000-0000-000000000003', 'a7000000-0000-0000-0000-000000000002',
+   'videos/a7000000-0000-0000-0000-000000000002/v3', 'thumbs/a7000000-0000-0000-0000-000000000002/t3');
+insert into public.comments (video_id, user_id, body) values
+  ('a7100000-0000-0000-0000-000000000001', 'a7000000-0000-0000-0000-000000000002', 'from bob'),
+  ('a7100000-0000-0000-0000-000000000001', 'a7000000-0000-0000-0000-000000000005', 'from eve');
+select is((select count(*) from public.notifications where status = 'pending' and send_after <= now()), 4::bigint,
+          'two follower pushes and two comment pushes are queued');
+-- Before sending: Eve unfollows Bob, Alice blocks Bob, and Alice's post is hidden by moderation.
+delete from public.follows where follower_id = 'a7000000-0000-0000-0000-000000000005';
+insert into public.blocks (blocker_id, blocked_id) values
+  ('a7000000-0000-0000-0000-000000000001', 'a7000000-0000-0000-0000-000000000002');
+update public.videos set hidden = true where id = 'a7100000-0000-0000-0000-000000000001';
+select is((select count(*) from public.claim_push_notifications(100, 'production')), 0::bigint,
+          'pushes that no longer apply are not sent');
+select is((select array_agg(kind || ':' || recipient_id order by kind, recipient_id) from public.notifications
+           where status = 'skipped' and created_at = now() and last_error = 'no longer applies'
+             and (dedupe_key like 'comment:%' or dedupe_key = 'video:a7100000-0000-0000-0000-000000000003')),
+          array['comment:a7000000-0000-0000-0000-000000000001', 'comment:a7000000-0000-0000-0000-000000000001',
+                'following_post:a7000000-0000-0000-0000-000000000001', 'following_post:a7000000-0000-0000-0000-000000000005'],
+          'unfollows, blocks and hidden posts cancel queued pushes');
+update public.videos set hidden = false where id = 'a7100000-0000-0000-0000-000000000001';
+delete from public.blocks where blocker_id = 'a7000000-0000-0000-0000-000000000001' and blocked_id = 'a7000000-0000-0000-0000-000000000002';
 
 -- ------------------------------------------------------------ weekly challenge
 update public.notifications set status = 'sent' where status = 'sending';

@@ -242,6 +242,8 @@ struct NotificationSettingsView: View {
                                 }
                             }
                             .disabled(!loaded)
+                            .accessibilityIdentifier("notification-toggle-"
+                                + item.title.lowercased().replacingOccurrences(of: " ", with: "-"))
                         }
                     }
                 } else {
