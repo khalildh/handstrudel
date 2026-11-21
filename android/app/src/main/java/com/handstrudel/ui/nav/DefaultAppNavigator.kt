@@ -224,6 +224,17 @@ class DefaultAppNavigator(
         }
     }
 
+    /**
+     * A new intent brought the activity forward while a system permission dialog was up.
+     * Android removes that dialog without delivering a result, so answer the waiting
+     * callers from the current grant state (a late real result then finds nobody waiting).
+     */
+    fun onPermissionFlowInterrupted() {
+        val permission = pendingPermission ?: return
+        Log.i(TAG, "permission request interrupted: $permission")
+        onPermissionResult(isGranted(permission))
+    }
+
     /** The activity's permission launcher result. */
     fun onPermissionResult(granted: Boolean) {
         val callbacks = pendingPermissionCallbacks.toList()

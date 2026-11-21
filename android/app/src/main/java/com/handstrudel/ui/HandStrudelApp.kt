@@ -41,6 +41,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import com.handstrudel.app.AppServices
+import com.handstrudel.app.DebugShellHooks
 import com.handstrudel.app.LocalAppServices
 import com.handstrudel.app.PlayReviewPrompt
 import com.handstrudel.social.SocialEntryPoints
@@ -52,7 +53,9 @@ import com.handstrudel.ui.nav.Destination
 import com.handstrudel.ui.nav.DestinationTabs
 import com.handstrudel.ui.nav.LocalAppNavigator
 import com.handstrudel.ui.studio.StudioEntryPoints
+import com.handstrudel.ui.settings.UsageAnalyticsScreen
 import com.handstrudel.ui.theme.StudioMaterialTheme
+import com.handstrudel.ui.theme.StudioThemePickerSheet
 import kotlinx.coroutines.delay
 
 /**
@@ -137,6 +140,12 @@ fun HandStrudelApp(services: AppServices, navigator: DefaultAppNavigator) {
             ErrorAlertHost(error, navigator::dismissError)
 
             ReviewPromptEffect(services, navigator)
+
+            val debugSheet by DebugShellHooks.openSheet.collectAsState()
+            when (debugSheet) {
+                "appearance" -> StudioThemePickerSheet(onDismiss = { DebugShellHooks.openSheet.value = null })
+                "analytics" -> UsageAnalyticsScreen(onDismiss = { DebugShellHooks.openSheet.value = null })
+            }
         }
     }
 }

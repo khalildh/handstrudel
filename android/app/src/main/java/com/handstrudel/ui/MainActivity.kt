@@ -12,6 +12,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.handstrudel.app.AppServices
 import com.handstrudel.app.DebugFakeSocial
+import com.handstrudel.app.DebugShellHooks
 import com.handstrudel.app.DeepLinkRouter
 import com.handstrudel.app.HandStrudelApplication
 import com.handstrudel.ui.nav.DefaultAppNavigator
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
 
         navigator.permissionHost = permissionHost
         DebugFakeSocial.installIfRequested(intent, navigator)
+        DebugShellHooks.handle(intent)
 
         setContent { HandStrudelApp(services, navigator) }
         // A recreated activity has already routed its launch intent.
@@ -55,7 +57,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        navigator.onPermissionFlowInterrupted()
         DebugFakeSocial.installIfRequested(intent, navigator)
+        DebugShellHooks.handle(intent)
         handleDeepLink(intent)
     }
 

@@ -57,3 +57,17 @@ object DebugFakeSocial {
         backingEnabled = true,
     )
 }
+
+/**
+ * DEBUG-only: open shell sheets whose buttons live in other workstreams' screens
+ * (`--es debugOpenSheet appearance|analytics`), for emulator verification.
+ */
+object DebugShellHooks {
+    const val EXTRA = "debugOpenSheet"
+    val openSheet = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    fun handle(intent: Intent?) {
+        if (!BuildConfig.DEBUG) return
+        intent?.getStringExtra(EXTRA)?.let { openSheet.value = it }
+    }
+}
