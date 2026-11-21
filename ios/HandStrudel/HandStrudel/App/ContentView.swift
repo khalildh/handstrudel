@@ -93,6 +93,7 @@ struct ContentView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("studioPlayInput") private var preferredInput: StudioPlayInput = .air
     @State private var showSheet = false
+    @State private var showMakeInstrument = false
     @State private var isRecording = false
     @State private var recordingUsesMicrophone = false
     @State private var recorderBusy = false
@@ -260,6 +261,10 @@ struct ContentView: View {
             }
         }
         .onOpenURL(perform: openSocialLink)
+        .task(id: auth.userId) {
+            // Saved instruments follow the account, so they survive a reinstall.
+            if auth.isSignedIn && remoteConfig.aiInstrumentsEnabled { await MyInstruments.shared.pullFromAccount() }
+        }
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { openSocialLink(url) }
         }
@@ -1243,10 +1248,17 @@ struct ContentView: View {
                         .padding(.bottom, 4)
                 }
 
-                // Bottom controls
-                bottomControls
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
+                // Bottom controls, or the "Make an instrument" panel in their place
+                if showMakeInstrument && canMakeInstrument {
+                    MakeInstrumentPanel(engine: engine, store: storeManager) { showMakeInstrument = false }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else {
+                    bottomControls
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                }
 
                 // Filter name toast
                 if showFilterName {
@@ -1368,6 +1380,14 @@ struct ContentView: View {
 
     // MARK: - Top Bar
 
+    /// "Make an instrument" shows on the Scale and Split wheels when the
+    /// remote flag (or a DEBUG override) turns it on, outside recording.
+    private var canMakeInstrument: Bool {
+        remoteConfig.aiInstrumentsEnabled
+            && (engine.scaleChordMelodyModeEnabled || engine.splitChordMelodyModeEnabled)
+            && !isRecording && !recorderBusy && recordCountdown == 0
+    }
+
     private var topBar: some View {
         HStack {
             // Beat dots
@@ -1397,6 +1417,18 @@ struct ContentView: View {
             .accessibilityHidden(true)
 
             Spacer(minLength: 8)
+
+            if canMakeInstrument {
+                Button { showMakeInstrument.toggle() } label: {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(showMakeInstrument ? palette.mediaAccent.opacity(0.6) : .black.opacity(0.4), in: Circle())
+                }
+                .accessibilityLabel("Make an instrument")
+                .accessibilityIdentifier("make-instrument-button")
+            }
 
             Button { showSetups = true } label: {
                 Image(systemName: "square.stack")

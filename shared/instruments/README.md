@@ -8,6 +8,10 @@ A HandStrudel instrument is a small JSON file that describes a playable on-scree
 - `library/` holds the instruments shipped in the iOS app (bundled as its `library` folder). `scale-wheel.json` and `split-wheel.json` are the built-in Scale and Split wheels. `wide-wheel.json` is a demo with bigger zones.
 - `fixtures/` pins the loading rules. Each file has an `input` instrument and the `expect`ed result: whether it is accepted, the issue codes in order, and the repaired values. Every implementation must pass all of them (iOS: `InstrumentSpecTests.testSharedFixtures`).
 
+## Generated instruments
+
+Players can prompt their own instruments (docs/ai-instruments.md). The generator starts from a `library/` file and returns an ordinary instrument in this format, with `"ai_generated": true`; apps label those "Made with AI". Generators must follow the schema exactly (no repairs, no unknown fields), keep the playability rules below without needing a repair, and never put music in the file: music a prompt implies goes in a separate suggestion. After changing `schema.json` or `library/`, run `npm run sync:instrument-ai` so the generator sees the change.
+
 ## Loading rules
 
 Fields a loader doesn't know are ignored, so newer files still open in older apps; generators must still follow the schema exactly. Files that are not instruments, use a newer `format_version`, have an invalid `id`, use a value outside the vocabulary, or exceed 16 KB are rejected. Values that are only out of range are repaired, with an issue code for each:
