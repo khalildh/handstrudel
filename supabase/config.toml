@@ -440,3 +440,6 @@ verify_jwt = false
 
 [functions.profile-avatar]
 verify_jwt = false
+
+[functions.moderation-media]
+verify_jwt = false

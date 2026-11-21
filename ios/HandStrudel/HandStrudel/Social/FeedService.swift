@@ -211,6 +211,7 @@ enum FeedService {
             case "COMMENT_FILTERED": throw SocialError.message("This comment was filtered. Remove links or harmful language and try again.")
             case "COMMENT_RATE_LIMITED": throw SocialError.message("You're commenting quickly. Wait a minute and try again.")
             case "COMMENT_THREAD_UNAVAILABLE": throw SocialError.message("This reply thread is no longer available.")
+            case "ACCOUNT_BANNED": throw SocialError.message("Your account can't comment because it broke the community guidelines. Contact support if you think this is a mistake.")
             default:
                 if error.code == "42501" { throw SocialError.message("You can't comment on this video right now.") }
                 throw error
