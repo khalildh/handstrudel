@@ -19,6 +19,7 @@ Legacy clips and profile photos keep using `media.handstrudel.com`.
 - `migrations/20261114060000_profile_avatars.sql`: exposes avatar keys on public creator profiles and restricts writes to the server.
 - `migrations/20261120000000_video_note_tracks.sql`: "Learn to play" note tracks (`videos.note_track`, at most 600 notes / 32 KB), written only by screened publication and only with a shared sound setup; feeds expose `has_note_track`.
 - `migrations/20261120010000_locked_sound_events.sql`: adds opt-in daily counters for Pro sounds opened from the feed (`locked_sound_tapped`) and unlocked from that screen (`locked_sound_unlocked`).
+- `migrations/20261121040000_daily_sound_streaks.sql`: the daily sound, its takes, posting streaks with a weekly freeze, streak badges and the 7-day hand theme loan. See [Daily sound](#daily-sound).
 - `tests/database/feed.test.sql`: pgTAP tests for RLS and triggers. Run them with `supabase test db`.
 - `tests/database/comments.test.sql`: pgTAP tests for comment permissions, thread visibility, and moderation.
 - `functions/sign-upload` and `functions/publish-upload`: reserve a private R2 upload and publish only after Sightengine clears the video and thumbnail. Set up the private bucket, secrets, and cutover using the [video upload release checklist](../docs/video-upload-release.md).
@@ -57,6 +58,34 @@ After the moderation reviewer is assigned, preview the remaining changes with `s
 
 ## Weekly play-along pilot
 Choose a source clip with the creator's approval and with play-along already enabled. In the dashboard, add a row to `public.weekly_challenges` with its video ID, a short title and prompt, a one-week UTC window, and `featured = true`. Only one featured window can be active at a time. During the window, attributed public takes on that source appear automatically. Leave the table empty to keep the pilot hidden; revoking the source's opt-in also hides the challenge.
+
+## Daily sound
+One sound is featured per **UTC day** (00:00 to 00:00 UTC, for everyone). The Music home shows it with a countdown, today's takes and the player's streak.
+
+**Picking.** If the owner scheduled a post for the day, that post's sound is used. Otherwise the first request of the day picks one automatically: a visible, unreported post with a shared playable preset that a player without Pro can open (the allowlist in the migration's `FREE SOUND VALUES` block, checked against the app catalog by `DailySoundTests`). Posts from the last 30 days come first, then creators not featured in the past week, then sounds not featured recently, then likes, views and remixes. A sound (same instrument, key, scale and progression) is not repeated within 30 days unless nothing else is left. The day keeps a copy of the sound, so it stays playable if the post is later deleted. If the post is hidden or its creator is blocked, the card shows the sound without the creator.
+
+**Schedule a sound** (SQL Editor, or any service-role connection). Find the post's ID in `public.videos`; it needs a shared playable preset:
+
+```sql
+-- Feature a post on a UTC date (today or later). Title (≤ 60 chars) and note (≤ 240) are optional.
+select * from public.schedule_daily_sound('2026-12-01', '<video uuid>', 'Night Drive', 'Keep the left hand on the root.');
+-- A Pro-only sound is refused unless you opt in; free players would see "Unlock".
+select * from public.schedule_daily_sound('2026-12-02', '<video uuid>', p_allow_pro => true);
+-- Remove a future schedule (the day then picks automatically).
+select public.unschedule_daily_sound('2026-12-01');
+-- What's coming up and what ran.
+select day, source, title, video_id from public.daily_sounds order by day desc limit 30;
+```
+
+Scheduling replaces an automatic pick for today only while nobody has posted a take yet (`DAILY_SOUND_HAS_TAKES`). Past days can't change.
+
+**Takes.** A screened post counts as a take when its upload was reserved during the day's window (server time, from `sign-upload`) and it either shares the same sound (tempo, mode and mix may differ) or plays along with the featured post. A take submitted just before midnight still counts for that day if screening finishes within six hours. The card lists visible takes only: hidden posts, posts the viewer reported, and blocked accounts are left out.
+
+**Streaks.** One take per day extends the streak. One freeze per ISO week (Monday to Sunday, UTC) covers a single missed day; two missed days in the same week reset it. Deleting or hiding a take after it counted keeps the credited day (`daily_streak_days`); a moderator can delete that row to remove it. Badges are earned once at 3, 7 and 30 days. Reaching 7 also lends one HandStrudel+ hand theme for 7 days (`daily_theme_grants`, rotating through the five premium themes). The app only times the loan from the server's grant. No device clock is involved.
+
+**Push notification hooks** (service role only; nothing sends notifications yet):
+- `select * from public.daily_sound_live();` at 00:00 UTC returns the new day's sound (picking it if needed) for a "Today's sound is live" push.
+- `select * from public.daily_streaks_at_risk(interval '3 hours');` returns players with a live streak and no take today whose deadline is within the interval, with `ends_at` and `freeze_would_cover` (true when missing today would only use this week's freeze).
 
 ## Optional app usage metrics
 In the project SQL Editor, view UTC daily totals with:

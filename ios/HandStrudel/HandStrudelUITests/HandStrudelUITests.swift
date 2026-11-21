@@ -2336,3 +2336,69 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
     }
 }
+
+// MARK: - Daily sound
+
+extension HandStrudelUITests {
+    /// Needs `node scripts/daily-sound-ui-fixture.mjs` and HANDSTRUDEL_DAILY_FIXTURE_URL.
+    func testDailySoundCardShowsTodaysSoundStreakAndPlaysIt() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_DAILY_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the daily sound fixture.")
+        }
+        app.launchArguments.append("--uitesting")
+        for key in ["SUPABASE_URL", "MEDIA_BASE_URL", "CLIP_MEDIA_BASE_URL"] { app.launchEnvironment[key] = endpoint }
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "daily-fixture-key"
+        app.launch()
+        signOutOfDailyFixture()
+
+        let card = element("daily-sound-card")
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "Today's sound sits at the top of the Music home")
+        XCTAssertTrue(app.staticTexts["Night Drive"].exists)
+        XCTAssertTrue(app.buttons["daily-sound-creator"].exists)
+        XCTAssertEqual(element("daily-take-count").label, "3 takes today")
+        XCTAssertTrue((element("daily-time-left").label).hasPrefix("New sound in"))
+        XCTAssertTrue(app.buttons["daily-streak-sign-in"].exists, "Signed out, the card invites a sign-in")
+        captureIfRequested("Daily-Sound-Guest")
+
+        signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 12))
+        let profileStreak = element("profile-daily-streak")
+        XCTAssertTrue(profileStreak.waitForExistence(timeout: 5), "The profile shows the streak and badges")
+        element("tab-music").tap()
+
+        let current = element("daily-streak-current")
+        XCTAssertTrue(current.waitForExistence(timeout: 10))
+        XCTAssertEqual(current.label, "7-day streak")
+        XCTAssertEqual(element("daily-streak-best").label, "Best 12")
+        let freeze = element("daily-streak-freeze").label
+        XCTAssertTrue(freeze.contains("freeze covered"), freeze)
+        let loan = element("daily-theme-loan")
+        XCTAssertTrue(loan.exists, "A 7-day streak shows the lent hand theme")
+        XCTAssertTrue(loan.label.contains("Royal hand theme unlocked"), loan.label)
+        XCTAssertEqual(element("daily-streak-badges").label, "Streak badges: 3 days, 7 days")
+        app.swipeUp(velocity: .slow)
+        captureIfRequested("Daily-Sound-Streak")
+        app.swipeDown(velocity: .slow)
+
+        let play = app.buttons["daily-play-sound"]
+        XCTAssertEqual(play.label, "Play today's sound")
+        play.tap()
+        let close = element("close-button")
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "Play today's sound opens the studio")
+        close.tap()
+        signOutOfDailyFixture()
+    }
+
+    /// Leaves the fixture account so the next run starts signed out.
+    private func signOutOfDailyFixture() {
+        let account = element("tab-account")
+        XCTAssertTrue(account.waitForExistence(timeout: 10))
+        account.tap()
+        if app.buttons["Edit profile"].waitForExistence(timeout: 4) {
+            app.buttons["Account settings"].tap()
+            app.buttons["Sign out"].tap()
+            XCTAssertTrue(app.buttons["Sign in"].waitForExistence(timeout: 8))
+        }
+        element("tab-music").tap()
+    }
+}

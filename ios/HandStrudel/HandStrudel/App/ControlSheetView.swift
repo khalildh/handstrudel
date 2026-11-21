@@ -1117,7 +1117,7 @@ struct ControlSheet: View {
                 GridItem(.flexible(), spacing: 8)
             ], spacing: 8) {
                 ForEach(HAND_THEMES) { theme in
-                    let locked = theme.isPremium && !storeManager.isUnlocked(theme.packId ?? "")
+                    let locked = !storeManager.isUnlocked(theme: theme)
                     let isSelected = engine.selectedHandTheme.id == theme.id
                     Button(action: {
                         if locked, let packId = theme.packId {
