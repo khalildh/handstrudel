@@ -1,0 +1,95 @@
+{
+  "description": "Each hand gets at most 16 zones; zones for either hand count for both.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "grid",
+      "rows": 4,
+      "columns": 5
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0
+      },
+      {
+        "role": "note",
+        "degree": 1
+      },
+      {
+        "role": "note",
+        "degree": 2
+      },
+      {
+        "role": "note",
+        "degree": 3
+      },
+      {
+        "role": "note",
+        "degree": 4
+      },
+      {
+        "role": "note",
+        "degree": 5
+      },
+      {
+        "role": "note",
+        "degree": 6
+      },
+      {
+        "role": "note",
+        "degree": 7
+      },
+      {
+        "role": "note",
+        "degree": 8
+      },
+      {
+        "role": "note",
+        "degree": 9
+      },
+      {
+        "role": "note",
+        "degree": 10
+      },
+      {
+        "role": "note",
+        "degree": 11
+      },
+      {
+        "role": "note",
+        "degree": 12
+      },
+      {
+        "role": "note",
+        "degree": 13
+      },
+      {
+        "role": "note",
+        "degree": 14
+      },
+      {
+        "role": "note",
+        "degree": 15
+      },
+      {
+        "role": "note",
+        "degree": 16
+      },
+      {
+        "role": "note",
+        "degree": 17
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "zones_dropped"
+    ],
+    "zone_count": 16
+  }
+}

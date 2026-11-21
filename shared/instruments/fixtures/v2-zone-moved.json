@@ -1,0 +1,34 @@
+{
+  "description": "A pad hanging off the play area is moved inside it.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "pads"
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0,
+        "frame": {
+          "x": 0.9,
+          "y": -0.2,
+          "w": 0.3,
+          "h": 0.3
+        }
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "zone_moved"
+    ],
+    "values": {
+      "zones.0.frame.x": 0.7,
+      "zones.0.frame.y": 0.0
+    }
+  }
+}

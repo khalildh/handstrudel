@@ -578,9 +578,14 @@ final class EngineController: ObservableObject {
     private let chordMelodyMode = ChordMelodyModeController()
     private let learnMode = LearnModeController()
     private let soundFontMode = SoundFontModeController()
+    private let instrumentSurfaceMode = InstrumentSurfaceModeController()
+    /// Plays format 2 instruments (`InstrumentLayout`) from touch and hands.
+    let instrumentSurface = InstrumentSurfacePlayer()
+    private lazy var instrumentSink = EngineInstrumentSink(engine: self)
 
     private var activeMode: ModeController {
         if learnModeEnabled { return learnMode }
+        if customInstrument?.isSurfaceInstrument == true { return instrumentSurfaceMode }
         if soundFontModeEnabled { return soundFontMode }
         // Radial mode normally goes through the WebView-synth chord-melody
         // controller, but flipping the per-mode toggle routes it through the
@@ -1348,6 +1353,7 @@ final class EngineController: ObservableObject {
         strudelBridge.noteOff(hand: "touch2")
         strudelBridge.noteOff(hand: "lead")
         leadVoiceMidi = nil
+        instrumentSurface.releaseAll()
         strudelBridge.stop()
         soundFontEngine.allNotesOff()
         for peer in Array(remoteJamVoices.keys) { playJamVoices([:], peer: peer) }
@@ -1380,6 +1386,14 @@ final class EngineController: ObservableObject {
 
     var wheelRules: WheelRules { wheelInstrument.rules }
 
+    /// The format 2 instrument on screen, if one is playing instead of a mode's own UI.
+    var surfaceInstrument: InstrumentSpec? { customInstrument?.isSurfaceInstrument == true ? customInstrument : nil }
+
+    /// The player's music that instrument zones resolve against.
+    var instrumentMusicContext: InstrumentMusicContext {
+        InstrumentMusicContext(key: selectedKey, scale: selectedScale, progression: chordMelodyProgression.degrees)
+    }
+
     /// Chord hand on the right: the instrument's side, mirrored by the player's
     /// swap-hands setting. Equals `chordMelodySwapHands` for built-in wheels.
     var wheelSwapHands: Bool { wheelRules.swapHands(playerSwap: chordMelodySwapHands) }
@@ -1388,6 +1402,19 @@ final class EngineController: ObservableObject {
     /// wheel's layout and behaviour; key, scale, progression and sound stay as
     /// the player set them, and the wheel adapts to them.
     func playInstrument(_ instrument: InstrumentSpec) {
+        if instrument.isSurfaceInstrument {
+            // Any other surface plays on the generic renderer, over the base
+            // (melodic) mode's state, with the player's music.
+            switchMode(grid: false, drums: false, learn: false)
+            customInstrument = instrument
+            instrumentSurface.sink = instrumentSink
+            instrumentSurface.context = instrumentMusicContext
+            instrumentSurface.load(instrument)
+            #if DEBUG
+            EngineNoteLog.clear()
+            #endif
+            return
+        }
         let mode = instrument.baseMode
         switchMode(grid: false, drums: false, learn: false,
                    splitChordMelody: mode == .splitchordmelody, scaleChordMelody: mode == .scalechordmelody)
@@ -1402,6 +1429,7 @@ final class EngineController: ObservableObject {
                     scaleChordMelody: Bool = false) {
         silenceAll()
         customInstrument = nil
+        instrumentSurface.load(nil)
         gridModeEnabled = grid
         drumModeEnabled = drums
         learnModeEnabled = learn

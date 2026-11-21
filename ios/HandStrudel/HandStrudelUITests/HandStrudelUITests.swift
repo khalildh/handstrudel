@@ -1972,10 +1972,119 @@ final class HandStrudelUITests: XCTestCase {
                        "Same scale notes: the instrument adapts to the player's settings")
         XCTAssertEqual((0..<12).map { app.buttons["wheel-chord-\($0)"] }.filter(\.exists).map(\.label), chordLabels,
                        "Same chords: the instrument doesn't choose the music")
+        let before = engineLog().filter { $0.hasPrefix("on:") }.count
         app.buttons["wheel-chord-1"].tap()
         app.buttons["wheel-note-2"].tap()
         XCTAssertTrue(element("close-button").exists)
+        // The wheel still sends its chord (4 notes, Scale wheel 7ths) and a note to the engine.
+        XCTAssertTrue(waitForLog { $0.filter { $0.hasPrefix("on:") }.count >= before + 5 }, "\(engineLog())")
         add(screenshotAttachment("2-wide-wheel"))
+    }
+
+    // MARK: - Format 2 instruments
+
+    /// Notes and hits the app sent to the engine (DEBUG `engine-note-log`).
+    private func engineLog() -> [String] {
+        let log = element("engine-note-log")
+        guard log.exists else { return [] }
+        return log.label.split(separator: " ").map(String.init)
+    }
+
+    private func waitForLog(timeout: TimeInterval = 4, _ condition: ([String]) -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if condition(engineLog()) { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return condition(engineLog())
+    }
+
+    private func pickInstrument(_ name: String) {
+        element("settings-button").tap()
+        selectMusicSettingsSection("play")
+        let picker = app.buttons["instrument-file-picker"].firstMatch
+        revealInMusicSettings(picker)
+        picker.tap()
+        // The menu is taller than the screen once every surface is listed: scroll its own list.
+        let menu = app.collectionViews.containing(NSPredicate(format: "identifier BEGINSWITH 'instrument-file-'")).firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "instrument menu")
+        RunLoop.current.run(until: Date().addingTimeInterval(0.6)) // let the menu finish opening
+        let item = app.buttons[name].firstMatch
+        for _ in 0..<6 where !(item.exists && item.isHittable) {
+            menu.swipeUp(velocity: .slow)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        }
+        XCTAssertTrue(item.isHittable, name)
+        item.tap()
+        let label = NSPredicate(format: "label == %@", name)
+        let picked = expectation(for: label, evaluatedWith: app.buttons["instrument-file-picker"].firstMatch)
+        wait(for: [picked], timeout: 5)
+        closeMusicSettings()
+    }
+
+    /// What the engine log should gain when a zone with this accessibility
+    /// value is played: each note (held or one-shot), a drum hit, or a parameter.
+    private func expectedEntries(forZoneValue value: String) -> [String] {
+        if ["kick", "snare", "hihat", "crash", "ride", "tom"].contains(value) { return ["hit:\(value)"] }
+        if ["lpf", "hpf", "reverb", "delay", "gain", "pan", "shape", "crush"].contains(value) { return ["fx:\(value)"] }
+        return value.split(separator: " ").map { "\($0)" }
+    }
+
+    /// Play a zone by tapping it and check the engine got what the zone says it plays.
+    private func playZone(_ index: Int, on instrument: String) {
+        let zone = app.buttons["surface-zone-\(index)"]
+        XCTAssertTrue(zone.waitForExistence(timeout: 5), "\(instrument) zone \(index)")
+        let value = (zone.value as? String) ?? ""
+        let expected = expectedEntries(forZoneValue: value)
+        XCTAssertFalse(expected.isEmpty, "\(instrument) zone \(index) has no sound")
+        func count(_ log: [String], _ entry: String) -> Int {
+            log.filter { $0 == entry || $0 == "on:\(entry)" || $0 == "play:\(entry)" }.count
+        }
+        let before = engineLog()
+        zone.tap()
+        let played = waitForLog { log in expected.allSatisfy { count(log, $0) > count(before, $0) } }
+        XCTAssertTrue(played, "\(instrument) zone \(index) (\(zone.label), \(value), \(zone.frame)) → \(engineLog().suffix(12))")
+    }
+
+    /// Every starter instrument, on every surface: pick it in the Instrument
+    /// picker, tap zones like a player, and check the notes, chords, hits and
+    /// parameters that actually reached the engine.
+    func testEveryStarterInstrumentPlaysFromTouch() {
+        app.launchArguments = ["--uitesting", "--reset-studio-input", "--uitest-camera-denied", "-hasSeenOnboarding", "YES"]
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        // The first tap can land while the start screen is still settling.
+        if !element("close-button").waitForExistence(timeout: 5), start.exists { start.tap() }
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
+
+        let starters: [(name: String, zones: [Int])] = [
+            ("Note Grid", [6, 4, 2]),
+            ("Chord Grid", [0, 1]),
+            ("Scale Keys", [0, 3, 6]),
+            ("Strum Ladder", [1, 4, 8]),
+            ("Drum Pads", [4, 5, 0]),
+            ("Beat Box", [2, 5]),
+            ("Synth Pads", [3, 0, 5]),
+            ("Halo", [0, 3]),
+            ("Chord Ring", [2, 3]),
+            ("Rainbow Arc", [0, 6]),
+            ("Floating Orbs", [4, 1]),
+            ("Pulse Chords", [0, 3]),
+        ]
+        // `TEST_RUNNER_STARTERS="Halo,Drum Pads"` runs a subset while iterating.
+        let only = ProcessInfo.processInfo.environment["STARTERS"].map { Set($0.split(separator: ",").map(String.init)) }
+        for starter in starters where only?.contains(starter.name) ?? true {
+            pickInstrument(starter.name)
+            for zone in starter.zones { playZone(zone, on: starter.name) }
+            add(screenshotAttachment("surface-\(starter.name)"))
+        }
+
+        // Back to the built-in wheel: its own touch zones take over again.
+        pickInstrument("Scale Wheel")
+        XCTAssertTrue(app.buttons["wheel-note-0"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["surface-zone-0"].exists)
     }
 
     private func screenshotAttachment(_ name: String) -> XCTAttachment {

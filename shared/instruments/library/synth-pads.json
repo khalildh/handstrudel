@@ -1,0 +1,89 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.synth-pads",
+  "name": "Synth Pads",
+  "description": "Five note pads and a filter strip: slide along the strip to open the sound up.",
+  "surface": {
+    "type": "pads"
+  },
+  "zones": [
+    {
+      "role": "note",
+      "degree": 2,
+      "frame": {
+        "x": 0.03,
+        "y": 0.04,
+        "w": 0.29,
+        "h": 0.3
+      }
+    },
+    {
+      "role": "note",
+      "degree": 3,
+      "frame": {
+        "x": 0.355,
+        "y": 0.04,
+        "w": 0.29,
+        "h": 0.3
+      }
+    },
+    {
+      "role": "note",
+      "degree": 4,
+      "frame": {
+        "x": 0.68,
+        "y": 0.04,
+        "w": 0.29,
+        "h": 0.3
+      }
+    },
+    {
+      "role": "note",
+      "degree": 0,
+      "frame": {
+        "x": 0.03,
+        "y": 0.38,
+        "w": 0.45,
+        "h": 0.3
+      }
+    },
+    {
+      "role": "note",
+      "degree": 1,
+      "frame": {
+        "x": 0.52,
+        "y": 0.38,
+        "w": 0.45,
+        "h": 0.3
+      }
+    },
+    {
+      "role": "expression",
+      "parameter": "filter",
+      "axis": "x",
+      "frame": {
+        "x": 0.03,
+        "y": 0.74,
+        "w": 0.94,
+        "h": 0.2
+      }
+    }
+  ],
+  "gestures": {
+    "play": "pinch",
+    "expressions": [
+      {
+        "hand": "right",
+        "input": "y",
+        "parameter": "reverb"
+      }
+    ]
+  },
+  "visuals": {
+    "palette": "ocean",
+    "shape": "rounded",
+    "effect": "particles",
+    "labels": "notes"
+  }
+}

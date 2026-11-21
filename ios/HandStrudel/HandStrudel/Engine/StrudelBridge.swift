@@ -243,6 +243,9 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
 
     func playHit(_ type: String) {
         webView.evaluateJavaScript("playHit('\(type)')", completionHandler: nil)
+        #if DEBUG
+        EngineNoteLog.record("hit:\(type)")
+        #endif
     }
 
     func updateDrumParams(intensity: Double, complexity: Double) {
@@ -254,6 +257,9 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         let safeVel = max(0, min(1, velocity))
         webView.evaluateJavaScript("noteOn('\(hand)',\(safeMidi),'\(waveform)',\(String(format: "%.2f", safeVel)))", completionHandler: nil)
         if isReady, !hand.hasPrefix("jam-") { onNoteStarted?() }
+        #if DEBUG
+        if !hand.hasPrefix("jam-") { EngineNoteLog.record("on:\(midiNoteName(safeMidi))") }
+        #endif
         noteCapture?.noteOn(voice: hand, midi: safeMidi, role: PerformanceNoteCapture.role(forVoice: hand))
     }
 
@@ -278,6 +284,9 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         let safeMidi = max(0, min(127, midi))
         webView.evaluateJavaScript("playNote(\(safeMidi),'\(waveform)',\(String(format: "%.2f", velocity)),\(String(format: "%.2f", duration)))", completionHandler: nil)
         noteCapture?.oneShot(midi: safeMidi, duration: duration, role: role)
+        #if DEBUG
+        EngineNoteLog.record("play:\(midiNoteName(safeMidi))")
+        #endif
     }
 
     func stop() {

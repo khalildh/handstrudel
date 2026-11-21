@@ -1,0 +1,96 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.floating-orbs",
+  "name": "Floating Orbs",
+  "description": "Six notes drifting slowly in space. Spread your left hand for reverb, turn your right for the filter.",
+  "surface": {
+    "type": "orbs",
+    "motion": "drift",
+    "amount": 0.025,
+    "period": 9
+  },
+  "zones": [
+    {
+      "role": "note",
+      "degree": 4,
+      "frame": {
+        "x": 0.1,
+        "y": 0.08,
+        "w": 0.3,
+        "h": 0.19
+      }
+    },
+    {
+      "role": "note",
+      "degree": 5,
+      "frame": {
+        "x": 0.6,
+        "y": 0.08,
+        "w": 0.3,
+        "h": 0.19
+      }
+    },
+    {
+      "role": "note",
+      "degree": 2,
+      "frame": {
+        "x": 0.1,
+        "y": 0.4,
+        "w": 0.3,
+        "h": 0.19
+      }
+    },
+    {
+      "role": "note",
+      "degree": 3,
+      "frame": {
+        "x": 0.6,
+        "y": 0.4,
+        "w": 0.3,
+        "h": 0.19
+      }
+    },
+    {
+      "role": "note",
+      "degree": 0,
+      "frame": {
+        "x": 0.1,
+        "y": 0.72,
+        "w": 0.3,
+        "h": 0.19
+      }
+    },
+    {
+      "role": "note",
+      "degree": 1,
+      "frame": {
+        "x": 0.6,
+        "y": 0.72,
+        "w": 0.3,
+        "h": 0.19
+      }
+    }
+  ],
+  "gestures": {
+    "play": "pinch",
+    "expressions": [
+      {
+        "hand": "left",
+        "input": "spread",
+        "parameter": "reverb"
+      },
+      {
+        "hand": "right",
+        "input": "rotation",
+        "parameter": "filter"
+      }
+    ]
+  },
+  "visuals": {
+    "palette": "aurora",
+    "shape": "round",
+    "effect": "glow",
+    "labels": "notes"
+  }
+}

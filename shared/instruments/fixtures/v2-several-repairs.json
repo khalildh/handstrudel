@@ -1,0 +1,62 @@
+{
+  "description": "Repairs are reported once each, in rule order.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "grid",
+      "rows": 0,
+      "columns": 3
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 30
+      },
+      {
+        "role": "note",
+        "degree": 1,
+        "label": "A very long label"
+      },
+      {
+        "role": "note",
+        "degree": 2
+      },
+      {
+        "role": "note",
+        "degree": 3
+      }
+    ],
+    "gestures": {
+      "expressions": [
+        {
+          "hand": "left",
+          "input": "x",
+          "parameter": "pan"
+        },
+        {
+          "hand": "left",
+          "input": "x",
+          "parameter": "crush"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "surface_clamped",
+      "zone_clamped",
+      "label_trimmed",
+      "zones_dropped",
+      "gesture_dropped"
+    ],
+    "values": {
+      "surface.rows": 1,
+      "zones.0.degree": 20
+    },
+    "zone_count": 3
+  }
+}

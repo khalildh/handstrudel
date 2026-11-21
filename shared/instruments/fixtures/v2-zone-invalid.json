@@ -1,0 +1,28 @@
+{
+  "description": "A zone without its role's field (a note without a degree, a pad without a frame) is rejected.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "keys"
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0
+      },
+      {
+        "role": "note",
+        "octave": 1
+      }
+    ]
+  },
+  "expect": {
+    "accepted": false,
+    "issues": [
+      "zone_invalid"
+    ]
+  }
+}

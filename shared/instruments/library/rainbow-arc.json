@@ -1,0 +1,60 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.rainbow-arc",
+  "name": "Rainbow Arc",
+  "description": "A fan of seven scale notes rising from left to right, like a rainbow over your hands.",
+  "surface": {
+    "type": "arc",
+    "inner_radius": 0.35,
+    "outer_radius": 1.0,
+    "start_angle": -90,
+    "end_angle": 90
+  },
+  "zones": [
+    {
+      "role": "note",
+      "degree": 0
+    },
+    {
+      "role": "note",
+      "degree": 1
+    },
+    {
+      "role": "note",
+      "degree": 2
+    },
+    {
+      "role": "note",
+      "degree": 3
+    },
+    {
+      "role": "note",
+      "degree": 4
+    },
+    {
+      "role": "note",
+      "degree": 5
+    },
+    {
+      "role": "note",
+      "degree": 6
+    }
+  ],
+  "gestures": {
+    "play": "pinch",
+    "expressions": [
+      {
+        "hand": "left",
+        "input": "spread",
+        "parameter": "reverb"
+      }
+    ]
+  },
+  "visuals": {
+    "palette": "candy",
+    "shape": "rounded",
+    "effect": "particles",
+    "labels": "degrees"
+  }
+}

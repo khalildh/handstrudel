@@ -10,6 +10,7 @@
     "update.recommended_version": { "type": "version", "default": null, "doc": "Older versions see a dismissible update banner." },
     "update.message": { "type": "string", "default": "", "max_length": 200, "doc": "Optional text on the update banner and blocker." },
     "update.app_store_url": { "type": "string", "default": "https://apps.apple.com/app/id6764415289", "doc": "Update button target. Must start with https://apps.apple.com/." },
-    "instruments.remote_enabled": { "type": "bool", "default": true, "doc": "Show downloaded instruments and fetch the catalog." }
+    "instruments.remote_enabled": { "type": "bool", "default": true, "doc": "Show downloaded instruments and fetch the catalog." },
+    "instruments.surfaces_enabled": { "type": "bool", "default": false, "doc": "Show the Instrument picker (every surface: wheels, grids, keys, pads, arcs, orbs) in release builds. Debug builds always show it." }
   }
 }

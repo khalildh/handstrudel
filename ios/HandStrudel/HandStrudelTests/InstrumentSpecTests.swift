@@ -20,7 +20,7 @@ final class InstrumentSpecTests: XCTestCase {
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "json" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
-        XCTAssertGreaterThanOrEqual(files.count, 10)
+        XCTAssertGreaterThanOrEqual(files.count, 30)
 
         for file in files {
             let name = file.lastPathComponent
@@ -38,8 +38,28 @@ final class InstrumentSpecTests: XCTestCase {
                 XCTAssertEqual(spec.surface.octaveBandRadius, surface["octave_band_radius"], name)
             }
             if let expectedName = expect["name"] as? String { XCTAssertEqual(spec.name, expectedName, name) }
+            if let count = expect["zone_count"] as? Int { XCTAssertEqual(spec.layout?.zones.count, count, name) }
+            if let values = expect["values"] as? [String: Any] {
+                let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(spec)) as? [String: Any])
+                for (path, expected) in values {
+                    let actual = Self.value(at: path, in: encoded)
+                    if let number = expected as? Double, !(expected is Bool) {
+                        XCTAssertEqual((actual as? Double) ?? .nan, number, accuracy: 0.000001, "\(name): \(path)")
+                    } else {
+                        XCTAssertEqual(actual.map { "\($0)" }, "\(expected)", "\(name): \(path)")
+                    }
+                }
+            }
             // A repaired instrument loads cleanly the second time.
             XCTAssertEqual(InstrumentSpec.load(try JSONEncoder().encode(spec)).issues, [], name)
+        }
+    }
+
+    /// `zones.0.frame.w` style paths into decoded JSON.
+    private static func value(at path: String, in object: Any) -> Any? {
+        path.split(separator: ".").reduce(Optional(object)) { current, key in
+            if let array = current as? [Any], let index = Int(key) { return array.indices.contains(index) ? array[index] : nil }
+            return (current as? [String: Any])?[String(key)]
         }
     }
 

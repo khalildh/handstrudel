@@ -142,6 +142,9 @@ final class SoundFontEngine {
 
     /// Start (or re-strike) a sustained voice. `velocity` is 0…1.
     func noteOn(voice: String, midi: Int, velocity: Double) {
+        #if DEBUG
+        if !voice.hasPrefix("jam-") { EngineNoteLog.record("on:\(midiNoteName(max(0, min(127, midi))))") }
+        #endif
         guard isAvailable else { return }
         let note = clampMidi(midi)
         let vel = clampVelocity(velocity)

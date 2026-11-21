@@ -1,25 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://handstrudel.com/schemas/instrument-1.json",
+  "$id": "https://handstrudel.com/schemas/instrument-2.json",
   "title": "HandStrudel instrument",
-  "description": "A playable on-screen instrument described as data: its surface and what each zone plays, always relative to the player's current sound (key, scale, progression, instrument). Instruments never pick a sound. Apps draw and play it with their own built-in code; nothing in this file is executed. Version 1 supports one surface type, the split wheel.",
+  "description": "A playable on-screen instrument described as data: its surface, what each zone plays, gestures and visuals, always relative to the player's current music (key, scale, progression, voicing, sound, tempo). Instruments never pick music. Apps draw and play it with their own built-in code; nothing in this file is executed. Format 1 has the split wheel; format 2 adds radial, grid, keys, strips, pads, arc and orbs surfaces. Format 1 files stay valid.",
   "type": "object",
   "required": [
     "format",
     "format_version",
     "id",
     "name",
-    "surface",
-    "chords",
-    "notes"
+    "surface"
   ],
-  "additionalProperties": false,
   "properties": {
     "format": {
       "const": "handstrudel.instrument"
     },
     "format_version": {
-      "const": 1
+      "enum": [
+        1,
+        2
+      ]
     },
     "id": {
       "type": "string",
@@ -34,9 +34,6 @@
     "description": {
       "type": "string",
       "maxLength": 200
-    },
-    "surface": {
-      "$ref": "#/$defs/split_wheel"
     },
     "chords": {
       "type": "object",
@@ -80,8 +77,88 @@
           "description": "Tint the note wedges that belong to the held chord."
         }
       }
+    },
+    "zones": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/zone"
+      },
+      "description": "At most 16 per hand (zones for any hand count for both), and no more than the surface fits at 44 points on the reference play area. Free zones may not overlap."
+    },
+    "gestures": {
+      "$ref": "#/$defs/gestures"
+    },
+    "visuals": {
+      "$ref": "#/$defs/visuals"
+    },
+    "surface": {
+      "type": "object",
+      "description": "split_wheel, or one of the format 2 surfaces."
     }
   },
+  "oneOf": [
+    {
+      "description": "Split wheel (format 1 or 2).",
+      "required": [
+        "chords",
+        "notes"
+      ],
+      "properties": {
+        "surface": {
+          "$ref": "#/$defs/split_wheel"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "zones"
+            ]
+          },
+          {
+            "required": [
+              "gestures"
+            ]
+          },
+          {
+            "required": [
+              "visuals"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "General surface (format 2).",
+      "required": [
+        "zones"
+      ],
+      "properties": {
+        "format_version": {
+          "const": 2
+        },
+        "surface": {
+          "$ref": "#/$defs/surface"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "chords"
+            ]
+          },
+          {
+            "required": [
+              "notes"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "unevaluatedProperties": false,
   "$defs": {
     "split_wheel": {
       "type": "object",
@@ -112,6 +189,446 @@
           "minimum": 0.6,
           "maximum": 0.92,
           "description": "Where the outer octave rim starts. Must leave at least 0.25 of base band outside the rest hole."
+        }
+      }
+    },
+    "surface": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "description": "How zones are placed in the play area. radial, grid, keys, strips and arc place zones in order; pads and orbs use each zone's frame.",
+      "properties": {
+        "type": {
+          "enum": [
+            "radial",
+            "grid",
+            "keys",
+            "strips",
+            "pads",
+            "arc",
+            "orbs"
+          ]
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "default": 3,
+          "description": "grid. Zones fill cells row by row from the top left."
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "default": 4,
+          "description": "grid."
+        },
+        "orientation": {
+          "enum": [
+            "horizontal",
+            "vertical"
+          ],
+          "default": "horizontal",
+          "description": "keys, strips: horizontal runs left to right (at most 7 zones), vertical bottom to top (at most 10)."
+        },
+        "inner_radius": {
+          "type": "number",
+          "minimum": 0.2,
+          "maximum": 0.6,
+          "description": "radial (default 0.35), arc (default 0.45): fraction of the radius. At least 0.3 inside outer_radius."
+        },
+        "outer_radius": {
+          "type": "number",
+          "minimum": 0.6,
+          "maximum": 1.0,
+          "default": 1.0,
+          "description": "radial: fraction of half the play area's shorter side. arc: of the smaller of half its width and its height."
+        },
+        "start_angle": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 40,
+          "default": -70,
+          "description": "arc: degrees clockwise from straight up, around the bottom centre."
+        },
+        "end_angle": {
+          "type": "number",
+          "minimum": -40,
+          "maximum": 100,
+          "default": 70,
+          "description": "arc: at least 60 degrees after start_angle."
+        },
+        "motion": {
+          "enum": [
+            "drift",
+            "pulse"
+          ],
+          "default": "drift",
+          "description": "orbs."
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.06,
+          "default": 0.02,
+          "description": "orbs: how far they drift or swell, as a fraction of the play area's shorter side. Counted when checking overlaps."
+        },
+        "period": {
+          "type": "number",
+          "minimum": 2,
+          "maximum": 20,
+          "default": 8,
+          "description": "orbs: seconds per drift or pulse cycle. Visual only, never tempo."
+        }
+      }
+    },
+    "zone": {
+      "type": "object",
+      "required": [
+        "role"
+      ],
+      "additionalProperties": false,
+      "description": "One playable area. The role says which musical part of the player's settings it plays; the player's key, scale, progression, voicing and sound decide the actual notes.",
+      "properties": {
+        "role": {
+          "enum": [
+            "note",
+            "chord",
+            "chord_tone",
+            "drum",
+            "expression"
+          ],
+          "description": "note: a scale degree. chord: a chord of the progression. chord_tone: a tone of the held chord. drum: a kit slot. expression: a control that sets a sound parameter by position."
+        },
+        "degree": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20,
+          "description": "note: scale degree from the root (0). Past the scale's size it climbs octaves (degree 7 of a 7-note scale is the root an octave up)."
+        },
+        "octave": {
+          "type": "integer",
+          "minimum": -2,
+          "maximum": 2,
+          "default": 0,
+          "description": "note, chord, chord_tone: octaves up or down."
+        },
+        "slot": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7,
+          "description": "chord: which chord of the player's progression; wraps around."
+        },
+        "tone": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "chord_tone: 0 root, 1 third, 2 fifth, 3 seventh of the held chord (else the progression's first chord)."
+        },
+        "drum": {
+          "enum": [
+            "kick",
+            "snare",
+            "hihat",
+            "crash",
+            "ride",
+            "tom"
+          ],
+          "description": "drum: kit slot. The player's drum sound plays it."
+        },
+        "parameter": {
+          "enum": [
+            "filter",
+            "hipass",
+            "reverb",
+            "delay",
+            "volume",
+            "pan",
+            "drive",
+            "crush"
+          ],
+          "description": "expression: the parameter the zone sets."
+        },
+        "axis": {
+          "enum": [
+            "x",
+            "y"
+          ],
+          "description": "expression: the zone's axis that sets the value (x left→right, y bottom→top). Defaults to the zone's long side."
+        },
+        "hand": {
+          "enum": [
+            "left",
+            "right",
+            "any"
+          ],
+          "default": "any",
+          "description": "Which tracked hand can play it. Touch plays every zone."
+        },
+        "behavior": {
+          "enum": [
+            "hold",
+            "latch",
+            "retrigger"
+          ],
+          "default": "hold",
+          "description": "Pitched zones only. hold: sounds while touched or pinched. latch: a tap turns it on, the next tap off. retrigger: a short note each time it's hit. Drums always retrigger."
+        },
+        "octave_bands": {
+          "type": "boolean",
+          "default": false,
+          "description": "Pitched zones only. The top (outer) 28% plays an octave up, the bottom (inner) 28% an octave down. Removed where a band would be under 44 points."
+        },
+        "frame": {
+          "type": "object",
+          "required": [
+            "x",
+            "y",
+            "w",
+            "h"
+          ],
+          "additionalProperties": false,
+          "description": "Where a pad or orb sits, as fractions of the play area (x right, y down). Moved inside the play area and grown to at least 44 points on the 340×480 reference play area when loaded.",
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "w": {
+              "type": "number"
+            },
+            "h": {
+              "type": "number"
+            }
+          }
+        },
+        "shape": {
+          "enum": [
+            "round",
+            "rounded"
+          ],
+          "description": "pads, orbs: a round pad is the circle inscribed in its frame. Defaults from visuals.shape (orbs are round)."
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 12,
+          "description": "Replaces the computed label (note name, chord, degree, drum or parameter)."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "note"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "degree"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "chord"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "slot"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "chord_tone"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "tone"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "drum"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "drum"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "expression"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "parameter"
+            ]
+          }
+        }
+      ]
+    },
+    "gestures": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Which hand gesture plays zones, and which hand inputs shape the sound.",
+      "properties": {
+        "play": {
+          "enum": [
+            "pinch",
+            "hover"
+          ],
+          "default": "pinch",
+          "description": "pinch: pinch inside a zone. hover: a hand's pinch point inside a zone plays it."
+        },
+        "expressions": {
+          "type": "array",
+          "maxItems": 6,
+          "description": "One expression per gesture, none on the play gesture, one control (zone or gesture) per parameter; extras are dropped.",
+          "items": {
+            "type": "object",
+            "required": [
+              "hand",
+              "input",
+              "parameter"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "hand": {
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              "input": {
+                "enum": [
+                  "x",
+                  "y",
+                  "spread",
+                  "pinch",
+                  "fist",
+                  "rotation",
+                  "thumbCurl",
+                  "indexCurl",
+                  "middleCurl",
+                  "ringCurl",
+                  "pinkyCurl"
+                ],
+                "description": "A hand-tracking axis (the app's MappingConfig axes), 0–1."
+              },
+              "parameter": {
+                "enum": [
+                  "filter",
+                  "hipass",
+                  "reverb",
+                  "delay",
+                  "volume",
+                  "pan",
+                  "drive",
+                  "crush"
+                ]
+              },
+              "invert": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "visuals": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Named styles only; each reads in every studio theme.",
+      "properties": {
+        "palette": {
+          "enum": [
+            "theme",
+            "aurora",
+            "ember",
+            "ocean",
+            "candy",
+            "mono"
+          ],
+          "default": "theme",
+          "description": "theme uses the studio theme's accents."
+        },
+        "shape": {
+          "enum": [
+            "rounded",
+            "round",
+            "square"
+          ],
+          "default": "rounded"
+        },
+        "effect": {
+          "enum": [
+            "none",
+            "glow",
+            "particles",
+            "ripple"
+          ],
+          "default": "glow",
+          "description": "How a zone looks while played."
+        },
+        "labels": {
+          "enum": [
+            "notes",
+            "degrees",
+            "none"
+          ],
+          "default": "notes",
+          "description": "notes: note and chord names in the player's key. degrees: scale degrees, roman numerals, chord-tone numbers."
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h"
+      ],
+      "additionalProperties": false,
+      "description": "Where a pad or orb sits, as fractions of the play area (x right, y down). Moved inside the play area and grown to at least 44 points on the 340×480 reference play area when loaded.",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number"
+        },
+        "h": {
+          "type": "number"
         }
       }
     }

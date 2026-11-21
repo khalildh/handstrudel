@@ -1,0 +1,36 @@
+{
+  "description": "A pad smaller than 44 points on the 340×480 reference play area grows around its centre.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "pads"
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0,
+        "frame": {
+          "x": 0.5,
+          "y": 0.5,
+          "w": 0.05,
+          "h": 0.05
+        }
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "zone_resized"
+    ],
+    "values": {
+      "zones.0.frame.w": 0.129412,
+      "zones.0.frame.h": 0.091667,
+      "zones.0.frame.x": 0.460294,
+      "zones.0.frame.y": 0.479167
+    }
+  }
+}

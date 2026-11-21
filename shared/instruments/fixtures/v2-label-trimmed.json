@@ -1,0 +1,28 @@
+{
+  "description": "Custom labels are trimmed to 12 characters.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "keys"
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0,
+        "label": "  Super long label text  "
+      }
+    ]
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "label_trimmed"
+    ],
+    "values": {
+      "zones.0.label": "Super long l"
+    }
+  }
+}

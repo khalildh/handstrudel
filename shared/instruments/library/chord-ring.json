@@ -1,0 +1,40 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.chord-ring",
+  "name": "Chord Ring",
+  "description": "Four chords around a ring, played as they come in your progression. Tap one to latch it on, tap again to stop.",
+  "surface": {
+    "type": "radial",
+    "inner_radius": 0.45,
+    "outer_radius": 1.0
+  },
+  "zones": [
+    {
+      "role": "chord",
+      "slot": 0,
+      "behavior": "latch"
+    },
+    {
+      "role": "chord",
+      "slot": 1,
+      "behavior": "latch"
+    },
+    {
+      "role": "chord",
+      "slot": 2,
+      "behavior": "latch"
+    },
+    {
+      "role": "chord",
+      "slot": 3,
+      "behavior": "latch"
+    }
+  ],
+  "visuals": {
+    "palette": "theme",
+    "shape": "rounded",
+    "effect": "ripple",
+    "labels": "degrees"
+  }
+}

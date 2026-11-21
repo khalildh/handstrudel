@@ -64,6 +64,7 @@ For each key the app takes the matching rows in order (priority, then newest) an
 | `update.message` | string | empty | Optional text for the banner and the blocker. |
 | `update.app_store_url` | string | the App Store page | Where the Update buttons go. Must be an `https://apps.apple.com/` link or it's ignored. |
 | `instruments.remote_enabled` | bool | `true` | False hides downloaded instruments and stops catalog fetches. |
+| `instruments.surfaces_enabled` | bool | `false` | True shows the Instrument picker (every surface type) in release builds; Debug builds always show it. |
 
 Prices always come from StoreKit. Config changes only the words around a price, never the price or what a product unlocks.
 

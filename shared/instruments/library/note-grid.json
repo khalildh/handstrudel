@@ -1,0 +1,66 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.note-grid",
+  "name": "Note Grid",
+  "description": "Nine notes of your scale in a keypad: low notes at the bottom, climbing to the top row.",
+  "surface": {
+    "type": "grid",
+    "rows": 3,
+    "columns": 3
+  },
+  "zones": [
+    {
+      "role": "note",
+      "degree": 6
+    },
+    {
+      "role": "note",
+      "degree": 7
+    },
+    {
+      "role": "note",
+      "degree": 8
+    },
+    {
+      "role": "note",
+      "degree": 3
+    },
+    {
+      "role": "note",
+      "degree": 4
+    },
+    {
+      "role": "note",
+      "degree": 5
+    },
+    {
+      "role": "note",
+      "degree": 0
+    },
+    {
+      "role": "note",
+      "degree": 1
+    },
+    {
+      "role": "note",
+      "degree": 2
+    }
+  ],
+  "gestures": {
+    "play": "pinch",
+    "expressions": [
+      {
+        "hand": "left",
+        "input": "y",
+        "parameter": "reverb"
+      }
+    ]
+  },
+  "visuals": {
+    "palette": "aurora",
+    "shape": "rounded",
+    "effect": "glow",
+    "labels": "notes"
+  }
+}

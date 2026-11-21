@@ -812,7 +812,7 @@ struct ContentView: View {
         !engine.gridModeEnabled && !engine.drumModeEnabled
             && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled
             && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.scaleChordMelodyModeEnabled
-            && !engine.soundFontModeEnabled
+            && !engine.soundFontModeEnabled && engine.surfaceInstrument == nil
     }
 
     // MARK: - Split / Scale overlay data helpers
@@ -1142,6 +1142,16 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
 
+            // Format 2 instruments (grid, keys, pads, orbs, …) on the generic renderer.
+            if engine.surfaceInstrument != nil {
+                InstrumentSurfaceView(player: engine.instrumentSurface,
+                                      enabled: !engine.isPaused && scenePhase == .active)
+                    .ignoresSafeArea()
+            }
+            #if DEBUG
+            EngineNoteLogProbe()
+            #endif
+
             // Learn mode overlay (Guitar Hero scrolling notes)
             if engine.learnModeEnabled {
                 let gridNotes = scaleNotes(key: engine.selectedKey, scale: engine.selectedScale,
@@ -1213,7 +1223,7 @@ struct ContentView: View {
                 }
 
                 // Floating code pill — hide in grid/drum/learn/chord/soundfont mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.scaleChordMelodyModeEnabled && !engine.soundFontModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.scaleChordMelodyModeEnabled && !engine.soundFontModeEnabled && engine.surfaceInstrument == nil {
                     codePill
                         .padding(.horizontal, 20)
                         .padding(.top, 2)
@@ -1222,7 +1232,7 @@ struct ContentView: View {
                 Spacer()
 
                 // Note badge — hide in grid/drum/learn/chord/soundfont mode
-                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.scaleChordMelodyModeEnabled && !engine.soundFontModeEnabled {
+                if !engine.gridModeEnabled && !engine.drumModeEnabled && !engine.learnModeEnabled && !engine.chordMelodyModeEnabled && !engine.radialChordMelodyModeEnabled && !engine.splitChordMelodyModeEnabled && !engine.scaleChordMelodyModeEnabled && !engine.soundFontModeEnabled && engine.surfaceInstrument == nil {
                     noteBadge
 
                     beatRing

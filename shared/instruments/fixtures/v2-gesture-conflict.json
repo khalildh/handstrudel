@@ -1,0 +1,68 @@
+{
+  "description": "One expression per gesture, none on the play gesture, one control per parameter.",
+  "input": {
+    "format": "handstrudel.instrument",
+    "format_version": 2,
+    "id": "community.test",
+    "name": "Test",
+    "surface": {
+      "type": "keys"
+    },
+    "zones": [
+      {
+        "role": "note",
+        "degree": 0
+      },
+      {
+        "role": "expression",
+        "parameter": "delay"
+      }
+    ],
+    "gestures": {
+      "play": "pinch",
+      "expressions": [
+        {
+          "hand": "right",
+          "input": "rotation",
+          "parameter": "filter"
+        },
+        {
+          "hand": "right",
+          "input": "rotation",
+          "parameter": "reverb"
+        },
+        {
+          "hand": "left",
+          "input": "pinch",
+          "parameter": "volume"
+        },
+        {
+          "hand": "left",
+          "input": "spread",
+          "parameter": "filter"
+        },
+        {
+          "hand": "left",
+          "input": "fist",
+          "parameter": "delay"
+        },
+        {
+          "hand": "left",
+          "input": "y",
+          "parameter": "reverb"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "accepted": true,
+    "issues": [
+      "gesture_dropped"
+    ],
+    "values": {
+      "gestures.expressions.0.input": "rotation",
+      "gestures.expressions.1.input": "y",
+      "gestures.expressions.1.parameter": "reverb"
+    }
+  }
+}

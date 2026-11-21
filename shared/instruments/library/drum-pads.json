@@ -1,0 +1,78 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 2,
+  "id": "builtin.drum-pads",
+  "name": "Drum Pads",
+  "description": "Six round pads for the kit: kick, snare, hats and cymbals. Uses whatever drum sound you've picked.",
+  "surface": {
+    "type": "pads"
+  },
+  "zones": [
+    {
+      "role": "drum",
+      "drum": "crash",
+      "frame": {
+        "x": 0.05,
+        "y": 0.04,
+        "w": 0.42,
+        "h": 0.26
+      }
+    },
+    {
+      "role": "drum",
+      "drum": "ride",
+      "frame": {
+        "x": 0.53,
+        "y": 0.04,
+        "w": 0.42,
+        "h": 0.26
+      }
+    },
+    {
+      "role": "drum",
+      "drum": "hihat",
+      "frame": {
+        "x": 0.05,
+        "y": 0.37,
+        "w": 0.42,
+        "h": 0.26
+      }
+    },
+    {
+      "role": "drum",
+      "drum": "tom",
+      "frame": {
+        "x": 0.53,
+        "y": 0.37,
+        "w": 0.42,
+        "h": 0.26
+      }
+    },
+    {
+      "role": "drum",
+      "drum": "kick",
+      "frame": {
+        "x": 0.05,
+        "y": 0.7,
+        "w": 0.42,
+        "h": 0.26
+      }
+    },
+    {
+      "role": "drum",
+      "drum": "snare",
+      "frame": {
+        "x": 0.53,
+        "y": 0.7,
+        "w": 0.42,
+        "h": 0.26
+      }
+    }
+  ],
+  "visuals": {
+    "palette": "ember",
+    "shape": "round",
+    "effect": "ripple",
+    "labels": "notes"
+  }
+}
