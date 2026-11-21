@@ -57,6 +57,7 @@
 		90224DD8E3719A286A3B008A /* strudel-engine.html in Resources */ = {isa = PBXBuildFile; fileRef = BC2AAEFFDD8CF0CAEF5D7390 /* strudel-engine.html */; };
 		9428BDE6E6BECDC9EAA5FC3B /* VideoUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F27BAFEE657ED1D0F721C12 /* VideoUploader.swift */; };
 		9B6081609E3BF5FDD39821DA /* SocialModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60394D480F9BC9261829DBBB /* SocialModels.swift */; };
+		C5C1AE9D93EE68CCEB0D2D44 /* InviteRewards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44999FA614FA1E7A78DF79F0 /* InviteRewards.swift */; };
 		9B766C4CA61883B90F7A937E /* ParamDefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F66A4286F922F3805EADFE /* ParamDefs.swift */; };
 		A1B2C3D4E5F600000000FF02 /* PinchDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000FF01 /* PinchDetector.swift */; };
 		A1B2C3D4E5F600000000FF11 /* MusicConfig.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000FF10 /* MusicConfig.generated.swift */; };
@@ -79,6 +80,7 @@
 		B8408544FA73C62DF3DD9C0A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D77EA18663B3717C68CAAB /* ContentView.swift */; };
 		D6802636D2AE4E728E125B13 /* AppAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6802636D2AE4E728E125B14 /* AppAnalytics.swift */; };
 		B865D46CF40CD2EB491FEB86 /* SocialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FD63E1E2EC2BFA39147EDD /* SocialTests.swift */; };
+		DBE138E1F2F80EB502E7D203 /* InviteRewardsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68CFFE1C5240DED071E167B6 /* InviteRewardsTests.swift */; };
 		A7E1D3C5B9F2400A8C6D1E03 /* NoteTrackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E1D3C5B9F2400A8C6D1E04 /* NoteTrackTests.swift */; };
 		B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E972CF1E53A24CA899C1A5 /* StoreManager.swift */; };
 		BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */; };
@@ -164,6 +166,7 @@
 		5F0E9E5A8B7C40119EE3B006 /* soundfonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources/soundfonts; sourceTree = "<group>"; };
 		5F0E9E5A8B7C40119EE3B008 /* SoundFontInstrumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFontInstrumentTests.swift; sourceTree = "<group>"; };
 		60394D480F9BC9261829DBBB /* SocialModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialModels.swift; sourceTree = "<group>"; };
+		44999FA614FA1E7A78DF79F0 /* InviteRewards.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InviteRewards.swift; sourceTree = "<group>"; };
 		6B7D7F4F5C7AF55B5D8BD8F6 /* LoopSharingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopSharingManager.swift; sourceTree = "<group>"; };
 		6C89256347633541234267B8 /* SaveGestureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGestureDetector.swift; sourceTree = "<group>"; };
 		6D0FA8069A98FCB16C44FB29 /* HandOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverlayView.swift; sourceTree = "<group>"; };
@@ -222,6 +225,7 @@
 		CM4D9E5A8B7C40119EE3A004 /* ChordMelodyOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordMelodyOverlayView.swift; sourceTree = "<group>"; };
 		CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordProgression.swift; sourceTree = "<group>"; };
 		D1FD63E1E2EC2BFA39147EDD /* SocialTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialTests.swift; sourceTree = "<group>"; };
+		68CFFE1C5240DED071E167B6 /* InviteRewardsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InviteRewardsTests.swift; sourceTree = "<group>"; };
 		A7E1D3C5B9F2400A8C6D1E04 /* NoteTrackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NoteTrackTests.swift; sourceTree = "<group>"; };
 		D986625C7BF30952FBAED619 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		E9EE726E13680963400F5267 /* DrumModeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumModeManagerTests.swift; sourceTree = "<group>"; };
@@ -429,6 +433,7 @@
 				F8E45E6EA0ECDAA67658AAEA /* ParamDefsTests.swift */,
 				5F0E9E5A8B7C40119EE3B008 /* SoundFontInstrumentTests.swift */,
 				564E945F8B1A241A5FE64EFB /* StoreManagerTests.swift */,
+				68CFFE1C5240DED071E167B6 /* InviteRewardsTests.swift */,
 				D1FD63E1E2EC2BFA39147EDD /* SocialTests.swift */,
 				A7E1D3C5B9F2400A8C6D1E04 /* NoteTrackTests.swift */,
 			);
@@ -444,6 +449,7 @@
 				060174F53A17DCA947630D4A /* ProfileView.swift */,
 				7944BC24ED82EBCC08239937 /* SignInView.swift */,
 				8FA2A33806A43063DD48DD26 /* SocialConfig.swift */,
+				44999FA614FA1E7A78DF79F0 /* InviteRewards.swift */,
 				60394D480F9BC9261829DBBB /* SocialModels.swift */,
 				0F27BAFEE657ED1D0F721C12 /* VideoUploader.swift */,
 				2E5A25B5F3A32C16D8AA1825 /* FeedService.swift */,
@@ -649,6 +655,7 @@
 				F8F0949B1485DEA5CC67EAA8 /* SignInView.swift in Sources */,
 				D429318FDB3402202042EFF1 /* SocialConfig.swift in Sources */,
 				9B6081609E3BF5FDD39821DA /* SocialModels.swift in Sources */,
+				C5C1AE9D93EE68CCEB0D2D44 /* InviteRewards.swift in Sources */,
 				9428BDE6E6BECDC9EAA5FC3B /* VideoUploader.swift in Sources */,
 				E1591791628BC7B6856F32FF /* FeedService.swift in Sources */,
 				BB7B62E284871FE2BC2ADED4 /* FeedView.swift in Sources */,
@@ -674,6 +681,7 @@
 				5F0E9E5A8B7C40119EE3B007 /* SoundFontInstrumentTests.swift in Sources */,
 				22BEC592D38D4260A28EA96C /* StoreManagerTests.swift in Sources */,
 				B865D46CF40CD2EB491FEB86 /* SocialTests.swift in Sources */,
+				DBE138E1F2F80EB502E7D203 /* InviteRewardsTests.swift in Sources */,
 				A7E1D3C5B9F2400A8C6D1E03 /* NoteTrackTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
