@@ -43,6 +43,8 @@ const secondPost = {
   source_video_id: process.env.FIXTURE_REMIXES === "1" ? video : undefined,
   source_username: process.env.FIXTURE_REMIXES === "1" ? post.username : undefined,
 };
+// A Pro-only instrument, to check the sound page's "Unlock & play".
+if (process.env.FIXTURE_SOUND_LOCKED === "1") post.sound_setup.instrument = "harpsichord";
 const sequencePosts = process.env.FIXTURE_SEQUENCE_CLIPS === "1" ? [3, 4].map((index) => ({
   ...post,
   id: `30000000-0000-0000-0000-00000000000${index}`,

@@ -1,5 +1,5 @@
 begin;
-select plan(22);
+select plan(23);
 
 insert into auth.users (id, email)
 values ('66000000-0000-0000-0000-000000000001', 'sound-original@test.dev'),
@@ -95,6 +95,14 @@ select results_eq(
     order by created_at desc, id desc limit 2$$,
   $$values ('67000000-0000-0000-0000-000000000006'::uuid), ('67000000-0000-0000-0000-000000000004'::uuid)$$,
   'Recent sorts newest first');
+select results_eq(
+  $$with last as (select created_at, id from public.sound_takes where id = '67000000-0000-0000-0000-000000000004')
+    select t.id from public.sound_takes t, last
+     where t.sound_id = '67000000-0000-0000-0000-000000000001'
+       and (t.created_at < last.created_at or (t.created_at = last.created_at and t.id < last.id))
+     order by t.created_at desc, t.id desc$$,
+  $$values ('67000000-0000-0000-0000-000000000002'::uuid), ('67000000-0000-0000-0000-000000000001'::uuid)$$,
+  'Recent pages with a (created_at, id) cursor and skips the hidden take in between');
 select is((select count(*) from public.sound_summary('67000000-0000-0000-0000-000000000005')), 0::bigint,
           'a hidden post opens no sound page');
 select results_eq(

@@ -180,6 +180,7 @@ struct SoundPageView: View {
     @State private var takes: [Video] = []
     @State private var more = false
     @State private var loading = false
+    @State private var generation = 0
     @State private var failed = false
     @State private var selected: Video?
     @State private var saved = false
@@ -220,6 +221,7 @@ struct SoundPageView: View {
                               message: Text("Play this sound on HandStrudel")) {
                         Label("Share sound", systemImage: "square.and.arrow.up")
                     }
+                    .accessibilityValue(reference.watchURL.absoluteString)
                     .accessibilityIdentifier("sound-page-share")
                 }
             }
@@ -346,7 +348,7 @@ struct SoundPageView: View {
                 ForEach(takes) { take in
                     SoundTakeTile(video: take, isOriginal: take.id == summary?.soundID) { selected = take }
                         .onAppear {
-                            if take.id == takes.last?.id, more, !loading { Task { await load(reset: false) } }
+                            if take.id == takes.last?.id { Task { await load(reset: false) } }
                         }
                 }
             }
@@ -355,38 +357,45 @@ struct SoundPageView: View {
         if loading { ProgressView().frame(maxWidth: .infinity).padding(.vertical, 12) }
     }
 
+    /// Loads the first page (reset) or the next one. A reset starts a new generation, so a
+    /// page still in flight for the previous sort order is dropped instead of appended.
     private func load(reset: Bool) async {
-        guard !loading || reset else { return }
+        if reset {
+            generation += 1
+            takes = []
+            more = false
+        } else if loading || !more {
+            return
+        }
+        let request = generation
+        let requestOrder = order
+        let after = reset ? nil : takes.last
         loading = true
-        defer { loading = false }
+        defer { if request == generation { loading = false } }
         do {
             if !summaryLoaded {
-                summary = try await FeedService.soundSummary(for: video.id)
-                summaryLoaded = true
-                if let summary {
-                    SoundTakeCounts.shared.record(summary.takeCount, for: video.id)
-                    if let id = summary.originalVideoID {
-                        original = id == video.id ? video : try await FeedService.video(id: id)
+                let loaded = try await FeedService.soundSummary(for: video.id)
+                if !summaryLoaded {
+                    summary = loaded
+                    summaryLoaded = true
+                    if let loaded {
+                        SoundTakeCounts.shared.record(loaded.takeCount, for: video.id)
+                        if let id = loaded.originalVideoID {
+                            original = id == video.id ? video : try await FeedService.video(id: id)
+                        }
                     }
                 }
             }
-            guard let sound = summary?.soundID else {
-                takes = []
-                more = false
-                return
-            }
-            let page = try await FeedService.soundTakes(sound: sound, order: order, after: reset ? nil : takes.last)
-            guard !Task.isCancelled else { return }
-            if reset {
-                takes = page
-            } else {
-                let known = Set(takes.map(\.id))
-                takes += page.filter { !known.contains($0.id) }
-            }
+            guard request == generation else { return }
+            guard let sound = summary?.soundID else { return }
+            let page = try await FeedService.soundTakes(sound: sound, order: requestOrder, after: after)
+            guard request == generation, !Task.isCancelled else { return }
+            let known = Set(takes.map(\.id))
+            takes += page.filter { !known.contains($0.id) }
             more = page.count == FeedService.soundPageSize
             failed = false
         } catch {
-            if !Task.isCancelled { failed = true }
+            if request == generation, !Task.isCancelled { failed = true }
         }
     }
 }
