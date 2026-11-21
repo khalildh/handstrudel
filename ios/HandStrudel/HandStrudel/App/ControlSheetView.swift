@@ -300,12 +300,14 @@ struct ControlSheet: View {
                 .foregroundColor(.primary.opacity(0.8))
             Spacer()
             Menu {
-                ForEach(InstrumentCatalog.shared.all, id: \.id) { instrument in
+                ForEach(InstrumentCatalog.shared.all + MyInstruments.shared.instruments, id: \.id) { instrument in
                     Button {
                         engine.playInstrument(instrument)
                     } label: {
                         if instrument.id == engine.wheelInstrument.id {
                             Label(instrument.name, systemImage: "checkmark")
+                        } else if instrument.isAIGenerated {
+                            Label("\(instrument.name) (Made with AI)", systemImage: "sparkles")
                         } else {
                             Text(instrument.name)
                         }
@@ -318,6 +320,17 @@ struct ControlSheet: View {
             }
             .accessibilityIdentifier("instrument-file-picker")
         }
+    }
+
+    /// Forces "Make an instrument" on in Debug builds, whatever remote config says.
+    private var forceAIInstrumentsToggle: some View {
+        Toggle(isOn: Binding(get: { UserDefaults.standard.bool(forKey: "forceAIInstruments") },
+                             set: { UserDefaults.standard.set($0, forKey: "forceAIInstruments"); RemoteConfig.shared.objectWillChange.send() })) {
+            Text("Make an instrument (AI)")
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundColor(.primary.opacity(0.8))
+        }
+        .accessibilityIdentifier("force-ai-instruments")
     }
     #endif
 
@@ -426,6 +439,7 @@ struct ControlSheet: View {
                     #if DEBUG
                     if currentMode == .splitChordMelody || currentMode == .scaleChordMelody {
                         instrumentFilePicker
+                        forceAIInstrumentsToggle
                     }
                     #endif
 

@@ -35,6 +35,11 @@
       "type": "string",
       "maxLength": 200
     },
+    "ai_generated": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when an AI model wrote this file from a player's prompt (the generate-instrument function sets it; models never do). Apps label these instruments \"Made with AI\". It says nothing about the music, which stays the player's."
+    },
     "surface": {
       "$ref": "#/$defs/split_wheel"
     },

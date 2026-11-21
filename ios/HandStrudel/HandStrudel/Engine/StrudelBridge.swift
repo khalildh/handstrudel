@@ -253,6 +253,9 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         let safeMidi = max(0, min(127, midi))
         let safeVel = max(0, min(1, velocity))
         webView.evaluateJavaScript("noteOn('\(hand)',\(safeMidi),'\(waveform)',\(String(format: "%.2f", safeVel)))", completionHandler: nil)
+        #if DEBUG
+        if !hand.hasPrefix("jam-") { MIDIProbe.record(safeMidi) }
+        #endif
         if isReady, !hand.hasPrefix("jam-") { onNoteStarted?() }
         noteCapture?.noteOn(voice: hand, midi: safeMidi, role: PerformanceNoteCapture.role(forVoice: hand))
     }
@@ -277,6 +280,9 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
                   capture role: NoteCaptureRole = .melody) {
         let safeMidi = max(0, min(127, midi))
         webView.evaluateJavaScript("playNote(\(safeMidi),'\(waveform)',\(String(format: "%.2f", velocity)),\(String(format: "%.2f", duration)))", completionHandler: nil)
+        #if DEBUG
+        MIDIProbe.record(safeMidi)
+        #endif
         noteCapture?.oneShot(midi: safeMidi, duration: duration, role: role)
     }
 

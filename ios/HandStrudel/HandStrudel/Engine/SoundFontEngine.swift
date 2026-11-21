@@ -151,6 +151,9 @@ final class SoundFontEngine {
         guard let channel = channel(for: voice, note: note) else { return }
         sampler.startNote(note, withVelocity: vel, onChannel: channel)
         activeNotes[voice] = (note, channel)
+        #if DEBUG
+        MIDIProbe.record(Int(note))
+        #endif
         voiceVelocity[voice] = vel
         onNoteStarted?()
         noteCapture?.noteOn(voice: voice, midi: Int(note), role: PerformanceNoteCapture.role(forVoice: voice))

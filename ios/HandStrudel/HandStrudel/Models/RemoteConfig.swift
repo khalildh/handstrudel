@@ -89,6 +89,17 @@ final class RemoteConfig: ObservableObject {
     var appStoreURL: URL { URL(string: string(RemoteConfigKeys.appStoreURL)) ?? RemoteConfigKeys.defaultAppStoreURL }
     var remoteInstrumentsEnabled: Bool { bool(RemoteConfigKeys.remoteInstruments) }
 
+    /// "Make an instrument" (AI). Off by default; DEBUG builds can force it on
+    /// with the `--force-ai-instruments` launch argument or the
+    /// `forceAIInstruments` user default (the Debug menu toggle).
+    var aiInstrumentsEnabled: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--force-ai-instruments")
+            || UserDefaults.standard.bool(forKey: "forceAIInstruments") { return true }
+        #endif
+        return bool(RemoteConfigKeys.aiInstruments)
+    }
+
     var updateRequirement: UpdateRequirement {
         UpdateRequirement(current: appVersion, minimum: minimumVersion, recommended: recommendedVersion)
     }
@@ -178,6 +189,10 @@ enum RemoteConfigKeys {
     static let updateMessage = "update.message"
     static let appStoreURL = "update.app_store_url"
     static let remoteInstruments = "instruments.remote_enabled"
+    static let aiInstruments = "ai_instruments.enabled"
+    static let aiDailyLimitFree = "ai_instruments.daily_limit_free"
+    static let aiDailyLimitPro = "ai_instruments.daily_limit_pro"
+    static let aiDailyLimitPlus = "ai_instruments.daily_limit_plus"
 
     static let defaultAppStoreURL = URL(string: "https://apps.apple.com/app/id6764415289")!
 
@@ -210,6 +225,11 @@ enum RemoteConfigKeys {
         updateMessage: .init(kind: .string(maxLength: 200), defaultValue: .string("")),
         appStoreURL: .init(kind: .string(maxLength: nil), defaultValue: .string(defaultAppStoreURL.absoluteString)),
         remoteInstruments: .init(kind: .bool, defaultValue: .bool(true)),
+        aiInstruments: .init(kind: .bool, defaultValue: .bool(false)),
+        // Read by the generate-instrument function; listed so the app knows every key.
+        aiDailyLimitFree: .init(kind: .number(min: 0, max: 1000), defaultValue: .number(5)),
+        aiDailyLimitPro: .init(kind: .number(min: 0, max: 1000), defaultValue: .number(25)),
+        aiDailyLimitPlus: .init(kind: .number(min: 0, max: 1000), defaultValue: .number(50)),
     ]
 
     static let defaults: [String: JSONValue] = definitions.mapValues(\.defaultValue)

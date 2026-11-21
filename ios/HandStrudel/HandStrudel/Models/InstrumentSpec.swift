@@ -30,12 +30,15 @@ struct InstrumentSpec: Codable, Equatable {
     var id: String
     var name: String
     var description: String?
+    /// Set by the generator on instruments an AI model wrote from a player's
+    /// prompt. The app labels them "Made with AI" (Guideline 5.1.2(i)).
+    var aiGenerated: Bool? = nil
     var surface: SplitWheel
     var chords: Chords
     var notes: Notes
 
     enum CodingKeys: String, CodingKey {
-        case format, formatVersion = "format_version", id, name, description, surface, chords, notes
+        case format, formatVersion = "format_version", id, name, description, aiGenerated = "ai_generated", surface, chords, notes
     }
 
     /// One circle cut into a chord half and a note half around a rest hole.
@@ -81,6 +84,7 @@ struct InstrumentSpec: Codable, Equatable {
     }
 
     var isBuiltIn: Bool { id.hasPrefix("builtin.") }
+    var isAIGenerated: Bool { aiGenerated == true }
 
     /// The wheel mode this instrument runs in. Scale-note instruments use the
     /// Scale mode slot, chord-tone ones the Split slot.

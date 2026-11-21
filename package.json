@@ -10,7 +10,10 @@
     "bundle:ios-audio": "node ios/bundle-strudel.mjs",
     "test:ios-web-audio": "node --test ios/strudel-audio-startup.test.mjs",
     "gen:config": "node scripts/gen-music-config.mjs",
-    "verify:config": "node scripts/gen-music-config.mjs && git diff --exit-code -- src/lib/music-data.generated.ts ios/HandStrudel/HandStrudel/Models/MusicConfig.generated.swift"
+    "verify:config": "node scripts/gen-music-config.mjs && git diff --exit-code -- src/lib/music-data.generated.ts ios/HandStrudel/HandStrudel/Models/MusicConfig.generated.swift",
+    "test:instrument-ai": "node --test scripts/instrument-evals/ supabase/functions/_shared/instrument-ai/",
+    "evals:instruments": "node scripts/instrument-evals/run.ts",
+    "sync:instrument-ai": "node scripts/instrument-ai/sync-assets.mjs"
   },
   "dependencies": {
     "@strudel/core": "^1.0.0",
@@ -25,6 +28,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "1.12.0",
     "@playwright/test": "^1.62.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",

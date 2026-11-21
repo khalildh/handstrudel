@@ -1,0 +1,34 @@
+name: AI instrument checks
+
+# "Make your own instrument": the generator's logic and the eval runner, with a
+# mocked model (no API key, no network). Real-model evals run by hand:
+# see docs/ai-instruments.md.
+on:
+  pull_request:
+    paths:
+      - "shared/instruments/**"
+      - "supabase/functions/_shared/instrument-ai/**"
+      - "supabase/functions/generate-instrument/**"
+      - "scripts/instrument-ai/**"
+      - "scripts/instrument-evals/**"
+      - ".github/workflows/instrument-ai.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Runs the TypeScript sources directly (type stripping).
+          node-version: 24
+      - name: Generator copy of the schema and seeds is up to date
+        run: node scripts/instrument-ai/sync-assets.mjs --check
+      - name: Generator and eval tests (mocked model)
+        run: node --test scripts/instrument-evals/ supabase/functions/_shared/instrument-ai/
+      - name: Offline eval run
+        run: node scripts/instrument-evals/run.ts --mock

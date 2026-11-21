@@ -10,6 +10,10 @@
     "update.recommended_version": { "type": "version", "default": null, "doc": "Older versions see a dismissible update banner." },
     "update.message": { "type": "string", "default": "", "max_length": 200, "doc": "Optional text on the update banner and blocker." },
     "update.app_store_url": { "type": "string", "default": "https://apps.apple.com/app/id6764415289", "doc": "Update button target. Must start with https://apps.apple.com/." },
-    "instruments.remote_enabled": { "type": "bool", "default": true, "doc": "Show downloaded instruments and fetch the catalog." }
+    "instruments.remote_enabled": { "type": "bool", "default": true, "doc": "Show downloaded instruments and fetch the catalog." },
+    "ai_instruments.enabled": { "type": "bool", "default": false, "doc": "Show \"Make an instrument\" (AI generation) on the wheel. DEBUG builds can force it on." },
+    "ai_instruments.daily_limit_free": { "type": "number", "default": 5, "min": 0, "max": 1000, "doc": "AI instrument generations per UTC day for free players. Read by the generate-instrument function; 0 turns generation off." },
+    "ai_instruments.daily_limit_pro": { "type": "number", "default": 25, "min": 0, "max": 1000, "doc": "Daily AI generations with Pro." },
+    "ai_instruments.daily_limit_plus": { "type": "number", "default": 50, "min": 0, "max": 1000, "doc": "Daily AI generations with HandStrudel+." }
   }
 }

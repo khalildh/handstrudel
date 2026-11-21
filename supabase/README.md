@@ -19,6 +19,8 @@ Legacy clips and profile photos keep using `media.handstrudel.com`.
 - `migrations/20261114060000_profile_avatars.sql`: exposes avatar keys on public creator profiles and restricts writes to the server.
 - `migrations/20261120000000_video_note_tracks.sql`: "Learn to play" note tracks (`videos.note_track`, at most 600 notes / 32 KB), written only by screened publication and only with a shared sound setup; feeds expose `has_note_track`.
 - `migrations/20261120010000_locked_sound_events.sql`: adds opt-in daily counters for Pro sounds opened from the feed (`locked_sound_tapped`) and unlocked from that screen (`locked_sound_unlocked`).
+- `migrations/20261123010000_ai_instruments.sql`: "Make your own instrument": the private generation log with daily quotas from remote config (`ai_instruments.daily_limit_*`), and players' saved instruments (`my_instruments`). See [docs/ai-instruments.md](../docs/ai-instruments.md).
+- `functions/generate-instrument`: signed-in prompt → instrument file through Claude (`ANTHROPIC_API_KEY`), with validation, one repair retry, fallback to the nearest built-in, moderation and quotas. Its logic lives in `functions/_shared/instrument-ai/` and is tested offline with `npm run test:instrument-ai`.
 - `tests/database/feed.test.sql`: pgTAP tests for RLS and triggers. Run them with `supabase test db`.
 - `tests/database/comments.test.sql`: pgTAP tests for comment permissions, thread visibility, and moderation.
 - `functions/sign-upload` and `functions/publish-upload`: reserve a private R2 upload and publish only after Sightengine clears the video and thumbnail. Set up the private bucket, secrets, and cutover using the [video upload release checklist](../docs/video-upload-release.md).
@@ -37,7 +39,7 @@ To use the local stack, set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MEDIA_BASE_URL
 
 ## Production setup (one time)
 1. Create the Supabase project, then `supabase link --project-ref <ref>` and `supabase db push`.
-2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload publish-upload delete-video delete-account profile-avatar`.
+2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload publish-upload delete-video delete-account profile-avatar generate-instrument`.
 3. Auth providers:
    - **Apple:** add the bundle ID `com.handstrudel.app` as a client ID (native sign-in needs no Services ID or key).
    - **Email:** enable it, and change the "Magic Link" email template to include `{{ .Token }}`, so users get a 6-digit code for the in-app code entry.
