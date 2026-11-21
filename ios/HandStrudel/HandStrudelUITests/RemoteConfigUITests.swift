@@ -53,6 +53,15 @@ final class RemoteConfigUITests: XCTestCase {
         XCTAssertTrue(element("update-required").waitForExistence(timeout: 10), "the hard block appears")
         XCTAssertTrue(element("update-required-open").exists)
         XCTAssertTrue(app.staticTexts["Update required"].exists)
+
+        // The button hands the App Store link to the system. A device opens the
+        // App Store; the Simulator has no App Store app, so the link goes to
+        // Safari, which can't show apps.apple.com pages there ("address is invalid").
+        element("update-required-open").tap()
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        let appStore = XCUIApplication(bundleIdentifier: "com.apple.AppStore")
+        XCTAssertTrue(safari.wait(for: .runningForeground, timeout: 10) || appStore.state == .runningForeground,
+                      "tapping Update leaves the app for the App Store link")
     }
 
     func testNoConfigLeavesTheAppAsItWas() {
