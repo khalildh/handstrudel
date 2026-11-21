@@ -21,7 +21,8 @@ function postFields(input: unknown) {
   const dimension = (v: unknown) => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 8192;
   if (typeof p.duration_s !== "number" || !Number.isFinite(p.duration_s) || p.duration_s <= 0 || p.duration_s > 60 ||
       !dimension(p.width) || !dimension(p.height) ||
-      (p.source_video_id != null && (typeof p.source_video_id !== "string" || !uuid.test(p.source_video_id)))) {
+      (p.source_video_id != null && (typeof p.source_video_id !== "string" || !uuid.test(p.source_video_id))) ||
+      (p.reply_to_id != null && (typeof p.reply_to_id !== "string" || !uuid.test(p.reply_to_id)))) {
     throw new HttpError(400, "Invalid video details.");
   }
   return {
@@ -32,6 +33,8 @@ function postFields(input: unknown) {
     sound_setup: p.sound_setup ?? null, note_track: p.sound_setup ? noteTrack(p.note_track) : null,
     comments_enabled: p.comments_enabled !== false,
     backing_enabled: p.backing_enabled === true, source_video_id: p.source_video_id ?? null,
+    // The database drops the link if the target is gone or blocked by the time the take is published.
+    reply_to_id: p.reply_to_id ?? null,
   };
 }
 

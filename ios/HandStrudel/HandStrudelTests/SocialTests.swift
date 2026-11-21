@@ -1285,6 +1285,76 @@ final class SocialTests: XCTestCase {
         XCTAssertNil(try link("https://handstrudel.com/watch/other?v=\(id)"))
     }
 
+    func testChallengeLinksOpenThePostWithTheReplyRecorder() throws {
+        let id = try XCTUnwrap(UUID(uuidString: "52000000-0000-0000-0000-000000000002"))
+        let challenge = ChallengeLink.url(for: id)
+        XCTAssertEqual(challenge.absoluteString, "https://handstrudel.com/watch?v=\(id.uuidString.lowercased())&reply=1")
+        XCTAssertEqual(PerformanceLink(url: challenge), .challenge(id))
+        XCTAssertEqual(PerformanceLink(url: try XCTUnwrap(URL(string: "handstrudel://reply/\(id)"))), .challenge(id))
+        XCTAssertEqual(PerformanceLink(url: try XCTUnwrap(URL(string: "https://handstrudel.com/watch?reply=1&v=\(id)"))), .challenge(id))
+        XCTAssertEqual(PerformanceLink(url: try XCTUnwrap(URL(string: "https://handstrudel.com/watch?v=\(id)&reply=0"))), .watch(id))
+        XCTAssertEqual(PerformanceLink.challenge(id).videoID, id)
+        XCTAssertNil(PerformanceLink(url: try XCTUnwrap(URL(string: "https://handstrudel.com/watch?reply=1"))))
+    }
+
+    func testReplyFieldsDecodeAndTravelWithThePost() throws {
+        let parent = "11111111-1111-1111-1111-111111111111"
+        let json = """
+        {"id":"22222222-2222-2222-2222-222222222222","user_id":"00000000-0000-0000-0000-00000000000a",
+         "video_key":"v.mp4","thumb_key":"t.jpg","caption":"","like_count":0,"created_at":"2026-11-21T05:00:00Z",
+         "username":"bob","reply_to_id":"\(parent)","reply_to_username":"alice","reply_count":3,
+         "sound_setup":{"version":1,"key":"C","scale":"Major","mode":"scalechordmelody"}}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let video = try decoder.decode(Video.self, from: Data(json.utf8))
+        XCTAssertEqual(video.replyToId, UUID(uuidString: parent))
+        XCTAssertEqual(video.replyToUsername, "alice")
+        XCTAssertEqual(video.replyCount, 3)
+
+        let fields = VideoPostFields(caption: "", instrument: nil, mode: nil, durationS: 3, width: 720, height: 1280,
+                                     replyToId: video.id)
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(fields)) as? [String: Any])
+        XCTAssertEqual((encoded["reply_to_id"] as? String)?.lowercased(), video.id.uuidString.lowercased())
+        let plain = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(VideoPostFields(caption: "", instrument: nil, mode: nil, durationS: 3, width: 720, height: 1280))
+        ) as? [String: Any])
+        XCTAssertNil(plain["reply_to_id"], "Ordinary posts don't name a target")
+    }
+
+    func testReplyRequestNeedsAPlayableSoundAndACreator() throws {
+        func video(_ extra: String) throws -> Video {
+            let json = """
+            {"id":"22222222-2222-2222-2222-222222222222","user_id":"00000000-0000-0000-0000-00000000000a",
+             "video_key":"v.mp4","thumb_key":"t.jpg","caption":"","like_count":0,"created_at":"2026-11-21T05:00:00Z"\(extra)}
+            """
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(Video.self, from: Data(json.utf8))
+        }
+        let sound = #","sound_setup":{"version":1,"instrument":"grand_piano","waveform":"sine","key":"D","scale":"Minor","# +
+            #""progression":"free","mode":"soundfont","bpm":96,"useSoundFont":true,"autoStrum":false,"padVolume":0.3,"# +
+            #""gridOctave":3,"gridRange":2}"#
+        XCTAssertNil(ReplyTakeRequest(video: try video(#","username":"alice""#)))
+        XCTAssertNil(ReplyTakeRequest(video: try video(sound)))
+        let request = try XCTUnwrap(ReplyTakeRequest(video: try video(sound + #","username":"alice""#)))
+        XCTAssertEqual(request.target, ReplyTarget(videoId: try XCTUnwrap(UUID(uuidString: "22222222-2222-2222-2222-222222222222")),
+                                                   username: "alice"))
+    }
+
+    @MainActor
+    func testDraftsKeepTheirReplyTargetAndOlderDraftsStillLoad() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let target = ReplyTarget(videoId: UUID(), username: "alice")
+        let draft = try RecordingDrafts(directory: directory).begin(instrument: "Piano", mode: "scale", replyTo: target)
+        XCTAssertEqual(draft.replyTo, target)
+        let roundTrip = try JSONDecoder().decode(RecordingDraft.self, from: JSONEncoder().encode(draft))
+        XCTAssertEqual(roundTrip.replyTo, target)
+        let older = #"{"id":"\#(UUID().uuidString)","createdAt":0}"#
+        XCTAssertNil(try JSONDecoder().decode(RecordingDraft.self, from: Data(older.utf8)).replyTo)
+    }
+
     func testJamHoldSurvivesHeartbeatAndEndsOnRelease() throws {
         let chord = JamHeldVoice(pitches: [60, 64, 67, 71], program: 40, waveform: "triangle", velocity: 0.6)
         let held = JamHeldState(sequence: 1, voices: ["pad": chord])

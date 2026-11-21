@@ -19,6 +19,8 @@ const thumbnailRequests = [];
 const countViews = process.env.FIXTURE_VIEW_COUNTS === "1";
 const showEngagement = process.env.FIXTURE_ENGAGEMENT === "1";
 const showReposts = process.env.FIXTURE_REPOSTS === "1";
+const showReplies = process.env.FIXTURE_REPLIES === "1";
+let lastPostFields = null;
 let shareCount = 4;
 const counted = new Set();
 let mediaAvailable = !canControlMedia;
@@ -29,6 +31,7 @@ const post = {
   instrument: "Grand Piano", duration_s: process.env.FIXTURE_NO_DURATION === "1" ? undefined : clipBytes ? 4 : undefined,
   backing_enabled: process.env.FIXTURE_PLAY_ALONG === "1",
   view_count: countViews ? 7 : undefined,
+  reply_count: showReplies ? 1 : undefined,
   sound_setup: {
     version: 1, instrument: "grand_piano", waveform: "sine", key: "D", scale: "Minor", progression: "free",
     mode: "soundfont", bpm: 96, useSoundFont: true, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
@@ -40,6 +43,9 @@ const secondPost = {
   video_key: "test/next-clip.mp4",
   source_video_id: process.env.FIXTURE_REMIXES === "1" ? video : undefined,
   source_username: process.env.FIXTURE_REMIXES === "1" ? post.username : undefined,
+  reply_to_id: showReplies ? video : undefined,
+  reply_to_username: showReplies ? post.username : undefined,
+  reply_count: showReplies ? 0 : undefined,
 };
 const sequencePosts = process.env.FIXTURE_SEQUENCE_CLIPS === "1" ? [3, 4].map((index) => ({
   ...post,
@@ -90,6 +96,8 @@ createServer((request, response) => {
       return send(mediaRequests);
     case "/__fixture/thumbnail-requests":
       return send(thumbnailRequests);
+    case "/__fixture/last-post-fields":
+      return send(lastPostFields ?? {});
     case "/__fixture/draft-upload-result": {
       if (!draftPosting || request.method !== "POST" || draftUploadStatus !== "checking") return response.writeHead(409).end();
       const result = url.searchParams.get("status");
@@ -101,6 +109,7 @@ createServer((request, response) => {
       if (!draftPosting || request.method !== "POST") return response.writeHead(404).end();
       request.resume();
       draftUploadStatus = "reserved";
+      lastPostFields = null;
       return send({
         id: draftUploadID,
         videoUploadUrl: `http://${request.headers.host}/__fixture/draft-video`,
@@ -117,8 +126,9 @@ createServer((request, response) => {
       let body = "";
       request.on("data", (chunk) => { body += chunk; });
       request.on("end", () => {
-        const { action, id } = JSON.parse(body);
+        const { action, id, fields } = JSON.parse(body);
         if (id.toLowerCase() !== draftUploadID) return response.writeHead(404).end();
+        if (action === "submit" && fields) lastPostFields = fields;
         if (action === "submit" && draftUploadStatus === "reserved") draftUploadStatus = "checking";
         send({ status: draftUploadStatus });
       });
@@ -154,6 +164,8 @@ createServer((request, response) => {
       return deliver();
     }
     case "/auth/v1/otp": return send({});
+    // A saved fixture session expires after an hour; refreshing must not break later runs.
+    case "/auth/v1/token":
     case "/auth/v1/verify": return send({
       access_token: "fixture-token", token_type: "bearer", expires_in: 3600,
       expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: "fixture-refresh",
@@ -269,8 +281,10 @@ createServer((request, response) => {
       const handle = url.searchParams.get("username")?.slice(3);
       const author = url.searchParams.get("user_id")?.slice(3).toLowerCase();
       const source = url.searchParams.get("source_video_id")?.slice(3).toLowerCase();
+      const parent = url.searchParams.get("reply_to_id")?.slice(3).toLowerCase();
       return send((singleClip ? [post] : [post, secondPost, ...sequencePosts]).filter((item) => (!id || item.id === id) && (!handle || item.username === handle)
-        && (!author || item.user_id === author) && (!source || item.source_video_id === source)));
+        && (!author || item.user_id === author) && (!source || item.source_video_id === source)
+        && (!parent || item.reply_to_id === parent)));
     }
     case "/rest/v1/public_creators": {
       const handle = url.searchParams.get("username")?.slice(3);

@@ -71,6 +71,10 @@ struct Video: Codable, Equatable, Identifiable {
     var repostedByID: UUID?
     /// Whether the post saved its notes for "Learn to play" (nil when the source didn't say).
     var hasNoteTrack: Bool?
+    /// The visible post this take answers ("Reply to @handle"), and how many visible takes answer this one.
+    var replyToId: UUID?
+    var replyToUsername: String?
+    var replyCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, caption, instrument, mode, width, height, hidden, username
@@ -95,6 +99,9 @@ struct Video: Codable, Equatable, Identifiable {
         case repostedBy = "reposted_by"
         case repostedByID = "reposted_by_id"
         case hasNoteTrack = "has_note_track"
+        case replyToId = "reply_to_id"
+        case replyToUsername = "reply_to_username"
+        case replyCount = "reply_count"
     }
 
     /// Read-only keys that aren't part of the stored video row model.
@@ -132,6 +139,9 @@ struct Video: Codable, Equatable, Identifiable {
         activityAt = try row.decodeIfPresent(String.self, forKey: .activityAt)
         repostedBy = try row.decodeIfPresent(String.self, forKey: .repostedBy)
         repostedByID = try row.decodeIfPresent(UUID.self, forKey: .repostedByID)
+        replyToId = try row.decodeIfPresent(UUID.self, forKey: .replyToId)
+        replyToUsername = try row.decodeIfPresent(String.self, forKey: .replyToUsername)
+        replyCount = try row.decodeIfPresent(Int.self, forKey: .replyCount)
         if let flag = try? row.decodeIfPresent(Bool.self, forKey: .hasNoteTrack) {
             hasNoteTrack = flag
         } else if let extra = try? decoder.container(keyedBy: ExtraKeys.self), extra.contains(.noteTrack) {
@@ -162,9 +172,11 @@ struct VideoPostFields: Codable, Equatable {
     var commentsEnabled: Bool? = nil
     var backingEnabled: Bool? = nil
     var sourceVideoId: UUID? = nil
+    var replyToId: UUID? = nil
 
     enum CodingKeys: String, CodingKey {
         case caption, instrument, mode, width, height
+        case replyToId = "reply_to_id"
         case durationS = "duration_s"
         case soundSetup = "sound_setup"
         case noteTrack = "note_track"
@@ -397,6 +409,8 @@ struct WeeklyChallenge: Decodable, Identifiable {
 
 enum PerformanceLink: Equatable {
     case watch(UUID), comments(UUID), sound(UUID), playAlong(UUID)
+    /// A "Challenge a friend" link: the post, opened with the reply recorder ready.
+    case challenge(UUID)
 
     init?(url: URL) {
         guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -405,7 +419,8 @@ enum PerformanceLink: Equatable {
            ["/watch", "/watch/"].contains(parts.path) {
             let IDs = parts.queryItems?.filter { $0.name == "v" } ?? []
             guard IDs.count == 1, let value = IDs.first?.value, let id = UUID(uuidString: value) else { return nil }
-            self = .watch(id)
+            let challenged = parts.queryItems?.contains(ChallengeLink.marker) == true
+            self = challenged ? .challenge(id) : .watch(id)
             return
         }
         guard parts.scheme == "handstrudel", let kind = parts.host, url.pathComponents.count == 2,
@@ -415,13 +430,14 @@ enum PerformanceLink: Equatable {
         case "comments": self = .comments(id)
         case "sound": self = .sound(id)
         case "play": self = .playAlong(id)
+        case "reply": self = .challenge(id)
         default: return nil
         }
     }
 
     var videoID: UUID {
         switch self {
-        case .watch(let id), .comments(let id), .sound(let id), .playAlong(let id): return id
+        case .watch(let id), .comments(let id), .sound(let id), .playAlong(let id), .challenge(let id): return id
         }
     }
 }

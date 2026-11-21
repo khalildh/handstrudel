@@ -32,6 +32,7 @@
 		3FDADBDC4BFF18F21A29F680 /* LoopRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EE16108C9368E03A5293FC /* LoopRecorder.swift */; };
 		40B3E422911CF13AF402CDCE /* HandTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 962D341307D9F8B90BCD5454 /* HandTheme.swift */; };
 		440E40A83FE64DC7EE931389 /* PostComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2002CD71507A5A94C81B174 /* PostComposerView.swift */; };
+		7A4E5C1D2B3F4A6E8D9C0B11 /* TakeReplies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4E5C1D2B3F4A6E8D9C0B12 /* TakeReplies.swift */; };
 		467B330FAF19DF881621A97A /* MappingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5284F5C3FE7B6AC79AF2AB8F /* MappingConfig.swift */; };
 		4EC81DC9ACA61F24040592D2 /* AudioExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9531420BA306B5BC2AB859A6 /* AudioExporter.swift */; };
 		575A0CD71B422DFD7ACB6FDF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 953AFC0DD8202F310F31DD8B /* PrivacyInfo.xcprivacy */; };
@@ -201,6 +202,7 @@
 		A1B2C3D4E5F600000002B001 /* ControlSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlSheetView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000002B011 /* UIKitBridges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIKitBridges.swift; sourceTree = "<group>"; };
 		A2002CD71507A5A94C81B174 /* PostComposerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PostComposerView.swift; sourceTree = "<group>"; };
+		7A4E5C1D2B3F4A6E8D9C0B12 /* TakeReplies.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TakeReplies.swift; sourceTree = "<group>"; };
 		A4D6E49EC2BD40C4448C835E /* SpatialAudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAudioManager.swift; sourceTree = "<group>"; };
 		A9F505B00217A74555C8E226 /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
 		AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandStrudelUITests.swift; sourceTree = "<group>"; };
@@ -440,6 +442,7 @@
 			children = (
 				7F54EF812D2A064C69B1BDD3 /* AuthManager.swift */,
 				A2002CD71507A5A94C81B174 /* PostComposerView.swift */,
+				7A4E5C1D2B3F4A6E8D9C0B12 /* TakeReplies.swift */,
 				6405E2C577924A99B72D9B6E /* ProfileImageStore.swift */,
 				060174F53A17DCA947630D4A /* ProfileView.swift */,
 				7944BC24ED82EBCC08239937 /* SignInView.swift */,
@@ -644,6 +647,7 @@
 				B033D247CE64C351B3262535 /* iMessageManager.swift in Sources */,
 				59FEC820DA105A80DD79DC57 /* AuthManager.swift in Sources */,
 				440E40A83FE64DC7EE931389 /* PostComposerView.swift in Sources */,
+				7A4E5C1D2B3F4A6E8D9C0B11 /* TakeReplies.swift in Sources */,
 				5BFBC651918642549D3C3FA1 /* ProfileImageStore.swift in Sources */,
 				372DDDFE5ECB97237C94192A /* ProfileView.swift in Sources */,
 				F8F0949B1485DEA5CC67EAA8 /* SignInView.swift in Sources */,
