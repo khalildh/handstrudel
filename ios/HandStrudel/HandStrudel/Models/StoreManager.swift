@@ -120,8 +120,10 @@ final class StoreManager: ObservableObject {
     }
 
     func purchase(_ product: StoreProduct) async throws {
+        Funnel.purchaseStarted(productId: product.productIdentifier)
         let result = try await Purchases.shared.purchase(product: product)
         apply(result.customerInfo)
+        if !result.userCancelled { Funnel.purchaseCompleted(productId: product.productIdentifier) }
     }
 
     /// Convenience: purchase by product ID. Fetches the product on demand if it
