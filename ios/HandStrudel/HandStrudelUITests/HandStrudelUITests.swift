@@ -1852,7 +1852,8 @@ final class HandStrudelUITests: XCTestCase {
         let create = element("create-custom-scale")
         XCTAssertTrue(create.waitForExistence(timeout: 5))
         create.tap()
-        XCTAssertTrue(app.staticTexts["Pro Upgrade"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("store-headline").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("store-buy-pro").exists)
         XCTAssertFalse(app.textFields["custom-scale-name"].exists)
     }
 
@@ -1937,6 +1938,58 @@ final class HandStrudelUITests: XCTestCase {
         note.tap()
         XCTAssertTrue(app.staticTexts["Now try a pinch"].waitForExistence(timeout: 5))
         XCTAssertFalse(note.exists)
+    }
+
+    /// The store sells only Pro and HandStrudel+, and a Pro owner can subscribe.
+    func testStoreSellsProAndPlusForEachKindOfPlayer() {
+        for state in ["none", "pro", "plus"] {
+            app.terminate()
+            app.launchArguments = ["--uitesting", "--uitest-store-state=\(state)", "--uitest-camera-denied", "-hasSeenOnboarding", "YES"]
+            app.launch()
+            let start = element("start-button")
+            XCTAssertTrue(start.waitForExistence(timeout: 5), state)
+            start.tap()
+            XCTAssertTrue(element("settings-button").waitForExistence(timeout: 5), state)
+            element("settings-button").tap()
+            let bag = app.buttons["Store"]
+            XCTAssertTrue(bag.waitForExistence(timeout: 5), state)
+            bag.tap()
+            XCTAssertTrue(element("store-headline").waitForExistence(timeout: 5), state)
+            XCTAssertFalse(app.staticTexts["808 Kit"].exists, "Old packs are no longer sold")
+            XCTAssertFalse(app.staticTexts["Studio Pack"].exists)
+            switch state {
+            case "none":
+                XCTAssertTrue(element("store-buy-pro").exists)
+                XCTAssertTrue(element("store-subscribe").exists)
+            case "pro":
+                XCTAssertTrue(element("store-pro-owned").exists)
+                XCTAssertTrue(element("store-plus-pro-note").exists)
+                let subscribe = element("store-subscribe")
+                XCTAssertTrue(subscribe.exists, "A Pro owner can subscribe to HandStrudel+")
+                let yearly = element("store-plan-yearly")
+                let monthly = element("store-plan-monthly")
+                XCTAssertTrue(yearly.exists && monthly.exists)
+                if subscribe.isEnabled {
+                    XCTAssertTrue(app.staticTexts["Save 44%"].exists, "Yearly shows its saving over monthly")
+                }
+                if subscribe.isEnabled { monthly.tap() }
+            default:
+                XCTAssertTrue(element("store-plus-member").exists)
+                XCTAssertTrue(element("store-manage-subscription").exists)
+                XCTAssertTrue(element("store-pro-included").exists)
+            }
+            add(screenshotAttachment("store-\(state)"))
+            app.swipeUp()
+            add(screenshotAttachment("store-\(state)-bottom"))
+            element("store-done").tap()
+        }
+    }
+
+    private func screenshotAttachment(_ name: String) -> XCTAttachment {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        return attachment
     }
 
     func testTouchOnlySettingRemembersChoice() {
