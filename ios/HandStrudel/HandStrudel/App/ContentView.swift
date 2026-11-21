@@ -57,6 +57,7 @@ struct ContentView: View {
     @StateObject private var storeManager = StoreManager()
     @StateObject private var auth = AuthManager()
     @StateObject private var drafts = RecordingDrafts()
+    @ObservedObject private var remoteConfig = RemoteConfig.shared
     @State private var recorderEvents = RecorderEvents()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.requestReview) private var requestReview
@@ -127,6 +128,9 @@ struct ContentView: View {
     @State private var splitTouchChordStack: [SplitTouchChord] = []
     // Song mode removed
 
+    /// The feed tab, unless remote config has switched it off (`feed.enabled`).
+    private var feedAvailable: Bool { SocialConfig.isConfigured && remoteConfig.feedEnabled }
+
     private var canShowReview: Bool {
         reviewReadyThisSession && scenePhase == .active && destination == .music
             && !engine.isRunning && !startingSession && !showDrafts && !showLoops && !showSetups && reviewingDraft == nil
@@ -138,7 +142,7 @@ struct ContentView: View {
         ZStack {
             (engine.isRunning || feedFullscreen ? Color.black : palette.background).ignoresSafeArea()
 
-            if SocialConfig.isConfigured {
+            if feedAvailable {
                 FeedView(auth: auth, isActive: destination == .feed && !engine.isRunning, isFullscreen: $feedFullscreen,
                          onMakeMusic: { destination = .music }, onTrySound: trySharedSound,
                          onPlayAlong: prepareBacking, onVideoAvailabilityChanged: { feedHasVideo = $0 },
@@ -148,7 +152,7 @@ struct ContentView: View {
                     .accessibilityHidden(destination != .feed || engine.isRunning)
             }
 
-            if !engine.isRunning && (destination != .feed || !SocialConfig.isConfigured) {
+            if !engine.isRunning && (destination != .feed || !feedAvailable) {
                 destinations
             }
 
@@ -420,6 +424,7 @@ struct ContentView: View {
                 .presentationDragIndicator(.visible)
         }
         .environment(\.isSoundLocked) { setup in setup.isLocked(unlocked: storeManager.isUnlocked) }
+        .remoteUpdates(showsBanner: !engine.isRunning)
     }
 
     private var destinations: some View {
@@ -429,6 +434,9 @@ struct ContentView: View {
                 case .feed:
                     if !SocialConfig.isConfigured {
                         socialUnavailable("Feed", icon: "play.rectangle")
+                    } else if !feedAvailable {
+                        socialUnavailable("Feed", icon: "play.rectangle",
+                                          detail: "The feed is taking a short break. Your music, drafts and account still work.")
                     }
                 case .music:
                     StartOverlayView(
@@ -452,7 +460,7 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            if destination != .feed || !SocialConfig.isConfigured { destinationTabs() }
+            if destination != .feed || !feedAvailable { destinationTabs() }
         }
         .tint(palette.accent)
     }
@@ -514,11 +522,14 @@ struct ContentView: View {
         .accessibilityLabel("Main navigation")
     }
 
-    private func socialUnavailable(_ title: String, icon: String) -> some View {
+    private func socialUnavailable(_ title: String, icon: String,
+                                   detail: String = "This section is unavailable in this build.") -> some View {
         VStack(spacing: 12) {
             Label(title, systemImage: icon).font(.title2.bold())
-            Text("This section is unavailable in this build.").foregroundStyle(.secondary)
+            Text(detail).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 32)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("\(title.lowercased())-unavailable")
     }
 
     private func startSession(setup: SoundSetup? = nil, useCurrentSoundAsFallback: Bool = false) {

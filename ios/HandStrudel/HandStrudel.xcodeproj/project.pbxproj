@@ -114,6 +114,12 @@
 		SPLITCHORDMELODYOVL00001 /* SplitChordMelodyOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SPLITCHORDMELODYOVL00002 /* SplitChordMelodyOverlayView.swift */; };
 		SPLITTOUCHOVL000000001 /* SplitTouchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = SPLITTOUCHOVL000000002 /* SplitTouchOverlay.swift */; };
 		WEAVEVIEW0000000000001 /* WeaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WEAVEVIEW0000000000002 /* WeaveView.swift */; };
+		7E3C0F1A2B4D4E5F8A9B0001 /* RemoteConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B0002 /* RemoteConfig.swift */; };
+		7E3C0F1A2B4D4E5F8A9B0003 /* InstrumentCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B0004 /* InstrumentCatalog.swift */; };
+		7E3C0F1A2B4D4E5F8A9B0005 /* RemoteUpdateGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B0006 /* RemoteUpdateGate.swift */; };
+		7E3C0F1A2B4D4E5F8A9B0007 /* RemoteConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B0008 /* RemoteConfigTests.swift */; };
+		7E3C0F1A2B4D4E5F8A9B0009 /* InstrumentCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B000A /* InstrumentCatalogTests.swift */; };
+		7E3C0F1A2B4D4E5F8A9B000B /* RemoteConfigUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3C0F1A2B4D4E5F8A9B000C /* RemoteConfigUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -243,6 +249,12 @@
 		SPLITCHORDMELODYOVL00002 /* SplitChordMelodyOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitChordMelodyOverlayView.swift; sourceTree = "<group>"; };
 		SPLITTOUCHOVL000000002 /* SplitTouchOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitTouchOverlay.swift; sourceTree = "<group>"; };
 		WEAVEVIEW0000000000002 /* WeaveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeaveView.swift; sourceTree = "<group>"; };
+		7E3C0F1A2B4D4E5F8A9B0002 /* RemoteConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteConfig.swift; sourceTree = "<group>"; };
+		7E3C0F1A2B4D4E5F8A9B0004 /* InstrumentCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstrumentCatalog.swift; sourceTree = "<group>"; };
+		7E3C0F1A2B4D4E5F8A9B0006 /* RemoteUpdateGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteUpdateGate.swift; sourceTree = "<group>"; };
+		7E3C0F1A2B4D4E5F8A9B0008 /* RemoteConfigTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteConfigTests.swift; sourceTree = "<group>"; };
+		7E3C0F1A2B4D4E5F8A9B000A /* InstrumentCatalogTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InstrumentCatalogTests.swift; sourceTree = "<group>"; };
+		7E3C0F1A2B4D4E5F8A9B000C /* RemoteConfigUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteConfigUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -299,6 +311,7 @@
 				1DD4B16EACBE49959B72A4A1 /* StudioTheme.swift */,
 				5977AF5F23854985BC812E56 /* RecordingDraftsView.swift */,
 				F15B500CE35D9D44107CDAC4 /* StoreView.swift */,
+				7E3C0F1A2B4D4E5F8A9B0006 /* RemoteUpdateGate.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -380,6 +393,8 @@
 				0CB456251F49E8C1FE668CC2 /* LearnSong.swift */,
 				A7E1D3C5B9F2400A8C6D1E02 /* NoteTrack.swift */,
 				1A5B0C0D0E0F4A1B8C2D3E02 /* InstrumentSpec.swift */,
+				7E3C0F1A2B4D4E5F8A9B0004 /* InstrumentCatalog.swift */,
+				7E3C0F1A2B4D4E5F8A9B0002 /* RemoteConfig.swift */,
 				CM4D9E5A8B7C40119EE3A006 /* ChordProgression.swift */,
 				5F0E9E5A8B7C40119EE3B004 /* SoundFontInstrument.swift */,
 				93D6C035D4A9EE1A66C31839 /* Loop.swift */,
@@ -417,6 +432,7 @@
 			isa = PBXGroup;
 			children = (
 				AA11BB22CC33DD44EE55FF66 /* HandStrudelUITests.swift */,
+				7E3C0F1A2B4D4E5F8A9B000C /* RemoteConfigUITests.swift */,
 			);
 			path = HandStrudelUITests;
 			sourceTree = "<group>";
@@ -440,6 +456,8 @@
 				D1FD63E1E2EC2BFA39147EDD /* SocialTests.swift */,
 				A7E1D3C5B9F2400A8C6D1E04 /* NoteTrackTests.swift */,
 				1A5B0C0D0E0F4A1B8C2D3E04 /* InstrumentSpecTests.swift */,
+				7E3C0F1A2B4D4E5F8A9B000A /* InstrumentCatalogTests.swift */,
+				7E3C0F1A2B4D4E5F8A9B0008 /* RemoteConfigTests.swift */,
 			);
 			path = HandStrudelTests;
 			sourceTree = "<group>";
@@ -626,6 +644,8 @@
 				6871AA438EAC5767702D188F /* LearnSong.swift in Sources */,
 				A7E1D3C5B9F2400A8C6D1E01 /* NoteTrack.swift in Sources */,
 				1A5B0C0D0E0F4A1B8C2D3E01 /* InstrumentSpec.swift in Sources */,
+				7E3C0F1A2B4D4E5F8A9B0003 /* InstrumentCatalog.swift in Sources */,
+				7E3C0F1A2B4D4E5F8A9B0001 /* RemoteConfig.swift in Sources */,
 				73E81C762C77D3DB08064674 /* LearnSongPicker.swift in Sources */,
 				31732217DB10380B3787DE51 /* LiveActivityManager.swift in Sources */,
 				EA36758DC9EE90ADC7128B23 /* Loop.swift in Sources */,
@@ -649,6 +669,7 @@
 				4E3F10DA602E4A40A107F24B /* RecordingDraftsView.swift in Sources */,
 				B8C72CBB854A0EC20AB41A5E /* StoreManager.swift in Sources */,
 				1D40AE3AA1F2B1FA4B31CBB2 /* StoreView.swift in Sources */,
+				7E3C0F1A2B4D4E5F8A9B0005 /* RemoteUpdateGate.swift in Sources */,
 				D75E25A96408DCA1BE5AA284 /* StrudelBridge.swift in Sources */,
 				D7B11BD41E8E91900E18989A /* WatchSessionManager.swift in Sources */,
 				F7E93C2DB10D88C64280E374 /* WatermarkManager.swift in Sources */,
@@ -687,6 +708,8 @@
 				B865D46CF40CD2EB491FEB86 /* SocialTests.swift in Sources */,
 				A7E1D3C5B9F2400A8C6D1E03 /* NoteTrackTests.swift in Sources */,
 				1A5B0C0D0E0F4A1B8C2D3E03 /* InstrumentSpecTests.swift in Sources */,
+				7E3C0F1A2B4D4E5F8A9B0009 /* InstrumentCatalogTests.swift in Sources */,
+				7E3C0F1A2B4D4E5F8A9B0007 /* RemoteConfigTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -695,6 +718,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB22CC33DD44EE55FF66AA11 /* HandStrudelUITests.swift in Sources */,
+				7E3C0F1A2B4D4E5F8A9B000B /* RemoteConfigUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -4,6 +4,7 @@ import RevenueCatUI
 
 struct StoreView: View {
     @ObservedObject var storeManager: StoreManager
+    @ObservedObject private var remoteConfig = RemoteConfig.shared
 
     var body: some View {
         ScrollView {
@@ -138,7 +139,7 @@ struct StoreView: View {
             HStack {
                 Text("⭐")
                     .font(.system(size: 28))
-                Text("HandStrudel Pro")
+                Text(verbatim: remoteConfig.proTitle)
                     .font(.system(size: 18, weight: .black, design: .rounded))
                     .foregroundColor(.white)
                 Spacer()
@@ -150,10 +151,15 @@ struct StoreView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                featureItem("120+ instruments")
-                featureItem("Every scale — modes, harmonic minor, exotic")
-                featureItem("Every chord progression")
-                featureItem("One-time purchase")
+                ForEach(Array(remoteConfig.proFeatures.enumerated()), id: \.offset) { _, feature in
+                    featureItem(feature)
+                }
+                if let note = remoteConfig.proNote {
+                    Text(verbatim: note)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(.green)
+                        .accessibilityIdentifier("store-pro-note")
+                }
             }
 
             if !unlocked {

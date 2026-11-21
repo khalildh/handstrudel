@@ -291,7 +291,8 @@ struct ControlSheet: View {
 
     #if DEBUG
     /// Prototype: play the wheel from any bundled instrument file
-    /// (`shared/instruments/library/`). Debug builds only until 1.0.3.
+    /// (`shared/instruments/library/`) or downloaded one (`InstrumentCatalog`).
+    /// Debug builds only until 1.0.3.
     private var instrumentFilePicker: some View {
         HStack {
             Text("Instrument file")
@@ -299,7 +300,7 @@ struct ControlSheet: View {
                 .foregroundColor(.primary.opacity(0.8))
             Spacer()
             Menu {
-                ForEach(InstrumentLibrary.all, id: \.id) { instrument in
+                ForEach(InstrumentCatalog.shared.all, id: \.id) { instrument in
                     Button {
                         engine.playInstrument(instrument)
                     } label: {

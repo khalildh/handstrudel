@@ -1,0 +1,21 @@
+{
+  "description": "App versions are major.minor.patch with up to three numeric parts; missing parts are 0. Anything else is invalid (null). compare is -1, 0 or 1 for a vs b.",
+  "parse": [
+    { "input": "1", "parts": [1, 0, 0] },
+    { "input": "1.0", "parts": [1, 0, 0] },
+    { "input": "1.0.3", "parts": [1, 0, 3] },
+    { "input": "10.20.30", "parts": [10, 20, 30] },
+    { "input": "", "parts": null },
+    { "input": "1.0.3.4", "parts": null },
+    { "input": "1.0-beta", "parts": null },
+    { "input": "v1.0", "parts": null },
+    { "input": "1..2", "parts": null }
+  ],
+  "compare": [
+    { "a": "1.0.2", "b": "1.0.3", "result": -1 },
+    { "a": "1.0.10", "b": "1.0.9", "result": 1 },
+    { "a": "1.0", "b": "1.0.0", "result": 0 },
+    { "a": "2", "b": "1.99.99", "result": 1 },
+    { "a": "1.1", "b": "1.0.12", "result": 1 }
+  ]
+}

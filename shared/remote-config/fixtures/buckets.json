@@ -1,0 +1,80 @@
+{
+  "description": "Rollout bucket = uint32 big-endian of the first 4 bytes of SHA-256(UTF-8 \"<key>:<install_id>\") mod 100. The install id is used as-is (case matters). An install is in a rollout when bucket < rollout_percent.",
+  "cases": [
+    {
+      "key": "feed.enabled",
+      "install_id": "00000000-0000-4000-8000-000000000000",
+      "bucket": 65
+    },
+    {
+      "key": "feed.enabled",
+      "install_id": "2F6C9A7E-1B4D-4C11-9E0A-5D2B7C3E8F10",
+      "bucket": 69
+    },
+    {
+      "key": "feed.enabled",
+      "install_id": "2f6c9a7e-1b4d-4c11-9e0a-5d2b7c3e8f10",
+      "bucket": 90
+    },
+    {
+      "key": "feed.enabled",
+      "install_id": "A1B2C3D4-E5F6-4711-8899-AABBCCDDEEFF",
+      "bucket": 62
+    },
+    {
+      "key": "feed.enabled",
+      "install_id": "FFFFFFFF-FFFF-4FFF-BFFF-FFFFFFFFFFFF",
+      "bucket": 75
+    },
+    {
+      "key": "feed.page_size",
+      "install_id": "00000000-0000-4000-8000-000000000000",
+      "bucket": 77
+    },
+    {
+      "key": "feed.page_size",
+      "install_id": "2F6C9A7E-1B4D-4C11-9E0A-5D2B7C3E8F10",
+      "bucket": 34
+    },
+    {
+      "key": "feed.page_size",
+      "install_id": "2f6c9a7e-1b4d-4c11-9e0a-5d2b7c3e8f10",
+      "bucket": 97
+    },
+    {
+      "key": "feed.page_size",
+      "install_id": "A1B2C3D4-E5F6-4711-8899-AABBCCDDEEFF",
+      "bucket": 58
+    },
+    {
+      "key": "feed.page_size",
+      "install_id": "FFFFFFFF-FFFF-4FFF-BFFF-FFFFFFFFFFFF",
+      "bucket": 23
+    },
+    {
+      "key": "store.pro_note",
+      "install_id": "00000000-0000-4000-8000-000000000000",
+      "bucket": 43
+    },
+    {
+      "key": "store.pro_note",
+      "install_id": "2F6C9A7E-1B4D-4C11-9E0A-5D2B7C3E8F10",
+      "bucket": 52
+    },
+    {
+      "key": "store.pro_note",
+      "install_id": "2f6c9a7e-1b4d-4c11-9e0a-5d2b7c3e8f10",
+      "bucket": 51
+    },
+    {
+      "key": "store.pro_note",
+      "install_id": "A1B2C3D4-E5F6-4711-8899-AABBCCDDEEFF",
+      "bucket": 71
+    },
+    {
+      "key": "store.pro_note",
+      "install_id": "FFFFFFFF-FFFF-4FFF-BFFF-FFFFFFFFFFFF",
+      "bucket": 99
+    }
+  ]
+}
