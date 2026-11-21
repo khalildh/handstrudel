@@ -34,10 +34,10 @@ up() {
     s/(\[analytics\][^\[]*?port = )\d+/\${1}59427/s; s/inspector_port = \d+/inspector_port = 59483/" "$cfg"
   # Each function first loads the test-only fetch redirect, then the real, unchanged code.
   mkdir -p "$root/supabase/functions/_test"
-  cp "$here/redirect-deno.ts" "$root/supabase/functions/_test/redirect.ts"
+  cp "$here/redirect-deno.mjs" "$root/supabase/functions/_test/redirect.mjs"
   for fn in sign-upload publish-upload delete-video delete-account; do
     mv "$root/supabase/functions/$fn/index.ts" "$root/supabase/functions/$fn/real.ts"
-    printf 'import "../_test/redirect.ts";\nimport "./real.ts";\n' > "$root/supabase/functions/$fn/index.ts"
+    printf 'import "../_test/redirect.mjs";\nimport "./real.ts";\n' > "$root/supabase/functions/$fn/index.ts"
   done
   cat > "$root/functions.env" <<EOF
 R2_ACCOUNT_ID=localseed
