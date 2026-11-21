@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "test:web": "playwright test",
+    "test:instruments": "node --test src/lib/instruments/",
     "bundle:ios-audio": "node ios/bundle-strudel.mjs",
     "test:ios-web-audio": "node --test ios/strudel-audio-startup.test.mjs",
     "gen:config": "node scripts/gen-music-config.mjs",

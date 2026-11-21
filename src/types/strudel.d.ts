@@ -22,7 +22,10 @@ declare module "@strudel/webaudio" {
   export const webaudioOutput: unknown;
   export function initAudio(options?: Record<string, unknown>): Promise<void>;
   export function getAudioContext(): AudioContext;
+  export function setAudioContext(context: AudioContext): AudioContext;
   export function registerSynthSounds(): void;
+  /** Trigger one sound at absolute time `t` (seconds) for `duration` seconds. */
+  export function superdough(value: Record<string, unknown>, t: number, duration: number): Promise<void>;
 }
 
 declare module "@strudel/soundfonts" {

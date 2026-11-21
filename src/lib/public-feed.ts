@@ -24,6 +24,9 @@ export interface PublicVideo {
   backing_enabled?: boolean;
   source_video_id?: string | null;
   source_username?: string | null;
+  /** The post carries an instrument file (read separately from videos.instrument_spec). */
+  has_instrument?: boolean;
+  instrument_spec_name?: string | null;
 }
 
 interface PublicSoundSetup {
@@ -218,6 +221,7 @@ export async function loadPublicVideos(
   else if (search || cursor) url.searchParams.set("or", `(${search?.filter ?? cursor})`);
   const options: RequestInit = { headers: { apikey: publicKey }, signal, cache: "no-store" };
   const supportedSelections = [
+    ",sound_setup,comments_enabled,comment_count,backing_enabled,source_video_id,source_username,view_count,has_instrument,instrument_spec_name",
     ",sound_setup,comments_enabled,comment_count,backing_enabled,source_video_id,source_username,view_count",
     ",sound_setup,comments_enabled,comment_count,backing_enabled,source_video_id,source_username",
     ",sound_setup,comments_enabled,comment_count",
