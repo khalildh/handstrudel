@@ -655,6 +655,47 @@ final class ChordVoicingTests: XCTestCase {
         XCTAssertEqual(padNotes(e)?.count, 4)
     }
 
+    func testMelodyHandFollowsTheVoicingOnChordToneWheels() {
+        let e = engine(scale: false)
+        // C major, degree 0: C E G (+ B for 7ths).
+        XCTAssertEqual(e.wheelMelodyLanes(degree: 0), [48, 52, 55, 60, 64, 67, 72, 76, 79])
+        e.chordVoicing = .seventh
+        XCTAssertEqual(e.wheelMelodyLanes(degree: 0), [48, 52, 55, 59, 60, 64, 67, 71, 72, 76, 79, 83])
+
+        // Play the melody hand across the whole melody arc and collect the
+        // pitch classes it actually sounds.
+        func melodyPitchClasses() -> Set<Int> {
+            var played = Set<Int>()
+            for step in 0...40 {
+                let y = 0.02 + Double(step) * 0.024
+                let manager = ChordMelodyModeManager()
+                manager.layout = .split
+                let melody = HandData(x: 0.8, y: y, spread: 0.5, pinch: 1, pinchX: 0.8, pinchY: y,
+                                      fist: 0, rotation: 0.5, thumbCurl: 0.5, indexCurl: 0.5, middleCurl: 0.5,
+                                      ringCurl: 0.5, pinkyCurl: 0.5, landmarks: [])
+                for _ in 0..<4 {
+                    let actions = manager.tick(hands: HandsState(left: nil, right: melody),
+                                               chordTones: e.wheelChordTones(degree:),
+                                               melodyTones: e.wheelMelodyLanes(degree:))
+                    for case .melodyOn(_, let midi, _, _) in actions { played.insert(midi % 12) }
+                }
+            }
+            return played
+        }
+        let sevenths = melodyPitchClasses()
+        XCTAssertTrue(sevenths.contains(11), "7ths put the 7th (B) on the melody arc: \(sevenths.sorted())")
+        e.chordVoicing = .triad
+        let triads = melodyPitchClasses()
+        XCTAssertFalse(triads.isEmpty)
+        XCTAssertTrue(triads.isSubset(of: [0, 4, 7]), "Triads keep the melody on C E G: \(triads.sorted())")
+
+        // Six-note scales: the 7th lands on the next root, so no duplicate lane.
+        e.selectedScale = .wholeTone
+        e.chordVoicing = .seventh
+        let lanes = e.wheelMelodyLanes(degree: 0)
+        XCTAssertEqual(lanes.count, Set(lanes).count)
+    }
+
     func testSoundSetupRoundTripsWithAndWithoutVoicing() throws {
         for voicing in [nil, ChordVoicing.triad, .seventh] {
             let sound = setup(mode: .scalechordmelody, voicing: voicing)

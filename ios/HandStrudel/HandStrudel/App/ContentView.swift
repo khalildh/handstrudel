@@ -812,14 +812,13 @@ struct ContentView: View {
         zoneDegrees.map { engine.wheelChordName(degree: $0) }
     }
 
-    /// MIDI notes the melody side maps to. Split: triad × 3 octaves (9 notes,
-    /// chord-tone snap). Scale: one octave of the full diatonic scale (7).
+    /// MIDI notes the melody side maps to. Split: the voiced chord × 3 octaves
+    /// (9 notes for triads, 12 for 7ths). Scale: one octave of the full diatonic scale (7).
     private func splitMelodyMidis(melodyDegree: Int, scaleMode: Bool) -> [Int] {
         if scaleMode {
             return scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
         }
-        let triad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
-        return (0..<3).flatMap { oct in triad.map { $0 + oct * 12 } }.sorted()
+        return engine.wheelMelodyLanes(degree: melodyDegree)
     }
 
     /// Lane indices that are chord tones of the active chord (Scale mode only).
@@ -936,8 +935,7 @@ struct ContentView: View {
                 lanes = scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
             } else {
                 let degree = splitMelodySnapDegree
-                let triad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-                lanes = (0..<3).flatMap { oct in triad.map { $0 + oct * 12 } }.sorted()
+                lanes = engine.wheelMelodyLanes(degree: degree)
             }
             guard !lanes.isEmpty else { return }
             let safe = max(0, min(lanes.count - 1, lane))
@@ -1070,7 +1068,7 @@ struct ContentView: View {
                         : engine.chordMelodyCurrentChordName + engine.chordVoicing.chordNameSuffix,
                     melodyLane: engine.chordMelodyMelodyLane,
                     melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
-                    melodyLaneCount: 9,
+                    melodyLaneCount: engine.wheelMelodyLanes(degree: engine.chordMelodyCurrentDegree ?? 0).count,
                     swapHands: engine.chordMelodySwapHands
                 )
                 .ignoresSafeArea()
@@ -1082,8 +1080,7 @@ struct ContentView: View {
                 let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
                 let chordNames = splitChordNames(zoneDegrees: zoneDegrees)
                 let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
-                let melodyTriad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
-                let melodyMidis = (0..<3).flatMap { oct in melodyTriad.map { $0 + oct * 12 } }.sorted()
+                let melodyMidis = engine.wheelMelodyLanes(degree: melodyDegree)
                 let melodyNames = melodyMidis.map { pitchClassName($0) }
                 RadialChordMelodyOverlayView(
                     zoneDegrees: zoneDegrees,
@@ -1102,7 +1099,7 @@ struct ContentView: View {
 
             // Split / Scale chord+melody overlay (single circle cut in half).
             // Scale mode has 7 melody wedges = one octave of the scale; Split
-            // has 9 melody wedges = 3 octaves of chord tones. The overlay
+            // has 3 octaves of chord tones (9 wedges, 12 with 7ths). The overlay
             // takes the same shape either way; what differs is the melody
             // labels + the count.
             if engine.splitChordMelodyModeEnabled || engine.scaleChordMelodyModeEnabled {

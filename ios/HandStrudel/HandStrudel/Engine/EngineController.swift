@@ -778,12 +778,7 @@ final class EngineController: ObservableObject {
             if scaleMode {
                 return scaleNotesOneOctave(key: self.selectedKey, scale: self.selectedScale)
             }
-            let triad = chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
-            var lanes: [Int] = []
-            for octave in 0..<3 {
-                for note in triad { lanes.append(note + octave * 12) }
-            }
-            return lanes.sorted()
+            return self.wheelMelodyLanes(degree: degree)
         }
 
         // SoundFont mode intentionally runs free-time — passing quantize here
@@ -1450,6 +1445,15 @@ final class EngineController: ObservableObject {
     /// Hand-tracked pads, accents, auto-strum and touch chords all use this.
     func wheelChordTones(degree: Int) -> [Int] {
         chordVoicing.notes(key: selectedKey, scale: selectedScale, degree: degree)
+    }
+
+    /// The melody hand's notes on the chord-tone wheels (Split, Radial, Grid
+    /// chord+melody, SoundFont): the voiced chord across three octaves, so
+    /// 7ths add the 7th to the melody too. Deduplicated because on six-note
+    /// scales the 7th lands on the next octave's root.
+    func wheelMelodyLanes(degree: Int) -> [Int] {
+        let tones = wheelChordTones(degree: degree)
+        return Array(Set((0..<3).flatMap { octave in tones.map { $0 + octave * 12 } })).sorted()
     }
 
     /// A wheel wedge's chord name, with "⁷" when the voicing is 7ths.

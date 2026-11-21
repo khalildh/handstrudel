@@ -2106,6 +2106,25 @@ final class HandStrudelUITests: XCTestCase {
         return (label, notes)
     }
 
+    /// Taps a melody wedge (a real touch) and returns the note that touch sent.
+    private func playTouchNote(_ index: Int) -> Int? {
+        let wedge = app.buttons["wheel-note-\(index)"]
+        XCTAssertTrue(wedge.waitForExistence(timeout: 5))
+        let before = Set(noteLog().map(\.voice))
+        wedge.tap()
+        let notes = waitForNotes {
+            noteLog().filter {
+                !before.contains($0.voice) && $0.voice.range(of: #"^splittouch-\d+-m$"#, options: .regularExpression) != nil
+            }.map(\.midi)
+        }
+        print("[voicing-ui] touch melody note \(index) -> \(notes)")
+        return notes.last
+    }
+
+    private var melodyWedgeCount: Int {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'wheel-note-'")).count
+    }
+
     /// Root pitch class of a wedge label such as "Chord Ebmaj⁷".
     private func rootPitchClass(_ label: String) -> Int? {
         let name = label.replacingOccurrences(of: "Chord ", with: "")
@@ -2137,7 +2156,9 @@ final class HandStrudelUITests: XCTestCase {
         // A menu tap can be swallowed while the wheel is animating; retry the
         // pick until the setting reads back.
         for _ in 0..<3 where !picked.evaluate(with: picker) {
-            picker.tap()
+            // The sheet can still be settling, which makes the row briefly
+            // report "not hittable"; tap its centre instead.
+            picker.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             guard option.waitForExistence(timeout: 3) else { continue }
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
             option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
@@ -2167,7 +2188,11 @@ final class HandStrudelUITests: XCTestCase {
     }
 
     func testChordVoicingChangesTheNotesTouchChordsPlay() {
+        // Split wheel: its melody arc is the held chord's tones.
         launchTouchSession()
+        element("settings-button").tap()
+        switchToMode("mode-splitChordMelody")
+        closeMusicSettings()
         chooseChordVoicing("7ths")
         let sevenths = playTouchChord(0)
         XCTAssertEqual(sevenths.notes.count, 4, "7ths play root, 3rd, 5th and 7th: \(sevenths.notes)")
@@ -2178,6 +2203,19 @@ final class HandStrudelUITests: XCTestCase {
         let triads = playTouchChord(0)
         XCTAssertEqual(triads.notes, Array(sevenths.notes.prefix(3)), "Same chord without its 7th")
         XCTAssertFalse(triads.label.hasSuffix("⁷"), triads.label)
+
+        // The melody arc offers the held chord's tones, so it follows too:
+        // 3 octaves of the triad (9 wedges), or of the 7th chord (12).
+        func lanes(_ chord: [Int]) -> [Int] { Array(Set((0..<3).flatMap { o in chord.map { $0 + o * 12 } })).sorted() }
+        let triadLanes = lanes(triads.notes)
+        XCTAssertEqual(melodyWedgeCount, triadLanes.count)
+        XCTAssertEqual(playTouchNote(3), triadLanes[3], "Triads: the 4th melody note is the root an octave up")
+        chooseChordVoicing("7ths")
+        _ = playTouchChord(0)
+        let seventhLanes = lanes(sevenths.notes)
+        XCTAssertEqual(melodyWedgeCount, seventhLanes.count)
+        let seventhLane = try! XCTUnwrap(seventhLanes.firstIndex(of: sevenths.notes[3]))
+        XCTAssertEqual(playTouchNote(seventhLane), sevenths.notes[3], "7ths: the melody arc offers the chord's 7th")
     }
 
     /// Scripted hands (the DEBUG DemoDirector) pinch a Scale-wheel chord wedge
