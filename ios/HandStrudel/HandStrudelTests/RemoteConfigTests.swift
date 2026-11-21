@@ -137,6 +137,19 @@ final class RemoteConfigTests: XCTestCase {
         XCTAssertEqual(offline.proNote, "Holiday sale")
     }
 
+    /// `feed.page_size` is read once at launch from the copy the previous launch cached.
+    func testLaunchValuesComeFromThePreviousLaunchsCache() async {
+        XCTAssertEqual(RemoteConfig.values(cachedAt: cacheURL, appVersion: "1.0.3", installID: "x")[RemoteConfigKeys.feedPageSize],
+                       .number(10), "first launch: default")
+        let config = makeConfig { _ in Self.rows([["key": "feed.page_size", "value": 15]]) }
+        await config.refresh()
+        XCTAssertEqual(config.feedPageSize, 15)
+        XCTAssertEqual(RemoteConfig.values(cachedAt: cacheURL, appVersion: "1.0.3", installID: "x")[RemoteConfigKeys.feedPageSize],
+                       .number(15), "next launch: the fetched value")
+        XCTAssertEqual(RemoteConfig.values(cachedAt: cacheURL, appVersion: "1.0.4", installID: "x")[RemoteConfigKeys.feedPageSize],
+                       .number(10), "after an app update: default until the next fetch")
+    }
+
     func testMalformedResponseKeepsTheLastGoodCopy() async {
         var response = Self.rows([["key": "feed.enabled", "value": false]])
         let config = makeConfig { _ in response }

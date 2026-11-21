@@ -54,8 +54,8 @@ For each key the app takes the matching rows in order (priority, then newest) an
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
-| `feed.enabled` | bool | `true` | Kill switch. False replaces the feed tab with a short "taking a break" note; music, drafts and the account tab keep working. Takes effect on the next fetch. |
-| `feed.page_size` | number | `10` | Posts per feed page, clamped to 5–30. Read once per launch, so it applies from the next launch. |
+| `feed.enabled` | bool | `true` | Kill switch. False replaces the feed tab with a short "taking a break" note; music, drafts and the account tab keep working. Takes effect on the next fetch. On a launch with no cached config (first launch, or the first after an app update) the feed can send its first request before the fetch returns; once cached, the switch applies from launch. |
+| `feed.page_size` | number | `10` | Posts per page for the Latest and Following feeds and profile and play-along lists (Discover always loads 24), clamped to 5–30. Read once per launch from the cached copy, so it applies from the launch after the fetch. |
 | `store.pro_title` | string | `HandStrudel Pro` | Store screen headline for Pro. |
 | `store.pro_features` | string array | today's 4 lines | Pro feature bullets (up to 6, 80 characters each). |
 | `store.pro_note` | string | empty | Optional line under the bullets, e.g. a sale. Hidden when empty. |
@@ -167,5 +167,6 @@ update public.instrument_catalog set published = false where id = 'community.big
 
 - `supabase test db` runs `supabase/tests/database/remote_config.test.sql`: RLS (clients can't read or write the tables, the preview is admin-only), platform and version targeting, priority, rollout, the shared bucket and version fixtures, and the catalog's checks.
 - iOS unit tests: `RemoteConfigTests` (shared fixtures, defaults, cache, throttling, update prompt) and `InstrumentCatalogTests` (validation, future formats, malformed files, bundled-wins merge, cache).
-- `RemoteConfigUITests` launches the app with `HANDSTRUDEL_REMOTE_CONFIG_FIXTURE` set to inline rows and checks the feed kill switch, the update banner (and that dismissing it sticks) and the hard block.
-- To try a change against a local stack, run the DEBUG app with `SUPABASE_URL` / `SUPABASE_ANON_KEY` pointing at it and use `scripts/remote-config.mjs` there.
+- `RemoteConfigUITests` launch the app with `HANDSTRUDEL_REMOTE_CONFIG_FIXTURE` / `HANDSTRUDEL_INSTRUMENT_CATALOG_FIXTURE` set to inline rows and drive it: the feed kill switch, the banner (tap Update, dismiss, relaunch), the hard block (taps don't reach the app; Update leaves it), the store copy in the Store sheet, and playing a downloaded instrument (the wheel's chord half moves sides) while bad, future-format and colliding files stay out of the picker. `--reset-remote-content` (DEBUG) clears the cache first.
+- `RemoteConfigLiveUITests` (opt-in) go through the app's real network code against a local stack: they write rows with the service key, check the app picks them up from `app_config_for()` / `instrument_catalog_for()` (including platform and version targeting), roll back (disable the row, unpublish the instrument) and check the app follows. Run with `TEST_RUNNER_HANDSTRUDEL_LIVE_SUPABASE_URL`, `TEST_RUNNER_HANDSTRUDEL_LIVE_ANON_KEY` and `TEST_RUNNER_HANDSTRUDEL_LIVE_SERVICE_KEY` set (local URLs only); the stack's Kong log shows the Latest feed's `limit=` equal to `feed.page_size`.
+- The Simulator has no App Store app, so `apps.apple.com` links land in Safari, which can't show them there; check the App Store page opening on a device.

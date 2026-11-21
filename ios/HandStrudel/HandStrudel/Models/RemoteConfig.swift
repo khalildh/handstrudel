@@ -134,12 +134,14 @@ final class RemoteConfig: ObservableObject {
 
     /// Values from the last good copy on disk at launch, for settings that
     /// must stay fixed for the whole session (and be read off the main actor).
-    nonisolated static let launchValues: [String: JSONValue] = {
-        guard let snapshot = readCache(RemoteCache.url("remote-config.json"), appVersion: bundleVersion) else {
-            return RemoteConfigKeys.defaults
-        }
-        return RemoteConfigKeys.resolve(rows: snapshot.rows, installID: RemoteInstall.id())
-    }()
+    nonisolated static let launchValues = values(cachedAt: RemoteCache.url("remote-config.json"),
+                                                 appVersion: bundleVersion, installID: RemoteInstall.id())
+
+    /// Resolved values from a cached snapshot, or the defaults without one.
+    nonisolated static func values(cachedAt url: URL?, appVersion: String, installID: String) -> [String: JSONValue] {
+        guard let snapshot = readCache(url, appVersion: appVersion) else { return RemoteConfigKeys.defaults }
+        return RemoteConfigKeys.resolve(rows: snapshot.rows, installID: installID)
+    }
 
     /// `feed.page_size` as of launch.
     nonisolated static var launchFeedPageSize: Int {
@@ -329,10 +331,23 @@ enum RemoteInstall {
 
 enum RemoteCache {
     static func url(_ name: String) -> URL? {
+        _ = resetForTesting
+        return folder?.appendingPathComponent(name)
+    }
+
+    private static var folder: URL? {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
             .appendingPathComponent("RemoteContent", isDirectory: true)
-            .appendingPathComponent(name)
     }
+
+    /// DEBUG UI tests pass `--reset-remote-content` to start without a cached copy.
+    private static let resetForTesting: Void = {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--reset-remote-content"), let folder {
+            try? FileManager.default.removeItem(at: folder)
+        }
+        #endif
+    }()
 }
 
 /// Where remote rows come from: a Supabase RPC, or in DEBUG a local fixture.
