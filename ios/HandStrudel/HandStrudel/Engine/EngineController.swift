@@ -223,6 +223,10 @@ final class EngineController: ObservableObject {
     /// Route Scale mode through the native SoundFont sampler.
     @Published var scaleUseSoundFont: Bool = true
     @Published var chordMelodySwapHands = false  // left=chords by default; toggle for lefties
+    /// An instrument file other than the built-in wheels that the Scale/Split
+    /// wheel is playing. Nil plays the built-in wheel for the current mode.
+    /// Cleared by every mode switch.
+    @Published private(set) var customInstrument: InstrumentSpec?
     @Published var chordMelodyPadVolume: Double = 0.6   // sustained chord pad gain (100% of the 0…0.6 slider range)
     let chordMelodyModeManager = ChordMelodyModeManager()
     @Published var chordMelodyCurrentDegree: Int? = nil
@@ -747,36 +751,12 @@ final class EngineController: ObservableObject {
         // idempotent, so this covers both the mode-switch and restore paths.
         soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
 
-        chordMelodyModeManager.layout = scaleChordMelodyModeEnabled ? .scale
-            : splitChordMelodyModeEnabled ? .split
-            : radialChordMelodyModeEnabled ? .radial
-            : .grid
-        chordMelodyModeManager.swapHands = chordMelodySwapHands
-        chordMelodyModeManager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
-        let bounds = UIScreen.main.bounds
-        chordMelodyModeManager.screenAspect = bounds.width / bounds.height
-
+        configureWheelManager()
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
-        let scaleMode = scaleChordMelodyModeEnabled
-
-        let chordTones: (Int) -> [Int] = { [weak self] degree in
-            guard let self else { return [] }
-            return scaleMode
-                ? chordNotesWithSeventh(key: self.selectedKey, scale: self.selectedScale, degree: degree)
-                : chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
-        }
-        let melodyTones: (Int) -> [Int] = { [weak self] degree in
-            guard let self else { return [] }
-            if scaleMode {
-                return scaleNotesOneOctave(key: self.selectedKey, scale: self.selectedScale)
-            }
-            let triad = chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
-            var lanes: [Int] = []
-            for octave in 0..<3 {
-                for note in triad { lanes.append(note + octave * 12) }
-            }
-            return lanes.sorted()
-        }
+        let key = selectedKey, scale = selectedScale
+        let tones = chordMelodyTones(key: key, scale: scale)
+        let chordTones = tones.chord
+        let melodyTones = tones.melody
 
         // SoundFont mode intentionally runs free-time — passing quantize here
         // makes the pad/melody/accent strikes wait for grid boundaries, which
@@ -1392,6 +1372,28 @@ final class EngineController: ObservableObject {
         jamSession.replayRemoteVoices()
     }
 
+    /// The Scale/Split wheel's behaviour, from its instrument file.
+    var wheelInstrument: InstrumentSpec {
+        if let customInstrument { return customInstrument }
+        return scaleChordMelodyModeEnabled ? InstrumentLibrary.scaleWheel : InstrumentLibrary.splitWheel
+    }
+
+    var wheelRules: WheelRules { wheelInstrument.rules }
+
+    /// Chord hand on the right: the instrument's side, mirrored by the player's
+    /// swap-hands setting. Equals `chordMelodySwapHands` for built-in wheels.
+    var wheelSwapHands: Bool { wheelRules.swapHands(playerSwap: chordMelodySwapHands) }
+
+    /// Play an instrument file on the wheel. The instrument only changes the
+    /// wheel's layout and behaviour; key, scale, progression and sound stay as
+    /// the player set them, and the wheel adapts to them.
+    func playInstrument(_ instrument: InstrumentSpec) {
+        let mode = instrument.baseMode
+        switchMode(grid: false, drums: false, learn: false,
+                   splitChordMelody: mode == .splitchordmelody, scaleChordMelody: mode == .scalechordmelody)
+        customInstrument = instrument.isBuiltIn ? nil : instrument
+    }
+
     /// Call when switching modes to stop lingering sounds
     func switchMode(grid: Bool, drums: Bool, learn: Bool, chordMelody: Bool = false,
                     lead: Bool = false, hybrid: Bool = false, flow: Bool = false,
@@ -1399,6 +1401,7 @@ final class EngineController: ObservableObject {
                     splitChordMelody: Bool = false,
                     scaleChordMelody: Bool = false) {
         silenceAll()
+        customInstrument = nil
         gridModeEnabled = grid
         drumModeEnabled = drums
         learnModeEnabled = learn
@@ -1511,4 +1514,39 @@ private class DisplayLinkTarget: NSObject {
     let callback: () -> Void
     init(callback: @escaping () -> Void) { self.callback = callback }
     @objc func handleDisplayLink() { callback() }
+}
+
+// MARK: - Wheel instruments
+
+extension EngineController {
+    /// Point the shared chord+melody manager at the current mode, and — for
+    /// the Split/Scale wheel — at the playing instrument file.
+    func configureWheelManager() {
+        let manager = chordMelodyModeManager
+        if splitChordMelodyModeEnabled || scaleChordMelodyModeEnabled {
+            let rules = wheelRules
+            manager.layout = rules.noteSource == .scaleOneOctave || rules.notesOctaveBand ? .scale : .split
+            manager.geometry = rules.geometry
+            manager.melodyOctaveBand = rules.notesOctaveBand
+            manager.swapHands = rules.swapHands(playerSwap: chordMelodySwapHands)
+        } else {
+            manager.layout = radialChordMelodyModeEnabled ? .radial : .grid
+            manager.geometry = .standard
+            manager.melodyOctaveBand = true
+            manager.swapHands = chordMelodySwapHands
+        }
+        manager.videoAspect = handTracker.videoWidth / handTracker.videoHeight
+        let bounds = UIScreen.main.bounds
+        manager.screenAspect = bounds.width / bounds.height
+    }
+
+    /// Chord voicing and note lanes for the hand-tracked chord+melody modes.
+    /// The wheel takes both from its instrument; the older layouts keep a
+    /// triad and three octaves of chord tones.
+    func chordMelodyTones(key: MusicKey, scale: Scale) -> (chord: (Int) -> [Int], melody: (Int) -> [Int]) {
+        let rules = splitChordMelodyModeEnabled || scaleChordMelodyModeEnabled
+            ? wheelRules : InstrumentLibrary.splitWheel.rules
+        return ({ rules.chordTones(key: key, scale: scale, degree: $0) },
+                { rules.noteLanes(key: key, scale: scale, chordDegree: $0) })
+    }
 }

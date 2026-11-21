@@ -49,8 +49,11 @@ struct SplitChordMelodyOverlayView: View {
     /// Melody-side octave shift driven by the outer radial band (Scale mode).
     /// 0 in Split since the melody side doesn't have an octave band.
     var melodyOctaveShift: Int = 0
-    /// Scale layout: the notes side always shows its up/down octave band.
+    /// The notes side always shows its up/down octave band (the instrument
+    /// has a note octave band, as the Scale wheel does).
     var scaleLayout = false
+    /// Wheel radii from the playing instrument file.
+    var geometry: WheelGeometry = .standard
 
     /// In Scale mode the melody half gets the same inner-band + outer-octave
     /// treatment as the chord side. Callers that don't say so explicitly fall
@@ -62,9 +65,9 @@ struct SplitChordMelodyOverlayView: View {
 
     // Geometry mirrors ChordMelodyModeManager so the drawn wheel lines up with
     // the angle/radius math that selects wedges.
-    private let radiusFraction = CGFloat(ChordMelodyModeManager.splitRadiusFraction)
-    private let deadzoneFraction = CGFloat(ChordMelodyModeManager.splitDeadzone)
-    private let octaveBandFraction = CGFloat(ChordMelodyModeManager.splitOctaveBandThreshold)
+    private var radiusFraction: CGFloat { CGFloat(geometry.radius) }
+    private var deadzoneFraction: CGFloat { CGFloat(geometry.restRadius) }
+    private var octaveBandFraction: CGFloat { CGFloat(geometry.octaveBandRadius) }
 
     /// Which side (left or right semicircle) the chord half occupies.
     private var chordIsRightHalf: Bool { swapHands }

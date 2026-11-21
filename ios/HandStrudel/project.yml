@@ -41,6 +41,9 @@ targets:
       - path: HandStrudel/Assets.xcassets
       - path: HandStrudel/Resources
       - path: HandStrudel/PrivacyInfo.xcprivacy
+      # Instrument files shared with the web app (bundled as the "library" folder).
+      - path: ../../shared/instruments/library
+        type: folder
     dependencies:
       - package: RevenueCat
         product: RevenueCat
