@@ -44,6 +44,7 @@ struct PostComposerView: View {
     let mode: String?
     let soundSetup: SoundSetup?
     let backingCredit: BackingCredit?
+    var replyTo: ReplyTarget? = nil
     @ObservedObject var auth: AuthManager
     let onSubmissionAccepted: () -> Void
     let onPostUpdate: (DraftPostUpdate) -> Void
@@ -55,6 +56,7 @@ struct PostComposerView: View {
     @State private var sharing = PostSharingOptions()
     @State private var commentsEnabled = true
     @State private var hasAudio: Bool?
+    @State private var postAsReply = true
 
     private var submission: DraftPostSubmission? {
         auth.userId.flatMap { drafts.postSubmission(for: draftID, accountID: $0) }
@@ -93,6 +95,14 @@ struct PostComposerView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                    if let replyTo {
+                        Toggle(isOn: $postAsReply) {
+                            Label("Reply to @\(replyTo.username)", systemImage: "arrowshape.turn.up.left")
+                        }
+                        .font(.subheadline)
+                        .disabled(uploader.isBusy || submission != nil)
+                        .accessibilityIdentifier("post-as-reply")
                     }
                     Toggle("Allow comments", isOn: $commentsEnabled)
                         .font(.subheadline)
@@ -180,7 +190,8 @@ struct PostComposerView: View {
             let posted = await uploader.post(clip: clip, draftID: draftID, accountID: accountID, store: drafts,
                                              caption: caption, instrument: instrument, mode: mode,
                                              soundSetup: preset, noteTrack: notes, commentsEnabled: commentsEnabled,
-                                             backingEnabled: allowBacking, backingCredit: backingCredit) {
+                                             backingEnabled: allowBacking, backingCredit: backingCredit,
+                                             replyTo: postAsReply ? replyTo : nil) {
                 guard auth.userId == accountID else { return }
                 leaveComposer()
                 onPostUpdate(.checking)

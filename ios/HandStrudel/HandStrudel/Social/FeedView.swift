@@ -7,6 +7,7 @@ private enum PerformanceStart {
     case backing(Video)
     case preset(SoundSetup)
     case learn(LearnToPlayRequest)
+    case reply(ReplyTakeRequest)
 }
 
 private struct SoundLockedKey: EnvironmentKey {
@@ -68,6 +69,7 @@ struct FeedView<Navigation: View>: View {
     @State private var audioDownload: Video?
     @State private var pendingBookmark: Video?
     @State private var sharing: Video?
+    @State private var challenging: Video?
     @State private var showsFullscreenControls = true
     @State private var playbackStore = FeedPlaybackStore()
     @State private var feedPlaybackGate = FeedPlaybackGate()
@@ -219,6 +221,7 @@ struct FeedView<Navigation: View>: View {
         .sheet(item: $sharing) { video in
             VideoShareSheet(video: video) { await model.refreshEngagement(for: video.id) }
         }
+        .sheet(item: $challenging) { video in ChallengeShareSheet(video: video) }
         .sheet(isPresented: $showSearch, onDismiss: resumePerformance) {
             PostSearchView(auth: auth) { start in
                 pendingStart = start
@@ -339,7 +342,8 @@ struct FeedView<Navigation: View>: View {
                        block: { act { try await model.block(video.userId, user: $0); show("Blocked @\(video.username ?? "user")") } },
                        delete: { deleting = video }, comments: { openComments(video) },
                        bookmark: { toggleBookmark(video) }, repost: { toggleRepost(video) },
-                       share: { sharing = video }, downloadAudio: { audioDownload = video },
+                       share: { sharing = video }, challenge: { challenging = video },
+                       downloadAudio: { audioDownload = video },
                        changeAudioPermission: {
                            if model.audioDownloadIDs.contains(video.id) { changeAudioPermission(video) }
                            else { confirmingAudioPermission = video }
@@ -375,6 +379,9 @@ struct FeedView<Navigation: View>: View {
         case .backing(let video): onPlayAlong(video)
         case .preset(let sound): onTrySound(sound)
         case .learn(let request):
+            request.send()
+            onTrySound(request.setup)
+        case .reply(let request):
             request.send()
             onTrySound(request.setup)
         }
@@ -1481,6 +1488,8 @@ private enum PlaylistDirection: Int {
 struct CreatorVideoView: View {
     let video: Video
     @ObservedObject var auth: AuthManager
+    /// Opened from a "Challenge a friend" link: lead with the reply recorder.
+    var challenged = false
     var onPlayAlong: ((Video) -> Void)? = nil
     var onTrySound: ((SoundSetup) -> Void)? = nil
     var allowsSharing = true
@@ -1496,6 +1505,7 @@ struct CreatorVideoView: View {
         NavigationStack {
             PerformanceDetail(video: current, auth: auth, isFullscreen: $isFullscreen,
                               showsFullscreenControls: $showsFullscreenControls,
+                              challenged: challenged && current.id == video.id,
                               onPlayAlong: onPlayAlong, onTrySound: onTrySound,
                               allowsSharing: allowsSharing && current.hidden != true,
                               onSwipe: clips.contains { $0.id != current.id } ? { direction in
@@ -1530,6 +1540,7 @@ private struct PerformanceDetail: View {
     @Binding var isFullscreen: Bool
     @Binding var showsFullscreenControls: Bool
     var notification: CreatorActivity? = nil
+    var challenged = false
     var onPlayAlong: ((Video) -> Void)? = nil
     var onTrySound: ((SoundSetup) -> Void)? = nil
     var allowsSharing = true
@@ -1545,9 +1556,23 @@ private struct PerformanceDetail: View {
     @State private var audioDownload: Video?
     @State private var canDownloadAudio = false
     @State private var sharing = false
+    @State private var challenging = false
+    /// The post this take answers, or a take from the reply strip, opened on top of this one.
+    @State private var nestedPost: Video?
 
     private var isCurrent: Bool {
         detailIsVisible && playerIsOnScreen && scenePhase == .active && !showComments && audioDownload == nil && !sharing
+            && !challenging && nestedPost == nil
+    }
+
+    /// Starts the post's sound with the next take marked as a reply.
+    private var replyWithTake: (() -> Void)? {
+        guard let request = ReplyTakeRequest(video: video), let onTrySound else { return nil }
+        return {
+            paused = true
+            request.send()
+            onTrySound(request.setup)
+        }
     }
 
     var body: some View {
@@ -1597,11 +1622,23 @@ private struct PerformanceDetail: View {
         .toolbar {
             if allowsSharing {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Share video", systemImage: "square.and.arrow.up") { sharing = true }
+                    if ReplyTakeRequest(video: video) != nil {
+                        Menu("Share video", systemImage: "square.and.arrow.up") {
+                            Button("Share video", systemImage: "square.and.arrow.up") { sharing = true }
+                            Button("Challenge a friend", systemImage: "flag.checkered") { challenging = true }
+                        }
+                        .accessibilityIdentifier("performance-share-menu")
+                    } else {
+                        Button("Share video", systemImage: "square.and.arrow.up") { sharing = true }
+                    }
                 }
             }
         }
         .sheet(isPresented: $sharing) { VideoShareSheet(video: video) }
+        .sheet(isPresented: $challenging) { ChallengeShareSheet(video: video) }
+        .sheet(item: $nestedPost) { post in
+            CreatorVideoView(video: post, auth: auth, onPlayAlong: onPlayAlong, onTrySound: onTrySound)
+        }
         .sheet(isPresented: $showComments) {
             CommentsView(video: video, auth: auth, targetComment: notification?.commentId)
         }
@@ -1644,8 +1681,16 @@ private struct PerformanceDetail: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if challenged { ChallengeCard(video: video, reply: replyWithTake) }
             VideoViewLabel(count: playback.displayedViewCount(fetched: video.viewCount))
                 .foregroundStyle(palette.muted)
+            if let parent = video.replyToId, let username = video.replyToUsername {
+                ReplyCreditButton(username: username) {
+                    Task { nestedPost = try? await FeedService.video(id: parent) }
+                }
+                .font(.subheadline.weight(.semibold))
+                .frame(minHeight: 44)
+            }
             if let setup = video.soundSetup {
                 ClipPresetCard(setup: setup, username: video.username ?? auth.profile?.username, onPlay: onTrySound.map { play in
                     { sound in
@@ -1673,6 +1718,14 @@ private struct PerformanceDetail: View {
                     onPlayAlong(video)
                 }
                 .buttonStyle(StudioActionStyle())
+            }
+            if !challenged, let replyWithTake {
+                Button("Reply with a take", systemImage: "arrowshape.turn.up.left", action: replyWithTake)
+                    .buttonStyle(StudioActionStyle())
+                    .accessibilityIdentifier("reply-with-take")
+            }
+            if (video.replyCount ?? 0) > 0 {
+                ReplyStrip(video: video) { nestedPost = $0 }
             }
             if allowsSharing && canDownloadAudio {
                 Button("Download audio", systemImage: "arrow.down.circle") {
@@ -2067,6 +2120,17 @@ private struct FeedCell: View {
                     Button("Inspired by @\(username)") { source(id) }
                         .font(.caption.weight(.semibold)).foregroundStyle(palette.mediaAccent)
                 }
+                if let id = video.replyToId, let username = video.replyToUsername {
+                    ReplyCreditButton(username: username) { source(id) }
+                        .font(.caption.weight(.semibold)).foregroundStyle(palette.mediaAccent)
+                }
+                if let replies = video.replyCount, replies > 0 {
+                    Button(replies == 1 ? "1 take in reply" : "\(replies.formatted()) takes in reply",
+                           systemImage: "rectangle.stack") { source(video.id) }
+                        .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.9))
+                        .accessibilityHint("Opens this post with its replies")
+                        .accessibilityIdentifier("feed-reply-count")
+                }
             }
             Spacer(minLength: 64)
         }
@@ -2139,6 +2203,7 @@ private struct FeedActionRail: View {
     let bookmark: () -> Void
     let repost: () -> Void
     let share: () -> Void
+    let challenge: () -> Void
     let downloadAudio: () -> Void
     let changeAudioPermission: () -> Void
     let showRemixes: () -> Void
@@ -2186,9 +2251,19 @@ private struct FeedActionRail: View {
             .accessibilityValue(engagement?.reposts.map { "\($0.formatted()) reposts" } ?? "")
             .accessibilityIdentifier("feed-repost")
 
-            Button(action: share) { glyph("paperplane", count: engagement?.shares) }
-                .accessibilityLabel("Share video")
-                .accessibilityValue(engagement.map { "\($0.shares.formatted()) shares" } ?? "")
+            Group {
+                if ReplyTakeRequest(video: video) != nil {
+                    Menu {
+                        Button("Share video", systemImage: "square.and.arrow.up", action: share)
+                        Button("Challenge a friend", systemImage: "flag.checkered", action: challenge)
+                    } label: { glyph("paperplane", count: engagement?.shares) }
+                } else {
+                    Button(action: share) { glyph("paperplane", count: engagement?.shares) }
+                }
+            }
+            .accessibilityLabel("Share video")
+            .accessibilityValue(engagement.map { "\($0.shares.formatted()) shares" } ?? "")
+            .accessibilityIdentifier("feed-share")
 
             Button(action: bookmark) {
                 glyph(isSaved ? "bookmark.fill" : "bookmark", count: engagement?.saves,
@@ -2427,6 +2502,12 @@ private struct FeedSoundSheet: View {
                             .buttonStyle(ProfileActionStyle(primary: true))
                             .accessibilityHint("Opens this setup in the Music tab")
                             .accessibilityIdentifier("play-clip-preset")
+                    }
+                    if let reply = ReplyTakeRequest(video: video) {
+                        Button("Reply with a take", systemImage: "arrowshape.turn.up.left") { onStart(.reply(reply)) }
+                            .buttonStyle(ProfileActionStyle())
+                            .accessibilityHint("Opens this sound and posts your next take as a reply")
+                            .accessibilityIdentifier("reply-with-take")
                     }
                     if let learn = LearnToPlayRequest(video: video) {
                         Button("Learn to play", systemImage: "graduationcap") { onStart(.learn(learn)) }
