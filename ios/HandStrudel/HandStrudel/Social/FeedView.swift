@@ -3,7 +3,7 @@ import Combine
 import SwiftUI
 import UIKit
 
-private enum PerformanceStart {
+enum PerformanceStart {
     case backing(Video)
     case preset(SoundSetup)
     case learn(LearnToPlayRequest)
@@ -22,7 +22,7 @@ extension EnvironmentValues {
 }
 
 /// Small label shown on posted sounds the viewer can unlock with Pro.
-private struct ProSoundBadge: View {
+struct ProSoundBadge: View {
     var body: some View {
         Label("Pro sound", systemImage: "lock.fill")
             .font(.caption2.weight(.bold))
@@ -279,7 +279,7 @@ struct FeedView<Navigation: View>: View {
             })
         }
         .sheet(item: $soundVideo, onDismiss: resumePerformance) { video in
-            FeedSoundSheet(video: video) { start in
+            SoundPageView(video: video, auth: auth) { start in
                 pendingStart = start
                 soundVideo = nil
             }
@@ -1415,6 +1415,7 @@ private struct ClipPresetCard: View {
     let setup: SoundSetup
     let username: String?
     let onPlay: ((SoundSetup) -> Void)?
+    var openSound: (() -> Void)? = nil
     @State private var saved = false
 
     private var title: String { setup.instrumentName ?? "Performance preset" }
@@ -1423,10 +1424,27 @@ private struct ClipPresetCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Label(title, systemImage: "waveform")
+                if let openSound {
+                    Button(action: openSound) {
+                        HStack(spacing: 4) {
+                            Label(title, systemImage: "waveform").lineLimit(1)
+                            Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
+                        }
+                        .frame(minHeight: 28)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(palette.mediaAccent)
-                    .lineLimit(1)
+                    .accessibilityLabel("Sound: \(title)")
+                    .accessibilityHint("Opens the sound page")
+                    .accessibilityIdentifier("clip-sound-page")
+                } else {
+                    Label(title, systemImage: "waveform")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(palette.mediaAccent)
+                        .lineLimit(1)
+                }
                 if isSoundLocked(setup) { ProSoundBadge() }
             }
             Text(setup.presetDetails)
@@ -1545,9 +1563,11 @@ private struct PerformanceDetail: View {
     @State private var audioDownload: Video?
     @State private var canDownloadAudio = false
     @State private var sharing = false
+    @State private var showSoundPage = false
 
     private var isCurrent: Bool {
         detailIsVisible && playerIsOnScreen && scenePhase == .active && !showComments && audioDownload == nil && !sharing
+            && !showSoundPage
     }
 
     var body: some View {
@@ -1605,6 +1625,19 @@ private struct PerformanceDetail: View {
         .sheet(isPresented: $showComments) {
             CommentsView(video: video, auth: auth, targetComment: notification?.commentId)
         }
+        .sheet(isPresented: $showSoundPage) {
+            SoundPageView(video: video, auth: auth) { start in
+                showSoundPage = false
+                paused = true
+                switch start {
+                case .preset(let sound): onTrySound?(sound)
+                case .backing(let source): onPlayAlong?(source)
+                case .learn(let learn):
+                    learn.send()
+                    onTrySound?(learn.setup)
+                }
+            }
+        }
         .task(id: video.id) {
             canDownloadAudio = (try? await FeedService.audioDownloadsAllowed([video.id]))?.contains(video.id) == true
         }
@@ -1652,7 +1685,7 @@ private struct PerformanceDetail: View {
                         paused = true
                         play(sound)
                     }
-                })
+                }, openSound: video.hidden == true ? nil : { showSoundPage = true })
             } else if let instrument = video.instrument {
                 Label(instrument, systemImage: "waveform").font(.caption).foregroundStyle(.secondary)
             }
@@ -2072,27 +2105,7 @@ private struct FeedCell: View {
         }
     }
 
-    private var soundButton: some View {
-        let title = video.soundSetup?.instrumentName ?? video.instrument ?? "Sound"
-        return Button(action: showSound) {
-            HStack(spacing: 6) {
-                Image(systemName: "waveform")
-                Text(title).lineLimit(1)
-                Image(systemName: "chevron.up").font(.system(size: 9, weight: .bold))
-            }
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 11)
-            .padding(.vertical, 7)
-            .foregroundStyle(palette.mediaAccent)
-            .background(.black.opacity(0.66), in: Capsule())
-            .overlay { Capsule().strokeBorder(.white.opacity(0.18)) }
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Sound options: \(title)")
-        .accessibilityIdentifier("feed-sound-options")
-    }
+    private var soundButton: some View { FeedSoundRow(video: video, action: showSound) }
 
     private var author: some View {
         Button(action: creator) {
@@ -2387,89 +2400,6 @@ private struct ClipPlaybackControls: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
-    }
-}
-
-private struct FeedSoundSheet: View {
-    @Environment(\.studioPalette) private var palette
-    @Environment(\.isSoundLocked) private var isSoundLocked
-    @Environment(\.dismiss) private var dismiss
-    let video: Video
-    let onStart: (PerformanceStart) -> Void
-    @State private var saved = false
-
-    private var title: String { video.soundSetup?.instrumentName ?? video.instrument ?? "Sound" }
-    private var savedName: String { video.username.map { "\(title) by @\($0)" } ?? title }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Label(title, systemImage: "waveform")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(palette.ink)
-                        if let setup = video.soundSetup {
-                            Text(setup.presetDetails)
-                                .font(.subheadline.monospaced())
-                                .foregroundStyle(palette.muted)
-                            if isSoundLocked(setup) {
-                                ProSoundBadge()
-                                Text("Unlock Pro to play this sound yourself.")
-                                    .font(.footnote)
-                                    .foregroundStyle(palette.muted)
-                            }
-                        }
-                    }
-                    if let setup = video.soundSetup {
-                        Button(isSoundLocked(setup) ? "Unlock & play" : "Play this sound",
-                               systemImage: isSoundLocked(setup) ? "lock.open.fill" : "play.fill") { onStart(.preset(setup)) }
-                            .buttonStyle(ProfileActionStyle(primary: true))
-                            .accessibilityHint("Opens this setup in the Music tab")
-                            .accessibilityIdentifier("play-clip-preset")
-                    }
-                    if let learn = LearnToPlayRequest(video: video) {
-                        Button("Learn to play", systemImage: "graduationcap") { onStart(.learn(learn)) }
-                            .buttonStyle(ProfileActionStyle())
-                            .accessibilityHint("Teaches the notes from this performance in Learn mode")
-                            .accessibilityIdentifier("learn-clip-notes")
-                    }
-                    if video.backingEnabled == true {
-                        Button("Play along", systemImage: "waveform.badge.plus") { onStart(.backing(video)) }
-                            .buttonStyle(ProfileActionStyle(primary: video.soundSetup == nil))
-                            .accessibilityHint("Uses this clip as a backing track")
-                            .accessibilityIdentifier("play-along")
-                    }
-                    if let setup = video.soundSetup {
-                        Button(saved ? "Preset saved" : "Save preset privately", systemImage: saved ? "checkmark" : "bookmark") {
-                            PersistenceManager.shared.addPreset(setup, named: savedName)
-                            saved = true
-                        }
-                        .buttonStyle(ProfileActionStyle())
-                        .disabled(saved)
-                        .accessibilityIdentifier("save-clip-preset")
-                    }
-                }
-                .frame(maxWidth: 480, alignment: .leading)
-                .padding(22)
-                .frame(maxWidth: .infinity, alignment: .center)
-            }
-            .background(palette.background.ignoresSafeArea())
-            .navigationTitle("Sound options")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-            }
-        }
-        .tint(palette.accent)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        .onAppear {
-            guard let setup = video.soundSetup else { return }
-            saved = PersistenceManager.shared.loadSetups().contains {
-                $0.sound == setup && $0.name == String(savedName.prefix(40))
-            }
-        }
     }
 }
 
