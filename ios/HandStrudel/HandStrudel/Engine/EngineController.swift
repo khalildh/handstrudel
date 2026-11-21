@@ -1384,20 +1384,14 @@ final class EngineController: ObservableObject {
     /// swap-hands setting. Equals `chordMelodySwapHands` for built-in wheels.
     var wheelSwapHands: Bool { wheelRules.swapHands(playerSwap: chordMelodySwapHands) }
 
-    /// Play an instrument file on the wheel: apply its sound (when it has one
-    /// the player can use) and switch to its wheel mode. Returns false when
-    /// its sound needs a pack the player hasn't unlocked.
-    @discardableResult
-    func playInstrument(_ instrument: InstrumentSpec, store: StoreManager) -> Bool {
+    /// Play an instrument file on the wheel. The instrument only changes the
+    /// wheel's layout and behaviour; key, scale, progression and sound stay as
+    /// the player set them, and the wheel adapts to them.
+    func playInstrument(_ instrument: InstrumentSpec) {
         let mode = instrument.baseMode
-        if let setup = instrument.sound?.soundSetup(mode: mode, gridOctave: gridBaseOctave, gridRange: gridOctaveRange) {
-            guard applySoundSetup(setup, store: store) else { return false }
-        } else {
-            switchMode(grid: false, drums: false, learn: false,
-                       splitChordMelody: mode == .splitchordmelody, scaleChordMelody: mode == .scalechordmelody)
-        }
+        switchMode(grid: false, drums: false, learn: false,
+                   splitChordMelody: mode == .splitchordmelody, scaleChordMelody: mode == .scalechordmelody)
         customInstrument = instrument.isBuiltIn ? nil : instrument
-        return true
     }
 
     /// Call when switching modes to stop lingering sounds

@@ -1939,8 +1939,9 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertFalse(note.exists)
     }
 
-    /// Prototype instrument files: the wheel switches from the built-in Scale
-    /// wheel file to Moon Pentatonic (5 notes, chords on the right) and plays.
+    /// Prototype instrument files: switching from the built-in Scale wheel
+    /// file to Wide Wheel changes the wheel's layout but keeps the player's
+    /// key, scale and chords — the same notes, in bigger zones.
     func testWheelPlaysFromAnInstrumentFile() {
         app.launchArguments = ["--uitesting", "--reset-studio-input", "--uitest-camera-denied", "-hasSeenOnboarding", "YES"]
         app.launch()
@@ -1948,9 +1949,11 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         start.tap()
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["wheel-note-0"].waitForExistence(timeout: 5), "Scale wheel file")
-        let window = app.windows.firstMatch.frame
-        XCTAssertLessThan(app.buttons["wheel-chord-0"].frame.midX, window.midX, "Scale wheel file: chords on the left")
+        let firstNote = app.buttons["wheel-note-0"]
+        XCTAssertTrue(firstNote.waitForExistence(timeout: 5), "Scale wheel file")
+        let noteLabels = (0..<12).map { app.buttons["wheel-note-\($0)"] }.filter(\.exists).map(\.label)
+        let chord = app.buttons["wheel-chord-0"].label
+        XCTAssertTrue(chord.hasSuffix("⁷"), "Scale wheel file plays 7th chords: \(chord)")
         add(screenshotAttachment("1-scale-wheel"))
 
         element("settings-button").tap()
@@ -1959,20 +1962,20 @@ final class HandStrudelUITests: XCTestCase {
         revealInMusicSettings(picker)
         XCTAssertEqual(picker.label, "Scale Wheel")
         picker.tap()
-        let moon = app.buttons["Moon Pentatonic"].firstMatch
-        XCTAssertTrue(moon.waitForExistence(timeout: 5))
-        moon.tap()
-        XCTAssertTrue(app.buttons["instrument-file-picker"].firstMatch.label == "Moon Pentatonic")
+        let wide = app.buttons["Wide Wheel"].firstMatch
+        XCTAssertTrue(wide.waitForExistence(timeout: 5))
+        wide.tap()
+        XCTAssertEqual(app.buttons["instrument-file-picker"].firstMatch.label, "Wide Wheel")
         closeMusicSettings()
 
-        XCTAssertTrue(app.buttons["wheel-note-4"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["wheel-note-5"].exists, "Moon Pentatonic: one wedge per pentatonic note")
-        XCTAssertTrue(app.buttons["wheel-note-0"].label.hasPrefix("Note D"), app.buttons["wheel-note-0"].label)
-        XCTAssertGreaterThan(app.buttons["wheel-chord-0"].frame.midX, window.midX, "Moon Pentatonic: chords on the right")
+        XCTAssertTrue(firstNote.waitForExistence(timeout: 5))
+        XCTAssertEqual((0..<12).map { app.buttons["wheel-note-\($0)"] }.filter(\.exists).map(\.label), noteLabels,
+                       "Same scale notes: the instrument adapts to the player's settings")
+        XCTAssertEqual(app.buttons["wheel-chord-0"].label, String(chord.dropLast()), "Triads instead of 7ths")
         app.buttons["wheel-chord-1"].tap()
         app.buttons["wheel-note-2"].tap()
         XCTAssertTrue(element("close-button").exists)
-        add(screenshotAttachment("2-moon-pentatonic"))
+        add(screenshotAttachment("2-wide-wheel"))
     }
 
     private func screenshotAttachment(_ name: String) -> XCTAttachment {

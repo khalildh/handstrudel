@@ -1,0 +1,22 @@
+{
+  "format": "handstrudel.instrument",
+  "format_version": 1,
+  "id": "demo.wide-wheel",
+  "name": "Wide Wheel",
+  "description": "Bigger zones for small screens or busy hands: a smaller rest hole, a deeper octave rim, and plain triads. Plays in whatever key, scale and sound you've chosen.",
+  "surface": {
+    "type": "split_wheel",
+    "radius": 1.0,
+    "rest_radius": 0.26,
+    "octave_band_radius": 0.7
+  },
+  "chords": {
+    "side": "left",
+    "voicing": "triad"
+  },
+  "notes": {
+    "source": "scale_one_octave",
+    "octave_band": true,
+    "highlight_chord_tones": true
+  }
+}

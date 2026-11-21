@@ -38,7 +38,6 @@ final class InstrumentSpecTests: XCTestCase {
                 XCTAssertEqual(spec.surface.octaveBandRadius, surface["octave_band_radius"], name)
             }
             if let expectedName = expect["name"] as? String { XCTAssertEqual(spec.name, expectedName, name) }
-            if let hasSound = expect["has_sound"] as? Bool { XCTAssertEqual(spec.sound != nil, hasSound, name) }
             // A repaired instrument loads cleanly the second time.
             XCTAssertEqual(InstrumentSpec.load(try JSONEncoder().encode(spec)).issues, [], name)
         }
@@ -63,7 +62,7 @@ final class InstrumentSpecTests: XCTestCase {
         XCTAssertEqual(ids.count, files.count, "Every library file is in the app bundle.")
         XCTAssertEqual(Set(ids).count, ids.count)
         XCTAssertEqual(Array(ids.prefix(2)).sorted(), [InstrumentLibrary.scaleWheelID, InstrumentLibrary.splitWheelID])
-        XCTAssertTrue(ids.contains("demo.moon-pentatonic"))
+        XCTAssertTrue(ids.contains("demo.wide-wheel"))
     }
 
     /// The built-in wheels now come from files; they must describe exactly the
@@ -101,51 +100,62 @@ final class InstrumentSpecTests: XCTestCase {
         XCTAssertEqual(InstrumentLibrary.splitWheel.rules.chordToneLanes(key: .C, scale: .major, chordDegree: 0, lanes: lanes), [])
     }
 
-    func testChordSideIsMirroredBySwapHands() throws {
-        let moon = try XCTUnwrap(InstrumentLibrary.builtIn("demo.moon-pentatonic")).rules
-        XCTAssertTrue(moon.swapHands(playerSwap: false))
-        XCTAssertFalse(moon.swapHands(playerSwap: true))
-        XCTAssertFalse(InstrumentLibrary.scaleWheel.rules.swapHands(playerSwap: false))
+    func testChordSideIsMirroredBySwapHands() {
+        var rightHanded = InstrumentLibrary.scaleWheel.rules
+        XCTAssertFalse(rightHanded.swapHands(playerSwap: false))
+        XCTAssertTrue(rightHanded.swapHands(playerSwap: true))
+        rightHanded.chordsOnRight = true
+        XCTAssertTrue(rightHanded.swapHands(playerSwap: false))
+        XCTAssertFalse(rightHanded.swapHands(playerSwap: true))
     }
 
     // MARK: Playing a file
 
+    /// An instrument changes the wheel, never the sound: it adapts to the
+    /// player's key, scale and progression.
     @MainActor
-    func testPlayingAnInstrumentAppliesItsSoundAndWheelUntilTheModeChanges() throws {
+    func testPlayingAnInstrumentKeepsThePlayersSoundAndAdaptsToIt() throws {
         let engine = EngineController()
-        let store = StoreManager()
-        let moon = try XCTUnwrap(InstrumentLibrary.builtIn("demo.moon-pentatonic"))
-        XCTAssertTrue(engine.playInstrument(moon, store: store))
+        engine.selectedKey = .D
+        engine.selectedScale = .pentatonic
+        engine.manualBPM = 97
+        let progression = engine.chordMelodyProgression
+        let soundFont = engine.selectedSoundFontInstrument
+        let wide = try XCTUnwrap(InstrumentLibrary.builtIn("demo.wide-wheel"))
+
+        engine.playInstrument(wide)
         XCTAssertTrue(engine.scaleChordMelodyModeEnabled)
-        XCTAssertEqual(engine.customInstrument, moon)
-        XCTAssertEqual(engine.wheelInstrument.id, moon.id)
+        XCTAssertEqual(engine.customInstrument, wide)
+        XCTAssertEqual(engine.wheelInstrument.id, wide.id)
         XCTAssertEqual(engine.selectedKey, .D)
         XCTAssertEqual(engine.selectedScale, .pentatonic)
-        XCTAssertEqual(engine.selectedSoundFontInstrument.id, "strings")
-        XCTAssertEqual(engine.manualBPM, 84)
-        XCTAssertTrue(engine.wheelSwapHands, "Moon Pentatonic puts the chords on the right.")
+        XCTAssertEqual(engine.manualBPM, 97)
+        XCTAssertEqual(engine.chordMelodyProgression.id, progression.id)
+        XCTAssertEqual(engine.selectedSoundFontInstrument, soundFont)
 
         engine.configureWheelManager()
         let manager = engine.chordMelodyModeManager
         XCTAssertEqual(manager.layout, .scale)
-        XCTAssertEqual(manager.geometry, WheelGeometry(radius: 0.94, restRadius: 0.28, octaveBandRadius: 0.74))
-        XCTAssertTrue(manager.swapHands)
-
+        XCTAssertEqual(manager.geometry, WheelGeometry(radius: 1.0, restRadius: 0.26, octaveBandRadius: 0.7))
         let tones = engine.chordMelodyTones(key: engine.selectedKey, scale: engine.selectedScale)
-        XCTAssertEqual(tones.melody(0).count, 5, "One wedge per pentatonic note.")
-        XCTAssertEqual(tones.chord(0).count, 3, "Moon Pentatonic plays triads.")
+        XCTAssertEqual(tones.melody(0).count, 5, "One wedge per note of the player's pentatonic scale.")
+        XCTAssertEqual(tones.chord(0).count, 3, "Wide Wheel plays triads.")
+
+        // Changing the player's scale reshapes the same instrument.
+        engine.selectedScale = .major
+        XCTAssertEqual(engine.chordMelodyTones(key: .D, scale: engine.selectedScale).melody(0).count, 7)
+        XCTAssertEqual(engine.customInstrument, wide)
 
         engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true)
         XCTAssertNil(engine.customInstrument)
         XCTAssertEqual(engine.wheelInstrument.id, InstrumentLibrary.scaleWheelID)
-        XCTAssertFalse(engine.wheelSwapHands)
     }
 
     @MainActor
-    func testPlayingABuiltInWheelFileSwitchesModeWithoutChangingTheSound() {
+    func testPlayingABuiltInWheelFileSwitchesMode() {
         let engine = EngineController()
         engine.selectedKey = .A
-        XCTAssertTrue(engine.playInstrument(InstrumentLibrary.splitWheel, store: StoreManager()))
+        engine.playInstrument(InstrumentLibrary.splitWheel)
         XCTAssertTrue(engine.splitChordMelodyModeEnabled)
         XCTAssertFalse(engine.scaleChordMelodyModeEnabled)
         XCTAssertNil(engine.customInstrument)
@@ -153,15 +163,6 @@ final class InstrumentSpecTests: XCTestCase {
         engine.configureWheelManager()
         XCTAssertEqual(engine.chordMelodyModeManager.layout, .split)
         XCTAssertEqual(engine.chordMelodyModeManager.geometry, .standard)
-    }
-
-    @MainActor
-    func testLockedSoundsDoNotStartTheInstrument() throws {
-        var spec = try XCTUnwrap(InstrumentLibrary.builtIn("demo.moon-pentatonic"))
-        spec.sound?.instrument = "harp"   // Pro-only SoundFont
-        let engine = EngineController()
-        XCTAssertFalse(engine.playInstrument(spec, store: StoreManager()))
-        XCTAssertNil(engine.customInstrument)
     }
 
     // MARK: Geometry reaches touch and hand tracking

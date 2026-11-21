@@ -30,7 +30,6 @@
       "rest_radius": 0.36,
       "octave_band_radius": 0.8
     },
-    "name": "Scale Wheel",
-    "has_sound": false
+    "name": "Scale Wheel"
   }
 }

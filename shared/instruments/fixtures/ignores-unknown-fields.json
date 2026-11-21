@@ -1,5 +1,5 @@
 {
-  "description": "A sound the app can't play is dropped; the instrument still loads with the player's own sound.",
+  "description": "Fields this version doesn't know (including a sound from an early draft) are ignored, so newer files still load. Instruments never choose a sound.",
   "input": {
     "format": "handstrudel.instrument",
     "format_version": 1,
@@ -24,26 +24,20 @@
     "sound": {
       "key": "D",
       "scale": "Pentatonic",
-      "progression": "pop",
-      "instrument": "theremin_9000",
-      "waveform": "sine",
-      "use_soundfont": true,
-      "bpm": 84,
-      "auto_strum": false,
-      "pad_volume": 0.3
+      "instrument": "strings"
+    },
+    "some_future_field": {
+      "anything": true
     }
   },
   "expect": {
     "accepted": true,
-    "issues": [
-      "sound_dropped"
-    ],
+    "issues": [],
     "surface": {
       "radius": 1.0,
       "rest_radius": 0.36,
       "octave_band_radius": 0.8
     },
-    "name": "Scale Wheel",
-    "has_sound": false
+    "name": "Scale Wheel"
   }
 }

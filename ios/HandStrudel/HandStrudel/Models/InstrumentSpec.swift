@@ -2,6 +2,11 @@ import Foundation
 
 /// A playable on-screen instrument described as data (`shared/instruments/`).
 ///
+/// An instrument is structure, not sound: its zones are defined relative to
+/// the player's current key, scale and progression (one note wedge per scale
+/// note, one chord wedge per progression chord), so it adapts to whatever
+/// sound is selected and never picks one itself.
+///
 /// The JSON Schema in `shared/instruments/schema.json` is the spec; this type
 /// mirrors it. Nothing in an instrument file is executed — the app's own code
 /// draws and plays it — so files can come from the bundle, a feed post or a
@@ -26,10 +31,9 @@ struct InstrumentSpec: Codable, Equatable {
     var surface: SplitWheel
     var chords: Chords
     var notes: Notes
-    var sound: Sound?
 
     enum CodingKeys: String, CodingKey {
-        case format, formatVersion = "format_version", id, name, description, surface, chords, notes, sound
+        case format, formatVersion = "format_version", id, name, description, surface, chords, notes
     }
 
     /// One circle cut into a chord half and a note half around a rest hole.
@@ -76,35 +80,6 @@ struct InstrumentSpec: Codable, Equatable {
         }
     }
 
-    /// Optional sound. Without it the instrument uses the player's settings.
-    struct Sound: Codable, Equatable {
-        var key: MusicKey
-        var scale: String
-        var progression: String
-        var customDegrees: [Int]?
-        var instrument: String
-        var waveform: String
-        var useSoundfont: Bool
-        var bpm: Double
-        var autoStrum: Bool
-        var padVolume: Double
-
-        enum CodingKeys: String, CodingKey {
-            case key, scale, progression, customDegrees = "custom_degrees", instrument, waveform
-            case useSoundfont = "use_soundfont", bpm, autoStrum = "auto_strum", padVolume = "pad_volume"
-        }
-
-        /// The equivalent app sound, or nil when any part isn't playable here.
-        func soundSetup(mode: SoundSetup.Mode, gridOctave: Int = 3, gridRange: Int = 2) -> SoundSetup? {
-            guard let scale = Scale(rawValue: scale) else { return nil }
-            let setup = SoundSetup(instrument: instrument, waveform: waveform, key: key, scale: scale,
-                                   progression: progression, customDegrees: customDegrees, mode: mode, bpm: bpm,
-                                   useSoundFont: useSoundfont, autoStrum: autoStrum, padVolume: padVolume,
-                                   gridOctave: gridOctave, gridRange: gridRange)
-            return setup.isValid ? setup : nil
-        }
-    }
-
     var isBuiltIn: Bool { id.hasPrefix("builtin.") }
 
     /// The wheel mode this instrument runs in. Scale-note instruments use the
@@ -140,7 +115,6 @@ enum InstrumentIssue: String, Equatable {
     case radiusClamped = "radius_clamped"
     case restRadiusClamped = "rest_radius_clamped"
     case octaveBandRadiusClamped = "octave_band_radius_clamped"
-    case soundDropped = "sound_dropped"
 }
 
 struct InstrumentLoadResult: Equatable {
@@ -159,7 +133,7 @@ extension InstrumentSpec {
     }
 
     /// Decode, check and repair an instrument file. Pure: the result depends
-    /// only on the bytes and on which sounds this app version knows.
+    /// only on the bytes. Fields this version doesn't know are ignored.
     static func load(_ data: Data) -> InstrumentLoadResult {
         guard data.count <= byteLimit else { return .init(spec: nil, issues: [.tooLarge]) }
         let decoder = JSONDecoder()
@@ -200,10 +174,6 @@ extension InstrumentSpec {
         let band = Self.clamp(surface.octaveBandRadius, bandMin...Wheel.octaveBandRadiusMax)
         if band != surface.octaveBandRadius { spec.surface.octaveBandRadius = band; issues.append(.octaveBandRadiusClamped) }
 
-        if let sound, sound.soundSetup(mode: baseMode) == nil {
-            spec.sound = nil
-            issues.append(.soundDropped)
-        }
         return .init(spec: spec, issues: issues)
     }
 
@@ -312,11 +282,11 @@ enum InstrumentLibrary {
         format: InstrumentSpec.formatName, formatVersion: 1, id: scaleWheelID, name: "Scale Wheel", description: nil,
         surface: .init(type: .splitWheel, radius: 1.0, restRadius: 0.36, octaveBandRadius: 0.8),
         chords: .init(side: .left, voicing: .seventh),
-        notes: .init(source: .scaleOneOctave, octaveBand: true, highlightChordTones: true), sound: nil)
+        notes: .init(source: .scaleOneOctave, octaveBand: true, highlightChordTones: true))
 
     private static let fallbackSplitWheel = InstrumentSpec(
         format: InstrumentSpec.formatName, formatVersion: 1, id: splitWheelID, name: "Split Wheel", description: nil,
         surface: .init(type: .splitWheel, radius: 1.0, restRadius: 0.36, octaveBandRadius: 0.8),
         chords: .init(side: .left, voicing: .triad),
-        notes: .init(source: .chordTonesThreeOctaves, octaveBand: false, highlightChordTones: nil), sound: nil)
+        notes: .init(source: .chordTonesThreeOctaves, octaveBand: false, highlightChordTones: nil))
 }

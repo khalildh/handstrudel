@@ -32,7 +32,6 @@
       "rest_radius": 0.36,
       "octave_band_radius": 0.8
     },
-    "name": "Extremely Long Instrument Name That Keep",
-    "has_sound": false
+    "name": "Extremely Long Instrument Name That Keep"
   }
 }

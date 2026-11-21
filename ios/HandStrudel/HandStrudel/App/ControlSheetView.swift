@@ -301,7 +301,7 @@ struct ControlSheet: View {
             Menu {
                 ForEach(InstrumentLibrary.all, id: \.id) { instrument in
                     Button {
-                        engine.playInstrument(instrument, store: storeManager)
+                        engine.playInstrument(instrument)
                     } label: {
                         if instrument.id == engine.wheelInstrument.id {
                             Label(instrument.name, systemImage: "checkmark")
