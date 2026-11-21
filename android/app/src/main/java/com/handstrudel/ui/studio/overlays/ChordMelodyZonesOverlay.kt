@@ -57,7 +57,9 @@ fun ChordMelodyZonesOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier
     val colors = rememberOverlayColors()
     val density = LocalDensity.current
 
-    val zoneDegrees = cm.zoneDegrees
+    val progression by engine.chordMelodyProgression.collectAsState()
+    // The engine publishes zoneDegrees; fall back to the progression before its first tick.
+    val zoneDegrees = cm.zoneDegrees.ifEmpty { progression.degrees }
     val zoneCount = max(1, zoneDegrees.size)
     val melodyLaneCount = ZonesGeometry.MELODY_LANES
     val chordsOnLeft = !swapHands

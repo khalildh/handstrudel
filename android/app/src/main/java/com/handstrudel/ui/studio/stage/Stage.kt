@@ -330,7 +330,15 @@ fun Stage() {
         )
     }
     if (showLearnPicker) {
-        LearnSongPicker(onPick = { engine.loadLearnSong(it); showLearnPicker = false }, onDismiss = { showLearnPicker = false })
+        LearnSongPicker(
+            onPick = {
+                engine.loadLearnSong(it)
+                showLearnPicker = false
+                // iOS: picking a lesson from the control sheet also closes the sheet.
+                if (showSheet) { showSheet = false; engine.resume() }
+            },
+            onDismiss = { showLearnPicker = false },
+        )
     }
 }
 

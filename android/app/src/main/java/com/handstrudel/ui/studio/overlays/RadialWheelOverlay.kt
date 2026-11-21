@@ -62,7 +62,9 @@ fun RadialWheelOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier) {
     val intervals = scale.intervals
     val colors = rememberOverlayColors()
 
-    val zoneDegrees = cm.zoneDegrees
+    val progression by engine.chordMelodyProgression.collectAsState()
+    // The engine publishes zoneDegrees; fall back to the progression before its first tick.
+    val zoneDegrees = cm.zoneDegrees.ifEmpty { progression.degrees }
     val chordNames = zoneDegrees.map { StudioMusic.chordDisplayName(key, intervals, it) }
     val melodyDegree = cm.currentDegree ?: zoneDegrees.firstOrNull() ?: 0
     val melodyNames = RadialGeometry.melodyNames(key, intervals, melodyDegree)
