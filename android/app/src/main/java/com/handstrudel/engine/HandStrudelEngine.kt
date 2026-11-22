@@ -71,10 +71,6 @@ import uniffi.handstrudel_core.Layout as CoreLayout
  * `Engine/EngineController.swift`. Strudel (WebView) voices the melodic family,
  * Grid, Drums, both drum-loop tracks and non-SoundFont chord+melody;
  * TinySoundFont voices the SoundFont-routed chord+melody family. Main thread.
- *
- * (Named `HandStrudelEngine` because the legacy `EngineController` facade still
- * carries the Phase 0 member names that studio-ui's unported Split overlay
- * uses; those names clash with the seam's StateFlows.)
  */
 class HandStrudelEngine(context: Context) : StudioEngine {
     private val appContext = context.applicationContext

@@ -19,8 +19,7 @@ import java.util.UUID
  * names: observables are [StateFlow]s, actions are functions. All calls are on
  * the main thread unless noted.
  *
- * Implementation: [HandStrudelEngine] (exposed through [LegacyStudioEngine]
- * until studio-ui drops its Phase 0 cast).
+ * Implementation: [HandStrudelEngine].
  *
  * Members added after Phase 0 have default bodies so other workstreams'
  * fakes keep compiling.

@@ -6,8 +6,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.handstrudel.BuildConfig
 import com.handstrudel.capture.CaptureController
 import com.handstrudel.capture.CaptureControllerImpl
-import com.handstrudel.engine.EngineController
-import com.handstrudel.engine.LegacyStudioEngine
+import com.handstrudel.engine.HandStrudelEngine
 import com.handstrudel.engine.StudioEngine
 import com.handstrudel.social.AuthSession
 import com.handstrudel.social.SignedOutAuthSession
@@ -46,7 +45,7 @@ class AppServices(
             val store: StoreGate = StoreManager.create(app)                // store
             store.bind(auth.userId)
             val analytics = createAnalytics(prefs, prefsStore)              // shell
-            val engine: StudioEngine = LegacyStudioEngine(EngineController(app)) // engine
+            val engine: StudioEngine = HandStrudelEngine(app)            // engine
             engine.onFirstNote = { analytics.record(AppAnalyticsEvent.FIRST_NOTE) }
             val reviewPrompt = PlayReviewPrompt(prefs, BuildConfig.VERSION_NAME) // shell
             val capture: CaptureController =                                  // capture
