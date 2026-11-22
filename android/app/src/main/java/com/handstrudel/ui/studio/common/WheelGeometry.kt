@@ -108,6 +108,36 @@ object WheelGeometry {
         return (cx + radius * sin(r).toFloat()) to (cy - radius * cos(r).toFloat())
     }
 
+    /** One accessibility element of the Split/Scale wheel (iOS `SplitAccessibilityNote`). */
+    data class AccessibleWedge(val zone: Zone, val id: String, val label: String, val x: Float, val y: Float, val size: Float)
+
+    /**
+     * iOS `SplitTouchUIView.layoutAccessibleNotes`: one element per chord wedge ("Chord X",
+     * `wheel-chord-i`) then per melody lane ("Note Y", `wheel-note-i`), centred on the base
+     * band at radius `outerR·(deadzone + octave band)/2`, sized `π·r/count` clamped to
+     * [minSize]…[maxSize] (22…44 pt on iOS). Sizes and positions are in px.
+     */
+    fun splitAccessibleWedges(
+        width: Float, height: Float, chordLabels: List<String>, melodyLabels: List<String>, swapHands: Boolean,
+        minSize: Float, maxSize: Float,
+    ): List<AccessibleWedge> {
+        val outerR = splitOuterRadius(width, height)
+        if (outerR <= 0f) return emptyList()
+        val radius = outerR * ((SPLIT_DEADZONE + SPLIT_OCTAVE_BAND_THRESHOLD) / 2).toFloat()
+        val cx = width / 2f
+        val cy = height / 2f
+        fun size(count: Int) = (Math.PI.toFloat() * radius / count).coerceIn(minSize, maxSize)
+        val chords = chordLabels.mapIndexed { i, label ->
+            val (x, y) = polar(cx, cy, chordCenterAngle(i, chordLabels.size, swapHands), radius)
+            AccessibleWedge(Zone.Chord(ChordSubzone(i, 0)), "wheel-chord-$i", "Chord $label", x, y, size(chordLabels.size))
+        }
+        val notes = melodyLabels.mapIndexed { i, label ->
+            val (x, y) = polar(cx, cy, melodyCenterAngle(i, melodyLabels.size, swapHands), radius)
+            AccessibleWedge(Zone.Melody(i), "wheel-note-$i", "Note $label", x, y, size(melodyLabels.size))
+        }
+        return chords + notes
+    }
+
     // ---- Radial (one wheel: chords outer ring, melody inner ring) ----
 
     /** iOS `radialWedgeIndex`: wedge 0 centred on the top. */

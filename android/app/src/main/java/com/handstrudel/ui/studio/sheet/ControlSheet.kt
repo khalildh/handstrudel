@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.sheet
 
+import com.handstrudel.ui.studio.common.isAccessibilityTextSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -194,26 +195,33 @@ private fun SettingsHeader(
 private fun SettingsTabs(section: SettingsSection, onSection: (SettingsSection) -> Unit) {
     val palette = LocalStudioPalette.current
     val shape = RoundedCornerShape(16.dp)
-    Row(
-        Modifier.fillMaxWidth().clip(shape).background(palette.surface).border(1.dp, palette.border, shape).padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        SettingsSection.entries.forEach { tab ->
-            val selected = tab == section
-            Column(
-                Modifier.weight(1f).heightIn(min = 46.dp).clip(RoundedCornerShape(12.dp))
-                    .background(if (selected) palette.accent else androidx.compose.ui.graphics.Color.Transparent)
-                    .clickable(role = Role.Tab) { onSection(tab) }
-                    .semantics { this.selected = selected }
-                    .testTag(tab.tag)
-                    .padding(vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-            ) {
-                val tint = if (selected) palette.onAccent else palette.muted
-                Icon(tab.icon, null, tint = tint, modifier = Modifier.size(18.dp))
-                Text(tab.title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = tint)
-            }
+    val box = Modifier.fillMaxWidth().clip(shape).background(palette.surface).border(1.dp, palette.border, shape).padding(4.dp)
+    @Composable
+    fun tabButton(tab: SettingsSection, modifier: Modifier) {
+        val selected = tab == section
+        Column(
+            modifier.heightIn(min = 46.dp).clip(RoundedCornerShape(12.dp))
+                .background(if (selected) palette.accent else androidx.compose.ui.graphics.Color.Transparent)
+                .clickable(role = Role.Tab) { onSection(tab) }
+                .semantics { this.selected = selected }
+                .testTag(tab.tag)
+                .padding(vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+        ) {
+            val tint = if (selected) palette.onAccent else palette.muted
+            Icon(tab.icon, null, tint = tint, modifier = Modifier.size(18.dp))
+            Text(tab.title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = tint)
+        }
+    }
+    // iOS stacks the tabs vertically at accessibility text sizes.
+    if (isAccessibilityTextSize()) {
+        Column(box, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            SettingsSection.entries.forEach { tabButton(it, Modifier.fillMaxWidth()) }
+        }
+    } else {
+        Row(box, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            SettingsSection.entries.forEach { tabButton(it, Modifier.weight(1f)) }
         }
     }
 }

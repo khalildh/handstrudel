@@ -69,7 +69,7 @@ class DefaultAppNavigator(
     override val destination: StateFlow<Destination> = _destination
     private val _startingSession = MutableStateFlow(false)
     /** iOS `startingSession`: tabs and Start are disabled until the engine runs or errors. */
-    val isStartingSession: StateFlow<Boolean> = _startingSession
+    override val isStartingSession: StateFlow<Boolean> = _startingSession
     private val _feedFullscreen = MutableStateFlow(false)
     /** iOS `feedFullscreen`: hides the status bar and blacks out the background. */
     val feedFullscreen: StateFlow<Boolean> = _feedFullscreen

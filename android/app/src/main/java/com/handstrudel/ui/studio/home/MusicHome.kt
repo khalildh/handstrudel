@@ -52,8 +52,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
+import kotlin.math.roundToInt
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -71,6 +80,7 @@ import com.handstrudel.ui.studio.common.StudioSettingRow
 import com.handstrudel.ui.studio.common.StudioSettingsDivider
 import com.handstrudel.ui.studio.common.StudioSettingsPanel
 import com.handstrudel.ui.studio.common.StudioSheet
+import com.handstrudel.ui.studio.common.isAccessibilityTextSize
 import com.handstrudel.ui.studio.common.studioContentWidth
 import com.handstrudel.ui.studio.pickers.InstrumentPickerSheet
 import com.handstrudel.ui.studio.pickers.ProgressionPickerSheet
@@ -99,7 +109,8 @@ fun MusicHome() {
     val key by engine.selectedKey.collectAsState()
     val scale by engine.selectedScale.collectAsState()
     val progression by engine.chordMelodyProgression.collectAsState()
-    val starting = status.startsWith("Preparing")
+    // iOS `startingSession` (covers the camera permission dialog, not just engine prep).
+    val starting by navigator.isStartingSession.collectAsState()
 
     var showSounds by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
@@ -203,17 +214,26 @@ fun MusicHome() {
                 }
 
                 // Library shortcuts.
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LibraryShortcut("Private drafts", Icons.Outlined.Movie, "private-drafts-button", Modifier.weight(1f)) { showDrafts = true }
-                    LibraryShortcut("Presets", Icons.Outlined.Layers, "music-presets-button", Modifier.weight(1f)) { showSetups = true }
-                    LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.weight(1f)) { showLoops = true }
+                // iOS: a row normally, a column at accessibility text sizes.
+                if (isAccessibilityTextSize()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LibraryShortcut("Private drafts", Icons.Outlined.Movie, "private-drafts-button", Modifier.fillMaxWidth()) { showDrafts = true }
+                        LibraryShortcut("Presets", Icons.Outlined.Layers, "music-presets-button", Modifier.fillMaxWidth()) { showSetups = true }
+                        LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.fillMaxWidth()) { showLoops = true }
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LibraryShortcut("Private drafts", Icons.Outlined.Movie, "private-drafts-button", Modifier.weight(1f)) { showDrafts = true }
+                        LibraryShortcut("Presets", Icons.Outlined.Layers, "music-presets-button", Modifier.weight(1f)) { showSetups = true }
+                        LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.weight(1f)) { showLoops = true }
+                    }
                 }
             }
         }
 
         // Start.
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).padding(bottom = 96.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(Modifier.studioContentWidth(520), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -288,7 +308,31 @@ private fun InstrumentBrowser(
     }
 
     Box(Modifier.fillMaxWidth().height(225.dp).testTag("sound-artwork")) {
-        HorizontalPager(pager, Modifier.fillMaxSize(), userScrollEnabled = enabled && n > 1) { page ->
+        // iOS: one "Sound artwork" element whose value names the sound, adjustable to
+        // the next/previous instrument (wrapping).
+        val index = instruments.indexOfFirst { it.id == selected.id }.coerceAtLeast(0)
+        fun step(by: Int): Boolean {
+            if (!enabled || instruments.size < 2) return false
+            onSelect(instruments[(index + by + instruments.size) % instruments.size])
+            return true
+        }
+        HorizontalPager(
+            pager,
+            Modifier.fillMaxSize().clearAndSetSemantics {
+                contentDescription = "Sound artwork"
+                stateDescription = "${selected.name}, ${key.rawValue} ${scale.displayName}, ${progression.name}, ${index + 1} of ${instruments.size}"
+                if (instruments.size > 1) {
+                    progressBarRangeInfo = ProgressBarRangeInfo(index.toFloat(), 0f..(instruments.size - 1).toFloat(), steps = instruments.size - 2)
+                    setProgress { target -> step(target.roundToInt().coerceIn(0, instruments.size - 1) - index) }
+                    customActions = listOf(
+                        CustomAccessibilityAction("Next instrument") { step(1) },
+                        CustomAccessibilityAction("Previous instrument") { step(-1) },
+                    )
+                }
+                if (!enabled) disabled()
+            },
+            userScrollEnabled = enabled && n > 1,
+        ) { page ->
             instruments.getOrNull(page % n)?.let {
                 SoundArtwork(it, key, scale, progression, Modifier.fillMaxSize())
             }

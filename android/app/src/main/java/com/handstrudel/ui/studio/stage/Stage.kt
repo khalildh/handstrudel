@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -69,7 +70,6 @@ import com.handstrudel.engine.PlayInput
 import com.handstrudel.engine.StudioMode
 import com.handstrudel.models.PARAM_DEFS
 import com.handstrudel.ui.capture.CaptureEntryPoints
-import com.handstrudel.ui.nav.LocalAppNavigator
 import com.handstrudel.ui.studio.CameraPreview
 import com.handstrudel.ui.studio.common.StudioMusic
 import com.handstrudel.ui.studio.onboarding.OnboardingOverlay
@@ -89,17 +89,18 @@ import com.handstrudel.ui.studio.visual.CAMERA_FILTERS
 import com.handstrudel.ui.studio.visual.CameraFilterOverlay
 import com.handstrudel.ui.studio.visual.HandOverlay
 import com.handstrudel.ui.studio.visual.cameraFilter
+import com.handstrudel.ui.studio.visual.cameraFilterEffect
 import com.handstrudel.ui.studio.visual.handTheme
 import com.handstrudel.ui.theme.LocalStudioPalette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /** iOS `ContentView.performanceView`: the full-screen session stage. */
 @Composable
 fun Stage() {
     val services = LocalAppServices.current
     val engine = services.engine
-    val navigator = LocalAppNavigator.current
     val palette = LocalStudioPalette.current
     val scope = rememberCoroutineScope()
 
@@ -132,6 +133,21 @@ fun Stage() {
 
     val filter = cameraFilter(filterId)
     val melodicActive = mode.isMelodicFamily
+    // iOS hides the melodic HUD with `.opacity(0)` and `.allowsHitTesting(false)`.
+    val chromeHidden = melodicActive && !chromeVisible
+    val swipeEnabled = FilterSwipe.isEnabled(mode, playInput, mixerOpen = CaptureEntryPoints.isBackingMixerOpen())
+    val cycleFilter = remember {
+        { swipeLeft: Boolean ->
+            // iOS: swipe left → next unlocked filter, right → previous; then the name toast.
+            val ids = CAMERA_FILTERS.filter { services.store.isUnlocked(it.packId) }.map { it.id }
+            FilterSwipe.next(ids, engine.selectedFilter.value, swipeLeft)?.let { id ->
+                engine.setFilter(id)
+                filterToast++
+            }
+            Unit
+        }
+    }
+    val swipe = Modifier.filterSwipe(swipeEnabled, cycleFilter)
     val touchEnabled = !isPaused && active
     val busy = capture.isRecording || capture.isBusy || capture.countdown != null
     val strudelHue = run {
@@ -157,8 +173,11 @@ fun Stage() {
     Box(Modifier.fillMaxSize().background(Color.Black).testTag("stage")) {
         // ---- Backdrop ----
         if (playInput == PlayInput.AIR && cameraIssue == null) {
-            CameraPreview(modifier = Modifier.fillMaxSize(), handTracker = engine.handTracker, filter = filter)
-            CameraFilterOverlay(filter, Modifier.fillMaxSize())
+            // iOS filters the ZStack of camera + colour overlay, so the matrix tints the overlay too.
+            Box(Modifier.fillMaxSize().cameraFilterEffect(filter)) {
+                CameraPreview(modifier = Modifier.fillMaxSize(), handTracker = engine.handTracker)
+                CameraFilterOverlay(filter, Modifier.fillMaxSize())
+            }
         } else {
             Box(
                 Modifier.fillMaxSize().background(
@@ -202,8 +221,10 @@ fun Stage() {
             else -> Unit
         }
 
-        // Tap empty space to hide/show the HUD (melodic family only).
-        if (melodicActive) {
+        // Tap empty space to hide/show the HUD (melodic family only). It sits under the
+        // chrome so buttons get their taps; while the HUD is hidden it moves above it and
+        // takes the next tap, so the invisible buttons can't be pressed (iOS).
+        val melodicSurface = @Composable {
             Box(
                 Modifier.fillMaxSize()
                     .clickable(remember { MutableInteractionSource() }, indication = null) { chromeVisible = !chromeVisible }
@@ -213,32 +234,27 @@ fun Stage() {
                         var total = 0f
                         detectHorizontalDragGestures(
                             onDragStart = { total = 0f },
-                            onDragEnd = {
-                                if (kotlin.math.abs(total) >= 50.dp.toPx()) {
-                                    val filters = CAMERA_FILTERS.filter { services.store.isUnlocked(it.packId) }
-                                    val idx = filters.indexOfFirst { it.id == engine.selectedFilter.value }
-                                    if (idx >= 0) {
-                                        val next = if (total < 0) (idx + 1) % filters.size else (idx - 1 + filters.size) % filters.size
-                                        engine.setFilter(filters[next].id)
-                                        filterToast++
-                                    }
-                                }
-                            },
+                            onDragEnd = { if (abs(total) >= FilterSwipe.MIN_DISTANCE.toPx()) cycleFilter(total < 0) },
                             onHorizontalDrag = { _, d -> total += d },
                         )
                     }
                     .testTag("stage-melodic-surface"),
             )
         }
+        if (melodicActive && !chromeHidden) melodicSurface()
 
         // ---- Floating chrome ----
-        val chromeAlpha by animateFloatAsState(if (melodicActive && !chromeVisible) 0f else 1f, tween(250), label = "chrome")
+        val chromeAlpha by animateFloatAsState(if (chromeHidden) 0f else 1f, tween(250), label = "chrome")
         Column(
             Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().alpha(chromeAlpha)
+                .then(if (chromeHidden) Modifier.clearAndSetSemantics {} else Modifier)
         ) {
             TopBar(
                 beat = beat,
                 locked = locked,
+                // iOS keeps ✕ enabled during the count-in; it cancels the countdown.
+                closeEnabled = !(capture.isRecording || capture.isBusy || capture.isLoopCapturing),
+                swipe = swipe,
                 onPresets = { showSetups = true },
                 onClose = {
                     services.capture.onSessionEnded()
@@ -248,7 +264,7 @@ fun Stage() {
             )
             if (!busy && (hasSeenOnboarding || mode != StudioMode.SCALE)) {
                 CameraInputStatus(
-                    playInput, cameraIssue,
+                    playInput, cameraIssue, swipe,
                     onTouch = { services.prefs.setStudioPlayInput(PlayInput.TOUCH); engine.setPlayInput(PlayInput.TOUCH) },
                     onRetry = { engine.reportCameraIssue(null); engine.startCameraIfRequested() },
                 )
@@ -263,16 +279,16 @@ fun Stage() {
                     )
                 }
             }
-            if (melodicActive) CodePill(codeDisplay, Modifier.padding(horizontal = 20.dp).padding(top = 2.dp))
+            if (melodicActive) CodePill(codeDisplay, Modifier.padding(horizontal = 20.dp).padding(top = 2.dp).then(swipe))
             Spacer(Modifier.weight(1f))
             if (melodicActive) {
-                NoteBadge(noteDisplay, beat, strudelHue, Modifier.align(Alignment.CenterHorizontally))
-                BeatRing(beat, bpm, Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp, bottom = 8.dp))
+                NoteBadge(noteDisplay, beat, strudelHue, Modifier.align(Alignment.CenterHorizontally).then(swipe))
+                BeatRing(beat, bpm, Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp, bottom = 8.dp).then(swipe))
             }
             if (mode == StudioMode.GRID) GridQuickBar(Modifier.padding(horizontal = 16.dp).padding(bottom = 4.dp))
             if (mode == StudioMode.DRUM) DrumXYPad(Modifier.padding(horizontal = 16.dp).padding(bottom = 4.dp))
             Box(Modifier.fillMaxWidth()) {
-                CaptureEntryPoints.StageBottomControls(onOpenSettings = { if (!locked) showSheet = true })
+                CaptureEntryPoints.StageBottomControls(onOpenSettings = { if (!locked) showSheet = true }, itemModifier = swipe)
             }
             AnimatedVisibility(filterToast > 0, Modifier.align(Alignment.CenterHorizontally), enter = fadeIn(), exit = fadeOut()) {
                 Toast("${filter.emoji} ${filter.name}", Color.Black.copy(alpha = 0.5f))
@@ -281,6 +297,8 @@ fun Stage() {
                 Toast("🎲 Randomized!", Color(0xFFAF52DE).copy(alpha = 0.6f), Modifier.testTag("randomized-toast"))
             }
         }
+
+        if (chromeHidden) melodicSurface()
 
         CaptureEntryPoints.StageOverlays()
 
@@ -319,15 +337,19 @@ fun Stage() {
         )
     }
     if (showSetups) {
+        // iOS: the engine and the backing track pause while Presets is open; closing it
+        // resumes the engine (the backing stays paused until the user plays it again).
+        LaunchedEffect(Unit) {
+            engine.pause()
+            CaptureEntryPoints.pauseBacking(services.capture)
+        }
         SoundSetupsSheet(
             onApply = { setup ->
-                engine.pause()
-                val ok = engine.applySoundSetup(setup, services.store)
-                engine.resume()
+                engine.applySoundSetup(setup, services.store)
                 showSetups = false
-                if (!ok) navigator.showError("Can't use this preset", "This setup is unavailable or requires a sound pack you don't own.")
+                engine.resume()
             },
-            onDismiss = { showSetups = false },
+            onDismiss = { showSetups = false; engine.resume() },
         )
     }
     if (showLearnPicker) {
@@ -349,29 +371,35 @@ internal fun hueColor(h: Double, s: Float, v: Float): Color {
 }
 
 @Composable
-private fun TopBar(beat: Int, locked: Boolean, onPresets: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
+private fun TopBar(
+    beat: Int, locked: Boolean, closeEnabled: Boolean, swipe: Modifier,
+    onPresets: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier,
+) {
     val palette = LocalStudioPalette.current
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        BeatDots(beat)
+        BeatDots(beat, swipe)
         Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
         Row(
-            Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 11.dp, vertical = 7.dp),
+            swipe.clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 11.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(Icons.Filled.GraphicEq, null, tint = palette.mediaAccent, modifier = Modifier.size(14.dp))
             Text("handstrudel", fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
         }
         Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
-        RoundButton(Icons.Outlined.Layers, "Presets", "studio-presets-button", enabled = !locked, onClick = onPresets)
+        RoundButton(Icons.Outlined.Layers, "Presets", "studio-presets-button", enabled = !locked, swipe = swipe, onClick = onPresets)
         Spacer(Modifier.size(8.dp))
-        RoundButton(Icons.Filled.Close, "End session", "close-button", enabled = !locked, onClick = onClose)
+        RoundButton(Icons.Filled.Close, "End session", "close-button", enabled = closeEnabled, swipe = swipe, onClick = onClose)
     }
 }
 
 @Composable
-private fun RoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, tag: String, enabled: Boolean, onClick: () -> Unit) {
+private fun RoundButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, tag: String, enabled: Boolean,
+    swipe: Modifier, onClick: () -> Unit,
+) {
     Box(
-        Modifier.size(44.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f))
+        swipe.size(44.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f))
             .clickable(enabled = enabled, onClick = onClick).testTag(tag).semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) { Icon(icon, null, tint = Color.White.copy(alpha = if (enabled) 0.85f else 0.35f), modifier = Modifier.size(18.dp)) }
@@ -394,13 +422,13 @@ fun BeatDots(beat: Int, modifier: Modifier = Modifier) {
 
 /** iOS `cameraInputStatus` + `CameraRecoveryBanner`. */
 @Composable
-private fun CameraInputStatus(input: PlayInput, issue: CameraIssue?, onTouch: () -> Unit, onRetry: () -> Unit) {
+private fun CameraInputStatus(input: PlayInput, issue: CameraIssue?, swipe: Modifier, onTouch: () -> Unit, onRetry: () -> Unit) {
     val palette = LocalStudioPalette.current
     Box(Modifier.fillMaxWidth().padding(top = 6.dp), contentAlignment = Alignment.Center) {
         if (input == PlayInput.AIR) {
             if (issue != null) {
                 Column(
-                    Modifier.padding(horizontal = 20.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.72f))
+                    swipe.padding(horizontal = 20.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.72f))
                         .padding(10.dp).testTag("camera-recovery-banner"),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
@@ -413,7 +441,7 @@ private fun CameraInputStatus(input: PlayInput, issue: CameraIssue?, onTouch: ()
             }
         } else {
             Row(
-                Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 10.dp, vertical = 6.dp)
+                swipe.clip(CircleShape).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 10.dp, vertical = 6.dp)
                     .testTag("touch-camera-off"),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {

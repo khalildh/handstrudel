@@ -3,25 +3,26 @@ package com.handstrudel.ui.studio.visual
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect
 import android.os.Build
-import android.view.View
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
- * Applies a filter's colour matrix to the camera preview view (iOS applies
- * `.saturation/.contrast/.brightness/.hueRotation` to `CameraView`). Uses
- * `View.setRenderEffect` on API 31+; below that only the overlay applies.
+ * The filter's colour matrix as a layer effect (iOS applies `.saturation/.contrast/
+ * .brightness/.hueRotation` to the ZStack of the camera and the colour overlay, so the
+ * overlay is filtered too). Put it on a container that holds [CameraFilterOverlay] and
+ * the preview. API 31+ only; below that just the overlay shows.
  */
-fun applyCameraFilter(view: View, filter: CameraFilter) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-    view.setRenderEffect(
-        if (filter.isIdentity) null
-        else RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(filter.colorMatrix)),
-    )
-}
+fun Modifier.cameraFilterEffect(filter: CameraFilter): Modifier =
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) this
+    else graphicsLayer {
+        renderEffect = if (filter.isIdentity) null
+        else RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(filter.colorMatrix)).asComposeRenderEffect()
+    }
 
 /** The filter's colour wash (iOS `overlayColor.opacity(...).blendMode(...)`), drawn over the camera. */
 @Composable
