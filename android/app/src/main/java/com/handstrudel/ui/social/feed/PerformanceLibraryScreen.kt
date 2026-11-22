@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,6 +35,7 @@ import com.handstrudel.social.data.FeedService
 import com.handstrudel.social.data.UnavailableException
 import com.handstrudel.social.model.Video
 import com.handstrudel.social.model.WeeklyChallenge
+import com.handstrudel.ui.social.SocialRefreshBox
 import com.handstrudel.ui.social.SocialScreen
 import com.handstrudel.ui.social.rememberSocial
 import com.handstrudel.ui.theme.LocalStudioPalette
@@ -123,7 +125,8 @@ fun PerformanceLibraryScreen(kind: LibraryKind, onDismiss: () -> Unit, onRemove:
     LaunchedEffect(Unit) { load() }
 
     SocialScreen(kind.title, onDismiss) {
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        SocialRefreshBox(onRefresh = { load() }, modifier = Modifier.weight(1f).fillMaxWidth()) {
+        LazyColumn(Modifier.fillMaxSize()) {
             if (kind is LibraryKind.Challenge) {
                 item {
                     val c = kind.challenge
@@ -187,6 +190,7 @@ fun PerformanceLibraryScreen(kind: LibraryKind, onDismiss: () -> Unit, onRemove:
                 }
             }
             if (more) item { TextButton(onClick = { scope.launch { load(append = true) } }, enabled = !loading, modifier = Modifier.padding(12.dp)) { Text("Load more", color = p.accent) } }
+        }
         }
     }
     selected?.let { video ->

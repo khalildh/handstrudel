@@ -31,6 +31,7 @@ import com.handstrudel.social.data.FeedService
 import com.handstrudel.social.model.PublicCreator
 import com.handstrudel.social.model.Video
 import com.handstrudel.ui.social.ProfileActionButton
+import com.handstrudel.ui.social.SocialRefreshBox
 import com.handstrudel.ui.social.SocialScreen
 import com.handstrudel.ui.social.account.CreatorPortfolio
 import com.handstrudel.ui.social.account.CreatorProfileHeader
@@ -124,6 +125,7 @@ fun PublicCreatorScreen(creatorId: UUID, onDismiss: () -> Unit, onFollowChange: 
     LaunchedEffect(userId) { load() }
 
     SocialScreen("Creator", onDismiss) {
+        SocialRefreshBox(onRefresh = { load() }, modifier = Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 21.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -159,6 +161,7 @@ fun PublicCreatorScreen(creatorId: UUID, onDismiss: () -> Unit, onFollowChange: 
                 Text(it, color = p.muted, fontSize = 13.sp)
                 ProfileActionButton("Try again", enabled = !loading && !changingFollow, onClick = { scope.launch { load() } }, modifier = Modifier.fillMaxWidth())
             }
+        }
         }
     }
     opened?.let { video ->

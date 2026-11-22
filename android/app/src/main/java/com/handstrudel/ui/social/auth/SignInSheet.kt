@@ -3,7 +3,6 @@ package com.handstrudel.ui.social.auth
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -57,9 +56,6 @@ fun SignInSheet(onDismiss: () -> Unit, reason: String = "Sign in to post your pe
                 Text(reason, color = p.muted, fontSize = 15.sp)
                 GoogleSignInButton(auth)
                 EmailCodeFlow(auth, showsOrHeader = GoogleSignIn.isAvailable)
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text("Make music as a guest", color = p.accent)
-                }
             }
         }
     }

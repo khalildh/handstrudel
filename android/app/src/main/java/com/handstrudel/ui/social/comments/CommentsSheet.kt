@@ -327,9 +327,10 @@ fun CommentsSheet(
                     }
                 } ?: notice?.let { Text(it, color = p.accent, fontSize = 13.sp, modifier = Modifier.padding(8.dp)) }
 
-                // Thread
+                // Thread (iOS `.refreshable { if !busy { await reload() } }`)
+                com.handstrudel.ui.social.SocialRefreshBox(onRefresh = { reload() }, modifier = Modifier.weight(1f).fillMaxWidth(), enabled = !busy) {
                 LazyColumn(
-                    Modifier.weight(1f).fillMaxWidth().alpha(if (busy) 0.6f else 1f), state = listState,
+                    Modifier.fillMaxSize().alpha(if (busy) 0.6f else 1f), state = listState,
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
@@ -390,6 +391,7 @@ fun CommentsSheet(
                             }) { Text("Load more comments", color = p.accent, fontWeight = FontWeight.SemiBold) }
                         }
                     }
+                }
                 }
 
                 // Composer

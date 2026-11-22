@@ -57,6 +57,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -100,6 +102,45 @@ fun SocialMaterialTheme(dark: Boolean? = null, content: @Composable () -> Unit) 
 }
 
 private fun Color.luminance(): Float = 0.2126f * red + 0.7152f * green + 0.0722f * blue
+
+/**
+ * Pull to refresh (iOS `.refreshable`). The spinner shows only while a pull-started
+ * [onRefresh] runs; [enabled] false ignores the pull (iOS `if !busy { … }`). The
+ * content must be scrollable (a `LazyColumn` or `verticalScroll`) and fill the box.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun SocialRefreshBox(
+    onRefresh: suspend () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val p = LocalStudioPalette.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val refresh by androidx.compose.runtime.rememberUpdatedState(onRefresh)
+    val canRefresh by androidx.compose.runtime.rememberUpdatedState(enabled)
+    var refreshing by remember { mutableStateOf(false) }
+    val state = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = {
+            if (!refreshing && canRefresh) {
+                refreshing = true
+                scope.launch { try { refresh() } finally { refreshing = false } }
+            }
+        },
+        modifier = modifier.testTag("pull-to-refresh"),
+        state = state,
+        indicator = {
+            androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                state = state, isRefreshing = refreshing, modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = p.surface, color = p.accent,
+            )
+        },
+        content = content,
+    )
+}
 
 /**
  * A full-screen modal page with a title bar (the iOS sheets with NavigationStack +

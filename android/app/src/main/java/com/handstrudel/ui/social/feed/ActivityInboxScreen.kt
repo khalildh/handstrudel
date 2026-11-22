@@ -43,6 +43,7 @@ import com.handstrudel.social.data.FeedService
 import com.handstrudel.social.data.UnavailableException
 import com.handstrudel.social.model.CreatorActivity
 import com.handstrudel.social.model.Video
+import com.handstrudel.ui.social.SocialRefreshBox
 import com.handstrudel.ui.social.SocialScreen
 import com.handstrudel.ui.social.rememberSocial
 import com.handstrudel.ui.social.relativeTime
@@ -87,7 +88,8 @@ fun ActivityInboxScreen(onDismiss: () -> Unit, onStart: (PerformanceStart) -> Un
     LaunchedEffect(Unit) { load() }
 
     SocialScreen("Notifications", onDismiss) {
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        SocialRefreshBox(onRefresh = { load() }, modifier = Modifier.weight(1f).fillMaxWidth()) {
+        LazyColumn(Modifier.fillMaxSize()) {
             error?.let { e ->
                 item {
                     Column(Modifier.padding(20.dp)) {
@@ -126,6 +128,7 @@ fun ActivityInboxScreen(onDismiss: () -> Unit, onStart: (PerformanceStart) -> Un
                 }
             }
             if (more) item { TextButton(onClick = { scope.launch { load(append = true) } }, enabled = !loading, modifier = Modifier.padding(12.dp)) { Text("Load more activity", color = p.accent) } }
+        }
         }
     }
 

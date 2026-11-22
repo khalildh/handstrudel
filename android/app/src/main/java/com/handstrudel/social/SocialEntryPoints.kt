@@ -49,15 +49,27 @@ object SocialEntryPoints {
         }
     }
 
-    /** Comments for a post (deep link `comments`). */
+    /** Comments for a post (deep link `comments`). Blocking the creator closes it (iOS `ContentView`). */
     @Composable
-    fun CommentsSheet(video: Video, onDismiss: () -> Unit) = SocialMaterialTheme { CommentsScreen(video, onDismiss) }
+    fun CommentsSheet(video: Video, onDismiss: () -> Unit) = SocialMaterialTheme {
+        CommentsScreen(video, onDismiss, onBlock = { author -> if (author == video.userId) onDismiss() })
+    }
 
     /** Sign-in / profile setup; capture shows it from the post composer. */
     @Composable
     fun SignInSheet(onDismiss: () -> Unit) = SocialMaterialTheme { SignInScreen(onDismiss) }
 
-    /** iOS `FeedService.video(id:)`: one post, or null if missing/hidden/unavailable. */
+    /**
+     * One post, or null if missing/hidden/unavailable. Request failures also return null
+     * (capture's play-along and upload checks rely on that); use [loadVideo] to tell
+     * "gone" from "couldn't reach the server".
+     */
     suspend fun fetchVideo(id: UUID): Video? =
         SocialServices.current?.feed?.let { runCatching { it.video(id) }.getOrNull() }
+
+    /**
+     * iOS `FeedService.video(id:)`: one post, or null if it is missing or hidden. Throws when
+     * the request fails (offline, server error), so deep links can say "Couldn't open this link".
+     */
+    suspend fun loadVideo(id: UUID): Video? = SocialServices.current?.feed?.video(id)
 }

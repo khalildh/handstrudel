@@ -38,7 +38,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +71,9 @@ fun ClipSurface(
     modifier: Modifier = Modifier,
     onToggleFullscreenControls: (() -> Unit)? = null,
     onSwipe: ((Int) -> Unit)? = null,
+    showsFullscreenControls: Boolean = false,
+    /** TalkBack "Next video" / "Previous video" when the parent pages (the feed pager). */
+    onAccessibilityMove: ((Int) -> Boolean)? = null,
 ) {
     val p = LocalStudioPalette.current
     val failed by clip.failed.collectAsState()
@@ -101,7 +106,17 @@ fun ClipSurface(
                         if (abs(dy) >= threshold) onSwipe(if (dy < 0) 1 else -1)
                     }) { _, amount -> dy += amount }
                 } else Modifier)
-                .semantics { contentDescription = if (paused) "Play video" else "Pause video" },
+                .semantics {
+                    contentDescription = if (paused) "Play video" else "Pause video"
+                    // iOS ClipPlaybackSurface `.accessibilityActions`.
+                    customActions = clipAccessibilityActions(
+                        showsFullscreenControls = onToggleFullscreenControls?.let { showsFullscreenControls },
+                        paused = paused, failed = failed,
+                        toggleControls = { onToggleFullscreenControls?.invoke() },
+                        togglePause = clip::togglePause,
+                        move = onSwipe?.let { swipe -> { by: Int -> swipe(by); true } } ?: onAccessibilityMove,
+                    )
+                },
         )
         if (isCurrent && failed) {
             Column(
@@ -122,6 +137,28 @@ fun ClipSurface(
     }
 }
 
+/**
+ * iOS ClipPlaybackSurface accessibility actions, in its order. [showsFullscreenControls] is
+ * null when the surface has no fullscreen controls; [move] null when it can't page.
+ */
+internal fun clipAccessibilityActions(
+    showsFullscreenControls: Boolean?,
+    paused: Boolean,
+    failed: Boolean,
+    toggleControls: () -> Unit,
+    togglePause: () -> Unit,
+    move: ((Int) -> Boolean)?,
+): List<CustomAccessibilityAction> = buildList {
+    if (showsFullscreenControls != null) {
+        add(CustomAccessibilityAction(if (showsFullscreenControls) "Hide playback controls" else "Show playback controls") { toggleControls(); true })
+    }
+    if (!failed) add(CustomAccessibilityAction(if (paused) "Play video" else "Pause video") { togglePause(); true })
+    if (move != null) {
+        add(CustomAccessibilityAction("Next video") { move(1) })
+        add(CustomAccessibilityAction("Previous video") { move(-1) })
+    }
+}
+
 /** iOS `FeedCell`: the clip with its bottom gradient and post details. */
 @Composable
 fun FeedCell(
@@ -139,11 +176,14 @@ fun FeedCell(
     creator: () -> Unit,
     showSound: () -> Unit,
     source: (java.util.UUID) -> Unit,
+    onAccessibilityMove: ((Int) -> Boolean)? = null,
 ) {
     Box(Modifier.fillMaxSize()) {
         ClipSurface(
             clip, isCurrent, aspectFit = isFullscreen,
             onToggleFullscreenControls = if (isFullscreen) onToggleFullscreenControls else null,
+            showsFullscreenControls = showsFullscreenControls,
+            onAccessibilityMove = onAccessibilityMove,
         )
         if (!isFullscreen || showsFullscreenControls) {
             Box(

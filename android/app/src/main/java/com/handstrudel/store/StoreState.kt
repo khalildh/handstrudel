@@ -37,5 +37,7 @@ sealed interface PurchaseResult {
 /** User-facing store copy shared by the manager and the UI. */
 object StoreCopy {
     const val UNAVAILABLE = "Purchases aren't available in this build"
+    /** Google Play pending purchase (e.g. cash or a slow payment method). */
+    const val PENDING = "Your purchase is pending. It will unlock once the payment completes."
     fun productUnavailable(id: String) = "Product unavailable: $id"
 }

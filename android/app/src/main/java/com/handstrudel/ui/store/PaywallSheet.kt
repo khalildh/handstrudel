@@ -148,7 +148,7 @@ fun PaywallContent(packId: String, store: StoreGate, onDismiss: () -> Unit, modi
                     scope.launch {
                         when (val result = store.purchase(activity, productId)) {
                             is PurchaseResult.Failed -> errorMessage = result.message
-                            PurchaseResult.Pending -> errorMessage = "Your purchase is pending. It will unlock once the payment completes."
+                            PurchaseResult.Pending -> errorMessage = StoreCopy.PENDING
                             else -> Unit
                         }
                         purchasing = false
