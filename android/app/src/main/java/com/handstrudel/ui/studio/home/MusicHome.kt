@@ -233,7 +233,7 @@ fun MusicHome() {
 
         // Start.
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).padding(bottom = 96.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(Modifier.studioContentWidth(520), verticalArrangement = Arrangement.spacedBy(8.dp)) {
