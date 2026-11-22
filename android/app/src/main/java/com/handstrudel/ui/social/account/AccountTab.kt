@@ -48,6 +48,7 @@ import com.handstrudel.ui.nav.LocalAppNavigator
 import com.handstrudel.ui.social.ProfileActionButton
 import com.handstrudel.ui.social.ProfileEyebrow
 import com.handstrudel.ui.social.SocialMaterialTheme
+import com.handstrudel.ui.social.SocialRefreshBox
 import com.handstrudel.ui.social.StudioActionButton
 import com.handstrudel.ui.social.auth.SignInSheet
 import com.handstrudel.ui.social.feed.CreatorVideoSheet
@@ -97,8 +98,10 @@ fun AccountTab() {
             val current = profile
             val username = current?.username
             if (current != null && current.id == userId && username != null && !needsSetup) {
+                // iOS `.refreshable { await portfolio.load(for: profile.id) }`
+                SocialRefreshBox(onRefresh = { portfolio.load(current.id) }, modifier = Modifier.weight(1f).fillMaxWidth()) {
                 Column(
-                    Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 21.dp).padding(bottom = 120.dp),
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 21.dp).padding(bottom = 120.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     val counts by portfolio.counts.collectAsState()
@@ -118,6 +121,7 @@ fun AccountTab() {
                         loadMore = { scope.launch { portfolio.load(current.id, append = true) } },
                         makeMusic = makeMusic, delete = { confirmDeleteVideo = it },
                     )
+                }
                 }
             } else if (userId != null && profile == null) {
                 Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
