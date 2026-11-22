@@ -116,21 +116,28 @@ private fun processFrame(imageProxy: ImageProxy, handTracker: HandTrackingManage
         // same coordinate space as what the PreviewView shows, so we don't need
         // to mirror x ourselves anymore.
         val raw = imageProxy.toBitmap()
-        val rotation = imageProxy.imageInfo.rotationDegrees.toFloat()
-        val w = imageProxy.width
-        val h = imageProxy.height
-
-        val matrix = Matrix().apply {
-            postRotate(rotation)
-            // Mirror horizontally so MediaPipe sees the same selfie-view image
-            // the user is looking at on PreviewView (CameraX visually mirrors
-            // the front camera preview but ImageAnalysis frames stay raw).
-            postScale(-1f, 1f, w.toFloat(), h.toFloat())
-        }
-        val oriented = Bitmap.createBitmap(raw, 0, 0, w, h, matrix, true)
+        val oriented = orientFrameForDetection(raw, imageProxy.imageInfo.rotationDegrees)
         handTracker.detectAsync(oriented, imageProxy.imageInfo.timestamp / 1_000_000)
         raw.recycle()
     } finally {
         imageProxy.close()
     }
+}
+
+/**
+ * Rotate a raw front-camera frame to the display orientation and mirror it for
+ * selfie view, so MediaPipe sees exactly what the PreviewView shows. Internal
+ * so the instrumented hand-pipeline test drives the same transform.
+ */
+internal fun orientFrameForDetection(raw: Bitmap, rotationDegrees: Int): Bitmap {
+    val w = raw.width
+    val h = raw.height
+    val matrix = Matrix().apply {
+        postRotate(rotationDegrees.toFloat())
+        // Mirror horizontally so MediaPipe sees the same selfie-view image
+        // the user is looking at on PreviewView (CameraX visually mirrors
+        // the front camera preview but ImageAnalysis frames stay raw).
+        postScale(-1f, 1f, w.toFloat(), h.toFloat())
+    }
+    return Bitmap.createBitmap(raw, 0, 0, w, h, matrix, true)
 }

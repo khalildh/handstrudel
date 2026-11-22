@@ -39,6 +39,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL",
             buildConfigString(configValue("handstrudel.supabaseUrl", swiftConstant("productionURL"))))
@@ -166,6 +167,9 @@ dependencies {
 
     // JVM unit tests (AT/). Pure Kotlin only: never load the :core .so here.
     testImplementation("junit:junit:4.13.2")
+    // Instrumented tests (src/androidTest): the real hand pipeline on a device/emulator.
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("org.json:json:20240303")
     // --- end integrator ---

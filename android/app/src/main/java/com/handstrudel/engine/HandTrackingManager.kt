@@ -117,7 +117,17 @@ data class HandsState(
  * should report CameraX failures through [onCameraBindFailed] / [onCameraInUse].
  */
 class HandTrackingManager(context: Context) {
-    private var handLandmarker: HandLandmarker? = null
+    private val appContext = context.applicationContext
+    @Volatile private var handLandmarker: HandLandmarker? = null
+    @Volatile private var delegate: Delegate = Delegate.GPU
+
+    // GPU watchdog: some GPU drivers (and the emulator's GL) pass delegate init
+    // but fail every inference ("Graph has errors"); MediaPipe only logs that,
+    // results never arrive and the error listener is not called. Until the
+    // first result arrives, too many unanswered GPU frames switch to the CPU.
+    @Volatile private var gotResult = false
+    private var unansweredSince = 0L
+    private var unansweredFrames = 0
     var onHandsDetected: ((HandsState) -> Unit)? = null
 
     /** When false (touch input), frames are dropped so no hands reach the engine. */
@@ -138,7 +148,8 @@ class HandTrackingManager(context: Context) {
 
     init {
         // GPU is 2–3× faster; some drivers fail to init it, so fall back to CPU.
-        handLandmarker = createLandmarker(context, Delegate.GPU) ?: createLandmarker(context, Delegate.CPU)
+        handLandmarker = createLandmarker(appContext, Delegate.GPU)
+            ?: createLandmarker(appContext, Delegate.CPU).also { delegate = Delegate.CPU }
     }
 
     private fun createLandmarker(context: Context, delegate: Delegate): HandLandmarker? = try {
@@ -149,7 +160,11 @@ class HandTrackingManager(context: Context) {
             .setMinHandDetectionConfidence(0.5f)
             .setMinHandPresenceConfidence(0.5f)
             .setMinTrackingConfidence(0.5f)
-            .setResultListener { result, _ -> processResult(result) }
+            .setResultListener { result, _ ->
+                gotResult = true
+                recordStats(result.timestampMs(), result.landmarks().size)
+                processResult(result)
+            }
             .setErrorListener { e -> Log.e(TAG, "Error: $e") }
             .build()
         HandLandmarker.createFromOptions(context, options).also { Log.i(TAG, "HandLandmarker initialized on $delegate") }
@@ -168,7 +183,34 @@ class HandTrackingManager(context: Context) {
         if (!isActive) return
         val issue = _cameraIssue.value
         if (issue == CameraIssue.UNAVAILABLE || issue == CameraIssue.INTERRUPTED) reportCameraIssue(null) // frames flow again
-        handLandmarker?.detectAsync(BitmapImageBuilder(bitmap).build(), timestampMs)
+        if (shouldAbandonGpu()) fallBackToCpu()
+        val landmarker = handLandmarker ?: return
+        if (stats != null) submitNanos[timestampMs] = System.nanoTime()
+        landmarker.detectAsync(BitmapImageBuilder(bitmap).build(), timestampMs)
+    }
+
+    /** DEBUG only: once a second, log frames/s and submit→result latency (verification). */
+    private class Stats { var windowStart = 0L; var frames = 0; var withHands = 0; var latencyNanos = 0L; var maxNanos = 0L }
+    private val stats: Stats? = if (com.handstrudel.BuildConfig.DEBUG) Stats() else null
+    private val submitNanos = java.util.concurrent.ConcurrentHashMap<Long, Long>()
+
+    private fun recordStats(timestampMs: Long, hands: Int) {
+        val s = stats ?: return
+        val now = System.nanoTime()
+        val submitted = submitNanos.remove(timestampMs) ?: return
+        if (submitNanos.size > 64) submitNanos.clear()
+        if (s.windowStart == 0L) s.windowStart = now
+        s.frames += 1
+        if (hands > 0) s.withHands += 1
+        val latency = now - submitted
+        s.latencyNanos += latency
+        if (latency > s.maxNanos) s.maxNanos = latency
+        val window = now - s.windowStart
+        if (window >= 1_000_000_000L) {
+            Log.d(TAG, "stats fps=%.1f frames=%d withHands=%d avgMs=%.1f maxMs=%.1f".format(
+                s.frames * 1e9 / window, s.frames, s.withHands, s.latencyNanos / 1e6 / s.frames, s.maxNanos / 1e6))
+            s.windowStart = now; s.frames = 0; s.withHands = 0; s.latencyNanos = 0; s.maxNanos = 0
+        }
     }
 
     private fun processResult(result: HandLandmarkerResult) {
@@ -208,9 +250,31 @@ class HandTrackingManager(context: Context) {
     /** CameraX `CameraState.ERROR_CAMERA_IN_USE` / `ERROR_MAX_CAMERAS_IN_USE` (iOS `.interrupted`). */
     fun onCameraInUse() = reportCameraIssue(CameraIssue.INTERRUPTED)
 
-    fun close() {
-        handLandmarker?.close()
+    /** Called per submitted frame (camera executor thread). */
+    private fun shouldAbandonGpu(): Boolean {
+        if (delegate != Delegate.GPU || gotResult) return false
+        val now = android.os.SystemClock.uptimeMillis()
+        if (unansweredFrames == 0) unansweredSince = now
+        unansweredFrames += 1
+        return unansweredFrames >= GPU_WATCHDOG_FRAMES && now - unansweredSince >= GPU_WATCHDOG_MS
     }
 
-    private companion object { const val TAG = "HandTracking" }
+    private fun fallBackToCpu() {
+        Log.w(TAG, "GPU delegate produced no results for $unansweredFrames frames; switching to CPU")
+        delegate = Delegate.CPU
+        // Closing a graph that has failed rethrows its error.
+        try { handLandmarker?.close() } catch (e: Exception) { Log.w(TAG, "closing failed GPU landmarker", e) }
+        handLandmarker = createLandmarker(appContext, Delegate.CPU)
+        submitNanos.clear()
+    }
+
+    fun close() {
+        try { handLandmarker?.close() } catch (e: Exception) { Log.w(TAG, "close failed", e) }
+    }
+
+    private companion object {
+        const val TAG = "HandTracking"
+        const val GPU_WATCHDOG_FRAMES = 30
+        const val GPU_WATCHDOG_MS = 3000L
+    }
 }

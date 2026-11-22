@@ -32,13 +32,18 @@ import org.json.JSONObject
  * `touch <split-chord|split-melody|scale-chord|scale-melody|radial-chord|radial-melody|zones-chord|zones-melody> <id> <a> [b]`,
  * `exit <id>`, `grid-on <id> <lane>`, `grid-slide <id> <lane>`, `grid-off <id>`, `drum-tap <lane>`,
  * `learn <songId>`, `learn-tap <lane>`, `quantize <bool> [div]`, `autostrum <bool>`, `swap <bool>`,
- * `preview <instrumentId>`, `firstnote <midi>`, `strudel <code>`, `state`.
+ * `preview <instrumentId>`, `firstnote <midi>`, `strudel <code>`, `state`,
+ * `handframes <seconds>` (loop the images in `<files>/handframes` (push via `run-as`), sorted by name,
+ * at ~30 fps as raw front-camera frames through the real frame transform and hand tracker).
  */
 internal object EngineDebugReceiver {
     private const val ACTION = "com.handstrudel.debug.ENGINE"
     private const val TAG = "EngineDebug"
 
+    private lateinit var appContext: Context
+
     fun register(context: Context, engine: HandStrudelEngine) {
+        appContext = context.applicationContext
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 val cmd = intent.getStringExtra("cmd") ?: return
@@ -113,8 +118,28 @@ internal object EngineDebugReceiver {
             }
             "js" -> e.strudel.evaluateForResult(a.drop(1).joinToString(" ")) { Log.i(TAG, "JS $it") }
             "state" -> logState(e)
+            "handframes" -> playHandFrames(e, a.getOrNull(1)?.toDouble() ?: 10.0)
             else -> Log.w(TAG, "unknown command ${a[0]}")
         }
+    }
+
+    /** Real MediaPipe on real images, standing in for CameraX when the emulator has no hands to film. */
+    private fun playHandFrames(e: HandStrudelEngine, seconds: Double) {
+        val dir = java.io.File(appContext.filesDir, "handframes")
+        val files = dir.listFiles { f -> f.extension.lowercase() in setOf("jpg", "jpeg", "png") }?.sortedBy { it.name }.orEmpty()
+        if (files.isEmpty()) { Log.w(TAG, "handframes: no images in $dir"); return }
+        Thread {
+            val frames = files.mapNotNull { android.graphics.BitmapFactory.decodeFile(it.path) }
+            if (frames.isEmpty()) { Log.w(TAG, "handframes: no readable images in $dir"); return@Thread }
+            val end = android.os.SystemClock.uptimeMillis() + (seconds * 1000).toLong()
+            var i = 0
+            while (android.os.SystemClock.uptimeMillis() < end) {
+                val raw = frames[i++ % frames.size]
+                e.handTracker.detectAsync(com.handstrudel.ui.studio.orientFrameForDetection(raw, 0), android.os.SystemClock.uptimeMillis())
+                Thread.sleep(33)
+            }
+            Log.i(TAG, "handframes: played $i frames from ${frames.size} images")
+        }.start()
     }
 
     private fun logState(e: HandStrudelEngine) {
