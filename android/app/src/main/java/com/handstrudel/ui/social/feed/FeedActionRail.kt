@@ -112,7 +112,10 @@ fun FeedActionRail(
 
 @Composable
 private fun MoreMenu(video: Video, isMine: Boolean, canDownloadAudio: Boolean, canChangeAudioPermission: Boolean, actions: FeedRailActions) {
-    var open by remember { mutableStateOf(false) }
+    // The rail is shared by every page and follows the current clip. Close the menu when the clip
+    // changes (auto-advance at the end of a clip), as iOS does when the cell scrolls away, so it
+    // never offers Block/Report/Delete for a different post than the one it was opened on.
+    var open by remember(video.id) { mutableStateOf(false) }
     Box {
         Glyph(Icons.Filled.MoreHoriz, null, label = "More", reservesCount = false, tag = "feed-more", onClick = { open = true })
         SocialMaterialTheme(dark = true) {
