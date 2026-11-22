@@ -185,9 +185,18 @@ class HandTrackingManager(context: Context) {
         if (issue == CameraIssue.UNAVAILABLE || issue == CameraIssue.INTERRUPTED) reportCameraIssue(null) // frames flow again
         if (shouldAbandonGpu()) fallBackToCpu()
         val landmarker = handLandmarker ?: return
-        if (stats != null) submitNanos[timestampMs] = System.nanoTime()
-        landmarker.detectAsync(BitmapImageBuilder(bitmap).build(), timestampMs)
+        // MediaPipe's live-stream graph throws (and takes the app down) on a timestamp that
+        // isn't strictly increasing, e.g. a camera rebind or a second frame source; clamp it.
+        // Stamp and submit under one lock so two threads can't hand MediaPipe out-of-order stamps.
+        synchronized(timestampLock) {
+            val ts = maxOf(timestampMs, lastTimestampMs + 1)
+            lastTimestampMs = ts
+            if (stats != null) submitNanos[ts] = System.nanoTime()
+            landmarker.detectAsync(BitmapImageBuilder(bitmap).build(), ts)
+        }
     }
+    private val timestampLock = Any()
+    private var lastTimestampMs = Long.MIN_VALUE / 2
 
     /** DEBUG only: once a second, log frames/s and submit→result latency (verification). */
     private class Stats { var windowStart = 0L; var frames = 0; var withHands = 0; var latencyNanos = 0L; var maxNanos = 0L }
