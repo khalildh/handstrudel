@@ -83,7 +83,7 @@ fun HandOverlay(handsState: HandsState, theme: HandTheme, modifier: Modifier = M
     }
 }
 
-private fun DrawScope.glowStroke(a: Offset, b: Offset, color: Color, width: Float, blur: Float) {
+private fun DrawScope.glowStroke(a: Offset, b: Offset, color: Color, width: Float, blur: Float, crisp: Boolean = true) {
     drawIntoCanvas { c ->
         val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             this.color = color.toArgb()
@@ -94,6 +94,9 @@ private fun DrawScope.glowStroke(a: Offset, b: Offset, color: Color, width: Floa
         }
         c.nativeCanvas.drawLine(a.x, a.y, b.x, b.y, paint)
     }
+    // CoreGraphics `setShadow` + stroke paints the stroke itself crisply on top of its blurred
+    // shadow, so the iOS glow layer reads as a solid 4 pt band, not only a haze.
+    if (crisp && blur > 0f) drawLine(color, a, b, strokeWidth = width, cap = StrokeCap.Round)
 }
 
 private fun DrawScope.glowDot(center: Offset, radius: Float, color: Color, blur: Float) {
@@ -122,7 +125,7 @@ private fun DrawScope.drawTrails(trails: HandTrails, side: String, color: Color,
             if (alpha < 0.01f) continue
             val p0 = visionToScreen(points[i - 1].x, points[i - 1].y, size.width, size.height, aspect)
             val p1 = visionToScreen(points[i].x, points[i].y, size.width, size.height, aspect)
-            if (isTip && fade > 0.3f) glowStroke(p0, p1, color.copy(alpha = alpha * 0.5f), baseWidth * fade + 4 * d * fade, 6 * d * fade)
+            if (isTip && fade > 0.3f) glowStroke(p0, p1, color.copy(alpha = alpha * 0.5f), baseWidth * fade + 4 * d * fade, 6 * d * fade, crisp = false)
             drawLine(color.copy(alpha = alpha), p0, p1, strokeWidth = baseWidth * fade, cap = StrokeCap.Round)
         }
     }

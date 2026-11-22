@@ -409,7 +409,11 @@ private fun RoundButton(
         swipe.size(44.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f))
             .clickable(enabled = enabled, onClick = onClick).testTag(tag).semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = Color.White.copy(alpha = if (enabled) alpha else 0.35f), modifier = Modifier.size(iconSize)) }
+    ) {
+        // iOS disables these during a take or count-in without dimming the glyph (explicit
+        // `.foregroundStyle`), so keep the same tint when disabled.
+        Icon(icon, null, tint = Color.White.copy(alpha = alpha), modifier = Modifier.size(iconSize))
+    }
 }
 
 /** iOS top-bar beat dots: 7 pt, current one ×1.5 in the media accent. */
