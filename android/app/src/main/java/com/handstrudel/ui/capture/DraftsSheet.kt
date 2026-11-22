@@ -80,7 +80,7 @@ internal fun DraftsSheetView(openedDraftId: UUID?, onRetake: (() -> Unit)?, onDi
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = palette.accent)
-                            Text("Drafts", color = palette.accent)
+                            Text("Drafts", fontSize = 17.sp, color = palette.accent)
                         }
                     }
                 }
@@ -90,7 +90,7 @@ internal fun DraftsSheetView(openedDraftId: UUID?, onRetake: (() -> Unit)?, onDi
                 )
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                     TextButton(onClick = onDismiss, enabled = !editorBusy, modifier = Modifier.testTag("drafts-done")) {
-                        Text("Done", fontWeight = FontWeight.SemiBold, color = palette.accent)
+                        Text("Done", fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = palette.accent)
                     }
                 }
             }
@@ -143,12 +143,12 @@ private fun DraftList(onOpen: (UUID) -> Unit) {
 private fun EmptyDrafts(title: String, detail: String) {
     val palette = LocalStudioPalette.current
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
     ) {
         Icon(StudioIcons.FilmStack, null, tint = palette.accent, modifier = Modifier.size(40.dp))
         Text(title, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = palette.ink, textAlign = TextAlign.Center)
-        if (detail.isNotEmpty()) Text(detail, color = palette.muted, textAlign = TextAlign.Center)
+        if (detail.isNotEmpty()) Text(detail, fontSize = 17.sp, color = palette.muted, textAlign = TextAlign.Center)
     }
 }

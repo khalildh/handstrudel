@@ -1,5 +1,9 @@
 package com.handstrudel.ui.capture
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.filled.UnfoldMore
+import com.handstrudel.ui.theme.StudioIcons
+
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.studio.common.SheetGrabber
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -7,7 +11,6 @@ import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +27,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -33,8 +35,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
@@ -107,37 +107,50 @@ internal fun LoopShelfSheetView(onDismiss: () -> Unit) {
         containerColor = palette.background,
         dragHandle = { SheetGrabber() },
     ) {
+        // iOS: inline navigation bar with only a trailing Done, then the scrolling content.
+        Box(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 8.dp)) {
+            com.handstrudel.ui.studio.common.SheetTextButton("Done", Modifier.align(Alignment.CenterEnd), bold = true, onClick = onDismiss)
+        }
         Column(
-            Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp).testTag("loop-shelf"),
+            Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 12.dp).testTag("loop-shelf"),
             verticalArrangement = Arrangement.spacedBy(15.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.GraphicEq, null, tint = palette.accent, modifier = Modifier.size(14.dp))
-                    Text("PRIVATE AUDIO LIBRARY", fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = palette.accent)
-                }
-                TextButton(onClick = onDismiss) { Text("Done", color = palette.accent, fontWeight = FontWeight.SemiBold) }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(StudioIcons.Waveform, null, tint = palette.accent, modifier = Modifier.size(14.dp))
+                Text("PRIVATE AUDIO LIBRARY", fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = palette.accent)
             }
             Text("Loop shelf", fontFamily = StudioFonts.Serif, fontSize = 34.sp, color = palette.ink)
             Text(
                 if (running) "Layer loops with the live instrument." else "Preview captured audio without opening the wheel.",
                 fontSize = 15.sp, color = palette.muted,
             )
-            Text("New recording length", fontSize = 13.sp, color = palette.muted)
-            // iOS Picker labels ("1 bar", "N bars"); six labelled chips need to scroll on a phone.
-            Row(Modifier.testTag("loop-recording-length").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                LOOP_BAR_OPTIONS.forEach { option ->
-                    FilterChip(
-                        selected = bars == option,
-                        onClick = { engine.setLoopRecordingBars(option) },
-                        label = { Text(if (option == 1) "1 bar" else "$option bars", fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = palette.accent, selectedLabelColor = palette.onAccent, labelColor = palette.ink),
-                    )
+            // iOS `Picker("New recording length")` in a VStack renders as a menu button: the
+            // current value in the tint with an up/down chevron; the label is only spoken.
+            Box {
+                var barsMenu by remember { mutableStateOf(false) }
+                Row(
+                    Modifier.testTag("loop-recording-length").clip(RoundedCornerShape(8.dp))
+                        .clickable { barsMenu = true }
+                        .semantics { contentDescription = "New recording length" }
+                        .padding(horizontal = 11.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Text(if (bars == 1) "1 bar" else "$bars bars", fontSize = 17.sp, color = palette.accent)
+                    Icon(Icons.Filled.UnfoldMore, null, tint = palette.accent, modifier = Modifier.size(15.dp))
+                }
+                DropdownMenu(expanded = barsMenu, onDismissRequest = { barsMenu = false }) {
+                    LOOP_BAR_OPTIONS.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(if (option == 1) "1 bar" else "$option bars") },
+                            trailingIcon = if (bars == option) ({ Icon(StudioIcons.Checkmark, null, modifier = Modifier.size(16.dp)) }) else null,
+                            onClick = { barsMenu = false; engine.setLoopRecordingBars(option) },
+                        )
+                    }
                 }
             }
             if (loops.isEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Filled.Repeat, null, tint = palette.ink)
+                    Icon(StudioIcons.Repeat, null, tint = palette.ink, modifier = Modifier.size(22.dp))
                     Text("No loops yet", fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = palette.ink)
                 }
                 Text("Tap the repeat button on the wheel to capture app audio.", fontSize = 15.sp, color = palette.muted)
