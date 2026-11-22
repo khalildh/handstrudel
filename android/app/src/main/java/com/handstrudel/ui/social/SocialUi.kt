@@ -300,23 +300,34 @@ val StudioPalette.overVideoInk: Color get() = Color.White
 /**
  * Full-screen social dialogs draw edge to edge, and Compose's `imePadding()` doesn't see the
  * keyboard inside a dialog window here, so read the IME inset from the dialog's decor view and
- * return it as bottom padding (keeps composers and fields above the keyboard).
+ * return the part of it above the navigation bar (callers already pad a visible navigation bar).
+ * The window neither pans nor resizes (a pan on top of this padding pushed the comment
+ * composer back under the keyboard).
  */
 @Composable
 fun DialogResizesForKeyboard(): androidx.compose.ui.unit.Dp {
     val view = androidx.compose.ui.platform.LocalView.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     var imeBottom by remember { mutableStateOf(0) }
+    val activityDecor = (androidx.compose.ui.platform.LocalContext.current.findActivity())?.window?.decorView
     androidx.compose.runtime.DisposableEffect(view) {
         val window = ((view as? androidx.compose.ui.window.DialogWindowProvider)
             ?: (view.parent as? androidx.compose.ui.window.DialogWindowProvider))?.window
-        // With adjustResize this edge-to-edge dialog never receives IME insets; adjustPan does.
         @Suppress("DEPRECATION")
-        window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
+        window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
         val decor = window?.decorView
         decor?.let {
             androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(it) { v, insets ->
-                imeBottom = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
+                val ime = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
+                val navType = androidx.core.view.WindowInsetsCompat.Type.navigationBars()
+                val nav = insets.getInsets(navType).bottom
+                // The app hides the navigation bar. The keyboard still covers that strip, but the
+                // dialog's IME inset is measured above it and the dialog gets no bar insets at
+                // all, so take the strip's height from the activity window and add it back.
+                val hiddenNav = if (ime > 0 && nav == 0) {
+                    activityDecor?.let { d -> androidx.core.view.ViewCompat.getRootWindowInsets(d)?.getInsetsIgnoringVisibility(navType)?.bottom } ?: 0
+                } else 0
+                imeBottom = (ime + hiddenNav - nav).coerceAtLeast(0)
                 androidx.core.view.ViewCompat.onApplyWindowInsets(v, insets)
             }
             androidx.core.view.ViewCompat.requestApplyInsets(it)
@@ -324,4 +335,10 @@ fun DialogResizesForKeyboard(): androidx.compose.ui.unit.Dp {
         onDispose { decor?.let { androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(it, null) } }
     }
     return with(density) { imeBottom.toDp() }
+}
+
+private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
