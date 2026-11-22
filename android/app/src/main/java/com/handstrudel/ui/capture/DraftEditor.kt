@@ -1,5 +1,9 @@
 package com.handstrudel.ui.capture
 
+import com.handstrudel.ui.theme.IosRed
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.draw.rotate
+import com.handstrudel.ui.theme.IosBorderedButton
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -306,7 +310,7 @@ internal fun DraftEditor(
                 },
             )
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             BorderedButton(
                 "Save to Gallery", Icons.Outlined.AddPhotoAlternate,
                 enabled = canExport && !busy,
@@ -325,7 +329,7 @@ internal fun DraftEditor(
             )
             Box {
                 var menu by remember { mutableStateOf(false) }
-                BorderedButton("Share", Icons.Outlined.IosShare, enabled = canExport && !busy, onClick = { menu = true }, modifier = Modifier.testTag("draft-share"))
+                BorderedButton("Share", StudioIcons.SquareAndArrowUp, enabled = canExport && !busy, onClick = { menu = true }, modifier = Modifier.testTag("draft-share"))
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Share video") }, onClick = {
                         menu = false
@@ -338,7 +342,9 @@ internal fun DraftEditor(
                 }
             }
             Spacer(Modifier.weight(1f))
-            if (onRetake != null) TextButton(onClick = onRetake, enabled = !busy) { Text("Retake", color = palette.accent) }
+            if (onRetake != null) TextButton(onClick = onRetake, enabled = !busy, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                Text("Retake", color = palette.accent, fontSize = 17.sp, fontWeight = FontWeight.Normal, maxLines = 1, softWrap = false)
+            }
         }
         val trim = pendingTrim ?: savedTrim ?: DraftTrimSelection.of(duration)
         if (trim != null) {
@@ -356,9 +362,9 @@ internal fun DraftEditor(
                 },
             )
         }
-        TextButton(onClick = { confirmDelete = true }, enabled = !busy, modifier = Modifier.padding(top = 6.dp).testTag("draft-delete")) {
-            Text("Delete draft", color = palette.recording)
-        }
+        // iOS: a plain destructive `Button` at body size, aligned with the content edge.
+        Text("Delete draft", color = if (busy) IosRed.copy(alpha = 0.3f) else IosRed, fontSize = 17.sp,
+            modifier = Modifier.padding(top = 6.dp).clickable(enabled = !busy) { confirmDelete = true }.padding(vertical = 6.dp).testTag("draft-delete"))
     }
 
     if (showNameEditor) {
@@ -469,16 +475,10 @@ private fun PostAction(
 /** iOS `.buttonStyle(.bordered)` tinted with the accent (a capsule on iOS 26): 15 % accent fill, icon + label. */
 @Composable
 private fun BorderedButton(text: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val palette = LocalStudioPalette.current
-    Row(
-        modifier.alpha(if (enabled) 1f else 0.45f).heightIn(min = 44.dp).clip(CircleShape)
-            .background(palette.accent.copy(alpha = 0.15f)).clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(icon, null, tint = palette.accent, modifier = Modifier.size(18.dp))
-        Text(text, color = palette.accent, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+    // iOS `Button(title, systemImage:)` with `.buttonStyle(.bordered)`.
+    IosBorderedButton(onClick = onClick, modifier = modifier, enabled = enabled, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)) { ink ->
+        Icon(icon, null, tint = ink, modifier = Modifier.size(23.dp))
+        Text(text, color = ink, fontSize = 17.sp, maxLines = 1)
     }
 }
 
@@ -502,8 +502,10 @@ private fun TrimControls(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Trim", fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = palette.ink, modifier = Modifier.weight(1f))
-            TextButton(onClick = onReset, enabled = !busy && !(trim.isFullLength && savedTrim != null),
-                modifier = Modifier.testTag("draft-trim-reset")) { Text("Reset", color = palette.accent) }
+            val canReset = !busy && !(trim.isFullLength && savedTrim != null)
+            TextButton(onClick = onReset, enabled = canReset, modifier = Modifier.testTag("draft-trim-reset")) {
+                Text("Reset", color = if (canReset) palette.accent else palette.ink.copy(alpha = 0.3f), fontSize = 17.sp)
+            }
         }
         Text("Drag the handles to trim. Tap a frame to preview it.", fontSize = 12.sp, color = palette.muted)
         DraftTrimFilmstrip(trim, frames, scrubPosition, outputScale, onScrub, onEdit)
@@ -512,17 +514,18 @@ private fun TrimControls(
                 modifier = Modifier.weight(1f).testTag("draft-trim-range"))
             Text("${label(trim.end - trim.start)} selected", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.ink)
         }
-        OutlinedButton(onClick = onPlaySelection, enabled = !busy, modifier = Modifier.testTag("draft-play-selection")) {
-            Icon(Icons.Filled.PlayArrow, null, tint = palette.accent, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Play selection", color = palette.accent)
+        IosBorderedButton(onClick = onPlaySelection, enabled = !busy, modifier = Modifier.testTag("draft-play-selection")) { ink ->
+            Icon(Icons.Filled.PlayArrow, null, tint = ink, modifier = Modifier.size(26.dp))
+            Text("Play selection", color = ink, fontSize = 17.sp)
         }
+        // iOS `DisclosureGroup("Fine trim")` at `.subheadline`: tinted label and a chevron that turns down.
         Row(
             Modifier.fillMaxWidth().clickable(onClick = onToggleFineTrim).padding(vertical = 6.dp).testTag("draft-fine-trim"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Fine trim", fontSize = 15.sp, color = palette.ink, modifier = Modifier.weight(1f))
-            Text(if (fineTrimExpanded) "▾" else "▸", color = palette.accent)
+            Text("Fine trim", fontSize = 15.sp, color = palette.accent, modifier = Modifier.weight(1f))
+            Icon(StudioIcons.ChevronRight, null, tint = palette.accent,
+                modifier = Modifier.size(15.dp).rotate(if (fineTrimExpanded) 90f else 0f))
         }
         if (fineTrimExpanded) {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -543,13 +546,19 @@ private fun TrimNudges(trim: DraftTrimSelection, edge: Edge, outputScale: Double
         Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.ink, modifier = Modifier.weight(1f))
         listOf(-1, 1).forEach { direction ->
             val next = trim.moving(edge, position + direction * step)
-            OutlinedButton(
+            // iOS: SF minus/plus, `.frame(minWidth: 28, minHeight: 32)`, `.buttonStyle(.bordered)`.
+            IosBorderedButton(
                 onClick = { onEdit(next, if (edge == Edge.START) next.start else next.end, true) },
                 enabled = !busy && next != trim,
-                modifier = Modifier.padding(start = 6.dp).semantics {
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
+                modifier = Modifier.padding(start = 8.dp).semantics {
                     contentDescription = "$name 0.1 seconds ${if (direction < 0) "earlier" else "later"}"
                 },
-            ) { Icon(if (direction < 0) Icons.Filled.Remove else Icons.Filled.Add, null, tint = palette.accent) }
+            ) { ink ->
+                Box(Modifier.size(width = 28.dp, height = 32.dp), contentAlignment = Alignment.Center) {
+                    Icon(if (direction < 0) Icons.Filled.Remove else Icons.Filled.Add, null, tint = ink, modifier = Modifier.size(24.dp))
+                }
+            }
         }
     }
 }

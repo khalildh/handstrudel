@@ -1,4 +1,11 @@
 package com.handstrudel.ui.capture
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.text.BasicTextField
+import com.handstrudel.ui.theme.StudioIcons
+import com.handstrudel.ui.theme.iosLight
+import com.handstrudel.ui.theme.IosGrouped
 import com.handstrudel.ui.theme.IosSwitch
 
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -98,14 +105,15 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
         modifier = Modifier.statusBarsPadding(),
         onDismissRequest = { if (!busy) onDismiss() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !busy }),
-        containerColor = palette.background,
+        // iOS: the composer sets no background, so the sheet shows the system elevated colour.
+        containerColor = IosGrouped.background(iosLight()),
         dragHandle = null,
     ) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.95f).testTag("post-composer")) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
                     TextButton(onClick = onDismiss, enabled = !busy) {
-                        Text(if (submission == null) "Cancel" else "Done", color = palette.accent)
+                        Text(if (submission == null) "Cancel" else "Done", color = if (busy) palette.ink.copy(alpha = 0.3f) else palette.accent, fontSize = 17.sp, fontWeight = FontWeight.Normal)
                     }
                 }
                 Text("New post", fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = palette.ink)
@@ -124,45 +132,56 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
                     },
                     modifier = Modifier.height(360.dp).fillMaxWidth(0.55f).clip(RoundedCornerShape(14.dp)).background(Color.Black),
                 )
-                OutlinedTextField(
+                // iOS: `TextField(axis: .vertical)` with 12 pt padding on white 8 % in a 10 pt rounded rectangle.
+                val secondary = IosGrouped.secondaryLabel(iosLight())
+                BasicTextField(
                     value = caption,
                     onValueChange = { caption = it.graphemePrefix(150) },
-                    placeholder = { Text("Say something about it…") },
                     enabled = !locked,
                     minLines = 1, maxLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = palette.ink, unfocusedTextColor = palette.ink, disabledTextColor = palette.muted,
-                        cursorColor = palette.accent, focusedBorderColor = palette.accent, unfocusedBorderColor = palette.border,
-                        focusedPlaceholderColor = palette.muted, unfocusedPlaceholderColor = palette.muted,
-                    ),
+                    textStyle = androidx.compose.ui.text.TextStyle(color = if (locked) palette.muted else palette.ink, fontSize = 17.sp),
+                    cursorBrush = SolidColor(palette.accent),
                     modifier = Modifier.fillMaxWidth().testTag("post-caption"),
+                    decorationBox = { inner ->
+                        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.08f)).padding(12.dp)) {
+                            if (caption.isEmpty()) Text("Say something about it…", color = palette.ink.copy(alpha = 0.3f), fontSize = 17.sp)
+                            inner()
+                        }
+                    },
                 )
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    draft.instrument?.let { Text("♪ $it", fontSize = 13.sp, color = palette.muted) }
-                    val sound = draft.soundSetup
-                    if (sound != null && sound.isValid) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            SwitchRow("Share playable preset", sharing.sharePlayablePreset, !locked, "post-share-preset") {
-                                sharing = sharing.copy(sharePlayablePreset = it)
-                            }
-                            Text(if (sharing.sharePlayablePreset) sound.presetDetails else "Your instrument settings won't be shared.",
-                                fontSize = 12.sp, color = palette.muted)
-                        }
+                // iOS `Label(instrument, systemImage: "music.note")` at `.footnote`, centred in the stack.
+                draft.instrument?.let {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(StudioIcons.MusicNote, null, tint = secondary, modifier = Modifier.size(16.dp))
+                        Text(it, fontSize = 13.sp, color = secondary)
                     }
-                    SwitchRow("Allow comments", commentsEnabled, !locked, "post-allow-comments") { commentsEnabled = it }
-                    when {
-                        credit != null -> Text("〰 Inspired by @${credit.username}", fontSize = 15.sp, color = palette.muted,
-                            modifier = Modifier.testTag("post-credit"))
-                        PostSharingOptions.canShareBacking(hasAudio == true, credit) -> {
-                            SwitchRow("Allow others to play along", sharing.allowPlayAlong, !locked, "post-allow-play-along") {
-                                sharing = sharing.copy(allowPlayAlong = it)
-                            }
-                            Text("When on, anyone can reuse this clip's audio, including any voice, as a credited backing loop.",
-                                fontSize = 12.sp, color = palette.muted)
+                }
+                val sound = draft.soundSetup
+                if (sound != null && sound.isValid) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SwitchRow("Share playable preset", sharing.sharePlayablePreset, !locked, "post-share-preset") {
+                            sharing = sharing.copy(sharePlayablePreset = it)
                         }
-                        else -> Text(if (checkingAudio) "Checking for play-along audio…" else "Play-along audio isn't available for this take.",
-                            fontSize = 12.sp, color = palette.muted)
+                        Text(if (sharing.sharePlayablePreset) sound.presetDetails else "Your instrument settings won't be shared.",
+                            fontSize = 12.sp, color = secondary)
                     }
+                }
+                SwitchRow("Allow comments", commentsEnabled, !locked, "post-allow-comments") { commentsEnabled = it }
+                when {
+                    credit != null -> Row(Modifier.testTag("post-credit"), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(StudioIcons.Waveform, null, tint = secondary, modifier = Modifier.size(18.dp))
+                        Text("Inspired by @${credit.username}", fontSize = 15.sp, color = secondary)
+                    }
+                    PostSharingOptions.canShareBacking(hasAudio == true, credit) -> {
+                        SwitchRow("Allow others to play along", sharing.allowPlayAlong, !locked, "post-allow-play-along") {
+                            sharing = sharing.copy(allowPlayAlong = it)
+                        }
+                        Text("When on, anyone can reuse this clip's audio, including any voice, as a credited backing loop.",
+                            fontSize = 12.sp, color = secondary)
+                    }
+                    else -> Text(if (checkingAudio) "Checking for play-along audio…" else "Play-along audio isn't available for this take.",
+                        fontSize = 12.sp, color = secondary)
                 }
                 UploadStatus(phase)
                 Button(
@@ -177,8 +196,11 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
                         )
                     },
                     enabled = !busy && userId != null && !(submission == null && checkingAudio) && !(submission != null && !submission.isPending),
-                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("post-publicly"),
+                    // iOS `.borderedProminent` tinted with the accent: white headline, 13 pt corners, 66 pt tall.
+                    shape = RoundedCornerShape(13.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White,
+                        disabledContainerColor = Color(0xFF767680).copy(alpha = 0.32f), disabledContentColor = palette.ink.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 66.dp).testTag("post-publicly"),
                 ) {
                     Text(
                         when {
@@ -190,7 +212,7 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
                         fontWeight = FontWeight.SemiBold, fontSize = 17.sp,
                     )
                 }
-                Text("We check your video and thumbnail before they appear publicly.", fontSize = 12.sp, color = palette.muted)
+                Text("We check your video and thumbnail before they appear publicly.", fontSize = 12.sp, color = IosGrouped.secondaryLabel(iosLight()))
             }
         }
     }
@@ -203,7 +225,7 @@ private fun UploadStatus(phase: VideoUploader.Phase) {
     when (phase) {
         VideoUploader.Phase.Preparing -> Spinner("Preparing video…")
         is VideoUploader.Phase.Uploading -> Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Uploading…", color = palette.ink)
+            Text("Uploading…", color = palette.ink, fontSize = 17.sp)
             LinearProgressIndicator(progress = { phase.fraction.toFloat() }, modifier = Modifier.fillMaxWidth(), color = palette.accent)
         }
         VideoUploader.Phase.Checking -> Spinner("Submitting video…")
@@ -216,9 +238,10 @@ private fun UploadStatus(phase: VideoUploader.Phase) {
 @Composable
 private fun Spinner(label: String) {
     val palette = LocalStudioPalette.current
-    Row(Modifier.testTag("post-status"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        CircularProgressIndicator(Modifier.height(18.dp), strokeWidth = 2.dp, color = palette.accent)
-        Text(label, color = palette.muted)
+    // iOS `ProgressView(label)`: the spinner above its label, centred.
+    Column(Modifier.testTag("post-status"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = IosGrouped.secondaryLabel(iosLight()))
+        Text(label, color = IosGrouped.secondaryLabel(iosLight()), fontSize = 17.sp)
     }
 }
 

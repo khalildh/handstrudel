@@ -1,5 +1,11 @@
 package com.handstrudel.ui.capture
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.handstrudel.ui.theme.iosLight
+import com.handstrudel.ui.theme.IosGrouped
+import com.handstrudel.ui.theme.GroupedChevron
+import com.handstrudel.ui.theme.GroupedCell
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.theme.StudioIcons
 import androidx.compose.foundation.background
@@ -122,22 +128,33 @@ private fun DraftList(onOpen: (UUID) -> Unit) {
         )
         return
     }
-    val format = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
-    LazyColumn(Modifier.fillMaxSize().testTag("drafts-list")) {
-        items(drafts, key = { it.id }) { draft ->
-            Column(
-                Modifier.fillMaxWidth().clickable { onOpen(draft.id) }.padding(horizontal = 20.dp, vertical = 12.dp)
-                    .testTag("draft-row"),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Text(draft.displayTitle, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = palette.ink, maxLines = 2)
-                if (draft.title != null && draft.instrument != null) Text(draft.instrument, fontSize = 15.sp, color = palette.muted)
-                Text(format.format(Date(draft.createdAt)), fontSize = 15.sp, color = palette.muted)
+    // iOS: a `List` of NavigationLinks with a hidden scroll background, so the rows keep the
+    // system inset grouped cell fill and disclosure chevrons over the studio background.
+    val secondary = IosGrouped.secondaryLabel(iosLight())
+    LazyColumn(Modifier.fillMaxSize().testTag("drafts-list"), contentPadding = PaddingValues(top = 35.dp, bottom = 24.dp)) {
+        itemsIndexed(drafts, key = { _, it -> it.id }) { index, draft ->
+            GroupedCell(index, drafts.size) {
+                Row(
+                    Modifier.fillMaxWidth().clickable { onOpen(draft.id) }.padding(horizontal = 20.dp, vertical = 11.dp)
+                        .testTag("draft-row"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(draft.displayTitle, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = palette.ink, maxLines = 2)
+                        if (draft.title != null && draft.instrument != null) Text(draft.instrument, fontSize = 15.sp, color = secondary)
+                        Text(iosAbbreviatedDateTime(Date(draft.createdAt)), fontSize = 15.sp, color = secondary)
+                    }
+                    GroupedChevron()
+                }
             }
-            HorizontalDivider(color = palette.border)
         }
     }
 }
+
+/** Foundation `date.formatted(date: .abbreviated, time: .shortened)`: "Nov 22, 2026 at 3:52 PM". */
+internal fun iosAbbreviatedDateTime(date: Date, locale: java.util.Locale = java.util.Locale.getDefault()): String =
+    java.text.SimpleDateFormat("MMM d, yyyy", locale).format(date) + " at " +
+        DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(date)
 
 @Composable
 private fun EmptyDrafts(title: String, detail: String) {
