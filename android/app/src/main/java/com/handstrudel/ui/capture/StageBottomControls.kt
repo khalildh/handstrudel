@@ -56,7 +56,7 @@ import com.handstrudel.ui.theme.LocalStudioPalette
 
 /** iOS `bottomControls`: loop button + Loops (left), ½× over record (centre), settings (right). */
 @Composable
-internal fun StageBottomControlsView(onOpenSettings: () -> Unit) {
+internal fun StageBottomControlsView(onOpenSettings: () -> Unit, itemModifier: Modifier = Modifier) {
     val services = LocalAppServices.current
     val controller = captureController()
     val palette = LocalStudioPalette.current
@@ -69,7 +69,7 @@ internal fun StageBottomControlsView(onOpenSettings: () -> Unit) {
         verticalAlignment = Alignment.Bottom,
     ) {
         if (controller != null) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(itemModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 LoopRecordButton()
                 Text(
                     "Loops",
@@ -85,7 +85,7 @@ internal fun StageBottomControlsView(onOpenSettings: () -> Unit) {
         }
         Spacer(Modifier.weight(1f))
         if (controller != null) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(itemModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val idle = !state.isRecording && !state.isBusy && state.countdown == null
                 if (idle) HalfSpeedToggle()
                 RecordButton()
@@ -93,7 +93,7 @@ internal fun StageBottomControlsView(onOpenSettings: () -> Unit) {
         }
         Spacer(Modifier.weight(1f))
         Box(
-            Modifier
+            itemModifier
                 .testTag("settings-button")
                 .semantics { contentDescription = "Music settings" }
                 .size(44.dp)
