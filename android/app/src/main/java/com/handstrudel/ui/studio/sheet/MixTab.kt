@@ -193,7 +193,7 @@ private fun ParamRow(def: ParamDef, isLocked: Boolean, value: Double, onToggleLo
 internal fun DrumTrackSection(label: String, track: Int, state: DrumTrackState, paywall: PaywallHost) {
     val engine = LocalAppServices.current.engine
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader(label, StudioIcons.BeatsHeadphones, notAvailable = DRUM_LOOPS.any { it.isPremium && paywall.isLocked(it.packId) })
+        SectionHeader(label, StudioIcons.BeatsHeadphones)
         TileGrid(DRUM_LOOPS, columns = 3) { loop ->
             val locked = loop.isPremium && paywall.isLocked(loop.packId)
             EmojiTile(

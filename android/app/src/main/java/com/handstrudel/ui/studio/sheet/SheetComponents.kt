@@ -1,7 +1,6 @@
 package com.handstrudel.ui.studio.sheet
 
 import androidx.compose.ui.platform.testTag
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.Icons
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
@@ -38,7 +37,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.handstrudel.app.LocalAppServices
 import com.handstrudel.ui.theme.LocalStudioPalette
 import com.handstrudel.ui.theme.IosSlider
 import com.handstrudel.ui.theme.IosSwitch
@@ -153,33 +151,22 @@ internal fun EmojiTile(
 
 /**
  * iOS's tiny "PRO" capsule on locked tiles (8 pt heavy rounded, ink 80 % on
- * `.ultraThinMaterial`, 5 pt inset from the top-trailing corner). When the store isn't
- * configured the WS3 rules say locked items read "Not available yet": the phrase doesn't
- * fit a PRO-sized capsule on a 48 pt tile without covering the emoji, so the capsule shows
- * a lock glyph (announced as "Not available yet") and the section header carries the
- * words ([com.handstrudel.ui.studio.common.SectionHeader] `notAvailable`).
+ * `.ultraThinMaterial`, 5 pt inset from the top-trailing corner). Shown with or without
+ * a RevenueCat key, like iOS.
  */
 @Composable
 internal fun TileProBadge(modifier: Modifier = Modifier) {
     val palette = LocalStudioPalette.current
-    val configured = LocalAppServices.current.store.isConfigured
-    val capsule = modifier.clip(CircleShape).background(palette.ink.copy(alpha = 0.12f))
-    if (configured) {
-        Text(
-            "PRO",
-            fontSize = 8.sp,
-            fontWeight = FontWeight.ExtraBold,
-            fontFamily = StudioFonts.Rounded,
-            color = palette.ink.copy(alpha = 0.8f),
-            maxLines = 1,
-            softWrap = false,
-            modifier = capsule.padding(horizontal = 5.dp, vertical = 2.dp),
-        )
-    } else {
-        Box(capsule.padding(horizontal = 4.dp, vertical = 2.dp).testTag("tile-not-available")) {
-            Icon(Icons.Filled.Lock, contentDescription = "Not available yet", tint = palette.ink.copy(alpha = 0.8f), modifier = Modifier.size(9.dp))
-        }
-    }
+    Text(
+        "PRO",
+        fontSize = 8.sp,
+        fontWeight = FontWeight.ExtraBold,
+        fontFamily = StudioFonts.Rounded,
+        color = palette.ink.copy(alpha = 0.8f),
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier.clip(CircleShape).background(palette.ink.copy(alpha = 0.12f)).padding(horizontal = 5.dp, vertical = 2.dp),
+    )
 }
 
 /** iOS capsule choice (quantize ¼ ⅛ 1/16, loop length): accent text + 15 % fill when selected. */

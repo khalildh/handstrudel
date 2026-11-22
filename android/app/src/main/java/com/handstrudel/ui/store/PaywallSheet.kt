@@ -113,18 +113,14 @@ fun PaywallContent(packId: String, store: StoreGate, onDismiss: () -> Unit, modi
             }
 
             when {
-                !store.isConfigured -> Text(
-                    StoreCopy.UNAVAILABLE, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded,
-                    color = Color.White.copy(alpha = 0.6f), textAlign = TextAlign.Center,
-                    modifier = Modifier.testTag("paywall-unavailable").padding(horizontal = 24.dp),
-                )
                 product != null -> Text(
                     product.displayPrice, fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Mono,
                     color = StoreColors.green, modifier = Modifier.testTag("paywall-price").padding(top = 8.dp),
                 )
                 state.isLoading -> CircularProgressIndicator(Modifier.size(22.dp), color = StoreColors.green, strokeWidth = 2.dp)
+                // iOS `product?.localizedPriceString ?? "---"` (also what shows with no RevenueCat key).
                 else -> Text("---", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Mono,
-                    color = StoreColors.green, modifier = Modifier.padding(top = 8.dp))
+                    color = StoreColors.green, modifier = Modifier.testTag("paywall-price").padding(top = 8.dp))
             }
         }
 
@@ -142,7 +138,7 @@ fun PaywallContent(packId: String, store: StoreGate, onDismiss: () -> Unit, modi
             GreenButton(
                 testTag = "paywall-unlock",
                 height = 56.dp,
-                enabled = store.isConfigured && !unlocked && !purchasing && !state.isRestoring,
+                enabled = !unlocked && !purchasing && !state.isRestoring,
                 onClick = {
                     val activity = context.findActivity() ?: return@GreenButton
                     purchasing = true
@@ -165,15 +161,13 @@ fun PaywallContent(packId: String, store: StoreGate, onDismiss: () -> Unit, modi
                 }
             }
 
-            if (store.isConfigured) {
-                RestorePurchasesButton(
-                    store = store,
-                    packId = packId,
-                    enabled = !purchasing,
-                    onRestoreStarted = { errorMessage = null },
-                    onRestored = onDismiss,
-                )
-            }
+            RestorePurchasesButton(
+                store = store,
+                packId = packId,
+                enabled = !purchasing,
+                onRestoreStarted = { errorMessage = null },
+                onRestored = onDismiss,
+            )
 
             errorMessage?.let {
                 Text(it, fontSize = 12.sp, color = StoreColors.red.copy(alpha = 0.8f), textAlign = TextAlign.Center,

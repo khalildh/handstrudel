@@ -2,7 +2,6 @@ package com.handstrudel.ui.studio.common
 
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.filled.Lock
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -175,15 +174,14 @@ fun PickerCategoryChip(title: String, selected: Boolean, modifier: Modifier = Mo
 
 /**
  * The lock pill on locked rows (iOS `ProBadge`: "PRO" capsule in the accent).
- * When the store isn't configured (no RevenueCat key) locked items read
- * "Not available yet" instead, per the WS3 rules.
+ * Shown whether or not the store is configured, like iOS: without a RevenueCat
+ * key the paywall still opens, with prices in the iOS "unavailable" state.
  */
 @Composable
 fun LockBadge(modifier: Modifier = Modifier) {
     val palette = LocalStudioPalette.current
-    val configured = LocalAppServices.current.store.isConfigured
     Text(
-        if (configured) "PRO" else "Not available yet",
+        "PRO",
         fontSize = 11.sp,
         fontFamily = StudioFonts.Mono,
         fontWeight = FontWeight.SemiBold,
@@ -199,8 +197,8 @@ fun LockBadge(modifier: Modifier = Modifier) {
 
 /**
  * Locked-content gate. [isLocked] asks the [StoreGate]; [open] shows the
- * store's `PaywallSheet` for a pack, or does nothing when the store isn't
- * configured ("Not available yet").
+ * store's `PaywallSheet` for a pack (also with no RevenueCat key, as iOS does
+ * when products fail to load: price "---", UNLOCK reports the product unavailable).
  */
 @Stable
 class PaywallHost internal constructor(val store: StoreGate) {
@@ -216,7 +214,7 @@ class PaywallHost internal constructor(val store: StoreGate) {
     }
 
     fun open(packId: String) {
-        if (store.isConfigured) this.packId = packId
+        this.packId = packId
     }
 
     /** Runs [action] when [packId] is unlocked, else opens the paywall. */
@@ -317,25 +315,11 @@ fun SheetTextButton(label: String, modifier: Modifier = Modifier, enabled: Boole
 
 /** iOS ControlSheet `sectionHeader`: small icon + tracked rounded caps. */
 @Composable
-fun SectionHeader(title: String, icon: ImageVector, modifier: Modifier = Modifier, notAvailable: Boolean = false) {
+fun SectionHeader(title: String, icon: ImageVector, modifier: Modifier = Modifier) {
     val palette = LocalStudioPalette.current
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Icon(icon, null, tint = palette.accent.copy(alpha = 0.6f), modifier = Modifier.size(12.dp))
         Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = palette.muted, letterSpacing = 1.5.sp)
-        // Android-only (no store configured): the words for the lock glyphs on this
-        // section's tiles, in the row-badge style, instead of a label on every tile.
-        if (notAvailable && !LocalAppServices.current.store.isConfigured) {
-            Spacer(Modifier.width(2.dp))
-            Row(
-                Modifier.testTag("section-not-available").clip(CircleShape).background(palette.ink.copy(alpha = 0.06f))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Icon(Icons.Filled.Lock, null, tint = palette.muted, modifier = Modifier.size(9.dp))
-                Text("Not available yet", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, color = palette.muted, maxLines = 1)
-            }
-        }
     }
 }
 

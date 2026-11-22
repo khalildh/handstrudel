@@ -75,8 +75,9 @@ internal const val TERMS_URL = "https://handstrudel.com/terms"
 
 /**
  * Store screen (iOS `Views/StoreView.swift`): drum kits, Pro, HandStrudel+,
- * Restore, Privacy + Terms. With no RevenueCat key it says purchases aren't
- * available and offers nothing to buy.
+ * Restore, Privacy + Terms. With no RevenueCat key it looks like iOS when
+ * products fail to load: every row and button shows, without prices, and a
+ * purchase reports the iOS "Product unavailable: <id>" error.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +101,7 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var showPaywall by remember { mutableStateOf(false) }
     var pendingNotice by remember { mutableStateOf<String?>(null) }
+    var subscribeError by remember { mutableStateOf<String?>(null) }
 
     // Always reload: a previous failed load would leave products missing.
     LaunchedEffect(store) { store.refresh() }
@@ -107,6 +109,7 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
     fun buy(productId: String) {
         val activity = context.findActivity() ?: return
         pendingNotice = null
+        subscribeError = null
         scope.launch {
             // Play can leave a purchase pending; say so instead of looking like nothing happened.
             if (store.purchase(activity, productId) == PurchaseResult.Pending) pendingNotice = StoreCopy.PENDING
@@ -129,39 +132,23 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
             if (state.isLoading) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
         }
 
-        if (!store.isConfigured) {
-            Text(
-                StoreCopy.UNAVAILABLE,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded,
-                color = Color.White.copy(alpha = 0.7f),
-                modifier = Modifier
-                    .testTag("store-unavailable")
-                    .card(highlighted = false)
-                    .padding(16.dp),
-            )
-        }
-
-        // Drum kits: only rows that are owned or whose product loaded (Play may not list them).
+        // Drum kits: always listed, like iOS; Buy shows the price once the product loaded.
         val kits = listOf(
             KitRow(ProductIds.KIT_808, "808 Kit", "🥁",
                 listOf("Boom Bap", "Drill", "Lo-Fi Hip Hop", "R&B", "Afrobeat", "Bounce", "Jersey Club", "Memphis", "Bossa Nova", "Reggae")),
             KitRow(ProductIds.KIT_ELECTRONIC, "Electronic Kit", "⚡",
                 listOf("Techno", "Breakbeat", "IDM", "Jungle", "Ambient", "Industrial", "2-Step", "Synthwave")),
-        ).filter { store.isUnlocked(it.id) || product(it.id) != null }
-        if (kits.isNotEmpty()) {
-            Section("DRUM KITS") {
-                kits.forEach { kit ->
-                    PackRow(kit, unlocked = store.isUnlocked(kit.id), product = product(kit.id), onBuy = { buy(kit.id) })
-                }
+        )
+        Section("DRUM KITS") {
+            kits.forEach { kit ->
+                PackRow(kit, unlocked = store.isUnlocked(kit.id), product = product(kit.id), onBuy = { buy(kit.id) })
             }
         }
 
         Section("PRO") {
             ProRow(
                 unlocked = store.hasProAccess,
-                configured = store.isConfigured,
-                product = product(ProductIds.PRO).takeIf { store.isConfigured },
+                product = product(ProductIds.PRO),
                 purchasing = state.purchasingProductId == ProductIds.PRO,
                 onBuy = { buy(ProductIds.PRO) },
             )
@@ -171,10 +158,19 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
             SubscriptionRow(
                 hasSubscription = store.hasSubscription,
                 hasProAccess = store.hasProAccess,
-                configured = store.isConfigured,
-                offeringAvailable = state.offeringAvailable,
+                offeringAvailable = store.isConfigured && state.offeringAvailable,
                 plans = ProductIds.plusPlans.mapNotNull(::product),
-                onSubscribe = { showPaywall = true },
+                onSubscribe = {
+                    pendingNotice = null
+                    // iOS opens RevenueCat's paywall; with no offering (no key, or nothing loaded)
+                    // there is nothing to show, so report it the way a missing product is reported.
+                    if (store.isConfigured && state.offeringAvailable) {
+                        subscribeError = null
+                        showPaywall = true
+                    } else {
+                        subscribeError = StoreCopy.productUnavailable(ProductIds.PLUS_SUBSCRIPTION)
+                    }
+                },
                 onBuyPlan = ::buy,
                 onManage = {
                     context.openUrl(
@@ -185,13 +181,13 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
             )
         }
 
-        state.lastError?.let {
-            Text(it, fontSize = 12.sp, color = StoreColors.red.copy(alpha = 0.8f), modifier = Modifier.fillMaxWidth())
+        (subscribeError ?: state.lastError)?.let {
+            Text(it, fontSize = 12.sp, color = StoreColors.red.copy(alpha = 0.8f), modifier = Modifier.fillMaxWidth().testTag("store-error"))
         } ?: pendingNotice?.let {
             Text(it, fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.fillMaxWidth().testTag("store-pending"))
         }
 
-        if (store.isConfigured) RestorePurchasesButton(store)
+        RestorePurchasesButton(store)
 
         // Required policy links, always reachable from the store.
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally)) {
@@ -215,7 +211,8 @@ private data class KitRow(val id: String, val name: String, val emoji: String, v
 
 @Composable
 private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // iOS puts headers and rows straight in the screen's 28 pt VStack.
+    Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         SectionHeader(title)
         content()
     }
@@ -243,9 +240,10 @@ private fun PackRow(kit: KitRow, unlocked: Boolean, product: StoreProduct?, onBu
         }
         if (unlocked) {
             CheckCircle()
-        } else if (product != null) {
+        } else {
             Row(
                 Modifier
+                    .testTag("store-buy-${kit.id}")
                     .clip(RoundedCornerShape(10.dp))
                     .background(StoreColors.green)
                     .clickable(onClick = onBuy)
@@ -253,14 +251,16 @@ private fun PackRow(kit: KitRow, unlocked: Boolean, product: StoreProduct?, onBu
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text("Buy", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = StudioFonts.Rounded, color = Color.Black)
-                Text(product.displayPrice, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Mono, color = Color.Black)
+                product?.let {
+                    Text(it.displayPrice, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Mono, color = Color.Black)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ProRow(unlocked: Boolean, configured: Boolean, product: StoreProduct?, purchasing: Boolean, onBuy: () -> Unit) {
+private fun ProRow(unlocked: Boolean, product: StoreProduct?, purchasing: Boolean, onBuy: () -> Unit) {
     Column(
         Modifier.testTag("store-pro").card(unlocked).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -277,7 +277,7 @@ private fun ProRow(unlocked: Boolean, configured: Boolean, product: StoreProduct
             FeatureItem("One-time purchase")
         }
         // iOS always offers BUY PRO and fetches the product on demand; the price shows once it loaded.
-        if (!unlocked && configured) {
+        if (!unlocked) {
             GreenButton(testTag = "store-buy-pro", enabled = !purchasing, onClick = onBuy) {
                 if (purchasing) {
                     CircularProgressIndicator(Modifier.size(20.dp), color = Color.Black, strokeWidth = 2.dp)
@@ -297,7 +297,6 @@ private fun ProRow(unlocked: Boolean, configured: Boolean, product: StoreProduct
 private fun SubscriptionRow(
     hasSubscription: Boolean,
     hasProAccess: Boolean,
-    configured: Boolean,
     offeringAvailable: Boolean,
     plans: List<StoreProduct>,
     onSubscribe: () -> Unit,
@@ -332,8 +331,7 @@ private fun SubscriptionRow(
                 }
             }
             hasProAccess -> StatusLine("Pro — Lifetime Access", "store-plus-lifetime", Modifier.padding(vertical = 12.dp))
-            !configured -> Unit
-            offeringAvailable -> GreenButton(testTag = "store-subscribe", onClick = onSubscribe) {
+            offeringAvailable || plans.isEmpty() -> GreenButton(testTag = "store-subscribe", onClick = onSubscribe) {
                 Text("SUBSCRIBE", fontSize = 16.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.Black)
             }
             // No RevenueCat offering: plain buttons for whichever Plus plans loaded.

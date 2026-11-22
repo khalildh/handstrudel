@@ -79,8 +79,9 @@ class StoreDebugOverrides {
  * RevenueCat-backed [StoreGate]. Port of iOS `Models/StoreManager.swift` (1.0.1).
  *
  * With no backend (blank `REVENUECAT_API_KEY`) it is unconfigured: only free
- * content (`packId == null`) unlocks, purchase/restore report unavailable and
- * nothing touches RevenueCat.
+ * content (`packId == null`) unlocks, nothing touches RevenueCat, and it behaves
+ * like iOS when StoreKit returns no products: a purchase fails with
+ * "Product unavailable: <id>" and a restore fails.
  */
 class StoreManager(
     private val backend: PurchasesBackend?,
@@ -148,7 +149,10 @@ class StoreManager(
     // MARK: - Load
 
     override suspend fun refresh() {
-        val backend = backend ?: return
+        val backend = backend ?: run {
+            _state.update { it.copy(lastError = null) }
+            return
+        }
         // A failure from an earlier purchase (e.g. in a paywall) shouldn't greet the next visit.
         _state.update { it.copy(isLoading = true, lastError = null) }
         try {
@@ -175,7 +179,12 @@ class StoreManager(
     // MARK: - Purchase
 
     override suspend fun purchase(activity: Activity, productId: String): PurchaseResult {
-        val backend = backend ?: return PurchaseResult.Failed(StoreCopy.UNAVAILABLE)
+        val backend = backend ?: run {
+            // iOS `purchase(productId:)` when the product can't be fetched: `StoreError.productNotFound`.
+            val message = StoreCopy.productUnavailable(productId)
+            _state.update { it.copy(lastError = message) }
+            return PurchaseResult.Failed(message)
+        }
         _state.update { it.copy(purchasingProductId = productId, lastError = null) }
         return try {
             apply(backend.purchase(activity, productId))

@@ -10,7 +10,10 @@ import java.util.UUID
  * Consumers (studio-ui, capture, shell) only call this interface.
  */
 interface StoreGate {
-    /** False when `BuildConfig.REVENUECAT_API_KEY` is blank: nothing paid unlocks, store hidden. */
+    /**
+     * False when `BuildConfig.REVENUECAT_API_KEY` is blank: nothing paid unlocks. The store and
+     * PRO badges still show (iOS with no products loaded); purchases fail with "Product unavailable".
+     */
     val isConfigured: Boolean
     val state: StateFlow<StoreState>
 
@@ -48,7 +51,7 @@ class UnconfiguredStoreGate : StoreGate {
     override val hasPlusFeatures: Boolean = false
     override val hasSubscription: Boolean = false
     override suspend fun purchase(activity: Activity, productId: String): PurchaseResult =
-        PurchaseResult.Failed(StoreCopy.UNAVAILABLE)
+        PurchaseResult.Failed(StoreCopy.productUnavailable(productId))
     override suspend fun restore(packId: String?): RestoreOutcome = RestoreOutcome.FAILED
     override suspend fun logIn(appUserId: String) = Unit
     override suspend fun logOut() = Unit

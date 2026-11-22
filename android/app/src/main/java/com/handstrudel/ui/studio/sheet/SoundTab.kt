@@ -162,7 +162,7 @@ internal fun SoundTab(paywall: PaywallHost, onOpenPresets: () -> Unit) {
     if (!usesSF) {
         StudioPaddedPanel {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionHeader("SOUND", StudioIcons.Waveform, notAvailable = WAVEFORMS.any { it.isPremium && paywall.isLocked(it.packId) })
+                SectionHeader("SOUND", StudioIcons.Waveform)
                 TileGrid(WAVEFORMS, columns = 4) { wf ->
                     val locked = wf.isPremium && paywall.isLocked(wf.packId)
                     EmojiTile(

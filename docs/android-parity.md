@@ -596,7 +596,7 @@ Copy the assets at build time with a Gradle `Copy` task (`generateStrudelAssets`
 * `iOS/App/ContentView.swift` performance view sections: top bar, overlays, note badge, beat ring, drum XY pad, grid quick bar, note grid, drum lanes, randomize.
 
 **Rules:**
-* Locked content shows the PRO badge. Tapping it opens `PaywallSheet(packId)`. When `store.isConfigured == false`, locked items show "Not available yet" and do nothing.
+* Locked content shows the PRO badge. Tapping it opens `PaywallSheet(packId)`. This holds when `store.isConfigured == false` too (iOS behaves the same when StoreKit returns no products): the paywall opens with the price "---", and UNLOCK reports "Product unavailable: <product id>".
 * Opening the control sheet calls `engine.pause()`. Dismissing calls `resume()`.
 * Presets, Close and Settings are disabled while `capture.isRecordingLocked`.
 * The bottom row of the Stage is exactly `CaptureEntryPoints.StageBottomControls(onOpenSettings = { showSheet = true })`. Recording overlays come from `CaptureEntryPoints.StageOverlays()`.
@@ -767,12 +767,12 @@ Copy the assets at build time with a Gradle `Copy` task (`generateStrudelAssets`
 **Details:**
 * `Purchases.configure(PurchasesConfiguration.Builder(context, BuildConfig.REVENUECAT_API_KEY).build())` in `StoreManager.init`, **only if the key is non-blank**. Otherwise `isConfigured = false`:
   * `isUnlocked()` returns true only for free content (`packId == null`).
-  * `StoreScreen` shows "Purchases aren't available in this build".
-  * Studio-ui hides the Store button.
+  * Everything else looks like iOS when products fail to load. Studio-ui shows the Store (bag) button and PRO badges. `StoreScreen` lists both drum kits, Pro and HandStrudel+ with "Buy", "BUY PRO" and "SUBSCRIBE" and no prices. `PaywallSheet` shows "---" as the price. Restore Purchases is offered.
+  * A purchase fails with iOS's `StoreError.productNotFound` copy, "Product unavailable: <product id>". It shows under the rows in the store and under UNLOCK in the paywall. SUBSCRIBE has no RevenueCat offering to show, so it reports "Product unavailable: com.handstrudel.plus". Restore reports iOS's "We couldn't restore your purchases. Please try again."
 * Entitlement mapping is a pure function `Entitlements.entitlementId(packId)`, identical to Swift, so it can be unit-tested.
 * Listen to `UpdatedCustomerInfoListener`.
 * Play product IDs (owner creates them in Play Console; see Risks): `com.handstrudel.pro` (one-time, non-consumable), subscription `com.handstrudel.plus` with base plans `monthly` and `yearly`. RevenueCat identifiers are `com.handstrudel.plus:monthly` / `:yearly`. Optionally `com.handstrudel.kit.808` and `com.handstrudel.kit.electronic`; Pro already grants the kit entitlements, so these can be skipped.
-* Store screen sections: drum kits (hidden if the products don't load), Pro, HandStrudel+ (RevenueCat `purchases-ui` `PaywallDialog` if an offering exists, else plain package buttons), Restore, Privacy (`https://handstrudel.com/privacy`) and **Terms (`https://handstrudel.com/terms`)**.
+* Store screen sections: drum kits (always listed, like iOS; the price shows once the product loads), Pro, HandStrudel+ (RevenueCat `purchases-ui` `PaywallDialog` if an offering exists, else plain package buttons), Restore, Privacy (`https://handstrudel.com/privacy`) and **Terms (`https://handstrudel.com/terms`)**.
 * `logIn`/`logOut` run in response to `auth.userId` changes. store subscribes in `AppServices` wiring (shell calls `store.bind(auth.userId)`).
 
 **Dependencies:** `com.revenuecat.purchases:purchases:8.10.x`, `com.revenuecat.purchases:purchases-ui:8.10.x`. Pick versions compatible with compileSdk 35 / Kotlin 2.0.21.
@@ -811,8 +811,8 @@ Copy the assets at build time with a Gradle `Copy` task (`generateStrudelAssets`
 | # | Needed from owner | Used by | Degradation without it |
 | --- | --- | --- | --- |
 | R1 | **Google Play Console app** `com.handstrudel.app`: upload key, internal testing track, license testers. Required for billing tests and for App Links verification. | store, shell | Debug builds run fine; billing can't be tested. |
-| R2 | **RevenueCat Android app** in the *same* RevenueCat project as iOS: the Play service-account JSON linked, entitlements `pro`, `plus_features`, `kit_808`, `kit_electronic` attached to the Play products (above), and the **public Android SDK key** (`goog_…`) passed as `handstrudel.revenuecatApiKey`. | store | `StoreGate.isConfigured = false`: store hidden, all paid content locked, no crash. |
-| R3 | **Play products:** `com.handstrudel.pro` (in-app), `com.handstrudel.plus` subscription with `monthly`/`yearly` base plans, prices matching iOS, and optionally the kit products. | store | The store shows only what loads. Missing products are hidden, not "---". |
+| R2 | **RevenueCat Android app** in the *same* RevenueCat project as iOS: the Play service-account JSON linked, entitlements `pro`, `plus_features`, `kit_808`, `kit_electronic` attached to the Play products (above), and the **public Android SDK key** (`goog_…`) passed as `handstrudel.revenuecatApiKey`. | store | `StoreGate.isConfigured = false`: all paid content locked, no crash. Store and PRO badges still show, with iOS's "no products" state ("---" prices, "Product unavailable: <id>" on purchase). |
+| R3 | **Play products:** `com.handstrudel.pro` (in-app), `com.handstrudel.plus` subscription with `monthly`/`yearly` base plans, prices matching iOS, and optionally the kit products. | store | Rows show without a price (iOS "---" in the paywall). Buying a missing product fails with "Product unavailable: <id>". |
 | R4 | **Google sign-in:** enable the Google provider in the Supabase dashboard. Needs a Google Cloud Web OAuth client id + secret and an Android OAuth client (package + SHA-1 of the debug, upload and Play signing keys). Pass the Web client id as `handstrudel.googleWebClientId`. **Confirm whether production already has Google enabled**: the repo's `supabase/config.toml` is local-only and shows neither Google nor Apple enabled. | social | Google button hidden; email OTP only. |
 | R5 | **Apple-account users on Android:** iOS users who signed up with Sign in with Apple (often private-relay emails) cannot reach that account via email OTP. Fix options: enable Apple OAuth (web flow) for Android (Apple Services ID, return URL `handstrudel://auth-callback`, Supabase redirect allow-list), or document "use the same email". Decide before public launch. | social | Those users get a new, separate account. |
 | R6 | **App Links:** `public/.well-known/assetlinks.json` with the Play app-signing SHA-256 (served at `https://handstrudel.com/.well-known/assetlinks.json`), deployed with the website. | shell | `https://handstrudel.com/watch` links open the browser; the `handstrudel://` scheme still works. |
