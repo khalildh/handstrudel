@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -618,6 +619,9 @@ private fun TrimHandle(
     val latestOnEdit by androidx.compose.runtime.rememberUpdatedState(onEdit)
     Box(
         Modifier.offset(x = center - 22.dp).width(44.dp).fillMaxHeight()
+            // The handles sit at the screen edges, inside the gesture-nav back zones: claim them
+            // so dragging a handle trims instead of closing the sheet.
+            .systemGestureExclusion()
             .semantics {
                 contentDescription = if (isStart) "Trim start" else "Trim end"
                 stateDescription = String.format(Locale.US, "%.2f seconds", value * outputScale)
