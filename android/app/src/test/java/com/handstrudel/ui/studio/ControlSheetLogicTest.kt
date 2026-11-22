@@ -8,7 +8,6 @@ import com.handstrudel.models.Scale
 import com.handstrudel.models.ScaleSelection
 import com.handstrudel.models.SoundSetup
 import com.handstrudel.models.SoundSetupMode
-import com.handstrudel.ui.studio.presets.presetCount
 import com.handstrudel.ui.studio.sheet.ControlSheetLogic
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -135,14 +134,9 @@ class ControlSheetLogicTest {
     }
 
     @Test
-    fun importMessagesAndPackCount() {
+    fun importMessages() {
         assertEquals("These presets are already saved on this device.", ControlSheetLogic.importResultMessage(0, 3))
         assertEquals("Imported 2 of 3 presets.", ControlSheetLogic.importResultMessage(2, 3))
-        val pack = """{"format":"handstrudel-presets","version":1,"presets":[{"name":"a"},{"name":"b"}]}"""
-        assertEquals(2, presetCount(pack.toByteArray()))
-        assertNull(presetCount("""{"format":"other","presets":[{}]}""".toByteArray()))
-        assertNull(presetCount("""{"format":"handstrudel-presets","presets":[]}""".toByteArray()))
-        assertNull(presetCount("not json".toByteArray()))
     }
 
     @Test

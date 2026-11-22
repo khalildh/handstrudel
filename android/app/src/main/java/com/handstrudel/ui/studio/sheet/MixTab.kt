@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Lock
@@ -37,7 +38,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,6 +56,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.handstrudel.app.LocalAppServices
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import com.handstrudel.engine.DrumTrackState
 import com.handstrudel.engine.SavedLoop
 import com.handstrudel.models.DRUM_LOOPS
@@ -96,8 +99,7 @@ internal fun BpmSection() {
     val engine = LocalAppServices.current.engine
     val palette = LocalStudioPalette.current
     val manualBPM by engine.manualBPM.collectAsState()
-    // TODO(engine): bpmIsMapped (iOS: config maps "bpm"); 1.0.1 always runs DEFAULT_MAPPING.
-    val bpmIsMapped = "bpm" in ControlSheetLogic.DEFAULT_MAPPED_PARAM_IDS
+    val bpmIsMapped = engine.bpmIsMapped
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeader("BPM", Icons.Filled.Timer)
         Text(
@@ -125,26 +127,19 @@ internal fun ParamsSection() {
     val engine = LocalAppServices.current.engine
     val locked by engine.lockedParams.collectAsState()
     val smoothed by engine.smoothedParams.collectAsState()
-    // TODO(engine): manualValues — the seam has setManualValue but no read-back, so the
-    // sheet mirrors iOS `toggleLock` (seed from the smoothed value) locally.
-    val manual = remember { mutableStateMapOf<String, Double>() }
+    val manual by engine.manualValues.collectAsState()
+    val mapped = engine.mappedParamIds.toSet().ifEmpty { ControlSheetLogic.DEFAULT_MAPPED_PARAM_IDS }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeader("PARAMETERS", Icons.Filled.Tune)
-        PARAM_DEFS.filter { it.id in ControlSheetLogic.DEFAULT_MAPPED_PARAM_IDS }.forEach { def ->
+        PARAM_DEFS.filter { it.id in mapped }.forEach { def ->
             val isLocked = def.id in locked
             val current = if (isLocked) manual[def.id] ?: def.defaultValue else smoothed[def.id] ?: def.defaultValue
             ParamRow(
                 def = def,
                 isLocked = isLocked,
                 value = current,
-                onToggleLock = {
-                    if (!isLocked) manual[def.id] = smoothed[def.id] ?: def.defaultValue
-                    engine.toggleLock(def.id)
-                },
-                onValue = { v ->
-                    manual[def.id] = v
-                    engine.setManualValue(def.id, v)
-                },
+                onToggleLock = { engine.toggleLock(def.id) },
+                onValue = { v -> engine.setManualValue(def.id, v) },
             )
         }
     }
@@ -228,6 +223,10 @@ internal fun LoopsSection(loops: List<SavedLoop>) {
     val bars by engine.loopRecordingBars.collectAsState()
     var renameTarget by remember { mutableStateOf<SavedLoop?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val share = com.handstrudel.ui.capture.rememberShareCopyLauncher()
+    var exporting by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -259,6 +258,21 @@ internal fun LoopsSection(loops: List<SavedLoop>) {
                     if (!engine.toggleLoopPlayback(loop.id)) message = "This loop couldn't play. Its audio file may be unavailable."
                 },
                 onRename = { renameTarget = loop },
+                exporting = exporting,
+                onExport = {
+                    // iOS `AudioExporter.shareCaptured` (event loops are unreachable in 1.0.1).
+                    exporting = true
+                    scope.launch {
+                        try {
+                            val copy = withContext(Dispatchers.IO) { com.handstrudel.ui.capture.exportLoop(context, loop) }
+                            share.share(copy, "audio/wav")
+                        } catch (_: Exception) {
+                            message = "Couldn't export this loop. The original is still saved."
+                        } finally {
+                            exporting = false
+                        }
+                    }
+                },
                 onDelete = { engine.deleteLoop(loop.id) },
                 onMute = { engine.toggleLoopMute(loop.id) },
                 onGain = { engine.setLoopGain(loop.id, it) },
@@ -283,6 +297,8 @@ private fun LoopRow(
     isPlaying: Boolean,
     onToggle: () -> Unit,
     onRename: () -> Unit,
+    exporting: Boolean,
+    onExport: () -> Unit,
     onDelete: () -> Unit,
     onMute: () -> Unit,
     onGain: (Double) -> Unit,
@@ -314,7 +330,13 @@ private fun LoopRow(
                     Text(ControlSheetLogic.loopDuration(loop.durationSeconds), fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = palette.muted)
                 }
             }
-            // TODO(capture): loop audio export (iOS AudioExporter share button) lives with capture's loop shelf.
+            if (loop.hasCapturedAudio) {
+                CircleIconButton(
+                    Icons.Filled.IosShare, "Export WAV", size = 28.dp, iconSize = 14.dp,
+                    tint = palette.accent.copy(alpha = if (exporting) 0.3f else 0.6f), background = Color.Transparent,
+                    onClick = { if (!exporting) onExport() },
+                )
+            }
             CircleIconButton(
                 Icons.Filled.Edit, "Rename ${loop.name}", size = 28.dp, iconSize = 14.dp,
                 tint = palette.accent.copy(alpha = 0.6f), background = Color.Transparent, onClick = onRename,

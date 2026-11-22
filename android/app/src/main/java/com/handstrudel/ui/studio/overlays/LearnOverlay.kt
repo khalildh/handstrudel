@@ -101,8 +101,8 @@ fun LearnOverlay(touchEnabled: Boolean, onPickSong: () -> Unit, modifier: Modifi
         val hitLineXPx = wPx * LearnGeometry.HIT_LINE_X.toFloat()
         val viewportAspect = wPx / max(1f, hPx)
 
-        val leftLane = hands.left?.let { LearnGeometry.cameraLane(it.pinchY, noteCount, StageMetrics.VIDEO_ASPECT.toDouble(), viewportAspect.toDouble()) }
-        val rightLane = hands.right?.let { LearnGeometry.cameraLane(it.pinchY, noteCount, StageMetrics.VIDEO_ASPECT.toDouble(), viewportAspect.toDouble()) }
+        val leftLane = hands.left?.let { LearnGeometry.cameraLane(it.pinchY, noteCount, StageMetrics.videoAspect(engine).toDouble(), viewportAspect.toDouble()) }
+        val rightLane = hands.right?.let { LearnGeometry.cameraLane(it.pinchY, noteCount, StageMetrics.videoAspect(engine).toDouble(), viewportAspect.toDouble()) }
 
         // Lanes, hit line, scrolling notes, hand lines.
         Canvas(Modifier.fillMaxSize()) {
@@ -148,7 +148,7 @@ fun LearnOverlay(touchEnabled: Boolean, onPickSong: () -> Unit, modifier: Modifi
 
             // Hand position indicators (vertical lines).
             fun handLine(px: Double, pinching: Boolean, color: Color) {
-                val x = LearnGeometry.correctedX(px, size.width, size.height, StageMetrics.VIDEO_ASPECT)
+                val x = LearnGeometry.correctedX(px, size.width, size.height, StageMetrics.videoAspect(engine))
                 val w = (if (pinching) 2f else 1f).dp.toPx()
                 val path = Path().apply { addRect(androidx.compose.ui.geometry.Rect(Offset(x - w / 2f, topPadPx), Size(w, usablePx))) }
                 if (pinching) glowPath(path, color.copy(alpha = 0.5f * 0.7f), 6.dp.toPx())
@@ -225,8 +225,20 @@ fun LearnOverlay(touchEnabled: Boolean, onPickSong: () -> Unit, modifier: Modifi
             if (learn.score.currentStreak > 0) HudStat(Icons.Filled.LocalFireDepartment, colors.orange, "${learn.score.currentStreak}")
         }
 
-        // TODO(engine): iOS shows a 3-2-1 countdown (120 pt, cyan glow) from
-        // `learnModeManager.countdownValue`/`isCountingDown`; `LearnDisplay` has neither.
+        // 3-2-1 count-in (iOS: 120 pt black rounded, cyan glow).
+        if (learn.isCountingDown && learn.countdownValue > 0) {
+            Box(Modifier.fillMaxSize().testTag("learn-countdown"), contentAlignment = Alignment.Center) {
+                Text(
+                    "${learn.countdownValue}",
+                    style = TextStyle(
+                        fontSize = 120.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        shadow = androidx.compose.ui.graphics.Shadow(colors.cyan, Offset.Zero, 40f),
+                    ),
+                )
+            }
+        }
 
         if (learn.songComplete) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

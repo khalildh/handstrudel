@@ -87,11 +87,11 @@ class OverlayGeometryTest {
 
     @Test fun zonesChordHalfColumns() {
         // 4 zones on the left half (0…500) with a 6 px inset → 122 px columns.
-        assertEquals(ZonesGeometry.Zone.Chord(0), ZonesGeometry.zoneForPoint(10f, 500f, 1000f, 2000f, 4, 9, false, 6f))
-        assertEquals(ZonesGeometry.Zone.Chord(1), ZonesGeometry.zoneForPoint(200f, 100f, 1000f, 2000f, 4, 9, false, 6f))
-        assertEquals(ZonesGeometry.Zone.Chord(3), ZonesGeometry.zoneForPoint(499f, 1900f, 1000f, 2000f, 4, 9, false, 6f))
+        assertEquals(ZonesGeometry.Zone.Chord(0, 1), ZonesGeometry.zoneForPoint(10f, 500f, 1000f, 2000f, 4, 9, false, 6f))
+        assertEquals(ZonesGeometry.Zone.Chord(1, 1), ZonesGeometry.zoneForPoint(200f, 100f, 1000f, 2000f, 4, 9, false, 6f))
+        assertEquals(ZonesGeometry.Zone.Chord(3, -1), ZonesGeometry.zoneForPoint(499f, 1900f, 1000f, 2000f, 4, 9, false, 6f))
         // Inside the inset clamps.
-        assertEquals(ZonesGeometry.Zone.Chord(0), ZonesGeometry.zoneForPoint(1f, 500f, 1000f, 2000f, 4, 9, false, 6f))
+        assertEquals(ZonesGeometry.Zone.Chord(0, 1), ZonesGeometry.zoneForPoint(1f, 500f, 1000f, 2000f, 4, 9, false, 6f))
     }
 
     @Test fun zonesMelodyLanesHighestOnTop() {

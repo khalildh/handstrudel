@@ -1,6 +1,7 @@
 package com.handstrudel.ui.studio.pickers
 
 import androidx.compose.foundation.background
+import com.handstrudel.models.ProgressionCategory
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,20 +72,12 @@ enum class GMCategory(val displayName: String, val emoji: String) {
 
 val SoundFontInstrument.gmCategory: GMCategory get() = GMCategory.of(program)
 
-/** iOS `ProgressionCategory` (custom excluded from the picker tabs). */
-enum class ProgressionCategory(val displayName: String) {
-    ESSENTIALS("Essentials"), POP_ROCK("Pop / Rock"), PUNK_HARD_ROCK("Punk / Hard Rock"), BLUES("Blues"),
-    JAZZ("Jazz"), SOUL_RNB("Soul / R&B"), FOLK_COUNTRY("Folk / Country"), CLASSICAL("Classical"),
-    CINEMATIC("Cinematic"), MODAL("Modal"), ELECTRONIC("Electronic"), WORLD("World"), LONG_FORM("Long-form"),
-}
+/** iOS picker tabs: every `ProgressionCategory` except custom. */
+internal val PICKER_PROGRESSION_CATEGORIES: List<ProgressionCategory> =
+    ProgressionCategory.entries.filter { it != ProgressionCategory.CUSTOM }
 
-/**
- * The progression's picker category. TODO(engine): today's `ChordProgression`
- * has no `category`; when engine ports the 145-entry catalog with iOS
- * `ProgressionCategory`, map it here (premium = not essentials). Until then
- * everything sits under Essentials (all free).
- */
-val ChordProgression.pickerCategory: ProgressionCategory get() = ProgressionCategory.ESSENTIALS
+/** The progression's picker category (iOS `ChordProgression.category`; premium = not essentials). */
+val ChordProgression.pickerCategory: ProgressionCategory get() = category
 
 /** iOS `InstrumentPickerSheet`: GM category tabs, PRO-badged locked rows. */
 @Composable
@@ -152,7 +145,7 @@ fun ProgressionPickerSheet(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ProgressionCategory.entries.forEach { cat ->
+                PICKER_PROGRESSION_CATEGORIES.forEach { cat ->
                     PickerCategoryChip(cat.displayName, category == cat) { category = cat }
                 }
             }

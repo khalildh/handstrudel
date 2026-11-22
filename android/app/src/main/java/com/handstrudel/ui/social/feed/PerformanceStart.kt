@@ -15,21 +15,3 @@ fun AppNavigator.start(start: PerformanceStart) = when (start) {
     is PerformanceStart.Backing -> prepareBacking(start.video)
     is PerformanceStart.Preset -> trySharedSound(start.sound)
 }
-
-/**
- * iOS `SoundSetup.presetDetails`: "C Major · 120 BPM · Pop Anthem".
- * TODO(engine): move onto `SoundSetup` next to `keyAndScale` (iOS keeps it in PersistenceManager).
- */
-val SoundSetup.presetDetails: String
-    get() {
-        val parts = mutableListOf(keyAndScale)
-        if (bpm in 20.0..400.0) parts += "${Math.round(bpm)} BPM"
-        resolvedProgression?.let { progression ->
-            parts += when {
-                progression.id == "free" -> "Free layout"
-                progression.isCustom -> progression.degrees.joinToString("-") { (it + 1).toString() }
-                else -> progression.name
-            }
-        }
-        return parts.joinToString(" · ")
-    }

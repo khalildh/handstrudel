@@ -56,15 +56,16 @@ fun SplitScaleWheelOverlay(scaleMode: Boolean, touchEnabled: Boolean, modifier: 
     val melodyNames = melodyMidis.map { StudioMusic.pitchClassName(it) }
     val chordToneLanes = StudioMusic.splitChordToneLanes(key, intervals, melodyMidis, melodyDegree, scaleMode)
     val zoneCount = max(1, chordNames.size)
-    val melodyCount = max(1, melodyNames.size)
+    // Scale arc: the engine's lane count (the scale length); it can lag a scale change by a
+    // frame, so fall back to the drawn names until they agree.
+    val melodyCount = max(1, if (scaleMode && cm.melodyLaneCount == melodyNames.size) cm.melodyLaneCount else melodyNames.size)
 
     var touches by remember { mutableStateOf<Map<Long, Zone>>(emptyMap()) }
     val touchedChords = touches.values.filterIsInstance<Zone.Chord>().map { it.sub }.toSet() +
         cm.touchedChordZones.map { ChordSubzone(it.wedge, it.octave) }
     val touchedLanes = touches.values.filterIsInstance<Zone.Melody>().map { it.lane }.toSet() + cm.touchedMelodyLanes
     // iOS `currentMelodyOctaveShift` (Scale mode's melody ±1 band).
-    // TODO(engine): add `ChordMelodyDisplay.melodyOctaveShift`; until then the band never lights from the hand.
-    val melodyOctaveShift = 0
+    val melodyOctaveShift = cm.melodyOctaveShift
 
     val measurer = rememberTextMeasurer()
     Canvas(

@@ -201,7 +201,7 @@ internal fun LoopShelfSheetView(onDismiss: () -> Unit) {
 }
 
 /** iOS `AudioExporter.shareCaptured`: a checked temporary copy of the original WAV. */
-private fun exportLoop(context: android.content.Context, loop: SavedLoop): File {
+internal fun exportLoop(context: android.content.Context, loop: SavedLoop): File {
     val source = loop.file ?: throw IllegalStateException("missing file")
     if (!WavFile.isComplete(source, loop.durationSeconds)) throw IllegalStateException("The captured audio file is incomplete.")
     val output = File(DraftExport.exportsDir(context), "HandStrudel-${UUID.randomUUID()}.wav")

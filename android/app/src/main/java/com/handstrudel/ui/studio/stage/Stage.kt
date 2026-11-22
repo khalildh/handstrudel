@@ -187,6 +187,7 @@ fun Stage() {
         HandOverlay(
             hands, handTheme(themeId),
             Modifier.fillMaxSize().alpha(if (capture.isRecording && hideSkeleton) 0f else 1f),
+            videoAspect = com.handstrudel.ui.studio.common.StageMetrics.videoAspect(engine),
         )
 
         // ---- Mode overlays ----

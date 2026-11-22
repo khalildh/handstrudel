@@ -59,20 +59,6 @@ import com.handstrudel.ui.theme.LocalStudioPalette
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** iOS `SoundSetup.presetDetails`: "C Major · 120 BPM · Pop". */
-internal fun SoundSetup.presetDetails(): String {
-    val parts = mutableListOf(keyAndScale)
-    if (bpm in 20.0..400.0) parts += "${Math.round(bpm)} BPM"
-    resolvedProgression?.let { p ->
-        parts += when {
-            p.id == "free" -> "Free layout"
-            p.isCustom -> p.degrees.joinToString("-") { (it + 1).toString() }
-            else -> p.name
-        }
-    }
-    return parts.joinToString(" · ")
-}
-
 /** iOS `PostComposerView`: preview, caption, sharing toggles, then the upload. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,7 +137,7 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
                             SwitchRow("Share playable preset", sharing.sharePlayablePreset, !locked, "post-share-preset") {
                                 sharing = sharing.copy(sharePlayablePreset = it)
                             }
-                            Text(if (sharing.sharePlayablePreset) sound.presetDetails() else "Your instrument settings won't be shared.",
+                            Text(if (sharing.sharePlayablePreset) sound.presetDetails else "Your instrument settings won't be shared.",
                                 fontSize = 12.sp, color = palette.muted)
                         }
                     }

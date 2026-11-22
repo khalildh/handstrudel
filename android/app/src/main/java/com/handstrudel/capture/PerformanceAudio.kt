@@ -1,7 +1,6 @@
 package com.handstrudel.capture
 
 import android.content.Context
-import com.handstrudel.BuildConfig
 import com.handstrudel.capture.drafts.Media
 import com.handstrudel.capture.drafts.MediaInfo
 import com.handstrudel.capture.upload.CaptureMessageException
@@ -26,17 +25,8 @@ object PerformanceAudio {
         OkHttpClient.Builder().connectTimeout(20, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
     }
 
-    /**
-     * iOS `SocialConfig.mediaURL`: screened keys (`videos|thumbs/<user>/screened/<id>`)
-     * live on the clip host, everything else on the legacy media host.
-     * TODO(social): use social's `SocialConfig.mediaURL` once it lands.
-     */
-    fun mediaUrl(key: String): String {
-        val parts = key.split("/")
-        val screened = parts.size == 4 && (parts[0] == "videos" || parts[0] == "thumbs") && parts[2] == "screened"
-        val base = (if (screened) BuildConfig.CLIP_MEDIA_BASE_URL else BuildConfig.MEDIA_BASE_URL).trimEnd('/')
-        return "$base/$key"
-    }
+    /** iOS `SocialConfig.mediaURL` (screened keys on the clip host, others on the legacy host). */
+    fun mediaUrl(key: String): String = com.handstrudel.social.SocialConfig.mediaUrl(key)
 
     suspend fun export(context: Context, video: Video): File {
         val dir = File(context.cacheDir, "backing").apply { mkdirs() }

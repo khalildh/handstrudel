@@ -1,5 +1,20 @@
 package com.handstrudel.ui.studio.sheet
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.RadioButtonChecked
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,7 +61,39 @@ import com.handstrudel.ui.studio.pickers.ProgressionPickerSheet
 import com.handstrudel.ui.studio.pickers.ScalePickerSheet
 import com.handstrudel.ui.theme.LocalStudioPalette
 
+/** iOS ControlSheet `pillToggle`: accent capsule when on. */
+@Composable
+private fun PillToggle(label: String, icon: ImageVector, isOn: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val palette = LocalStudioPalette.current
+    Row(
+        modifier
+            .heightIn(min = 44.dp)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { selected = isOn },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            Modifier
+                .background(if (isOn) palette.accent.copy(alpha = 0.15f) else palette.surface, CircleShape)
+                .border(
+                    if (isOn) 1.5.dp else 0.5.dp,
+                    if (isOn) palette.accent.copy(alpha = 0.4f) else palette.ink.copy(alpha = 0.06f),
+                    CircleShape,
+                )
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val tint = if (isOn) palette.accent else palette.ink.copy(alpha = 0.5f)
+            Icon(icon, null, tint = tint, modifier = Modifier.size(13.dp))
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = tint)
+        }
+    }
+}
+
 /** iOS ControlSheet `.sound`: hero, harmony, waveform grid (non-SoundFont path), Presets row. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SoundTab(paywall: PaywallHost, onOpenPresets: () -> Unit) {
     val services = LocalAppServices.current
@@ -61,6 +108,8 @@ internal fun SoundTab(paywall: PaywallHost, onOpenPresets: () -> Unit) {
     val key by engine.selectedKey.collectAsState()
     val scale by engine.selectedScale.collectAsState()
     val progression by engine.chordMelodyProgression.collectAsState()
+    val chordMode by engine.chordMode.collectAsState()
+    val circleOfFifths by engine.circleOfFifthsEnabled.collectAsState()
     val recordingLocked by services.capture.isRecordingLocked.collectAsState()
 
     val usesSF = ControlSheetLogic.activePathUsesSoundFont(mode, radialSF, splitSF, scaleSF)
@@ -99,8 +148,13 @@ internal fun SoundTab(paywall: PaywallHost, onOpenPresets: () -> Unit) {
                 StudioSettingRow("Chords", Icons.Filled.LibraryMusic, value = progression.name) { showProgressionPicker = true }
             }
         }
-        // TODO(engine): chordMode / setChordMode and circleOfFifthsEnabled / setCircleOfFifths —
-        // iOS shows "Chords" and "Circle of 5ths" pill toggles here; the seam has neither.
+        // iOS `harmonyToggles` (HStack, wrapping when it doesn't fit).
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            PillToggle("Chords", Icons.Filled.LibraryMusic, chordMode, Modifier.testTag("harmony-chords")) { engine.setChordMode(!chordMode) }
+            PillToggle("Circle of 5ths", Icons.Filled.RadioButtonChecked, circleOfFifths, Modifier.testTag("harmony-circle-of-fifths")) {
+                engine.setCircleOfFifths(!circleOfFifths)
+            }
+        }
     }
 
     // ---- Sound (waveforms) ----

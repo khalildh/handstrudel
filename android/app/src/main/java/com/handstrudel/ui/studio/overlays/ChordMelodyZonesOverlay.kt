@@ -65,8 +65,9 @@ fun ChordMelodyZonesOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier
     val chordsOnLeft = !swapHands
 
     var touches by remember { mutableStateOf<Map<Long, ZonesGeometry.Zone>>(emptyMap()) }
-    val touchedZones = touches.values.filterIsInstance<ZonesGeometry.Zone.Chord>().map { it.zone }.toSet() +
-        cm.touchedChordZones.map { it.wedge }
+    val touchedCells = touches.values.filterIsInstance<ZonesGeometry.Zone.Chord>().map { it.zone to it.octave }.toSet() +
+        cm.touchedChordZones.map { it.wedge to it.octave }
+    val touchedZones = touchedCells.map { it.first }.toSet()
     val touchedLanes = touches.values.filterIsInstance<ZonesGeometry.Zone.Melody>().map { it.lane }.toSet() +
         cm.touchedMelodyLanes
     val padPx = with(density) { 6.dp.toPx() }
@@ -84,8 +85,7 @@ fun ChordMelodyZonesOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier
                 },
                 onEnter = { id, zone ->
                     when (zone) {
-                        // TODO(engine): `zonesTouchEnterChord` has no octave; touches play the middle row.
-                        is ZonesGeometry.Zone.Chord -> engine.zonesTouchEnterChord(id, zone.zone)
+                        is ZonesGeometry.Zone.Chord -> engine.zonesTouchEnterChord(id, zone.zone, zone.octave)
                         is ZonesGeometry.Zone.Melody -> engine.zonesTouchEnterMelody(id, zone.lane)
                     }
                 },
@@ -112,7 +112,7 @@ fun ChordMelodyZonesOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier
                 val degreeColor = colors.forDegree(degree)
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     for (oct in OCTAVES) {
-                        val isActiveCell = isCurrentZone && oct == (if (touched) 0 else cm.octaveShift)
+                        val isActiveCell = if (touched) (i to oct) in touchedCells else isCurrentZone && oct == cm.octaveShift
                         val isHeld = isActiveCell && (cm.isChordHandPinching || touched)
                         OctaveCell(degree, oct, degreeColor, isCurrentZone, isActiveCell, isHeld, Modifier.weight(1f).fillMaxWidth())
                     }
@@ -262,7 +262,8 @@ object ZonesGeometry {
     const val MELODY_VERTICAL_INSET = 0.15
 
     sealed interface Zone {
-        data class Chord(val zone: Int) : Zone
+        /** [octave]: the touched row, +1 (top third), 0 (middle), −1 (bottom third). */
+        data class Chord(val zone: Int, val octave: Int = 0) : Zone
         data class Melody(val lane: Int) : Zone
     }
 
@@ -284,9 +285,11 @@ object ZonesGeometry {
             val start = (if (chordsOnLeft) 0f else half) + padPx
             val usable = half - 2 * padPx
             val count = max(1, zoneCount)
-            if (usable <= 0f) return Zone.Chord(0)
+            val row = kotlin.math.floor(y / (height / 3f)).toInt().coerceIn(0, 2)
+            val octave = 1 - row
+            if (usable <= 0f) return Zone.Chord(0, octave)
             val col = kotlin.math.floor((x - start) / (usable / count)).toInt()
-            Zone.Chord(col.coerceIn(0, count - 1))
+            Zone.Chord(col.coerceIn(0, count - 1), octave)
         } else {
             val count = max(1, melodyCount)
             val top = height * MELODY_VERTICAL_INSET.toFloat()

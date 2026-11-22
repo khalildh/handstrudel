@@ -5,6 +5,7 @@ import android.graphics.Matrix
 import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraState
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
@@ -18,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.handstrudel.engine.CameraIssue
 import com.handstrudel.engine.HandTrackingManager
 import com.handstrudel.ui.studio.visual.CAMERA_FILTERS
 import com.handstrudel.ui.studio.visual.CameraFilter
@@ -44,7 +46,12 @@ fun CameraPreview(
 
             val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
             cameraProviderFuture.addListener({
-                val cameraProvider = cameraProviderFuture.get()
+                val cameraProvider = try {
+                    cameraProviderFuture.get()
+                } catch (e: Exception) {
+                    handTracker.onCameraBindFailed(e)
+                    return@addListener
+                }
 
                 val preview = Preview.Builder()
                     .build()
@@ -67,11 +74,22 @@ fun CameraPreview(
 
                 try {
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
+                    val camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner, cameraSelector, preview, imageAnalysis
                     )
+                    // Another app holding the camera (iOS `.interrupted`); clears once it reopens.
+                    camera.cameraInfo.cameraState.observe(lifecycleOwner) { state ->
+                        when (state.error?.code) {
+                            CameraState.ERROR_CAMERA_IN_USE, CameraState.ERROR_MAX_CAMERAS_IN_USE -> handTracker.onCameraInUse()
+                            null -> if (state.type == CameraState.Type.OPEN &&
+                                handTracker.cameraIssue.value == CameraIssue.INTERRUPTED
+                            ) handTracker.reportCameraIssue(null)
+                            else -> Unit
+                        }
+                    }
                 } catch (e: Exception) {
                     Log.e("CameraPreview", "Camera bind failed: $e")
+                    handTracker.onCameraBindFailed(e)
                 }
             }, ContextCompat.getMainExecutor(ctx))
 

@@ -46,21 +46,9 @@ import androidx.compose.ui.unit.sp
 /** Display metadata for one picker entry (iOS `LearnSong` name/emoji/bpm). */
 internal data class LearnSongEntry(val id: String, val name: String, val emoji: String, val bpm: Int)
 
-/**
- * The picker's catalog, ported from iOS `Models/LearnSong.swift` `BUNDLED_SONGS`.
- * Ids are the snake_case song names (see [learnSongId]).
- * TODO(engine): replace with LEARN_SONGS from models/LearnSongs.kt (ids must match).
- */
-internal val LEARN_PICKER_SONGS: List<LearnSongEntry> = listOf(
-    LearnSongEntry(learnSongId("Twinkle Twinkle"), "Twinkle Twinkle", "⭐", 100),
-    LearnSongEntry(learnSongId("Ode to Joy"), "Ode to Joy", "🎵", 108),
-    LearnSongEntry(learnSongId("Mary Had a Little Lamb"), "Mary Had a Little Lamb", "🐑", 110),
-    LearnSongEntry(learnSongId("When the Saints"), "When the Saints", "🎺", 112),
-    LearnSongEntry(learnSongId("Amazing Grace"), "Amazing Grace", "🕊️", 80),
-    LearnSongEntry(learnSongId("Frere Jacques"), "Frere Jacques", "🔔", 120),
-    LearnSongEntry(learnSongId("Jingle Bells"), "Jingle Bells", "🎄", 130),
-    LearnSongEntry(learnSongId("Scarborough Fair"), "Scarborough Fair", "🌿", 90),
-)
+/** The picker's catalog: the engine's `BUNDLED_SONGS` (iOS `Models/LearnSong.swift`), in order. */
+internal val LEARN_PICKER_SONGS: List<LearnSongEntry> =
+    com.handstrudel.models.BUNDLED_SONGS.map { LearnSongEntry(it.id, it.name, it.emoji, it.bpm.toInt()) }
 
 /** iOS practice generators: (label, icon, generated song name → id). */
 internal data class PracticeEntry(val label: String, val songName: String) {
@@ -69,8 +57,8 @@ internal data class PracticeEntry(val label: String, val songName: String) {
 
 /**
  * iOS `LearnSong.ascending(noteCount: 10)`, `.descending(10)`, `.arpeggio(14)`,
- * `.random(12)`; the generated song is named e.g. "Ascending 10".
- * TODO(engine): the engine catalog must accept these ids (random regenerates per load).
+ * `.random(12)`; the generated song is named e.g. "Ascending 10". Ids match the
+ * engine's `PRACTICE_SONG_IDS` (random regenerates per load).
  */
 internal val LEARN_PRACTICE: List<PracticeEntry> = listOf(
     PracticeEntry("Ascending", "Ascending 10"),

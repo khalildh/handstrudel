@@ -19,39 +19,8 @@ object ControlSheetLogic {
 
     // ---- Custom progression -------------------------------------------------------
 
-    /**
-     * iOS `ChordProgression.parse(_:)` degrees: splits on anything that isn't a
-     * letter or digit, maps "1".."7" (leading digit run, so "3rd" → 3) or a
-     * leading Roman numeral run (i…vii, quality suffixes ignored) to a 0-based
-     * degree, skips everything else. Null when nothing parses. Like iOS there
-     * is no upper bound on the count; `SoundSetup.isValid` only accepts 1–64.
-     *
-     * TODO(engine): switch to ChordProgression.parse once engine ports it.
-     */
-    fun parseProgressionDegrees(text: String): List<Int>? {
-        val tokens = text.split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }
-        val degrees = tokens.mapNotNull(::degreeForToken)
-        return degrees.ifEmpty { null }
-    }
-
-    private fun degreeForToken(raw: String): Int? {
-        val token = raw.lowercase(Locale.ROOT)
-        val digits = token.takeWhile { it.isDigit() }
-        if (digits.isNotEmpty()) {
-            val n = digits.toIntOrNull() ?: return null
-            return if (n in 1..7) n - 1 else null
-        }
-        return when (token.takeWhile { it == 'i' || it == 'v' }) {
-            "i" -> 0
-            "ii" -> 1
-            "iii" -> 2
-            "iv" -> 3
-            "v" -> 4
-            "vi" -> 5
-            "vii" -> 6
-            else -> null
-        }
-    }
+    /** iOS `ChordProgression.parse(_:)` degrees (the engine's port). Null when nothing parses. */
+    fun parseProgressionDegrees(text: String): List<Int>? = ChordProgression.parse(text)?.degrees
 
     /** iOS `romanNumeral(_:)`: diatonic numeral for a 0-based degree (0 = I … 6 = vii°). */
     fun romanNumeral(degree: Int): String {
@@ -62,7 +31,10 @@ object ControlSheetLogic {
     /** iOS `applyCustomProgression()`: id "custom", Roman-numeral label, ✍️. Null when nothing parses. */
     fun customProgression(text: String): ChordProgression? {
         val degrees = parseProgressionDegrees(text) ?: return null
-        return ChordProgression("custom", degrees.joinToString(" ", transform = ::romanNumeral), "✍️", degrees)
+        return ChordProgression(
+            "custom", degrees.joinToString(" ", transform = ::romanNumeral), "✍️", degrees,
+            com.handstrudel.models.ProgressionCategory.CUSTOM,
+        )
     }
 
     // ---- Formatting ---------------------------------------------------------------
@@ -76,24 +48,13 @@ object ControlSheetLogic {
     /** iOS `Int(x.rounded())` (half away from zero). */
     fun roundedInt(value: Double): Int = if (value >= 0) (value + 0.5).toInt() else -((-value + 0.5).toInt())
 
-    /**
-     * iOS `paramFormatter(spec.format).format`. Android's `ParamDef` has no format
-     * kind yet, so the kinds from `shared/music-config.json` are keyed by id here.
-     * TODO(engine): ParamDef.format
-     */
-    fun formatParam(def: ParamDef, value: Double): String = when (def.id) {
-        "noteIdx" -> NOTES[roundedInt(value).coerceIn(0, NOTES.size - 1)].replaceFirstChar { it.uppercase() }
-        "attack" -> String.format(Locale.US, "%.3f", value)
-        "lpf", "hpf" -> "${roundedInt(value)}hz"
-        "bpm" -> "${roundedInt(value)} bpm"
-        "crush" -> "${roundedInt(value)}"
-        else -> String.format(Locale.US, "%.2f", value)
-    }
+    /** iOS `paramFormatter(spec.format).format` (the engine's [ParamDef.format]). */
+    fun formatParam(def: ParamDef, value: Double): String = def.format(value)
 
     /**
-     * Param ids the hands control. 1.0.1 always starts with iOS `DEFAULT_MAPPING`
-     * (left y/x/spread = noteIdx/lpf/reverb, right = gain/bpm/delay).
-     * TODO(engine): mappedParamIds (iOS `config.left/right.values`)
+     * iOS `DEFAULT_MAPPING`'s param ids (left y/x/spread = noteIdx/lpf/reverb, right =
+     * gain/bpm/delay). The sheet reads the live `StudioEngine.mappedParamIds`; this is the
+     * fallback when the engine reports none.
      */
     val DEFAULT_MAPPED_PARAM_IDS: Set<String> = setOf("noteIdx", "lpf", "reverb", "gain", "bpm", "delay")
 
@@ -153,18 +114,7 @@ object ControlSheetLogic {
     }
 
     /** iOS `SoundSetup.presetDetails`: "Key Scale · 120 BPM · Progression". */
-    fun presetDetails(sound: SoundSetup): String {
-        val parts = mutableListOf(sound.keyAndScale)
-        if (sound.bpm in 20.0..400.0) parts += "${roundedInt(sound.bpm)} BPM"
-        sound.resolvedProgression?.let { p ->
-            parts += when {
-                p.id == "free" -> "Free layout"
-                p.isCustom -> p.degrees.joinToString("-") { (it + 1).toString() }
-                else -> p.name
-            }
-        }
-        return parts.joinToString(" · ")
-    }
+    fun presetDetails(sound: SoundSetup): String = sound.presetDetails
 
     /** iOS row subtitle: `[instrumentName, presetDetails].compactMap.joined(" / ")`. */
     fun presetSubtitle(sound: SoundSetup): String = listOfNotNull(sound.instrumentName, presetDetails(sound)).joinToString(" / ")

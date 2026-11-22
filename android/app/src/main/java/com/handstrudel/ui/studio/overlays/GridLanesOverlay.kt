@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PanTool
+import androidx.compose.material.icons.outlined.PanTool
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Icon
@@ -85,8 +87,8 @@ fun GridLanesOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier) {
         val bottomPad = maxHeight * GridGeometry.BOTTOM_PAD.toFloat()
         val laneHeight = (maxHeight - topPad - bottomPad) / max(1, count)
 
-        val leftVisualLane = hands.left?.let { GridGeometry.visualLaneForPinch(it.pinchY, wPx, hPx, StageMetrics.VIDEO_ASPECT, count) }
-        val rightVisualLane = hands.right?.let { GridGeometry.visualLaneForPinch(it.pinchY, wPx, hPx, StageMetrics.VIDEO_ASPECT, count) }
+        val leftVisualLane = hands.left?.let { GridGeometry.visualLaneForPinch(it.pinchY, wPx, hPx, StageMetrics.videoAspect(engine), count) }
+        val rightVisualLane = hands.right?.let { GridGeometry.visualLaneForPinch(it.pinchY, wPx, hPx, StageMetrics.videoAspect(engine), count) }
 
         Column(Modifier.fillMaxSize()) {
             Spacer(Modifier.height(topPad))
@@ -215,6 +217,8 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
     val baseOctave by engine.gridBaseOctave.collectAsState()
     val octaveRange by engine.gridOctaveRange.collectAsState()
     val quantize by engine.quantizeEnabled.collectAsState()
+    val fingerOctave by engine.fingerOctaveEnabled.collectAsState()
+    val fingerCount by engine.currentFingerCount.collectAsState()
     val colors = rememberOverlayColors()
 
     Row(
@@ -224,16 +228,28 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // TODO(engine): iOS shows 5 finger-count dots here when `fingerOctaveEnabled` is on
-        // (`currentFingerCount`); neither is on the StudioEngine seam. iOS defaults it off,
-        // which is the layout below (manual octave steppers shown).
+        // Finger count dots (finger octave on).
+        if (fingerOctave) {
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                for (i in 1..5) {
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .background(if (i <= fingerCount) colors.green else Color.White.copy(alpha = 0.15f), CircleShape),
+                    )
+                }
+            }
+        }
         Text("Oct $baseOctave", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = colors.green)
 
-        RoundIconButton(Icons.Filled.KeyboardArrowDown, "Octave down", Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.1f)) {
-            if (baseOctave > 1) engine.setGridBaseOctave(baseOctave - 1)
-        }
-        RoundIconButton(Icons.Filled.KeyboardArrowUp, "Octave up", Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.1f)) {
-            if (baseOctave < 6) engine.setGridBaseOctave(baseOctave + 1)
+        // Manual octave steppers (finger octave off).
+        if (!fingerOctave) {
+            RoundIconButton(Icons.Filled.KeyboardArrowDown, "Octave down", Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.1f)) {
+                if (baseOctave > 1) engine.setGridBaseOctave(baseOctave - 1)
+            }
+            RoundIconButton(Icons.Filled.KeyboardArrowUp, "Octave up", Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.1f)) {
+                if (baseOctave < 6) engine.setGridBaseOctave(baseOctave + 1)
+            }
         }
 
         Spacer(Modifier.weight(1f))
@@ -247,7 +263,14 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
             selected = quantize,
         ) { engine.setQuantizeEnabled(!quantize) }
 
-        // TODO(engine): iOS finger-octave toggle (`fingerOctaveEnabled`) goes here; not on the seam.
+        // Finger octave toggle (iOS "hand.raised.fingers.spread" / "hand.raised.slash").
+        RoundIconButton(
+            if (fingerOctave) Icons.Filled.PanTool else Icons.Outlined.PanTool,
+            "Finger octave",
+            if (fingerOctave) colors.green else Color.White.copy(alpha = 0.5f),
+            if (fingerOctave) colors.green.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.1f),
+            selected = fingerOctave,
+        ) { engine.setFingerOctaveEnabled(!fingerOctave) }
 
         for (range in 1..3) {
             val selected = octaveRange == range

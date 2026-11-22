@@ -69,9 +69,6 @@ import com.handstrudel.ui.theme.LocalStudioPalette
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import java.util.UUID
 
 /** iOS `SoundPresetPack` size limit; anything bigger is refused by the codec anyway. */
@@ -118,11 +115,10 @@ fun SoundSetupsSheet(onApply: (SoundSetup) -> Unit, onDismiss: () -> Unit) {
         scope.launch {
             val bytes = runCatching { withContext(Dispatchers.IO) { readCapped(context, uri) } }
                 .getOrElse { message = errorText(it); return@launch }
-            // iOS reviews the pack (count) before importing. The seam imports in one call, so
-            // count the presets here and let the engine codec do the real validation.
-            // TODO(engine): previewPresetPack(bytes) → count, to avoid double parsing.
-            val count = presetCount(bytes)
-            if (count == null) importNow(bytes, null) else pendingImport = PendingImport(bytes, count)
+            // iOS validates the pack and confirms the count before importing.
+            engine.previewPresetPack(bytes)
+                .onSuccess { presets -> pendingImport = PendingImport(bytes, presets.size) }
+                .onFailure { message = errorText(it) }
         }
     }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -363,17 +359,4 @@ private fun readCapped(context: Context, uri: Uri): ByteArray {
         }
         out.toByteArray()
     }
-}
-
-/** Number of entries in the pack's `presets` array, or null when it isn't a readable pack. */
-internal fun presetCount(bytes: ByteArray): Int? = try {
-    if (bytes.size > MAX_PACK_BYTES) {
-        null
-    } else {
-        val root = Json.parseToJsonElement(bytes.decodeToString()).jsonObject
-        val format = (root["format"] as? kotlinx.serialization.json.JsonPrimitive)?.content
-        if (format != "handstrudel-presets") null else root["presets"]?.jsonArray?.size?.takeIf { it in 1..128 }
-    }
-} catch (_: Exception) {
-    null
 }

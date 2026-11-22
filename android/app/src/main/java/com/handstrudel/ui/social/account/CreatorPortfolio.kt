@@ -64,7 +64,6 @@ import com.handstrudel.ui.social.ProfileActionButton
 import com.handstrudel.ui.social.ProfileEyebrow
 import com.handstrudel.ui.social.ProfileImage
 import com.handstrudel.ui.social.compactCount
-import com.handstrudel.ui.social.feed.presetDetails
 import com.handstrudel.ui.social.rememberSocial
 import com.handstrudel.ui.social.viewsLabel
 import com.handstrudel.ui.theme.LocalStudioPalette
