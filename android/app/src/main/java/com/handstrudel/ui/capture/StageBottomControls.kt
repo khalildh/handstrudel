@@ -38,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -79,8 +78,8 @@ internal fun StageBottomControlsView(onOpenSettings: () -> Unit, itemModifier: M
                     modifier = Modifier.testTag("stage-loop-shelf")
                         .defaultMinSize(minWidth = 44.dp, minHeight = 28.dp)
                         .clip(CircleShape).background(Color.Black.copy(alpha = 0.64f))
+                        // iOS disables these during a take or count-in without dimming them.
                         .clickable(enabled = !locked) { showLoops = true }
-                        .alpha(if (locked) 0.5f else 1f)
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 )
             }
@@ -101,8 +100,7 @@ internal fun StageBottomControlsView(onOpenSettings: () -> Unit, itemModifier: M
                 .size(44.dp)
                 .clip(CircleShape)
                 .background(Color.Black.copy(alpha = 0.55f))
-                .clickable(enabled = !locked, onClick = onOpenSettings)
-                .alpha(if (locked) 0.5f else 1f),
+                .clickable(enabled = !locked, onClick = onOpenSettings),
             contentAlignment = Alignment.Center,
         ) { Icon(StudioIcons.SliderHorizontal3, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp)) }
     }
