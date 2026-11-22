@@ -63,7 +63,7 @@ class DefaultAppNavigator(
 
     /** Social seams, replaceable for tests and the debug fake (see `DebugFakeSocial`). */
     var socialConfigured: () -> Boolean = { services.auth.isConfigured }
-    var fetchVideo: suspend (UUID) -> Video? = { SocialEntryPoints.fetchVideo(it) }
+    var fetchVideo: suspend (UUID) -> Video? = { SocialEntryPoints.loadVideo(it) }
 
     private val _destination = MutableStateFlow(Destination.Music)
     override val destination: StateFlow<Destination> = _destination
