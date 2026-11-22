@@ -105,10 +105,11 @@ fun OnboardingOverlay(
             Text(OnboardingCopy.body(played, canSuggestPinching), fontSize = 15.sp, color = palette.muted)
             Text(
                 OnboardingCopy.button(played),
-                fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.accent,
-                modifier = Modifier.testTag("onboarding-got-it").clip(CircleShape)
+                // iOS `.buttonStyle(.bordered)`: 17 pt label on a tinted rounded rectangle.
+                fontSize = 17.sp, color = palette.accent,
+                modifier = Modifier.testTag("onboarding-got-it").clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
                     .background(palette.accent.copy(alpha = 0.15f)).clickable(onClick = onDone)
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
             )
         }
     }

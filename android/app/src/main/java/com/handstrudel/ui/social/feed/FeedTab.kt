@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.SmartDisplay
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -636,7 +637,8 @@ private fun EmptyState(
                 CircularProgressIndicator(color = p.accent)
                 Text("Loading videos", color = p.muted)
             } else {
-                Icon(Icons.Outlined.PlayCircle, null, tint = p.accent, modifier = Modifier.size(40.dp))
+                // iOS SF `play.rectangle` at 40 pt (about 46 x 38 pt).
+                Icon(Icons.Outlined.SmartDisplay, null, tint = p.accent, modifier = Modifier.size(48.dp))
                 val title = when {
                     error != null -> error
                     !followingOnly -> "No performances yet"
@@ -661,7 +663,8 @@ private fun EmptyState(
                     StudioActionButton("Make the first one", onClick = onMakeMusic)
                 }
                 TextButton(onClick = onRefresh, modifier = Modifier.heightIn(min = 44.dp)) {
-                    Text(if (error == null) "Refresh" else "Try again", color = p.accent)
+                    // iOS: a plain 17 pt Button in the feed's white (primary) tint.
+                    Text(if (error == null) "Refresh" else "Try again", color = p.ink, fontSize = 17.sp)
                 }
             }
         }
