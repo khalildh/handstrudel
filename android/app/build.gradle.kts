@@ -110,7 +110,28 @@ android {
 // ---------------------------------------------------------------------------
 
 // --- engine (assets) ---
-// `generateStrudelAssets` copy task (WS2) goes here.
+// The Strudel engine (HTML, bundle, sampled instruments) is the iOS one, copied
+// at build time into generated assets under `strudel/` (served to the WebView
+// by StrudelAssets). Nothing is duplicated in git. The bundle is rebuilt with
+// `node ios/bundle-strudel.mjs` only if it is missing.
+val iosResources = rootProject.file("../ios/HandStrudel/HandStrudel/Resources")
+val strudelAssetsOut = layout.buildDirectory.dir("generated/assets/strudel")
+val generateStrudelAssets by tasks.registering(Copy::class) {
+    description = "Copies the iOS Strudel engine and instrument samples into Android assets."
+    doFirst {
+        if (!File(iosResources, "strudel-bundle.js").isFile) {
+            val iosDir = rootProject.file("../ios")
+            val proc = ProcessBuilder("node", "bundle-strudel.mjs").directory(iosDir).inheritIO().start()
+            check(proc.waitFor() == 0) { "node ios/bundle-strudel.mjs failed" }
+        }
+    }
+    from(iosResources) {
+        include("strudel-engine.html", "strudel-bundle.js", "instrument-samples/**")
+    }
+    into(strudelAssetsOut.map { it.dir("strudel") })
+}
+android.sourceSets.getByName("main").assets.srcDir(strudelAssetsOut)
+tasks.named("preBuild") { dependsOn(generateStrudelAssets) }
 // --- end engine (assets) ---
 
 dependencies {

@@ -74,6 +74,10 @@ data class ChordMelodyDisplay(
     val melodyResting: Boolean = false,
     val touchedChordZones: Set<ChordSubzone> = emptySet(),
     val touchedMelodyLanes: Set<Int> = emptySet(),
+    /** Scale layout: the melody hand's outer-band octave shift (−1, 0, +1). */
+    val melodyOctaveShift: Int = 0,
+    /** Number of melody lanes the overlay should draw (9 for Split/Radial/Zones; the scale length for Scale). */
+    val melodyLaneCount: Int = 9,
 )
 
 /** Grid and drum lane display state. */
@@ -130,6 +134,9 @@ data class LearnDisplay(
     val visibleNotes: List<LearnVisibleNote> = emptyList(),
     val hitEffects: List<LearnHitEffect> = emptyList(),
     val songComplete: Boolean = false,
+    /** 3, 2, 1 during the count-in; 0 while playing. */
+    val countdownValue: Int = 0,
+    val isCountingDown: Boolean = false,
 )
 
 /** iOS `RecordedLoop` (captured-audio loops only; event loops are unreachable in 1.0.1). */

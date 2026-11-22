@@ -1,89 +1,157 @@
 package com.handstrudel.models
 
+import java.util.Locale
+
+// Port of iOS `Models/ParamDefs.swift`, `MusicConfig.generated.swift` and
+// `MappingConfig.swift` (the parts the engine uses). Owner: engine.
+
+/** iOS `NOTES` (shared/music-config.json). */
+val NOTES: List<String> = listOf(
+    "c2", "d2", "e2", "g2", "a2", "c3", "d3", "e3", "g3", "a3",
+    "c4", "d4", "e4", "g4", "a4", "c5", "d5", "e5",
+)
+
+/** iOS `MIDI_NOTES`. */
+val MIDI_NOTES: List<Int> = listOf(36, 38, 40, 43, 45, 48, 50, 52, 55, 57, 60, 62, 64, 67, 69, 72, 74, 76)
+
+/** iOS `STRUCTS`: rotated every 8 s in the melodic modes. */
+val STRUCTS: List<String> = listOf(
+    "x ~ x ~ x ~ x ~", "x ~ ~ x ~ ~ x ~", "x x ~ x ~ x x ~", "[x x x] ~ ~ ~", "x ~ x x ~ x ~ ~",
+)
+
+/** iOS `FLOW_STRUCT`: dense 16th pulse for Flow mode. */
+const val FLOW_STRUCT: String = "x x x x x x x x x x x x x x x x"
+
+/** iOS `NOTE_DISPLAY` ("C2", "D2", …). */
+val NOTE_DISPLAY: List<String> = NOTES.map { it.substring(0, 1).uppercase() + it.substring(1) }
+
+/** Swift `String(format:)` always uses a dot decimal separator. */
+internal fun fmt(value: Double, decimals: Int): String = String.format(Locale.US, "%.${decimals}f", value)
+
+/** iOS `Int(x.rounded())` (half away from zero). */
+internal fun swiftRound(value: Double): Int = Math.round(kotlin.math.abs(value)).toInt().let { if (value < 0) -it else it }
+
+/** iOS `ParamDef` with its formatter kind (`format`). */
 data class ParamDef(
     val id: String,
     val label: String,
     val strudelKey: String,
     val min: Double,
     val max: Double,
-    val defaultValue: Double
+    val defaultValue: Double,
+    val formatKind: String = "fixed2",
+) {
+    /** Display string (iOS `format`). */
+    fun format(v: Double): String = when (formatKind) {
+        "note" -> NOTE_DISPLAY[swiftRound(v).coerceIn(0, NOTES.size - 1)]
+        "fixed3" -> fmt(v, 3)
+        "hz" -> "${swiftRound(v)}hz"
+        "bpm" -> "${swiftRound(v)} bpm"
+        "int" -> "${swiftRound(v)}"
+        else -> fmt(v, 2)
+    }
+
+    /** Strudel code literal (iOS `toCode`). */
+    fun toCode(v: Double): String = when (formatKind) {
+        "note" -> "\"${NOTES[swiftRound(v).coerceIn(0, NOTES.size - 1)]}\""
+        "fixed3" -> fmt(v, 3)
+        "hz" -> "${swiftRound(v)}"
+        "bpm" -> fmt(v / 4, 1)
+        "int" -> "${swiftRound(v)}"
+        else -> fmt(v, 2)
+    }
+}
+
+/** iOS `PARAM_SPECS` → `PARAM_DEFS`. */
+val PARAM_DEFS: List<ParamDef> = listOf(
+    ParamDef("noteIdx", "pitch", "note", 0.0, 17.0, 10.0, "note"),
+    ParamDef("gain", "volume", "gain", 0.03, 0.9, 0.55, "fixed2"),
+    ParamDef("lpf", "filter", "lpf", 120.0, 6120.0, 3000.0, "hz"),
+    ParamDef("hpf", "hi-pass", "hpf", 20.0, 4000.0, 2000.0, "hz"),
+    ParamDef("reverb", "reverb", "room", 0.0, 0.9, 0.2, "fixed2"),
+    ParamDef("bpm", "tempo", "cpm", 50.0, 205.0, 120.0, "bpm"),
+    ParamDef("delay", "delay", "delay", 0.0, 0.55, 0.12, "fixed2"),
+    ParamDef("pan", "pan", "pan", 0.0, 1.0, 0.5, "fixed2"),
+    ParamDef("crush", "crush", "crush", 1.0, 16.0, 8.0, "int"),
+    ParamDef("shape", "shape", "shape", 0.0, 0.9, 0.0, "fixed2"),
+    ParamDef("attack", "attack", "attack", 0.001, 0.5, 0.01, "fixed3"),
+    ParamDef("release", "release", "release", 0.01, 1.0, 0.1, "fixed2"),
 )
 
-val PARAM_DEFS = listOf(
-    ParamDef("noteIdx", "pitch", "note", 0.0, 17.0, 10.0),
-    ParamDef("gain", "volume", "gain", 0.03, 0.9, 0.55),
-    ParamDef("lpf", "filter", "lpf", 120.0, 6120.0, 3000.0),
-    ParamDef("hpf", "hi-pass", "hpf", 20.0, 4000.0, 2000.0),
-    ParamDef("reverb", "reverb", "room", 0.0, 0.9, 0.2),
-    ParamDef("bpm", "tempo", "cpm", 50.0, 205.0, 120.0),
-    ParamDef("delay", "delay", "delay", 0.0, 0.55, 0.12),
-    ParamDef("pan", "pan", "pan", 0.0, 1.0, 0.5),
-    ParamDef("crush", "crush", "crush", 1.0, 16.0, 8.0),
-    ParamDef("shape", "shape", "shape", 0.0, 0.9, 0.0),
-    ParamDef("attack", "attack", "attack", 0.001, 0.5, 0.01),
-    ParamDef("release", "release", "release", 0.01, 1.0, 0.1),
+val PARAM_MAP: Map<String, ParamDef> = PARAM_DEFS.associateBy { it.id }
+
+/** iOS `AxisDef`. `invert` flips the raw 0…1 value before mapping. */
+data class AxisDef(val key: String, val label: String, val basic: Boolean, val invert: Boolean)
+
+val AXIS_DEFS: List<AxisDef> = listOf(
+    AxisDef("y", "Y pos", true, true),
+    AxisDef("x", "X pos", true, true),
+    AxisDef("spread", "spread", true, false),
+    AxisDef("pinch", "pinch", false, false),
+    AxisDef("fist", "fist", false, false),
+    AxisDef("rotation", "rotation", false, false),
+    AxisDef("thumbCurl", "thumb curl", false, false),
+    AxisDef("indexCurl", "index curl", false, false),
+    AxisDef("middleCurl", "middle curl", false, false),
+    AxisDef("ringCurl", "ring curl", false, false),
+    AxisDef("pinkyCurl", "pinky curl", false, false),
 )
 
-val PARAM_MAP = PARAM_DEFS.associateBy { it.id }
+val AXIS_MAP: Map<String, AxisDef> = AXIS_DEFS.associateBy { it.key }
 
-val NOTES = listOf(
-    "c2", "d2", "e2", "g2", "a2",
-    "c3", "d3", "e3", "g3", "a3",
-    "c4", "d4", "e4", "g4", "a4",
-    "c5", "d5", "e5",
+/** iOS `MappingConfig`: axis → param id per hand. */
+data class MappingConfig(val left: Map<String, String>, val right: Map<String, String>) {
+    private val allValues: List<String> get() = left.values + right.values
+
+    /** iOS `EngineController.bpmIsMapped`. */
+    val bpmIsMapped: Boolean get() = "bpm" in allValues
+
+    /** iOS `buildDefaultParams`. */
+    fun defaultParams(): Map<String, Double> =
+        allValues.toSet().mapNotNull { id -> PARAM_MAP[id]?.let { id to it.defaultValue } }.toMap()
+
+    /** iOS `extraParamIds`: mapped ids minus noteIdx/bpm/none/save, sorted. */
+    fun extraParamIds(): List<String> =
+        (allValues.toSet() - setOf("noteIdx", "bpm", "none", "save")).sorted()
+}
+
+/** iOS `DEFAULT_MAPPING` (the only mapping reachable in 1.0.1). */
+val DEFAULT_MAPPING: MappingConfig = MappingConfig(
+    left = mapOf("y" to "noteIdx", "x" to "lpf", "spread" to "reverb"),
+    right = mapOf("y" to "gain", "x" to "bpm", "spread" to "delay"),
 )
 
-val MIDI_NOTES = listOf(
-    36, 38, 40, 43, 45,
-    48, 50, 52, 55, 57,
-    60, 62, 64, 67, 69,
-    72, 74, 76,
-)
+private fun structAt(structIdx: Int): String = STRUCTS[structIdx.coerceIn(0, STRUCTS.size - 1)]
 
-val STRUCTS = listOf(
-    "x ~ x ~ x ~ x ~",
-    "x ~ ~ x ~ ~ x ~",
-    "x x ~ x ~ x x ~",
-    "[x x x] ~ ~ ~",
-    "x ~ x x ~ x ~ ~",
-)
+/** iOS `buildCode`: a static snapshot of the current melodic pattern. */
+fun buildCode(p: Map<String, Double>, structIdx: Int, config: MappingConfig, waveform: String = "sawtooth"): String {
+    val note = NOTES[swiftRound(p["noteIdx"] ?: 10.0).coerceIn(0, NOTES.size - 1)]
+    val cpm = fmt((p["bpm"] ?: 120.0) / 4, 1)
+    val sb = StringBuilder("note(\"$note\").s(\"$waveform\").struct(\"${structAt(structIdx)}\").cpm($cpm)")
+    for (id in config.extraParamIds()) {
+        val def = PARAM_MAP[id] ?: continue
+        sb.append(".${def.strudelKey}(${def.toCode(p[id] ?: def.defaultValue)})")
+    }
+    return sb.toString()
+}
 
-data class DrumLoop(
-    val id: String,
-    val name: String,
-    val emoji: String,
-    val code: String,
-    val isPremium: Boolean = false,
-    val packId: String? = null
-)
+/** iOS `buildSignalCode`: the live pattern, reading `__hp.*` signals. */
+fun buildSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth", structOverride: String? = null): String {
+    val st = structOverride ?: structAt(structIdx)
+    val sb = StringBuilder("note(signal(() => __hp._midi)).s(\"$waveform\").struct(\"$st\").cpm(signal(() => __hp._cpm))")
+    for (id in config.extraParamIds()) {
+        val def = PARAM_MAP[id] ?: continue
+        sb.append(".${def.strudelKey}(signal(() => __hp.$id))")
+    }
+    return sb.toString()
+}
 
-// Drum sound building blocks (Strudel synth code)
-private const val DEEP_KICK = """note("c1").s("sine").decay(0.3).sustain(0).gain(1.4).lpf(120)"""
-private const val PUNCH_KICK = """note("f1").s("triangle").decay(0.1).sustain(0).gain(1.2).lpf(300)"""
-private const val HOUSE_KICK = """note("d1").s("sine").decay(0.2).sustain(0).gain(1.3).lpf(200)"""
-private const val NOISE_SNARE = """note("c4").s("white").decay(0.12).sustain(0).gain(0.7).hpf(1000).lpf(6000)"""
-private const val TONE_SNARE = """note("e3").s("triangle").decay(0.08).sustain(0).gain(0.5).lpf(3000)"""
-private val SNARE = "stack($NOISE_SNARE, $TONE_SNARE)"
-private const val CLAP = """note("g4").s("pink").decay(0.09).sustain(0).gain(0.8).hpf(1500).lpf(8000)"""
-private const val HARD_CLAP = """note("a4").s("white").decay(0.07).sustain(0).gain(0.9).hpf(2000).crush(4)"""
-private const val CLOSED_HAT = """note("a5").s("white").decay(0.025).sustain(0).gain(0.35).hpf(8000)"""
-private const val OPEN_HAT = """note("a5").s("white").decay(0.12).sustain(0).gain(0.3).hpf(7000)"""
-private const val TINY_HAT = """note("c6").s("pink").decay(0.015).sustain(0).gain(0.25).hpf(10000)"""
-private const val RIMSHOT = """note("b4").s("triangle").decay(0.02).sustain(0).gain(0.6).hpf(5000)"""
-private const val CLAVE = """note("d5").s("sine").decay(0.03).sustain(0).gain(0.5).hpf(3000)"""
-
-val DRUM_LOOPS = listOf(
-    DrumLoop("none", "None", "\uD83D\uDD07", ""),
-    DrumLoop("basic", "Basic", "\uD83E\uDD41",
-        """stack($PUNCH_KICK.struct("x ~ x ~"), $SNARE.struct("~ x ~ x"), $CLOSED_HAT.struct("x x x x"))"""),
-    DrumLoop("hiphop", "Hip Hop", "\uD83C\uDFA4",
-        """stack($DEEP_KICK.struct("x ~ ~ x ~ ~ x ~"), $HARD_CLAP.struct("~ ~ ~ ~ x ~ ~ ~"), $CLOSED_HAT.struct("~ x ~ x ~ x ~ x"), $OPEN_HAT.struct("~ ~ x ~ ~ ~ x ~"))"""),
-    DrumLoop("house", "House", "\uD83C\uDFE0",
-        """stack($HOUSE_KICK.struct("x x x x"), $CLAP.struct("~ ~ x ~"), $OPEN_HAT.struct("~ x ~ x ~ x ~ x"), $TINY_HAT.struct("[x x] [x x] [x x] [x x]"))"""),
-    DrumLoop("trap", "Trap", "\uD83D\uDD0A",
-        """stack($DEEP_KICK.struct("x ~ ~ ~ x ~ ~ ~").gain(1.6), $HARD_CLAP.struct("~ ~ ~ ~ x ~ ~ ~").gain(1.1), $CLOSED_HAT.struct("[x x x x] [x x x x] [x x x x] [x x x x]"), $OPEN_HAT.struct("~ ~ ~ ~ ~ ~ [~ x] ~"))"""),
-    DrumLoop("minimal", "Minimal", "\u2728",
-        """stack($PUNCH_KICK.struct("x ~ ~ x"), $RIMSHOT.struct("~ ~ x ~"), $CLAVE.struct("~ x ~ ~"))"""),
-)
-
-// Waveform / WAVEFORMS moved to Waveforms.kt (full iOS catalog).
+/** iOS `buildChordSignalCode`: three stacked voices on `__hp._cm0..2`. */
+fun buildChordSignalCode(structIdx: Int, config: MappingConfig, waveform: String = "sawtooth", structOverride: String? = null): String {
+    val st = structOverride ?: structAt(structIdx)
+    val extras = config.extraParamIds().mapNotNull { id ->
+        PARAM_MAP[id]?.let { ".${it.strudelKey}(signal(() => __hp.$id))" }
+    }.joinToString("")
+    fun voice(i: Int) = "note(signal(() => __hp._cm$i)).s(\"$waveform\").struct(\"$st\").cpm(signal(() => __hp._cpm))$extras"
+    return "stack(${voice(0)}, ${voice(1)}, ${voice(2)})"
+}
