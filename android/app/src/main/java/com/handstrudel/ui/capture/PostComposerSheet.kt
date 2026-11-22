@@ -69,6 +69,7 @@ import com.handstrudel.capture.upload.VideoUploader
 import com.handstrudel.models.SoundSetup
 import com.handstrudel.ui.theme.LocalStudioPalette
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** iOS `PostComposerView`: preview, caption, sharing toggles, then the upload. */
@@ -105,15 +106,23 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
         if (credit == null) hasAudio = withContext(Dispatchers.IO) { MediaInfo.hasAudioTrack(clip.file) }
     }
 
+    // The state remembers its first lambda, so read busy through rememberUpdatedState (iOS: interactiveDismissDisabled(uploader.isBusy)).
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !busyNow.value })
+    val sheetScope = androidx.compose.runtime.rememberCoroutineScope()
     ModalBottomSheet(
         modifier = Modifier.statusBarsPadding(),
-        onDismissRequest = { if (!busy) onDismiss() },
-        // The state remembers its first lambda, so read busy through rememberUpdatedState (iOS: interactiveDismissDisabled(uploader.isBusy)).
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !busyNow.value }),
+        onDismissRequest = { if (!busyNow.value) onDismiss() },
+        sheetState = sheetState,
+        // Material's own Back path hides the sheet without asking confirmValueChange, and its API 33+ callback keeps
+        // the first onDismissRequest. Handle Back ourselves (BackHandler below) so it does nothing while posting.
+        properties = androidx.compose.material3.ModalBottomSheetProperties(shouldDismissOnBackPress = false),
         // iOS: the composer sets no background, so the sheet shows the system elevated colour.
         containerColor = IosGrouped.background(iosLight()),
         dragHandle = null,
     ) {
+        androidx.activity.compose.BackHandler(enabled = !busy) {
+            sheetScope.launch { sheetState.hide() }.invokeOnCompletion { if (!busyNow.value) onDismiss() }
+        }
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.95f).testTag("post-composer")) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
