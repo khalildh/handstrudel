@@ -27,7 +27,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -225,9 +227,18 @@ private fun UploadStatus(phase: VideoUploader.Phase) {
     val modifier = Modifier.fillMaxWidth().testTag("post-status")
     when (phase) {
         VideoUploader.Phase.Preparing -> Spinner("Preparing video…")
-        is VideoUploader.Phase.Uploading -> Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // iOS `ProgressView(value:) { Text("Uploading…") }`: the label over a 4 pt rounded bar,
+        // system-fill track and tint fill, with no M3 gap or stop dot.
+        is VideoUploader.Phase.Uploading -> Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Uploading…", color = palette.ink, fontSize = 17.sp)
-            LinearProgressIndicator(progress = { phase.fraction.toFloat() }, modifier = Modifier.fillMaxWidth(), color = palette.accent)
+            val fraction = phase.fraction.toFloat().coerceIn(0f, 1f)
+            Box(
+                Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(IosSystemFill)
+                    .semantics { progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f) }
+                    .testTag("post-upload-progress"),
+            ) {
+                Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(palette.accent))
+            }
         }
         VideoUploader.Phase.Checking -> Spinner("Submitting video…")
         is VideoUploader.Phase.Pending -> Text(phase.message, fontSize = 13.sp, color = palette.muted, modifier = modifier)
@@ -235,6 +246,9 @@ private fun UploadStatus(phase: VideoUploader.Phase) {
         else -> Unit
     }
 }
+
+/** iOS dark `systemFill` (rgba 120 120 128 / 0.36), the track of a `ProgressView` bar. */
+private val IosSystemFill = Color(0x5C787880)
 
 @Composable
 private fun Spinner(label: String) {
