@@ -1,25 +1,23 @@
 package com.handstrudel.social
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import com.handstrudel.social.model.Video
+import com.handstrudel.ui.nav.LocalAppNavigator
+import com.handstrudel.ui.social.SocialMaterialTheme
+import com.handstrudel.ui.social.account.AccountTab as AccountScreen
+import com.handstrudel.ui.social.auth.SignInSheet as SignInScreen
+import com.handstrudel.ui.social.comments.CommentsSheet as CommentsScreen
+import com.handstrudel.ui.social.feed.CreatorVideoSheet as CreatorVideoScreen
+import com.handstrudel.ui.social.feed.FeedTab as FeedScreen
+import com.handstrudel.ui.social.feed.PerformanceStart
+import com.handstrudel.ui.social.feed.start
 import java.util.UUID
 
 /**
  * Social UI entry points used by shell and capture. Owner: social (WS5).
- * Phase 0 stubs render "not available" placeholders. Composables get services
- * from `LocalAppServices` / `LocalAppNavigator`.
+ * Composables get services from `LocalAppServices` / `LocalAppNavigator`; the
+ * Supabase-backed services come from [SocialServices] (created on first use).
+ * When social is unconfigured they render nothing (shell shows its placeholder).
  */
 object SocialEntryPoints {
 
@@ -30,43 +28,36 @@ object SocialEntryPoints {
      */
     @Composable
     fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @Composable (overVideo: Boolean) -> Unit) {
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
-            Placeholder("Feed isn't available yet.")
-            Box(Modifier.align(Alignment.BottomCenter)) { tabBar(true) }
-        }
+        SocialMaterialTheme { FeedScreen(isActive, onFullscreenChanged, tabBar) }
     }
 
     /** The Account tab (profile, settings, sign-in). */
     @Composable
-    fun AccountTab() = Placeholder("Accounts aren't available yet.")
+    fun AccountTab() = SocialMaterialTheme { AccountScreen() }
 
-    /** A single post (deep link `watch`, "view post"). */
+    /** A single post (deep link `watch`, "view post"). Play this sound / Play along hand off to Music. */
     @Composable
-    fun CreatorVideoSheet(video: Video, onDismiss: () -> Unit) = StubSheet("Post", onDismiss)
+    fun CreatorVideoSheet(video: Video, onDismiss: () -> Unit) {
+        val navigator = LocalAppNavigator.current
+        SocialMaterialTheme {
+            CreatorVideoScreen(
+                video, onDismiss = onDismiss,
+                onPlayAlong = { onDismiss(); navigator.start(PerformanceStart.Backing(it)) },
+                onTrySound = { onDismiss(); navigator.start(PerformanceStart.Preset(it)) },
+                allowsSharing = video.hidden != true,
+            )
+        }
+    }
 
     /** Comments for a post (deep link `comments`). */
     @Composable
-    fun CommentsSheet(video: Video, onDismiss: () -> Unit) = StubSheet("Comments", onDismiss)
+    fun CommentsSheet(video: Video, onDismiss: () -> Unit) = SocialMaterialTheme { CommentsScreen(video, onDismiss) }
 
     /** Sign-in / profile setup; capture shows it from the post composer. */
     @Composable
-    fun SignInSheet(onDismiss: () -> Unit) = StubSheet("Sign in", onDismiss)
+    fun SignInSheet(onDismiss: () -> Unit) = SocialMaterialTheme { SignInScreen(onDismiss) }
 
     /** iOS `FeedService.video(id:)`: one post, or null if missing/hidden/unavailable. */
-    suspend fun fetchVideo(id: UUID): Video? = null
-}
-
-@Composable
-private fun Placeholder(text: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text, color = Color.White.copy(alpha = 0.7f))
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun StubSheet(title: String, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(24.dp)) { Text("$title isn't available yet.") }
-    }
+    suspend fun fetchVideo(id: UUID): Video? =
+        SocialServices.current?.feed?.let { runCatching { it.video(id) }.getOrNull() }
 }

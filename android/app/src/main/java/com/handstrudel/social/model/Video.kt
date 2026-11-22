@@ -66,6 +66,13 @@ data class Video(
     /** iOS `watchURL`. Media URLs (`videoURL`/`thumbURL`) come from social's `SocialConfig.mediaURL`. */
     val watchUrl: String get() = "https://handstrudel.com/watch?v=${id.toString().lowercase()}"
 
+    /** iOS `videoURL` / `thumbURL`. */
+    val videoUrl: String get() = com.handstrudel.social.SocialConfig.mediaUrl(videoKey)
+    val thumbUrl: String get() = com.handstrudel.social.SocialConfig.mediaUrl(thumbKey)
+
+    /** iOS `feedCursorTimestamp`: the exact server string. */
+    val feedCursorTimestamp: String get() = createdAt
+
     companion object {
         fun parseTimestamp(raw: String): Instant? =
             runCatching { OffsetDateTime.parse(raw).toInstant() }.getOrNull()
