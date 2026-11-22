@@ -372,8 +372,11 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
     LaunchedEffect(selectedVideo?.id) { currentClip?.prepareForVisit() }
 
     // ---- Layout --------------------------------------------------------------------------
+    val menuBackdrop = rememberFeedBackdrop()
+    val rootView = androidx.compose.ui.platform.LocalView.current
     BoxWithConstraints(
-        Modifier.fillMaxSize().background(if (hasVideos || isFullscreen) Color.Black else p.background)
+        Modifier.fillMaxSize().feedBackdropSource(menuBackdrop, rootView)
+            .background(if (hasVideos || isFullscreen) Color.Black else p.background)
             .then(if (isActive) Modifier.semantics { testTagsAsResourceId = true } else Modifier.clearAndSetSemantics { }),
     ) {
         val viewportHeight = maxHeight
@@ -428,6 +431,7 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
                 isMine = selectedVideo.userId == userId, isSaved = selectedVideo.id in savedIds,
                 canDownloadAudio = selectedVideo.id in audioIds,
                 canChangeAudioPermission = selectedVideo.userId == userId && selectedVideo.sourceVideoId == null,
+                menuBackdrop = menuBackdrop,
                 actions = FeedRailActions(
                     like = { act { model.toggleLike(selectedVideo, it) } },
                     comments = { lastCommentVideo = selectedVideo.id; commenting = selectedVideo },

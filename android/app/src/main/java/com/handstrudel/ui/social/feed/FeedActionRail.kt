@@ -87,6 +87,8 @@ fun FeedActionRail(
     canChangeAudioPermission: Boolean,
     actions: FeedRailActions,
     modifier: Modifier = Modifier,
+    /** The feed content the More menu blurs (API 31+); null keeps the translucent card. */
+    menuBackdrop: FeedBackdrop? = null,
 ) {
     val p = LocalStudioPalette.current
     val liveViews = clip?.viewCount?.collectAsState()?.value
@@ -114,29 +116,40 @@ fun FeedActionRail(
             label = if (isSaved) "Remove from Saved" else "Save privately", tag = "save-performance", onClick = actions.bookmark)
         val views = clip?.let { liveViews?.let { v -> maxOf(v, video.viewCount ?: 0) } ?: video.viewCount } ?: video.viewCount
         Glyph(StudioIcons.Eye, views, label = "Views", value = views?.toString() ?: "Not available", tag = "feed-views-count", onClick = null)
-        MoreMenu(video, isMine, canDownloadAudio, canChangeAudioPermission, actions)
+        MoreMenu(video, isMine, canDownloadAudio, canChangeAudioPermission, actions, menuBackdrop)
     }
 }
 
 @Composable
-private fun MoreMenu(video: Video, isMine: Boolean, canDownloadAudio: Boolean, canChangeAudioPermission: Boolean, actions: FeedRailActions) {
+private fun MoreMenu(
+    video: Video,
+    isMine: Boolean,
+    canDownloadAudio: Boolean,
+    canChangeAudioPermission: Boolean,
+    actions: FeedRailActions,
+    backdrop: FeedBackdrop?,
+) {
     // The rail is shared by every page and follows the current clip. Close the menu when the clip
     // changes (auto-advance at the end of a clip), as iOS does when the cell scrolls away, so it
     // never offers Block/Report/Delete for a different post than the one it was opened on.
     var open by remember(video.id) { mutableStateOf(false) }
+    val material = rememberFeedMenuMaterial(backdrop)
     Box {
         Glyph(StudioIcons.Ellipsis, null, label = "More", reservesCount = false, tag = "feed-more", onClick = { open = true })
         SocialMaterialTheme(dark = true) {
-            // iOS presents the rail's `Menu` above the button as a translucent dark material
-            // card (13 pt corners, 17 pt rows, trailing SF glyphs, hairline separators) and,
-            // opening upward, lists the items in reverse so the first sits nearest the button.
+            // iOS presents the rail's `Menu` above the button as a dark material card that
+            // blurs the video under it (13 pt corners, 17 pt rows, trailing SF glyphs, hairline
+            // separators) and, opening upward, lists the items in reverse so the first sits
+            // nearest the button. API 31+ blurs the recorded feed with a RenderEffect
+            // (FeedMenuBackdrop.kt); older devices keep the translucent card.
             DropdownMenu(
                 expanded = open, onDismissRequest = { open = false },
-                modifier = Modifier.width(250.dp),
+                modifier = Modifier.width(250.dp).then(material.modifier).testTag("feed-more-menu"),
                 shape = RoundedCornerShape(13.dp),
-                containerColor = Color(0xFF2A2A2A).copy(alpha = 0.78f),
+                containerColor = if (material.active) Color.Transparent else FeedMenuFallback,
                 tonalElevation = 0.dp, shadowElevation = 12.dp,
             ) {
+                material.Attach()
                 val red = Color(0xFFFF453A)
                 val rows = buildList<Triple<String, Pair<Color?, ImageVector?>, () -> Unit>> {
                     if (canDownloadAudio) add(Triple("Download audio", null to StudioIcons.ArrowDownCircle, actions.downloadAudio))
