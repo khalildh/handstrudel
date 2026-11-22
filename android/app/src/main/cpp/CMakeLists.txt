@@ -9,6 +9,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # we don't use anyway.
 add_compile_definitions(TSF_NO_STDIO)
 
+# Match iOS AVAudioUnitSampler's SF2 velocity response (amplitude = velocity^2); see tsf.h.
+add_compile_definitions(TSF_SF2_VELOCITY_CURVE)
+
 # -O3 + fast-math for the audio render path (TSF is very float-heavy).
 add_compile_options(-O3 -ffast-math)
 

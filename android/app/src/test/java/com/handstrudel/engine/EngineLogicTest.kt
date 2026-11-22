@@ -31,6 +31,31 @@ class EngineLogicTest {
         assertEquals("stack(a, b)", HandStrudelEngine.stackCode(listOf("a", "b")))
     }
 
+    @Test fun drumVolume_keepsTheSliderRangeAbove100Percent() {
+        assertEquals(1.8, HandStrudelEngine.clampDrumVolume(1.8), 0.0)
+        assertEquals(2.0, HandStrudelEngine.clampDrumVolume(2.4), 0.0)
+        assertEquals(0.0, HandStrudelEngine.clampDrumVolume(-1.0), 0.0)
+        val part = HandStrudelEngine.buildDrumCodeParts(
+            DrumTrackState("basic", HandStrudelEngine.clampDrumVolume(1.8), 120.0), DrumTrackState("none"), 0.5, 0.5, 1.0,
+        )
+        assertTrue(part[0].endsWith(").gain(1.62)).cpm(60.0)")) // 1.8 × (0.3 + 0.5 × 1.2)
+    }
+
+    @Test fun foregroundTracker_backgroundsOnlyWhenNoActivityIsStarted() {
+        val events = mutableListOf<Boolean>()
+        val t = ForegroundTracker { events += it }
+        t.activityStarted()
+        // "Share one app" relaunch: a second instance starts before the first stops.
+        t.activityStarted()
+        t.activityStopped()
+        assertTrue(t.isForeground)
+        t.activityStopped()
+        assertFalse(t.isForeground)
+        t.activityStopped() // extra stop is ignored
+        t.activityStarted()
+        assertEquals(listOf(true, false, true), events)
+    }
+
     @Test fun loopDuration_barsAndCap() {
         assertEquals(8.0, HandStrudelEngine.loopDuration(4, 120.0), 1e-9)
         assertEquals(90.0, HandStrudelEngine.loopDuration(32, 60.0), 1e-9)

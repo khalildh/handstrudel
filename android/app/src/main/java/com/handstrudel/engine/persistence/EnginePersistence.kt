@@ -1,5 +1,6 @@
 package com.handstrudel.engine.persistence
 
+import com.handstrudel.models.TextRules
 import com.handstrudel.app.PrefsStore
 import com.handstrudel.engine.SavedLoop
 import com.handstrudel.models.CustomScale
@@ -125,7 +126,7 @@ class EnginePersistence(private val store: PrefsStore) {
 
     /** iOS `addPreset`: trimmed name ≤40 chars, valid sound, unique by (sound, name), newest first. */
     fun addPreset(sound: SoundSetup, name: String): Boolean {
-        val trimmed = name.trim().let { if (it.length > 40) it.substring(0, 40) else it }
+        val trimmed = TextRules.prefixGraphemes(name.trim(), 40) // iOS `prefix(40)` (Characters)
         if (!sound.isValid || trimmed.isEmpty()) return false
         val setups = loadSetups()
         if (setups.any { it.sound == sound && it.name == trimmed }) return false
@@ -230,7 +231,6 @@ fun clampedLoopGain(value: Double): Double = if (value.isFinite()) value.coerceI
 /** iOS `RecordedLoop.cleanName`: drop control characters, trim, at most 40 characters. */
 fun cleanLoopName(value: String): String {
     val sb = StringBuilder()
-    value.codePoints().forEach { cp -> if (!Character.isISOControl(cp) && Character.getType(cp) != Character.CONTROL.toInt()) sb.appendCodePoint(cp) }
-    val trimmed = sb.toString().trim()
-    return if (trimmed.length > 40) trimmed.substring(0, trimmed.offsetByCodePoints(0, minOf(40, trimmed.codePointCount(0, trimmed.length)))) else trimmed
+    value.codePoints().forEach { cp -> if (!TextRules.isControl(cp)) sb.appendCodePoint(cp) }
+    return TextRules.prefixGraphemes(sb.toString().trim(), 40)
 }

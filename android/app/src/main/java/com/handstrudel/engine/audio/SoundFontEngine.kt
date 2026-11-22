@@ -45,8 +45,9 @@ class SoundFontEngine(private val context: Context) {
             loadFailed = true
             return null
         }
-        // -6 dB keeps stacked chord voices (7th chords + melody + accents) from clipping.
-        val loaded = TinySoundFont.load(bytes, output.sampleRate, -6f)
+        // iOS: AVAudioUnitSampler at unity gain into the main mixer, SF2 velocity curve
+        // (amplitude = velocity², built into tsf.h via TSF_SF2_VELOCITY_CURVE). Same levels here.
+        val loaded = TinySoundFont.load(bytes, output.sampleRate, IOS_SAMPLER_GAIN_DB)
         if (loaded == null) loadFailed = true
         tsf = loaded
         loaded
@@ -166,6 +167,8 @@ class SoundFontEngine(private val context: Context) {
     companion object {
         private const val TAG = "SoundFontEngine"
         const val SF2_ASSET = "soundfonts/GeneralUser-GS.sf2"
+        /** AVAudioUnitSampler's default master gain. */
+        const val IOS_SAMPLER_GAIN_DB = 0f
 
         private fun nativeSampleRate(context: Context): Int {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager

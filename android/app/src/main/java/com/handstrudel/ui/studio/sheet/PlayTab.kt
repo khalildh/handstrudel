@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.handstrudel.app.LocalAppServices
 import com.handstrudel.engine.StudioMode
+import com.handstrudel.ui.nav.LocalAppNavigator
 import com.handstrudel.ui.studio.common.SectionHeader
 import com.handstrudel.ui.studio.common.StudioPaddedPanel
 import com.handstrudel.ui.studio.home.StudioInputPicker
@@ -79,16 +80,14 @@ import com.handstrudel.ui.theme.LocalStudioPalette
 internal fun PlayTab(onOpenLearnPicker: () -> Unit) {
     val services = LocalAppServices.current
     val engine = services.engine
+    val navigator = LocalAppNavigator.current
     val playInput by engine.playInput.collectAsState()
     val mode by engine.mode.collectAsState()
 
     StudioPaddedPanel {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionHeader("PLAY INPUT", Icons.Filled.TouchApp)
-            StudioInputPicker(selection = playInput, onChange = {
-                services.prefs.setStudioPlayInput(it)
-                engine.setPlayInput(it)
-            })
+            StudioInputPicker(selection = playInput, onChange = navigator::changePlayInput)
         }
     }
     StudioPaddedPanel { OtherModesPicker(mode, onOpenLearnPicker) }

@@ -141,6 +141,20 @@ class DefaultAppNavigator(
         }
     }
 
+    override fun changePlayInput(input: PlayInput) {
+        val engine = services.engine
+        services.prefs.setStudioPlayInput(input) // iOS sets `preferredInput` first, even if access is then denied.
+        if (input == PlayInput.AIR && engine.isRunning.value && !isGranted(Manifest.permission.CAMERA)) {
+            requestPermission(Manifest.permission.CAMERA) { _ ->
+                // Granted: the engine starts the camera. Denied: its access check reports
+                // PERMISSION_DENIED and falls back to touch (iOS `startSession` → `fallBackToTouch`).
+                if (engine.isRunning.value) engine.setPlayInput(PlayInput.AIR)
+            }
+            return
+        }
+        engine.setPlayInput(input)
+    }
+
     /** iOS `limitScaleToEntitlement`: an unentitled scale becomes Pentatonic. */
     private fun limitScaleToEntitlement() {
         val engine = services.engine

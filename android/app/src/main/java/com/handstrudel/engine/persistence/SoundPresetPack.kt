@@ -1,5 +1,6 @@
 package com.handstrudel.engine.persistence
 
+import com.handstrudel.models.TextRules
 import com.handstrudel.engine.PresetPackException
 import com.handstrudel.models.NamedSoundSetup
 import com.handstrudel.models.SoundSetup
@@ -27,9 +28,8 @@ data class SoundPresetPack(
     data class Entry(val name: String, val sound: SoundSetup) {
         /** iOS `Entry.isValid`. */
         val isValid: Boolean
-            get() = name.isNotEmpty() && name.length <= 40 && name == name.trim() &&
-                name.codePoints().noneMatch { Character.getType(it) == Character.CONTROL.toInt() } &&
-                sound.isValid
+            get() = name.isNotEmpty() && TextRules.graphemeCount(name) <= 40 && name == name.trim() &&
+                !TextRules.containsControl(name) && sound.isValid
     }
 
     fun validate() {

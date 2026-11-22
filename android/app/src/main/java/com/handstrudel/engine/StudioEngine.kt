@@ -155,6 +155,8 @@ interface StudioEngine {
     val learn: StateFlow<LearnDisplay>
     /** Id from the engine's learn-song catalog (`models/LearnSongs.kt`: `BUNDLED_SONGS` ids or `PRACTICE_SONG_IDS`). */
     fun loadLearnSong(songId: String)
+    /** iOS "Play again": reloads the same song instance (a generated practice song keeps its notes). */
+    fun replayLearnSong() { learn.value.currentSongId?.let(::loadLearnSong) }
     fun updateLearnViewport(widthPx: Float, heightPx: Float)
     fun tapLearnLane(lane: Int)
 
