@@ -133,6 +133,8 @@ class CaptureControllerImpl(
 
     init {
         DraftExport.sweep(context)
+        // Nothing is in flight at launch: backing audio and loop captures left by a crash are stale.
+        CaptureTempFiles.sweepCrashLeftovers(context)
         (context.applicationContext as? Application)?.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) { startedActivities++ }
             override fun onActivityStopped(activity: Activity) {
@@ -521,7 +523,7 @@ class CaptureControllerImpl(
                 recordingError("Audio capture isn't available right now.")
                 return@launch
             }
-            val capture = LoopCapture(File(File(context.cacheDir, "loop-capture"), "${UUID.randomUUID()}.wav"), audio)
+            val capture = LoopCapture(File(CaptureTempFiles.loopCaptureDir(context), "${UUID.randomUUID()}.wav"), audio)
             try {
                 capture.start()
             } catch (e: Exception) {

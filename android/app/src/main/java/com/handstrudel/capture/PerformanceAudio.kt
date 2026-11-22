@@ -29,7 +29,7 @@ object PerformanceAudio {
     fun mediaUrl(key: String): String = com.handstrudel.social.SocialConfig.mediaUrl(key)
 
     suspend fun export(context: Context, video: Video): File {
-        val dir = File(context.cacheDir, "backing").apply { mkdirs() }
+        val dir = CaptureTempFiles.backingDir(context).apply { mkdirs() }
         val localVideo = File(dir, "Backing-${UUID.randomUUID()}.mp4")
         try {
             try {
