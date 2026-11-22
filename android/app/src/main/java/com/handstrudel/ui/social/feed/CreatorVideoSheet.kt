@@ -208,7 +208,7 @@ fun PerformanceDetail(
                         modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).padding(10.dp))
                 }
                 IconButton(onClick = { setFullscreen(!isFullscreen) }, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).testTag("profile-video-fullscreen")) {
-                    FeedVideoIcon(if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen, if (isFullscreen) "Exit full screen" else "Full screen")
+                    FeedVideoIcon(if (isFullscreen) StudioIcons.ArrowDownRightAndArrowUpLeft else StudioIcons.ArrowUpLeftAndArrowDownRight, if (isFullscreen) "Exit full screen" else "Full screen")
                 }
             }
             if (!isFullscreen) {
@@ -276,7 +276,7 @@ fun PlaybackControls(clip: FeedClip, showsPause: Boolean, muted: Boolean, toggle
         }
         FeedProgressStrip(clip, durationHint, Modifier.weight(1f), onVerticalSwipe)
         Box(Modifier.clickable(onClick = toggleMute).testTag("video-playback-mute")) {
-            FeedVideoIcon(if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp, if (muted) "Unmute" else "Mute")
+            FeedVideoIcon(if (muted) StudioIcons.SpeakerSlash else StudioIcons.SpeakerWave2, if (muted) "Unmute" else "Mute")
         }
     }
 }

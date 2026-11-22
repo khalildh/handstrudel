@@ -309,4 +309,103 @@ object StudioIcons {
     /** SF `chevron.down` / `chevron.up` at a bold weight. */
     val ChevronDown: ImageVector = icon("chevron.down", "M4.5,8.5L12,16L19.5,8.5", stroke = 2.6f)
     val ChevronUp: ImageVector = icon("chevron.up", "M4.5,15.5L12,8L19.5,15.5", stroke = 2.6f)
+
+    // --- Social glyphs (feed rail, header, profile, menus), drawn from iOS 1.0.1 screenshots. ---
+
+    private const val SPEAKER = "M3.5,9.2H7.2L11.8,5.2V18.8L7.2,14.8H3.5Z"
+
+    /** SF `speaker.wave.2`: an outlined speaker with two sound waves. */
+    val SpeakerWave2: ImageVector = icon("speaker.wave.2", SPEAKER, "M15.2,9.2a4,4 0 0 1 0,5.6", "M18.2,6.4a8,8 0 0 1 0,11.2", stroke = 2f)
+
+    /** SF `speaker.slash`: the speaker struck through. */
+    val SpeakerSlash: ImageVector = icon("speaker.slash", SPEAKER, "M3.5,3.5L20.5,20.5", stroke = 2f)
+
+    /** SF `arrow.up.left.and.arrow.down.right`: two diagonal arrows pointing to the corners. */
+    val ArrowUpLeftAndArrowDownRight: ImageVector = icon(
+        "arrow.up.left.and.arrow.down.right",
+        "M4.5,4.5L10.5,10.5", "M4.5,10.5V4.5H10.5", "M19.5,19.5L13.5,13.5", "M19.5,13.5V19.5H13.5",
+        stroke = 2.2f,
+    )
+
+    /** SF `arrow.down.right.and.arrow.up.left`: two diagonal arrows pointing to the centre. */
+    val ArrowDownRightAndArrowUpLeft: ImageVector = icon(
+        "arrow.down.right.and.arrow.up.left",
+        "M4,4L10.5,10.5", "M10.5,4.5V10.5H4.5", "M20,20L13.5,13.5", "M13.5,19.5V13.5H19.5",
+        stroke = 2.2f,
+    )
+
+    /** SF `paperplane`: an outlined paper plane pointing up-right. */
+    val Paperplane: ImageVector = icon("paperplane", "M21,3L2.8,10.4L10.2,13.8L13.6,21.2Z", "M10.2,13.8L21,3", stroke = 2f)
+
+    /** SF `arrow.triangle.2.circlepath`: two circling arcs with solid arrowheads. */
+    val ArrowTriangle2Circlepath: ImageVector = icon(
+        "arrow.triangle.2.circlepath",
+        "M4.6,12A7.4,7.4 0 0 1 17.4,7", "M19.4,12A7.4,7.4 0 0 1 6.6,17",
+        fills = listOf("M21,4.6V10.6H15Z", "M3,19.4V13.4H9Z"),
+        stroke = 2.1f,
+    )
+
+    /** SF `bubble` as iOS 18 draws it: a rounded-rectangle speech bubble, tail at the bottom left. */
+    val BubbleRect: ImageVector = icon(
+        "bubble.rect",
+        "M6.2,4H17.8a3.2,3.2 0 0 1 3.2,3.2V13.8a3.2,3.2 0 0 1 -3.2,3.2H10.6L6.4,20.6V17H6.2a3.2,3.2 0 0 1 -3.2,-3.2V7.2a3.2,3.2 0 0 1 3.2,-3.2Z",
+        stroke = 2f,
+    )
+
+    /** SF `eye`: an almond outline with a solid pupil. */
+    val Eye: ImageVector = icon(
+        "eye",
+        "M1.8,12C4.4,7.4 8,5.2 12,5.2C16,5.2 19.6,7.4 22.2,12C19.6,16.6 16,18.8 12,18.8C8,18.8 4.4,16.6 1.8,12Z",
+        fills = listOf("M8.6,12a3.4,3.4 0 1 0 6.8,0a3.4,3.4 0 1 0 -6.8,0z"),
+        stroke = 2f,
+    )
+
+    /** SF `ellipsis`: three solid dots. */
+    val Ellipsis: ImageVector = icon(
+        "ellipsis",
+        fills = listOf("M3.2,12a1.9,1.9 0 1 0 3.8,0a1.9,1.9 0 1 0 -3.8,0z" + "M10.1,12a1.9,1.9 0 1 0 3.8,0a1.9,1.9 0 1 0 -3.8,0z" +
+            "M17,12a1.9,1.9 0 1 0 3.8,0a1.9,1.9 0 1 0 -3.8,0z"),
+    )
+
+    /** SF `waveform.badge.plus`: waveform bars with a solid circular plus badge at the bottom right. */
+    val WaveformBadgePlusCircle: ImageVector = icon(
+        "waveform.badge.plus.circle",
+        "M2,10.5V13.5M5,7V17M8,3.5V20.5M11,7.5V16.5M14,9.5V12.5",
+        fills = listOf("M13.6,17.6a4.9,4.9 0 1 0 9.8,0a4.9,4.9 0 1 0 -9.8,0z" + "M17.75,14.9h1.5v1.95h1.95v1.5h-1.95v1.95h-1.5v-1.95h-1.95v-1.5h1.95z"),
+        evenOdd = true,
+        stroke = 2f,
+    )
+
+    /** SF `rectangle.grid.3x2`: six small rounded rectangles in three columns. */
+    val RectangleGrid3x2: ImageVector = icon(
+        "rectangle.grid.3x2",
+        *listOf(5f, 13f).flatMap { y -> listOf(2.5f, 9.5f, 16.5f).map { x -> "M${x + 1f},${y}h3a1,1 0 0 1 1,1v4a1,1 0 0 1 -1,1h-3a1,1 0 0 1 -1,-1v-4a1,1 0 0 1 1,-1z" } }.toTypedArray(),
+        stroke = 1.6f,
+    )
+
+    /** SF `square.and.arrow.up`: an open box with an arrow rising out of it. */
+    val SquareAndArrowUp: ImageVector = icon(
+        "square.and.arrow.up",
+        "M8.5,9H7a2,2 0 0 0 -2,2V19.5a2,2 0 0 0 2,2H17a2,2 0 0 0 2,-2V11a2,2 0 0 0 -2,-2H15.5", "M12,2.5V14.5", "M8.4,6.1L12,2.5L15.6,6.1",
+        stroke = 1.9f,
+    )
+
+    /** SF `flag`: a pole with a swallow-tail pennant. */
+    val Flag: ImageVector = icon("flag", "M5,21.5V3.5", "M5,4H19.5L16.5,8.75L19.5,13.5H5", stroke = 1.7f)
+
+    /** SF `arrow.down.circle`: a ring with a downward arrow. */
+    val ArrowDownCircle: ImageVector = icon(
+        "arrow.down.circle", "M3,12a9,9 0 1 0 18,0a9,9 0 1 0 -18,0z", "M12,7V16.5", "M8,12.8L12,16.8L16,12.8", stroke = 1.7f,
+    )
+
+    /** SF `chevron.right` at a semibold weight (disclosure rows, filmstrip handles). */
+    val ChevronRight: ImageVector = icon("chevron.right", "M9,4.5L16.5,12L9,19.5", stroke = 2.4f)
+
+    /** SF `play.rectangle`: a rounded rectangle with a play triangle. */
+    val PlayRectangle: ImageVector = icon(
+        "play.rectangle",
+        "M5,5H19a2.5,2.5 0 0 1 2.5,2.5V16.5a2.5,2.5 0 0 1 -2.5,2.5H5a2.5,2.5 0 0 1 -2.5,-2.5V7.5a2.5,2.5 0 0 1 2.5,-2.5Z",
+        fills = listOf("M10,8.6V15.4L15.6,12Z"),
+        stroke = 1.7f,
+    )
 }

@@ -13,6 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.PaddingValues
+import com.handstrudel.ui.theme.GroupedCell
+import com.handstrudel.ui.theme.GroupedChevron
+import com.handstrudel.ui.theme.IosGrouped
+import com.handstrudel.ui.theme.iosLight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
@@ -87,9 +93,11 @@ fun ActivityInboxScreen(onDismiss: () -> Unit, onStart: (PerformanceStart) -> Un
     }
     LaunchedEffect(Unit) { load() }
 
-    SocialScreen("Notifications", onDismiss) {
+    val light = iosLight()
+    SocialScreen("Notifications", onDismiss, background = IosGrouped.background(light)) {
         SocialRefreshBox(onRefresh = { load() }, modifier = Modifier.weight(1f).fillMaxWidth()) {
-        LazyColumn(Modifier.fillMaxSize()) {
+        // iOS: a default inset grouped `List` (system cell colours, disclosure chevrons).
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 35.dp, bottom = 24.dp)) {
             error?.let { e ->
                 item {
                     Column(Modifier.padding(20.dp)) {
@@ -107,9 +115,10 @@ fun ActivityInboxScreen(onDismiss: () -> Unit, onStart: (PerformanceStart) -> Un
                     }
                 }
             }
-            items(items, key = { it.id.toString() + it.timestamp }) { item ->
+            itemsIndexed(items, key = { _, it -> it.id.toString() + it.timestamp }) { index, item ->
+                GroupedCell(index, items.size) {
                 Row(
-                    Modifier.fillMaxWidth().clickable { opened = item }.padding(horizontal = 20.dp, vertical = 12.dp)
+                    Modifier.fillMaxWidth().clickable { opened = item }.padding(horizontal = 20.dp, vertical = 11.dp)
                         .testTag("notification-performance-row"),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -121,10 +130,12 @@ fun ActivityInboxScreen(onDismiss: () -> Unit, onStart: (PerformanceStart) -> Un
                     Icon(icon, null, tint = if (item.kind.isLike) p.recording else p.accent, modifier = Modifier.width(28.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(item.title, color = p.ink, fontSize = 15.sp, fontWeight = if (item.isUnread) FontWeight.Bold else FontWeight.Normal)
-                        if (item.body.isNotEmpty()) Text(item.body, color = p.muted, maxLines = 2)
-                        Text(relativeTime(item.createdAtInstant), color = p.muted, fontSize = 11.sp)
+                        if (item.body.isNotEmpty()) Text(item.body, color = IosGrouped.secondaryLabel(light), fontSize = 17.sp, maxLines = 2)
+                        Text(relativeTime(item.createdAtInstant), color = IosGrouped.secondaryLabel(light), fontSize = 11.sp)
                     }
                     if (item.isUnread) Box(Modifier.size(7.dp).clip(CircleShape).background(p.accent).semantics { contentDescription = "Unread" })
+                    GroupedChevron()
+                }
                 }
             }
             if (more) item { TextButton(onClick = { scope.launch { load(append = true) } }, enabled = !loading, modifier = Modifier.padding(12.dp)) { Text("Load more activity", color = p.accent) } }

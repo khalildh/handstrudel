@@ -1,5 +1,14 @@
 package com.handstrudel.ui.social.feed
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.filled.Sync
 import com.handstrudel.ui.theme.StudioIcons
@@ -91,20 +100,20 @@ fun FeedActionRail(
             tint = if (liked) p.recording else Color.White, label = if (liked) "Unlike" else "Like",
             value = "${video.likeCount} likes", tag = "feed-like", onClick = actions.like)
         val commentsOn = video.commentsEnabled == true
-        Glyph(StudioIcons.Bubble, video.commentCount ?: 0,
+        Glyph(StudioIcons.BubbleRect, video.commentCount ?: 0,
             label = if (commentsOn) "Comments, ${video.commentCount ?: 0}" else if (isMine) "Manage comments" else "Comments off",
             enabled = commentsOn || isMine, tag = "video-comments-button", onClick = actions.comments)
-        Glyph(StudioIcons.WaveformBadgePlus, engagement?.remixes, label = "Remixes", tag = "feed-remix-count", onClick = actions.showRemixes)
+        Glyph(StudioIcons.WaveformBadgePlusCircle, engagement?.remixes, label = "Remixes", tag = "feed-remix-count", onClick = actions.showRemixes)
         val didRepost = engagement?.repostedByMe == true
-        Glyph(Icons.Filled.Sync, engagement?.reposts, tint = if (didRepost) p.mediaAccent else Color.White,
+        Glyph(StudioIcons.ArrowTriangle2Circlepath, engagement?.reposts, tint = if (didRepost) p.mediaAccent else Color.White,
             label = if (isMine) "Reposts" else if (didRepost) "Remove repost" else "Repost",
             enabled = !isMine, tag = "feed-repost", onClick = actions.repost)
-        Glyph(Icons.AutoMirrored.Outlined.Send, engagement?.shares, label = "Share video", tag = "feed-share", onClick = actions.share)
+        Glyph(StudioIcons.Paperplane, engagement?.shares, label = "Share video", tag = "feed-share", onClick = actions.share)
         Glyph(if (isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, engagement?.saves,
             tint = if (isSaved) p.mediaAccent else Color.White,
             label = if (isSaved) "Remove from Saved" else "Save privately", tag = "save-performance", onClick = actions.bookmark)
         val views = clip?.let { liveViews?.let { v -> maxOf(v, video.viewCount ?: 0) } ?: video.viewCount } ?: video.viewCount
-        Glyph(Icons.Outlined.Visibility, views, label = "Views", value = views?.toString() ?: "Not available", tag = "feed-views-count", onClick = null)
+        Glyph(StudioIcons.Eye, views, label = "Views", value = views?.toString() ?: "Not available", tag = "feed-views-count", onClick = null)
         MoreMenu(video, isMine, canDownloadAudio, canChangeAudioPermission, actions)
     }
 }
@@ -116,23 +125,43 @@ private fun MoreMenu(video: Video, isMine: Boolean, canDownloadAudio: Boolean, c
     // never offers Block/Report/Delete for a different post than the one it was opened on.
     var open by remember(video.id) { mutableStateOf(false) }
     Box {
-        Glyph(Icons.Filled.MoreHoriz, null, label = "More", reservesCount = false, tag = "feed-more", onClick = { open = true })
+        Glyph(StudioIcons.Ellipsis, null, label = "More", reservesCount = false, tag = "feed-more", onClick = { open = true })
         SocialMaterialTheme(dark = true) {
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                fun item(text: String, color: Color? = null, action: () -> Unit): @Composable () -> Unit = {
-                    DropdownMenuItem(text = { Text(text, color = color ?: Color.Unspecified) }, onClick = { open = false; action() })
-                }
-                if (canDownloadAudio) item("Download audio", action = actions.downloadAudio)()
-                if (canChangeAudioPermission) {
-                    item(if (canDownloadAudio) "Turn off audio downloads" else "Allow audio downloads", action = actions.changeAudioPermission)()
-                }
-                val red = LocalStudioPalette.current.recording
-                if (isMine) {
-                    if (video.backingEnabled == true) item("Stop allowing play-along", action = actions.revokeBacking)()
-                    item("Delete post", red, actions.delete)()
-                } else {
-                    item("Report", action = actions.report)()
-                    item("Block @${video.username ?: "user"}", red, actions.block)()
+            // iOS presents the rail's `Menu` above the button as a translucent dark material
+            // card (13 pt corners, 17 pt rows, trailing SF glyphs, hairline separators) and,
+            // opening upward, lists the items in reverse so the first sits nearest the button.
+            DropdownMenu(
+                expanded = open, onDismissRequest = { open = false },
+                modifier = Modifier.width(250.dp),
+                shape = RoundedCornerShape(13.dp),
+                containerColor = Color(0xFF2A2A2A).copy(alpha = 0.78f),
+                tonalElevation = 0.dp, shadowElevation = 12.dp,
+            ) {
+                val red = Color(0xFFFF453A)
+                val rows = buildList<Triple<String, Pair<Color?, ImageVector?>, () -> Unit>> {
+                    if (canDownloadAudio) add(Triple("Download audio", null to StudioIcons.ArrowDownCircle, actions.downloadAudio))
+                    if (canChangeAudioPermission) {
+                        add(Triple(if (canDownloadAudio) "Turn off audio downloads" else "Allow audio downloads", null to StudioIcons.Waveform, actions.changeAudioPermission))
+                    }
+                    if (isMine) {
+                        if (video.backingEnabled == true) add(Triple("Stop allowing play-along", null to null, actions.revokeBacking))
+                        add(Triple("Delete post", red to null, actions.delete))
+                    } else {
+                        add(Triple("Report", null to StudioIcons.Flag, actions.report))
+                        add(Triple("Block @${video.username ?: "user"}", red to StudioIcons.HandRaised, actions.block))
+                    }
+                }.reversed()
+                val accent = LocalStudioPalette.current.accent
+                rows.forEachIndexed { index, (text, style, action) ->
+                    if (index > 0) Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.16f)))
+                    Row(
+                        Modifier.fillMaxWidth().height(44.dp).clickable { open = false; action() }.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(text, color = style.first ?: Color.White, fontSize = 17.sp, fontWeight = FontWeight.Normal, maxLines = 1,
+                            modifier = Modifier.weight(1f))
+                        style.second?.let { icon -> Icon(icon, null, tint = accent, modifier = Modifier.size(22.dp)) }
+                    }
                 }
             }
         }

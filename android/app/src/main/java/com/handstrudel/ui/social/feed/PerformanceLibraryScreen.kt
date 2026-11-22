@@ -1,5 +1,14 @@
 package com.handstrudel.ui.social.feed
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.handstrudel.ui.theme.iosLight
+import com.handstrudel.ui.theme.IosGrouped
+import com.handstrudel.ui.theme.GroupedHeader
+import com.handstrudel.ui.theme.GroupedCell
 import com.handstrudel.ui.theme.StudioIcons
 
 import com.handstrudel.ui.theme.StudioFonts
@@ -125,72 +134,78 @@ fun PerformanceLibraryScreen(kind: LibraryKind, onDismiss: () -> Unit, onRemove:
 
     LaunchedEffect(Unit) { load() }
 
-    SocialScreen(kind.title, onDismiss) {
+    // iOS: a default inset grouped `List` (system sheet colours), one section for the challenge
+    // card and one for the takes.
+    val light = iosLight()
+    val secondary = IosGrouped.secondaryLabel(light)
+    val rowPad = Modifier.padding(horizontal = IosGrouped.CellInset, vertical = 11.dp)
+    SocialScreen(kind.title, onDismiss, background = IosGrouped.background(light)) {
         SocialRefreshBox(onRefresh = { load() }, modifier = Modifier.weight(1f).fillMaxWidth()) {
-        LazyColumn(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 35.dp, bottom = 24.dp)) {
             if (kind is LibraryKind.Challenge) {
-                item {
-                    val c = kind.challenge
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(c.title, color = p.ink, fontSize = 24.sp, fontFamily = StudioFonts.Serif)
-                        Text(c.prompt, color = p.ink)
-                        c.endsAtInstant?.let {
-                            Text("Ends " + DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
-                                .format(it.atZone(ZoneId.systemDefault())), color = p.muted, fontSize = 12.sp)
-                        }
-                        val s = source
-                        if (s != null) {
-                            TextButton(onClick = { selected = s }) { Icon(Icons.Outlined.PlayCircle, null, tint = p.accent); Text("  Watch the backing clip", color = p.accent) }
-                            TextButton(onClick = { onStart(PerformanceStart.Backing(s)) }, modifier = Modifier.testTag("challenge-play-along")) {
-                                Icon(StudioIcons.Waveform, null, tint = p.accent); Text("  Play along", color = p.accent, fontWeight = FontWeight.SemiBold)
+                val c = kind.challenge
+                val s = source
+                val rows = buildList<@Composable () -> Unit> {
+                    add { Text(c.title, color = p.ink, fontSize = 22.sp, fontFamily = StudioFonts.Serif, modifier = rowPad) }
+                    add { Text(c.prompt, color = p.ink, fontSize = 17.sp, modifier = rowPad) }
+                    c.endsAtInstant?.let { ends -> add { Text("Ends " + iosAbbreviatedDateTime(ends), color = secondary, fontSize = 12.sp, modifier = rowPad) } }
+                    if (s != null) {
+                        add { GroupedButtonRow(StudioIcons.PlayRectangle, "Watch the backing clip", p.accent) { selected = s } }
+                        add {
+                            GroupedButtonRow(StudioIcons.Waveform, "Play along", p.accent, bold = true, modifier = Modifier.testTag("challenge-play-along")) {
+                                onStart(PerformanceStart.Backing(s))
                             }
-                        } else if (!loading && error == null) {
-                            Text("This challenge is no longer available.", color = p.muted)
                         }
+                    } else if (!loading && error == null) {
+                        add { Text("This challenge is no longer available.", color = secondary, fontSize = 17.sp, modifier = rowPad) }
                     }
-                    Text("COMMUNITY TAKES", color = p.muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 20.dp))
                 }
+                itemsIndexed(rows) { i, row -> GroupedCell(i, rows.size) { row() } }
+                item { Spacer(Modifier.height(35.dp)); GroupedHeader("Community takes") }
             } else if (kind is LibraryKind.Remixes) {
                 source?.let { s ->
                     item {
-                        TextButton(onClick = { onStart(PerformanceStart.Backing(s)) }, modifier = Modifier.padding(horizontal = 12.dp)) {
-                            Icon(StudioIcons.Waveform, null, tint = p.accent); Text("  Play along", color = p.accent, fontWeight = FontWeight.SemiBold)
+                        GroupedCell(0, 1) { GroupedButtonRow(StudioIcons.Waveform, "Play along", p.accent, bold = true) { onStart(PerformanceStart.Backing(s)) } }
+                        Spacer(Modifier.height(35.dp))
+                    }
+                }
+            }
+            val rows = buildList<@Composable () -> Unit> {
+                error?.let { e ->
+                    add { Text(e, color = secondary, fontSize = 17.sp, modifier = rowPad) }
+                    add { Text("Try again", color = p.accent, fontSize = 17.sp, modifier = Modifier.fillMaxWidth().clickable { scope.launch { load() } }.then(rowPad)) }
+                }
+                if (items.isEmpty()) {
+                    if (loading) add {
+                        Row(rowPad, verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(color = p.accent, modifier = Modifier.size(20.dp)); Text("  Loading performances", color = secondary)
                         }
-                    }
-                }
-            }
-            error?.let { e ->
-                item {
-                    Column(Modifier.padding(20.dp)) {
-                        Text(e, color = p.muted)
-                        TextButton(onClick = { scope.launch { load() } }) { Text("Try again", color = p.accent) }
-                    }
-                }
-            }
-            if (items.isEmpty()) {
-                item {
-                    Box(Modifier.padding(20.dp)) {
-                        if (loading) Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(color = p.accent, modifier = Modifier.size(20.dp)); Text("  Loading performances", color = p.muted)
-                        } else if (error == null) Text(
+                    } else if (error == null) add {
+                        Text(
                             when (kind) {
                                 LibraryKind.Saved -> "Save a performance from its options menu to find it here later. Only you can see this list."
                                 is LibraryKind.Challenge -> "No takes yet. Play along and post a take to join this week's challenge."
                                 is LibraryKind.Remixes -> "No remixes yet. Published Play Along clips will appear here."
-                            }, color = p.muted,
+                            }, color = secondary, fontSize = 17.sp, modifier = rowPad,
                         )
                     }
                 }
-            }
-            items(items, key = { it.id }) { video ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    PerformanceListRow(video, onClick = { selected = video }, modifier = Modifier.weight(1f))
-                    if (kind == LibraryKind.Saved) {
-                        TextButton(onClick = { remove(video) }, enabled = removing == null) { Text("Remove", color = p.recording) }
+                items.forEach { video ->
+                    add {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            PerformanceListRow(video, onClick = { selected = video }, modifier = Modifier.weight(1f))
+                            if (kind == LibraryKind.Saved) {
+                                TextButton(onClick = { remove(video) }, enabled = removing == null) { Text("Remove", color = p.recording) }
+                            }
+                        }
                     }
                 }
+                if (more) add {
+                    Text("Load more", color = if (loading) secondary else p.accent, fontSize = 17.sp,
+                        modifier = Modifier.fillMaxWidth().clickable(enabled = !loading) { scope.launch { load(append = true) } }.then(rowPad))
+                }
             }
-            if (more) item { TextButton(onClick = { scope.launch { load(append = true) } }, enabled = !loading, modifier = Modifier.padding(12.dp)) { Text("Load more", color = p.accent) } }
+            itemsIndexed(rows) { i, row -> GroupedCell(i, rows.size) { row() } }
         }
         }
     }
@@ -199,4 +214,25 @@ fun PerformanceLibraryScreen(kind: LibraryKind, onDismiss: () -> Unit, onRemove:
             onPlayAlong = { selected = null; onStart(PerformanceStart.Backing(it)) },
             onTrySound = { selected = null; onStart(PerformanceStart.Preset(it)) })
     }
+}
+
+/** A `Button(title, systemImage:)` row in an inset grouped list: tinted glyph and 17 pt title. */
+@Composable
+internal fun GroupedButtonRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, tint: androidx.compose.ui.graphics.Color, bold: Boolean = false,
+                              modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Row(
+        modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = IosGrouped.CellInset, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(26.dp))
+        Text(title, color = tint, fontSize = 17.sp, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
+    }
+}
+
+/** Foundation `date.formatted(date: .abbreviated, time: .shortened)` in en: "Nov 28, 2026 at 2:22 PM". */
+internal fun iosAbbreviatedDateTime(instant: java.time.Instant, zone: ZoneId = ZoneId.systemDefault(), locale: java.util.Locale = java.util.Locale.getDefault()): String {
+    val t = instant.atZone(zone)
+    val date = DateTimeFormatter.ofPattern("MMM d, yyyy", locale).format(t)
+    val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).format(t)
+    return "$date at $time"
 }

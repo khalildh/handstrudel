@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioIcons
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -520,11 +521,11 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
                     if (hasVideos || isFullscreen) {
                         if (!isFullscreen) {
                             Box(Modifier.clickable { services.prefs.setFeedMuted(!muted) }.testTag("feed-mute")) {
-                                FeedVideoIcon(if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp, if (muted) "Unmute" else "Mute")
+                                FeedVideoIcon(if (muted) StudioIcons.SpeakerSlash else StudioIcons.SpeakerWave2, if (muted) "Unmute" else "Mute")
                             }
                         }
                         Box(Modifier.clickable { isFullscreen = !isFullscreen }.testTag("feed-fullscreen")) {
-                            FeedVideoIcon(if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen, if (isFullscreen) "Exit full screen" else "Full screen")
+                            FeedVideoIcon(if (isFullscreen) StudioIcons.ArrowDownRightAndArrowUpLeft else StudioIcons.ArrowUpLeftAndArrowDownRight, if (isFullscreen) "Exit full screen" else "Full screen")
                         }
                     }
                 }

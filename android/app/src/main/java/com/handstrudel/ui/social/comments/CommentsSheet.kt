@@ -1,5 +1,9 @@
 package com.handstrudel.ui.social.comments
 
+import com.handstrudel.ui.theme.StudioIcons
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.layout.height
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -283,13 +287,49 @@ fun CommentsSheet(
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         val keyboard = com.handstrudel.ui.social.DialogResizesForKeyboard()
+        // iOS presents comments with `.presentationDetents([.medium, .large])`: a half-height
+        // sheet over the dimmed video that drags up to full height (and rises with the keyboard).
+        val dialogView = androidx.compose.ui.platform.LocalView.current
+        androidx.compose.runtime.SideEffect {
+            ((dialogView as? androidx.compose.ui.window.DialogWindowProvider)
+                ?: (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider))?.window?.setDimAmount(0.2f)
+        }
+        var large by remember { mutableStateOf(targetComment != null) }
+        val density = androidx.compose.ui.platform.LocalDensity.current
         SocialMaterialTheme {
+          androidx.compose.foundation.layout.BoxWithConstraints(
+              Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars)
+                  .padding(bottom = keyboard),
+          ) {
+            val expanded = large || keyboard > 0.dp
+            val sheetHeight by androidx.compose.animation.core.animateDpAsState(
+                if (expanded) maxHeight - 10.dp else maxHeight * 0.53f, label = "commentsDetent")
+            Box(Modifier.fillMaxSize().clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null,
+            ) { if (!busy) onDismiss() })
+            var drag by remember { mutableStateOf(0f) }
             Column(
-                Modifier.fillMaxSize().background(p.background).windowInsetsPadding(WindowInsets.statusBars)
-                    .windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = keyboard).semantics { testTagsAsResourceId = true },
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(sheetHeight)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(p.background)
+                    .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {}
+                    .semantics { testTagsAsResourceId = true },
             ) {
+                // Grabber: drag up for the large detent, down to the medium one or to dismiss.
+                Box(
+                    Modifier.fillMaxWidth().height(14.dp).pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragStart = { drag = 0f },
+                            onDragEnd = {
+                                val threshold = with(density) { 40.dp.toPx() }
+                                if (drag < -threshold) large = true
+                                else if (drag > threshold) { if (large) large = false else if (!busy) onDismiss() }
+                            },
+                        ) { _, amount -> drag += amount }
+                    }.testTag("comments-grabber"),
+                    contentAlignment = Alignment.Center,
+                ) { Box(Modifier.size(width = 36.dp, height = 5.dp).clip(RoundedCornerShape(3.dp)).background(p.muted.copy(alpha = 0.5f))) }
                 // Header
-                Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 10.dp, top = 16.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 10.dp, top = 4.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Comments", color = p.ink, fontSize = 22.sp, fontFamily = StudioFonts.Serif)
                         video.username?.let { Text("Performance by @$it", color = p.muted, fontSize = 12.sp) }
@@ -313,9 +353,10 @@ fun CommentsSheet(
                             }
                         }
                     }
-                    IconButton(onClick = onDismiss, enabled = !busy, modifier = Modifier.semantics { contentDescription = "Close comments" }) {
-                        Box(Modifier.size(36.dp).clip(CircleShape).background(p.surface), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Close, null, tint = p.ink, modifier = Modifier.size(16.dp))
+                    IconButton(onClick = onDismiss, enabled = !busy, modifier = Modifier.size(48.dp).semantics { contentDescription = "Close comments" }) {
+                        // iOS: SF xmark 13 pt semibold in a 44 pt surface circle.
+                        Box(Modifier.size(44.dp).clip(CircleShape).background(p.surface), contentAlignment = Alignment.Center) {
+                            Icon(StudioIcons.XMark, null, tint = p.ink, modifier = Modifier.size(17.dp))
                         }
                     }
                 }
@@ -369,13 +410,13 @@ fun CommentsSheet(
                         if (root.replyCount > loaded) {
                             item(key = "more-${root.id}") {
                                 TextButton(onClick = { perform { loadReplies(root.id, append = true) } }, modifier = Modifier.padding(start = 39.dp)) {
-                                    Text(if (loaded == 0) "View replies (${root.replyCount})" else "More replies", color = p.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(if (loaded == 0) "View replies (${root.replyCount})" else "More replies", color = p.ink, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         } else if (loaded > 0) {
                             item(key = "hide-${root.id}") {
                                 TextButton(onClick = { replies.remove(root.id) }, modifier = Modifier.padding(start = 39.dp)) {
-                                    Text("Hide replies", color = p.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("Hide replies", color = p.ink, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
@@ -411,11 +452,19 @@ fun CommentsSheet(
                         if (canPost) {
                             val valid = VideoComment.isValidBody(draft)
                             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                                OutlinedTextField(
+                                // iOS: `TextField(axis: .vertical)` padded 11 pt on the surface colour, 16 pt corners.
+                                androidx.compose.foundation.text.BasicTextField(
                                     value = draft, onValueChange = { draft = it },
-                                    placeholder = { Text(if (replyTarget == null) "Add a comment…" else "Write a reply…") },
                                     maxLines = 4, enabled = !busy,
+                                    textStyle = androidx.compose.ui.text.TextStyle(color = p.ink, fontSize = 17.sp),
+                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(p.accent),
                                     modifier = Modifier.weight(1f).focusRequester(composerFocus).testTag("comment-text"),
+                                    decorationBox = { inner ->
+                                        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(p.surface).padding(11.dp)) {
+                                            if (draft.isEmpty()) Text(if (replyTarget == null) "Add a comment…" else "Write a reply…", color = p.ink.copy(alpha = 0.3f), fontSize = 17.sp)
+                                            inner()
+                                        }
+                                    },
                                 )
                                 Box(
                                     Modifier.size(44.dp)
@@ -443,6 +492,7 @@ fun CommentsSheet(
                     }
                 }
             }
+          }
 
             action?.let { a ->
                 AlertDialog(

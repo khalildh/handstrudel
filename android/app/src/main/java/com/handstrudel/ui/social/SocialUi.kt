@@ -175,7 +175,7 @@ fun SocialScreen(
             ) {
                 Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (dismissOnLeading) {
-                        TextButton(onClick = onDismiss, enabled = dismissEnabled) { Text(dismissLabel, color = p.accent) }
+                        TextButton(onClick = onDismiss, enabled = dismissEnabled) { Text(dismissLabel, color = if (dismissEnabled) p.accent else p.ink.copy(alpha = 0.3f), fontSize = 17.sp, fontWeight = FontWeight.Normal) }
                     } else {
                         Spacer(Modifier.width(64.dp))
                     }
@@ -184,7 +184,7 @@ fun SocialScreen(
                     Row(Modifier.widthIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
                         trailing()
                         if (!dismissOnLeading) {
-                            TextButton(onClick = onDismiss, enabled = dismissEnabled) { Text(dismissLabel, color = p.accent, fontWeight = FontWeight.SemiBold) }
+                            TextButton(onClick = onDismiss, enabled = dismissEnabled) { Text(dismissLabel, color = if (dismissEnabled) p.accent else p.ink.copy(alpha = 0.3f), fontWeight = FontWeight.SemiBold, fontSize = 17.sp) }
                         }
                     }
                 }
@@ -207,18 +207,20 @@ fun ProfileActionButton(
 ) {
     val p = LocalStudioPalette.current
     val shape = RoundedCornerShape(13.dp)
+    // Dim through the colours rather than `Modifier.alpha`: an alpha layer here left the primary
+    // fill undrawn on first composition (the creator profile's Follow button rendered blank).
+    val dim = if (enabled) 1f else 0.5f
     Row(
         modifier.heightIn(min = 46.dp).clip(shape)
-            .background(if (primary) p.accent else p.background.copy(alpha = 0.6f))
+            .background(if (primary) p.accent.copy(alpha = dim) else p.background.copy(alpha = 0.6f))
             .then(if (primary) Modifier else Modifier.border(1.dp, p.border, shape))
             .clickable(enabled = enabled, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.5f)
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val ink = if (primary) p.onAccent else p.ink
+        val ink = (if (primary) p.onAccent else p.ink).let { if (enabled) it else it.copy(alpha = it.alpha * dim) }
         if (icon != null) { Icon(icon, null, tint = ink, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)) }
         Text(text, color = ink, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -271,7 +273,9 @@ fun FeedVideoIcon(icon: ImageVector, contentDescription: String?, tint: Color = 
         modifier.size(size.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.55f))
             .border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, contentDescription, tint = tint, modifier = Modifier.size((size * 0.45f).dp)) }
+    ) { // SF Symbols at size × 0.41 pt render a glyph about 0.43 × size tall; these 24-unit vectors leave
+    // a ~18 % margin, so size the box to land the same visible glyph.
+    Icon(icon, contentDescription, tint = tint, modifier = Modifier.size((size * 0.52f).dp)) }
 }
 
 /** iOS `.number.notation(.compactName)`: 999, 1.2K, 3.4M. */
@@ -290,13 +294,33 @@ private fun trimDecimal(v: Double): String {
 /** `1 view` / `1,234 views`. */
 fun viewsLabel(count: Int): String = if (count == 1) "1 view" else "${String.format(Locale.getDefault(), "%,d", count)} views"
 
-/** iOS `Text(date, style: .relative)` equivalent. */
-fun relativeTime(instant: Instant?): String {
+/**
+ * iOS `Text(date, style: .relative)`: the two largest non-zero units, abbreviated, with no
+ * "ago" ("2 hr, 10 min", "3 days, 4 hr", "45 sec"), as SwiftUI renders a past date.
+ */
+fun relativeTime(instant: Instant?, now: Long = System.currentTimeMillis()): String {
     instant ?: return ""
-    // Device and server clocks differ slightly; never show a fresh post as "in 0 minutes".
-    val now = System.currentTimeMillis()
-    if (instant.toEpochMilli() >= now - DateUtils.MINUTE_IN_MILLIS) return "Just now"
-    return DateUtils.getRelativeTimeSpanString(instant.toEpochMilli(), System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+    // Device and server clocks differ slightly; a just-posted comment reads "0 sec", never a future time.
+    return relativeTimeSpan(maxOf(0L, (now - instant.toEpochMilli()) / 1000L))
+}
+
+/** [relativeTime] for a span of [seconds]. */
+fun relativeTimeSpan(seconds: Long): String {
+    val units = listOf(
+        Triple(365L * 86_400L, "yr", "yrs"), Triple(30L * 86_400L, "mth", "mths"), Triple(7L * 86_400L, "wk", "wks"),
+        Triple(86_400L, "day", "days"), Triple(3_600L, "hr", "hr"), Triple(60L, "min", "min"), Triple(1L, "sec", "sec"),
+    )
+    var rest = seconds
+    val parts = mutableListOf<String>()
+    for ((size, one, many) in units) {
+        val n = rest / size
+        if (n > 0 || (parts.isNotEmpty())) {
+            if (n > 0) parts += "$n ${if (n == 1L) one else many}"
+            rest -= n * size
+            if (parts.size == 2 || parts.isNotEmpty() && n == 0L) break
+        }
+    }
+    return parts.ifEmpty { listOf("0 sec") }.joinToString(", ")
 }
 
 /** Terms, guidelines and help open in Custom Tabs (falls back to the browser). */

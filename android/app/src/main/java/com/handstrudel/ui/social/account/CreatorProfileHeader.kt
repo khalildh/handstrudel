@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.account
 
+import com.handstrudel.ui.theme.StudioIcons
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -92,7 +93,8 @@ fun CreatorProfileHeader(
                     }
                 }
                 Column {
-                    Text(artistName, color = p.ink, fontSize = 30.sp, fontFamily = StudioFonts.Serif, lineHeight = 34.sp)
+                    // iOS `.largeTitle` serif (34 pt).
+                    Text(artistName, color = p.ink, fontSize = 34.sp, fontFamily = StudioFonts.Serif, lineHeight = 40.sp)
                     Text("@$username", color = p.muted, fontSize = 15.sp, fontFamily = StudioFonts.Mono)
                 }
             }
@@ -111,7 +113,7 @@ fun CreatorProfileHeader(
                         .clickable { shareText(context, SocialConfig.creatorUrl(username)) }
                         .semantics { contentDescription = "Share profile" },
                     contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.Share, null, tint = p.ink) }
+                ) { Icon(StudioIcons.SquareAndArrowUp, null, tint = p.ink, modifier = Modifier.size(24.dp)) }
             }
         }
     }
@@ -126,7 +128,7 @@ private fun RowScope.Stat(name: String, count: Int?, spokenName: String? = null,
             stateDescription = count?.toString() ?: "Unavailable"
         }.then(if (tag != null) Modifier.testTag(tag) else Modifier),
     ) {
-        Text(count?.let(::compactCount) ?: "–", color = p.ink, fontSize = 19.sp, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, maxLines = 1)
-        Text(name, color = p.muted, fontSize = 11.sp, maxLines = 1)
+        Text(count?.let(::compactCount) ?: "–", color = p.ink, fontSize = 20.sp, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(name, color = p.muted, fontSize = 12.sp, maxLines = 1)
     }
 }

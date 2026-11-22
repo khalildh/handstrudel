@@ -71,7 +71,7 @@ import com.handstrudel.ui.theme.LocalStudioPalette
 import kotlinx.coroutines.launch
 
 private enum class PortfolioTab(val title: String, val icon: ImageVector) {
-    CLIPS("Performances", Icons.Filled.GridView), SOUNDS("Sounds", StudioIcons.Waveform), REPOSTS("Reposts", Icons.Filled.Repeat);
+    CLIPS("Performances", StudioIcons.RectangleGrid3x2), SOUNDS("Sounds", StudioIcons.Waveform), REPOSTS("Reposts", StudioIcons.ArrowTriangle2Circlepath);
     val tag: String get() = "profile-${title.lowercase()}"
 }
 
@@ -134,9 +134,20 @@ fun CreatorPortfolio(
                         .clickable { tab = option }.testTag(option.tag),
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // iOS `Label` at `.subheadline.weight(.semibold)` with `.minimumScaleFactor(0.78)`.
                     val ink = if (selected) p.ink else p.muted
-                    Icon(option.icon, null, tint = ink, modifier = Modifier.size(15.dp)); Spacer(Modifier.width(4.dp))
-                    Text(option.title, color = ink, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1)
+                    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
+                        val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+                        val density = androidx.compose.ui.platform.LocalDensity.current
+                        val full = with(density) {
+                            measurer.measure(option.title, androidx.compose.ui.text.TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold)).size.width.toDp()
+                        }
+                        val scale = ((maxWidth - 24.dp) / full).coerceIn(0.78f, 1f)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(option.icon, null, tint = ink, modifier = Modifier.size(19.dp * scale)); Spacer(Modifier.width(5.dp * scale))
+                            Text(option.title, color = ink, fontWeight = FontWeight.SemiBold, fontSize = 15.sp * scale, maxLines = 1, softWrap = false)
+                        }
+                    }
                 }
             }
         }
@@ -164,7 +175,7 @@ fun CreatorPortfolio(
                     }
                 }
             } else if (!loadingReposts && repostError == null) {
-                EmptyCard("No reposts yet", "Repost a clip from the feed to share it with your followers and find it here.", Icons.Filled.Repeat)
+                EmptyCard("No reposts yet", "Repost a clip from the feed to share it with your followers and find it here.", StudioIcons.ArrowTriangle2Circlepath)
             }
             when {
                 repostError != null -> {
@@ -237,7 +248,13 @@ private fun Spotlight(video: Video, onClick: () -> Unit) {
             ProfileEyebrow("LATEST PERFORMANCE")
             Text(clipTitle(video), color = p.ink, fontSize = 20.sp, fontFamily = StudioFonts.Serif, maxLines = 2)
             (video.soundSetup?.instrumentName ?: video.instrument)?.takeIf { it.isNotEmpty() }?.let { Text(it, color = p.muted, fontSize = 12.sp, maxLines = 1) }
-            video.viewCount?.let { Text(viewsLabel(it), color = p.muted, fontSize = 12.sp) }
+            // iOS `VideoViewLabel`: `Label(…, systemImage: "eye")` at `.caption.weight(.medium)`.
+            video.viewCount?.let {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(StudioIcons.Eye, null, tint = p.muted, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(5.dp))
+                    Text(viewsLabel(it), color = p.muted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+            }
         }
         Box(Modifier.size(36.dp).clip(CircleShape).background(p.accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
             Icon(Icons.Filled.PlayArrow, null, tint = p.accent, modifier = Modifier.size(16.dp))
@@ -274,12 +291,13 @@ private fun Tile(video: Video, creditCreator: Boolean = false, onClick: () -> Un
         }
         Column(Modifier.align(Alignment.BottomStart).padding(5.dp).clip(RoundedCornerShape(7.dp)).background(Color.Black.copy(alpha = 0.72f)).padding(5.dp)) {
             if (creditCreator && video.username != null) Text("@${video.username}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            // iOS: `Label`s at `.caption2.weight(.semibold)` (SF heart.fill / eye ≈ 13 pt, 4 pt gap), 6 pt apart.
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(10.dp))
-                Text(" ${compactCount(video.likeCount)}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp))
+                Text(compactCount(video.likeCount), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 video.viewCount?.let {
-                    Spacer(Modifier.width(6.dp)); Icon(Icons.Outlined.Visibility, null, tint = Color.White, modifier = Modifier.size(10.dp))
-                    Text(" ${compactCount(it)}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.width(6.dp)); Icon(StudioIcons.Eye, null, tint = Color.White, modifier = Modifier.size(15.dp)); Spacer(Modifier.width(4.dp))
+                    Text(compactCount(it), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

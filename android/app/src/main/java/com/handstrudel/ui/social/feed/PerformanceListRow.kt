@@ -1,5 +1,8 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioIcons
+import com.handstrudel.ui.theme.iosLight
+import com.handstrudel.ui.theme.IosGrouped
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +37,7 @@ import com.handstrudel.ui.theme.LocalStudioPalette
 fun PerformanceListRow(video: Video, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val p = LocalStudioPalette.current
     Row(
-        modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(Modifier.size(width = 40.dp, height = 56.dp).clip(RoundedCornerShape(6.dp)).background(p.surface), contentAlignment = Alignment.Center) {
@@ -43,9 +46,10 @@ fun PerformanceListRow(video: Video, onClick: () -> Unit, modifier: Modifier = M
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("@${video.username ?: "creator"}", color = p.ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text(video.caption.ifEmpty { video.instrument ?: "Performance" }, color = p.muted, fontSize = 12.sp,
+            Text(video.caption.ifEmpty { video.instrument ?: "Performance" }, color = IosGrouped.secondaryLabel(iosLight()), fontSize = 12.sp,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = p.muted)
+        // iOS: `chevron.right` at `.caption` in the secondary label colour.
+        Icon(StudioIcons.ChevronRight, null, tint = IosGrouped.secondaryLabel(iosLight()), modifier = Modifier.size(13.dp))
     }
 }

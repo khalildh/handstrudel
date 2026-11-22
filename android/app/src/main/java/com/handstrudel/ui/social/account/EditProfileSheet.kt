@@ -1,5 +1,15 @@
 package com.handstrudel.ui.social.account
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import com.handstrudel.ui.theme.IosRed
+import com.handstrudel.ui.theme.iosLight
+import com.handstrudel.ui.theme.IosGrouped
+import com.handstrudel.ui.theme.GroupedFooter
+import com.handstrudel.ui.theme.GroupedHeader
+import com.handstrudel.ui.theme.GroupedCell
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -149,41 +159,73 @@ fun EditProfileSheet(onDismiss: () -> Unit) {
     }
 
     val tooLong = name.trim().let { it.codePointCount(0, it.length) } > AuthManager.DISPLAY_NAME_LIMIT
-    SocialScreen("Edit profile", onDismiss, dismissLabel = "Cancel", dismissOnLeading = true, dismissEnabled = !saving, trailing = {
-        TextButton(onClick = ::save, enabled = !saving && !loadingPhoto && !tooLong, modifier = Modifier.testTag("profile-save")) {
-            Text("Save", color = p.accent, fontWeight = FontWeight.SemiBold)
+    // iOS: a default `Form` (inset grouped, system sheet colours), not the studio palette.
+    val light = iosLight()
+    val disabledInk = p.ink.copy(alpha = 0.3f)
+    SocialScreen("Edit profile", onDismiss, dismissLabel = "Cancel", dismissOnLeading = true, dismissEnabled = !saving,
+        background = IosGrouped.background(light), trailing = {
+        val canSave = !saving && !loadingPhoto && !tooLong
+        TextButton(onClick = ::save, enabled = canSave, modifier = Modifier.testTag("profile-save")) {
+            Text("Save", color = if (canSave) p.accent else disabledInk, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
         }
     }) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("PROFILE PHOTO", color = p.muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Box(Modifier.size(58.dp).clip(CircleShape).background(p.surface), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.AccountCircle, null, tint = p.muted)
-                    val pending = pendingPhoto
-                    val key = profile?.avatarKey
-                    if (pending != null) {
-                        val bitmap = remember(pending) { android.graphics.BitmapFactory.decodeByteArray(pending, 0, pending.size)?.asImageBitmap() }
-                        if (bitmap != null) Image(bitmap, null, contentScale = ContentScale.Crop, modifier = Modifier.size(58.dp))
-                    } else if (!removePhoto && key != null) {
-                        ProfileImage(ProfileImageStore.Resource(SocialConfig.mediaUrl(key), ProfileImageStore.Kind.AVATAR), Modifier.size(58.dp))
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(top = 20.dp, bottom = 20.dp)) {
+            GroupedHeader("Profile photo")
+            val showRemove = pendingPhoto != null || (!removePhoto && profile?.avatarKey != null)
+            GroupedCell(0, if (showRemove) 2 else 1) {
+                Row(Modifier.padding(horizontal = IosGrouped.CellInset, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Box(Modifier.size(58.dp).clip(CircleShape).background(p.surface), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.AccountCircle, null, tint = p.muted, modifier = Modifier.size(26.dp))
+                        val pending = pendingPhoto
+                        val key = profile?.avatarKey
+                        if (pending != null) {
+                            val bitmap = remember(pending) { android.graphics.BitmapFactory.decodeByteArray(pending, 0, pending.size)?.asImageBitmap() }
+                            if (bitmap != null) Image(bitmap, null, contentScale = ContentScale.Crop, modifier = Modifier.size(58.dp))
+                        } else if (!removePhoto && key != null) {
+                            ProfileImage(ProfileImageStore.Resource(SocialConfig.mediaUrl(key), ProfileImageStore.Kind.AVATAR), Modifier.size(58.dp))
+                        }
                     }
+                    Row(
+                        Modifier.clickable(enabled = !saving) { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                            .testTag("profile-choose-photo"),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(Icons.Outlined.Photo, null, tint = p.accent, modifier = Modifier.size(26.dp))
+                        Text("Choose photo", color = p.accent, fontSize = 17.sp)
+                    }
+                    if (loadingPhoto) CircularProgressIndicator(color = p.accent, modifier = Modifier.size(18.dp))
                 }
-                TextButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !saving,
-                    modifier = Modifier.testTag("profile-choose-photo")) {
-                    Icon(Icons.Outlined.Photo, null, tint = p.accent); Text("  Choose photo", color = p.accent)
+            }
+            if (showRemove) {
+                GroupedCell(1, 2) {
+                    Text("Remove photo", color = IosRed, fontSize = 17.sp, modifier = Modifier.fillMaxWidth().clickable(enabled = !saving) {
+                        if (pendingPhoto != null && profile?.avatarKey == null) { pendingPhoto = null; selection = null } else confirmingRemoval = true
+                    }.padding(horizontal = IosGrouped.CellInset, vertical = 11.dp))
                 }
-                if (loadingPhoto) CircularProgressIndicator(color = p.accent, modifier = Modifier.size(18.dp))
             }
-            if (pendingPhoto != null || (!removePhoto && profile?.avatarKey != null)) {
-                TextButton(onClick = {
-                    if (pendingPhoto != null && profile?.avatarKey == null) { pendingPhoto = null; selection = null } else confirmingRemoval = true
-                }, enabled = !saving) { Text("Remove photo", color = p.recording) }
+            GroupedFooter("Your photo is public. Only the selected image is uploaded, after you tap Save.")
+            Spacer(Modifier.height(35.dp))
+            GroupedCell(0, 1) {
+                androidx.compose.foundation.text.BasicTextField(
+                    value = name, onValueChange = { name = it }, singleLine = true, enabled = !saving,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = p.ink, fontSize = 17.sp),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(p.accent),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(horizontal = IosGrouped.CellInset, vertical = 11.dp)
+                        .testTag("profile-display-name"),
+                    decorationBox = { inner ->
+                        Box { if (name.isEmpty()) Text("Display name", color = disabledInk, fontSize = 17.sp); inner() }
+                    },
+                )
             }
-            Text("Your photo is public. Only the selected image is uploaded, after you tap Save.", color = p.muted, fontSize = 13.sp)
-            OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, enabled = !saving,
-                placeholder = { Text("Display name") }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("profile-display-name"))
-            Text("Leave blank to show your username instead.", color = p.muted, fontSize = 13.sp)
-            error?.let { Text(it, color = p.muted, modifier = Modifier.testTag("profile-edit-error")) }
+            GroupedFooter("Leave blank to show your username instead.")
+            error?.let {
+                Spacer(Modifier.height(20.dp))
+                GroupedCell(0, 1) {
+                    Text(it, color = IosGrouped.secondaryLabel(light), fontSize = 17.sp,
+                        modifier = Modifier.padding(horizontal = IosGrouped.CellInset, vertical = 11.dp).testTag("profile-edit-error"))
+                }
+            }
         }
     }
     if (confirmingRemoval) {

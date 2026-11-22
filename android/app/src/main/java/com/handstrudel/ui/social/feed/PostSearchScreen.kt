@@ -1,5 +1,23 @@
 package com.handstrudel.ui.social.feed
 
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.handstrudel.ui.theme.iosLight
+import com.handstrudel.ui.theme.IosGrouped
+import com.handstrudel.ui.theme.GroupedCell
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -95,44 +114,65 @@ fun PostSearchScreen(onDismiss: () -> Unit, onStart: (PerformanceStart) -> Unit)
         load(s, id, null)
     }
 
-    SocialScreen("Search posts", onDismiss) {
-        OutlinedTextField(
+    // iOS: `.searchable` (navigation-bar drawer field) over a default inset grouped `List`.
+    val light = iosLight()
+    val secondary = IosGrouped.secondaryLabel(light)
+    val rowPad = Modifier.padding(horizontal = IosGrouped.CellInset, vertical = 11.dp)
+    SocialScreen("Search posts", onDismiss, background = IosGrouped.background(light)) {
+        BasicTextField(
             value = input, onValueChange = { input = it; reset() }, singleLine = true,
-            placeholder = { Text("Caption, instrument, or creator") },
-            leadingIcon = { Icon(Icons.Filled.Search, null) },
+            textStyle = androidx.compose.ui.text.TextStyle(color = p.ink, fontSize = 17.sp),
+            cursorBrush = SolidColor(p.accent),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).testTag("search-field"),
+            decorationBox = { inner ->
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 36.dp).clip(RoundedCornerShape(10.dp)).background(IosGrouped.searchFill(light))
+                        .padding(start = 8.dp, end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Search, null, tint = secondary, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Box(Modifier.weight(1f)) {
+                        if (input.isEmpty()) Text("Caption, instrument, or creator", color = secondary, fontSize = 17.sp, maxLines = 1)
+                        inner()
+                    }
+                    if (input.isNotEmpty()) {
+                        Icon(Icons.Filled.Cancel, "Clear text", tint = secondary,
+                            modifier = Modifier.size(20.dp).clickable { input = ""; reset() })
+                    }
+                }
+            },
         )
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        val rows = buildList<@Composable () -> Unit> {
             if (search == null) {
-                item { Text("Enter at least two characters. Use @ to search posts by creator handle.", color = p.muted, modifier = Modifier.padding(20.dp)) }
+                add { Text("Enter at least two characters. Use @ to search posts by creator handle.", color = secondary, fontSize = 17.sp, modifier = rowPad) }
             } else if (results.isEmpty() && !busy && !failed) {
-                item {
+                add {
                     val broader = search.broaderInput
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(rowPad, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(if (search.isHandleSearch) "No posts match that handle" else "No matching posts", color = p.ink, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
                         Text(
                             when {
                                 broader != null -> "Check the handle, or also search captions, instruments, and creator names."
                                 search.isHandleSearch -> "Check the spelling or try a different handle."
                                 else -> "Try a shorter search, a different instrument, or a creator's name."
-                            }, color = p.muted,
+                            }, color = secondary,
                         )
                         if (broader != null) TextButton(onClick = { input = broader; reset() }) { Text("Broaden search", color = p.accent) }
                     }
                 }
             }
-            items(results, key = { it.id }) { video -> PerformanceListRow(video, onClick = { opened = video }) }
-            if (busy) item { Column(Modifier.fillMaxWidth().padding(20.dp)) { CircularProgressIndicator(color = p.accent); Text("Searching posts", color = p.muted) } }
+            results.forEach { video -> add { PerformanceListRow(video, onClick = { opened = video }) } }
+            if (busy) add { Column(rowPad.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(color = p.accent); Text("Searching posts", color = secondary) } }
             if (failed) {
-                item {
-                    Column(Modifier.padding(20.dp)) {
-                        Text(if (cursor == null) "Couldn't load search results." else "Couldn't load more results.", color = p.muted)
-                        TextButton(onClick = ::loadNextPage) { Text("Try again", color = p.accent) }
-                    }
-                }
+                add { Text(if (cursor == null) "Couldn't load search results." else "Couldn't load more results.", color = secondary, fontSize = 17.sp, modifier = rowPad) }
+                add { Text("Try again", color = p.accent, fontSize = 17.sp, modifier = Modifier.fillMaxWidth().clickable(onClick = ::loadNextPage).then(rowPad)) }
             } else if (more && !busy) {
-                item { TextButton(onClick = ::loadNextPage, modifier = Modifier.padding(horizontal = 12.dp)) { Text("Load more", color = p.accent) } }
+                add { Text("Load more", color = p.accent, fontSize = 17.sp, modifier = Modifier.fillMaxWidth().clickable(onClick = ::loadNextPage).then(rowPad)) }
             }
+        }
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)) {
+            itemsIndexed(rows) { i, row -> GroupedCell(i, rows.size) { row() } }
         }
     }
     opened?.let { video ->
