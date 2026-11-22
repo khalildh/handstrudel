@@ -1,5 +1,6 @@
 package com.handstrudel.ui
 
+import android.app.ActivityManager
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -16,11 +17,20 @@ import com.handstrudel.app.DebugShellHooks
 import com.handstrudel.app.DeepLinkRouter
 import com.handstrudel.app.HandStrudelApplication
 import com.handstrudel.ui.nav.DefaultAppNavigator
+import java.lang.ref.WeakReference
 
 /**
  * Single activity. Owner: shell. Services and navigator are process-scoped
  * ([HandStrudelApplication]); the activity contributes the window (immersive, screen kept
  * on), runtime-permission prompts, deep-link intents and foreground/background lifecycle.
+ *
+ * Launch mode is `singleTop`, not `singleTask`: `singleTask` clears whatever sits above the
+ * activity when the launcher intent comes back, and the MediaProjection "Share one app"
+ * picker relaunches the launcher intent while its consent activity is still on top, so the
+ * consent returned RESULT_CANCELED. With `singleTop`, an intent that arrives while another
+ * activity is on top (the camera permission dialog, the consent dialog) creates a second
+ * instance; that duplicate hands its intent to the live instance and finishes before it
+ * starts, so there is still one activity and the system dialog keeps its result.
  */
 class MainActivity : ComponentActivity() {
 
@@ -35,6 +45,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val existing = live?.get()
+        if (savedInstanceState == null && existing != null && existing !== this && !existing.isFinishing && !existing.isDestroyed) {
+            Log.i(TAG, "duplicate instance; relaying ${intent?.action} to the live activity")
+            existing.relay(intent)
+            if (existing.taskId != taskId) {
+                (getSystemService(ACTIVITY_SERVICE) as? ActivityManager)?.moveTaskToFront(existing.taskId, 0)
+            }
+            finish()
+            return
+        }
+        live = WeakReference(this)
 
         // Edge to edge; keep the screen on (iOS isIdleTimerDisabled); hide the navigation bar
         // (iOS persistentSystemOverlays(.hidden)). The status bar is managed by HandStrudelApp.
@@ -57,7 +79,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        navigator.onPermissionFlowInterrupted()
+        relay(intent)
+    }
+
+    /** A new intent for this instance (directly, or from a duplicate instance). */
+    private fun relay(intent: Intent?) {
+        if (intent == null) return
         DebugFakeSocial.installIfRequested(intent, navigator)
         DebugShellHooks.handle(intent)
         handleDeepLink(intent)
@@ -80,6 +107,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (live?.get() === this) live = null
         if (navigator.permissionHost === permissionHost) navigator.permissionHost = null
         super.onDestroy()
     }
@@ -94,5 +122,9 @@ class MainActivity : ComponentActivity() {
         navigator.openPerformance(link)
     }
 
-    private companion object { const val TAG = "MainActivity" }
+    private companion object {
+        const val TAG = "MainActivity"
+        /** The instance that owns the UI (see the class comment). Main thread only. */
+        var live: WeakReference<MainActivity>? = null
+    }
 }
