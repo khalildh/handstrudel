@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -99,17 +100,32 @@ fun StudioSettingRow(
             Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(palette.accent.copy(alpha = 0.09f)),
             contentAlignment = Alignment.Center,
         ) { Icon(icon, null, tint = palette.accent, modifier = Modifier.size(17.dp)) }
-        Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.ink)
-        Spacer(Modifier.weight(1f).widthIn(min = 4.dp))
-        if (value != null) {
-            Text(
-                value, fontSize = 14.sp, fontFamily = FontFamily.Monospace, color = palette.muted,
-                textAlign = TextAlign.End, maxLines = 2,
-            )
+        if (isAccessibilityTextSize()) {
+            // iOS stacks title over value at accessibility sizes.
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.ink)
+                if (value != null) Text(value, fontSize = 14.sp, fontFamily = FontFamily.Monospace, color = palette.muted)
+            }
+        } else {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.ink)
+            Spacer(Modifier.weight(1f).widthIn(min = 4.dp))
+            if (value != null) {
+                Text(
+                    value, fontSize = 14.sp, fontFamily = FontFamily.Monospace, color = palette.muted,
+                    textAlign = TextAlign.End, maxLines = 2,
+                )
+            }
         }
         Icon(trailing, null, tint = palette.muted, modifier = Modifier.size(16.dp))
     }
 }
+
+/**
+ * iOS `DynamicTypeSize.isAccessibilitySize`: the text scale is past the largest
+ * standard size (iOS AX1 is about 1.6× the default), so layouts stack vertically.
+ */
+@Composable
+fun isAccessibilityTextSize(): Boolean = LocalDensity.current.fontScale >= 1.5f
 
 /** iOS `StudioActionStyle`: full-width accent button, 54 pt min height, 17 pt corners. */
 @Composable

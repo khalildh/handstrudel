@@ -80,6 +80,7 @@ import com.handstrudel.ui.studio.common.StudioSettingRow
 import com.handstrudel.ui.studio.common.StudioSettingsDivider
 import com.handstrudel.ui.studio.common.StudioSettingsPanel
 import com.handstrudel.ui.studio.common.StudioSheet
+import com.handstrudel.ui.studio.common.isAccessibilityTextSize
 import com.handstrudel.ui.studio.common.studioContentWidth
 import com.handstrudel.ui.studio.pickers.InstrumentPickerSheet
 import com.handstrudel.ui.studio.pickers.ProgressionPickerSheet
@@ -213,10 +214,19 @@ fun MusicHome() {
                 }
 
                 // Library shortcuts.
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LibraryShortcut("Private drafts", Icons.Outlined.Movie, "private-drafts-button", Modifier.weight(1f)) { showDrafts = true }
-                    LibraryShortcut("Presets", Icons.Outlined.Layers, "music-presets-button", Modifier.weight(1f)) { showSetups = true }
-                    LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.weight(1f)) { showLoops = true }
+                // iOS: a row normally, a column at accessibility text sizes.
+                if (isAccessibilityTextSize()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LibraryShortcut("Private drafts", Icons.Outlined.Movie, "private-drafts-button", Modifier.fillMaxWidth()) { showDrafts = true }
+                        LibraryShortcut("Presets", Icons.Outlined.Layers, "music-presets-button", Modifier.fillMaxWidth()) { showSetups = true }
+                        LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.fillMaxWidth()) { showLoops = true }
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LibraryShortcut("Private drafts", Icons.Outlined.Movie, "private-drafts-button", Modifier.weight(1f)) { showDrafts = true }
+                        LibraryShortcut("Presets", Icons.Outlined.Layers, "music-presets-button", Modifier.weight(1f)) { showSetups = true }
+                        LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.weight(1f)) { showLoops = true }
+                    }
                 }
             }
         }
