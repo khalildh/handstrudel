@@ -1616,7 +1616,13 @@ TSFDEF int tsf_note_on(tsf* f, int preset_index, int key, float vel)
 		voice->playingKey = key;
 		voice->playIndex = voicePlayIndex;
 		voice->heldSustain = 0;
+#ifdef TSF_SF2_VELOCITY_CURVE
+		// HandStrudel: the SF2/DLS default velocity-to-attenuation modulator (concave, 96 dB),
+		// i.e. amplitude = vel^2, which Apple's AVAudioUnitSampler applies on iOS.
+		voice->noteGainDB = f->globalGainDB - region->attenuation - 2.0f * tsf_gainToDecibels(1.0f / vel);
+#else
 		voice->noteGainDB = f->globalGainDB - region->attenuation - tsf_gainToDecibels(1.0f / vel);
+#endif
 
 		if (f->channels)
 		{
