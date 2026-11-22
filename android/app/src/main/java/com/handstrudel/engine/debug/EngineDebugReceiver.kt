@@ -111,6 +111,7 @@ internal object EngineDebugReceiver {
                 val ok = e.applySoundSetup(setup, AllUnlocked)
                 Log.i(TAG, "apply=$ok")
             }
+            "js" -> e.strudel.evaluateForResult(a.drop(1).joinToString(" ")) { Log.i(TAG, "JS $it") }
             "state" -> logState(e)
             else -> Log.w(TAG, "unknown command ${a[0]}")
         }
@@ -120,6 +121,7 @@ internal object EngineDebugReceiver {
         val cm = e.chordMelody.value
         val learn = e.learn.value
         val o = JSONObject()
+            .put("playInput", e.playInput.value.raw).put("cameraIssue", e.cameraIssue.value?.name ?: "none")
             .put("running", e.isRunning.value).put("paused", e.isPaused.value).put("status", e.status.value)
             .put("mode", e.mode.value.raw).put("activeSoundFont", e.activeSoundFontRouting)
             .put("strudelReady", e.strudel.isReady).put("beat", e.currentBeat.value)

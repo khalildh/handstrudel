@@ -109,13 +109,30 @@ internal class StrudelAssets(private val context: Context, private val debugMete
     try { if (dest instanceof AudioDestinationNode) connect.call(this, analyserFor(dest.context)); } catch (e) {}
     return r;
   };
-  window.__hsPeak = function () {
-    var a = window.__hsAnalyser;
-    if (!a) return 0;
+  function peakOf(a) {
     var buf = new Float32Array(a.fftSize);
     a.getFloatTimeDomainData(buf);
     var p = 0;
     for (var i = 0; i < buf.length; i++) { var v = Math.abs(buf[i]); if (v > p) p = v; }
+    return p;
+  }
+  window.__hsPeak = function () {
+    var p = 0;
+    // Strudel may create more than one context; meter the one the engine plays on.
+    try { p = peakOf(analyserFor(getAudioContext())); } catch (e) {}
+    // Strudel patterns reach the speakers through superdough's destinationGain.
+    try {
+      var out = getSuperdoughAudioController().output;
+      if (out && out.destinationGain) {
+        if (window.__hsOutGain !== out.destinationGain) {
+          window.__hsOutGain = out.destinationGain;
+          window.__hsOutAnalyser = out.destinationGain.context.createAnalyser();
+          window.__hsOutAnalyser.fftSize = 2048;
+          connect.call(out.destinationGain, window.__hsOutAnalyser);
+        }
+        p = Math.max(p, peakOf(window.__hsOutAnalyser));
+      }
+    } catch (e) {}
     return p;
   };
 })();
