@@ -68,7 +68,9 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTagsAsResourceId
@@ -217,8 +219,8 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
     val pagerState = rememberPagerState { videos.size }
     fun movePage(by: Int): Boolean {
         val target = FeedNavigation.destination(model.current.value, by, model.videos.value.size) ?: return false
+        // The pager follows once any drag/settle finishes (a fling would cancel an immediate jump).
         model.current.value = target
-        scope.launch { pagerState.scrollToPage(target) }
         return true
     }
     fun advanceAfterClip(id: UUID): Boolean =
@@ -229,8 +231,9 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
             if (page in model.videos.value.indices && page != model.current.value) model.current.value = page
         }
     }
-    LaunchedEffect(current, videos.size) {
-        if (current in videos.indices && pagerState.currentPage != current && !pagerState.isScrollInProgress) pagerState.scrollToPage(current)
+    val pagerScrolling = pagerState.isScrollInProgress
+    LaunchedEffect(current, videos.size, pagerScrolling) {
+        if (!pagerScrolling && current in videos.indices && pagerState.currentPage != current) pagerState.scrollToPage(current)
         model.loadMore()
     }
     LaunchedEffect(pagerState) { snapshotFlow { pagerState.isScrollInProgress }.collect { pool.isPaging = it } }
@@ -355,13 +358,15 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
     // ---- Layout --------------------------------------------------------------------------
     BoxWithConstraints(
         Modifier.fillMaxSize().background(if (hasVideos || isFullscreen) Color.Black else p.background)
-            .semantics { testTagsAsResourceId = true },
+            .then(if (isActive) Modifier.semantics { testTagsAsResourceId = true } else Modifier.clearAndSetSemantics { }),
     ) {
         val viewportHeight = maxHeight
         if (hasVideos) {
             VerticalPager(
                 state = pagerState,
-                beyondViewportPageCount = 1,
+                // Warm only the selected clip while the tab is hidden (iOS a09c0631).
+                beyondViewportPageCount = if (isActive && resumed) 1 else 0,
+                userScrollEnabled = isActive,
                 key = { videos.getOrNull(it)?.id ?: it },
                 modifier = Modifier.fillMaxSize().nestedScroll(edgeSwipes).testTag("feed-video-viewport"),
             ) { page ->
@@ -501,9 +506,10 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     val c = challenge
                     if (!isFullscreen && c != null && mode != FeedMode.FOLLOWING) {
-                        Box(Modifier.weight(1f, fill = false)) { WeeklyChallengeBanner(c, hasVideos) { openChallenge = c } }
+                        Box(Modifier.weight(1f)) { WeeklyChallengeBanner(c, hasVideos) { openChallenge = c } }
+                    } else {
+                        Spacer(Modifier.weight(1f))
                     }
-                    Spacer(Modifier.weight(1f))
                     if (hasVideos || isFullscreen) {
                         if (!isFullscreen) {
                             Box(Modifier.clickable { services.prefs.setFeedMuted(!muted) }.testTag("feed-mute")) {
@@ -524,6 +530,12 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
             }
         }
         if (isActive) SocialToast(toast ?: if (preparingAudio) "Preparing audio…" else null, topPadding = (headerHeight.value + 4).toInt())
+        if (!isActive) {
+            // Hidden under Music/Account: swallow touches that the tab above doesn't handle.
+            Box(Modifier.fillMaxSize().pointerInput(Unit) {
+                awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } }
+            })
+        }
     }
 
     // ---- Sheets ------------------------------------------------------------------------

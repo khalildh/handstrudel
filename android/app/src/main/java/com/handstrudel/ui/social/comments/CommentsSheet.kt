@@ -280,10 +280,11 @@ fun CommentsSheet(
         onDismissRequest = { if (!busy) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        val keyboard = com.handstrudel.ui.social.DialogResizesForKeyboard()
         SocialMaterialTheme {
             Column(
                 Modifier.fillMaxSize().background(p.background).windowInsetsPadding(WindowInsets.statusBars)
-                    .windowInsetsPadding(WindowInsets.navigationBars).imePadding().semantics { testTagsAsResourceId = true },
+                    .windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = keyboard).semantics { testTagsAsResourceId = true },
             ) {
                 // Header
                 Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 10.dp, top = 16.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {

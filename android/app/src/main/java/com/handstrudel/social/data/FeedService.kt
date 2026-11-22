@@ -121,7 +121,8 @@ class FeedService(private val rest: SupabaseRest) {
         val rpc = if (item.kind.isLike) "mark_like_activity_read" else "mark_creator_activity_read"
         rest.rpc(rpc, buildJsonObject {
             put("target_item", id(item.id))
-            if (item.kind.isLike) put("seen_at", item.timestamp) else put("seen_at", JsonNull)
+            // Swift omits a nil `seen_at`; the comment/reply RPC takes only the item.
+            if (item.kind.isLike) put("seen_at", item.timestamp)
         })
     }
 

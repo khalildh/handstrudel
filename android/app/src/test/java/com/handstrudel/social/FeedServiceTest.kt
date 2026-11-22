@@ -219,6 +219,8 @@ class FeedServiceTest {
         assertTrue(seen.last().body!!.contains("\"seen_at\":\"2026-11-14T05:00:00.123456+00:00\""))
         feed.markActivityRead(item.copy(kind = com.handstrudel.social.model.CreatorActivity.Kind.COMMENT))
         assertEquals("/rpc/mark_creator_activity_read", seen.last().path)
+        // mark_creator_activity_read(target_item) has no seen_at parameter (Swift omits nil).
+        assertEquals("""{"target_item":"33333333-cccc-3333-3333-333333333333"}""", seen.last().body)
     }
 
     @Test fun commentErrorsMapToFriendlyMessages() = runBlocking {

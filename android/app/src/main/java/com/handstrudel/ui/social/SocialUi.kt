@@ -56,6 +56,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -103,6 +105,7 @@ private fun Color.luminance(): Float = 0.2126f * red + 0.7152f * green + 0.0722f
  * A full-screen modal page with a title bar (the iOS sheets with NavigationStack +
  * Done/Close). Back dismisses unless [dismissEnabled] is false.
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun SocialScreen(
     title: String,
@@ -119,10 +122,12 @@ fun SocialScreen(
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         val p = LocalStudioPalette.current
+        val keyboard = DialogResizesForKeyboard()
         SocialMaterialTheme {
             Column(
                 Modifier.fillMaxSize().background(background ?: p.background)
-                    .windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars).imePadding(),
+                    .windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(bottom = keyboard).semantics { testTagsAsResourceId = true },
             ) {
                 Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (dismissOnLeading) {
@@ -132,7 +137,7 @@ fun SocialScreen(
                     }
                     Text(title, color = p.ink, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, maxLines = 1,
                         overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.widthIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
                         trailing()
                         if (!dismissOnLeading) {
                             TextButton(onClick = onDismiss, enabled = dismissEnabled) { Text(dismissLabel, color = p.accent, fontWeight = FontWeight.SemiBold) }
@@ -240,6 +245,9 @@ fun viewsLabel(count: Int): String = if (count == 1) "1 view" else "${String.for
 /** iOS `Text(date, style: .relative)` equivalent. */
 fun relativeTime(instant: Instant?): String {
     instant ?: return ""
+    // Device and server clocks differ slightly; never show a fresh post as "in 0 minutes".
+    val now = System.currentTimeMillis()
+    if (instant.toEpochMilli() >= now - DateUtils.MINUTE_IN_MILLIS) return "Just now"
     return DateUtils.getRelativeTimeSpanString(instant.toEpochMilli(), System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
 }
 
@@ -288,3 +296,32 @@ fun BoxScope.SocialToast(text: String?, topPadding: Int = 8) {
 
 /** Colours for text on top of video. */
 val StudioPalette.overVideoInk: Color get() = Color.White
+
+/**
+ * Full-screen social dialogs draw edge to edge, and Compose's `imePadding()` doesn't see the
+ * keyboard inside a dialog window here, so read the IME inset from the dialog's decor view and
+ * return it as bottom padding (keeps composers and fields above the keyboard).
+ */
+@Composable
+fun DialogResizesForKeyboard(): androidx.compose.ui.unit.Dp {
+    val view = androidx.compose.ui.platform.LocalView.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var imeBottom by remember { mutableStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(view) {
+        val window = ((view as? androidx.compose.ui.window.DialogWindowProvider)
+            ?: (view.parent as? androidx.compose.ui.window.DialogWindowProvider))?.window
+        // With adjustResize this edge-to-edge dialog never receives IME insets; adjustPan does.
+        @Suppress("DEPRECATION")
+        window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
+        val decor = window?.decorView
+        decor?.let {
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(it) { v, insets ->
+                imeBottom = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
+                androidx.core.view.ViewCompat.onApplyWindowInsets(v, insets)
+            }
+            androidx.core.view.ViewCompat.requestApplyInsets(it)
+        }
+        onDispose { decor?.let { androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(it, null) } }
+    }
+    return with(density) { imeBottom.toDp() }
+}
