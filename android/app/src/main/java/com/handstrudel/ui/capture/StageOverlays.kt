@@ -1,5 +1,6 @@
 package com.handstrudel.ui.capture
 
+import com.handstrudel.ui.theme.StudioFonts
 import android.Manifest
 import android.app.Activity
 import android.media.projection.MediaProjectionConfig
@@ -53,7 +54,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -123,7 +123,7 @@ private fun WatermarkOverlay(credit: BackingCredit?) {
                 modifier = Modifier.padding(8.dp).size(Watermark.QR_DP.dp).clip(RoundedCornerShape(4.dp)).background(Color.White),
             )
             Column(Modifier.padding(top = 10.dp, end = 7.dp)) {
-                Text(Watermark.title(credit), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                Text(Watermark.title(credit), fontFamily = StudioFonts.Mono, fontWeight = FontWeight.Bold, fontSize = 11.sp,
                     color = Color(0xFF00FF9E), maxLines = 1, lineHeight = 16.sp)
                 Text(Watermark.subtitle(credit), fontWeight = FontWeight.Medium, fontSize = 9.sp,
                     color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp)

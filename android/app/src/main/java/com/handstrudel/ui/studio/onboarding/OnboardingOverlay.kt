@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.onboarding
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -31,7 +32,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -101,12 +101,12 @@ fun OnboardingOverlay(
                 .clip(RoundedCornerShape(20.dp)).background(palette.surface).padding(17.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            Text(OnboardingCopy.title(played, canSuggestPinching), fontSize = 22.sp, fontFamily = FontFamily.Serif, color = palette.ink)
+            Text(OnboardingCopy.title(played, canSuggestPinching), fontSize = 22.sp, fontFamily = StudioFonts.Serif, color = palette.ink)
             Text(OnboardingCopy.body(played, canSuggestPinching), fontSize = 15.sp, color = palette.muted)
             Text(
                 OnboardingCopy.button(played),
                 fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.accent,
-                modifier = Modifier.testTag("onboarding-got-it").clip(RoundedCornerShape(8.dp))
+                modifier = Modifier.testTag("onboarding-got-it").clip(CircleShape)
                     .background(palette.accent.copy(alpha = 0.15f)).clickable(onClick = onDone)
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             )

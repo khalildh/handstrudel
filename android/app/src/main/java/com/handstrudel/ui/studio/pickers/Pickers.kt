@@ -193,7 +193,7 @@ fun ScalePickerSheet(onDismiss: () -> Unit) {
 
     fun choose(scale: ScaleSelection) { engine.setScale(scale); onDismiss() }
 
-    StudioSheet(title = "Scale", onDismiss = onDismiss, leadingAction = "Done" to onDismiss, trailingAction = null) {
+    StudioSheet(title = "Scale", onDismiss = onDismiss, leadingAction = "Done" to onDismiss, trailingAction = null, mediumDetent = true) {
         LazyColumn(Modifier.fillMaxWidth()) {
             item { SectionLabel("Your scales") }
             item {

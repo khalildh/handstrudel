@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,7 +55,7 @@ fun FeedSoundSheet(video: Video, onDismiss: () -> Unit, onStart: (PerformanceSta
                         Spacer(Modifier.width(8.dp))
                         Text(title, color = p.ink, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                     }
-                    video.soundSetup?.let { Text(it.presetDetails, color = p.muted, fontSize = 15.sp, fontFamily = FontFamily.Monospace) }
+                    video.soundSetup?.let { Text(it.presetDetails, color = p.muted, fontSize = 15.sp, fontFamily = StudioFonts.Mono) }
                 }
                 video.soundSetup?.let { setup ->
                     ProfileActionButton("Play this sound", primary = true, icon = Icons.Filled.PlayArrow,

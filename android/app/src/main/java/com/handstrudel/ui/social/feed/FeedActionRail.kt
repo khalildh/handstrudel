@@ -1,5 +1,8 @@
 package com.handstrudel.ui.social.feed
 
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.filled.Sync
+import com.handstrudel.ui.theme.StudioIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,15 +92,15 @@ fun FeedActionRail(
             tint = if (liked) p.recording else Color.White, label = if (liked) "Unlike" else "Like",
             value = "${video.likeCount} likes", tag = "feed-like", onClick = actions.like)
         val commentsOn = video.commentsEnabled == true
-        Glyph(Icons.Outlined.ChatBubbleOutline, video.commentCount ?: 0,
+        Glyph(StudioIcons.Bubble, video.commentCount ?: 0,
             label = if (commentsOn) "Comments, ${video.commentCount ?: 0}" else if (isMine) "Manage comments" else "Comments off",
             enabled = commentsOn || isMine, tag = "video-comments-button", onClick = actions.comments)
-        Glyph(Icons.Filled.GraphicEq, engagement?.remixes, label = "Remixes", tag = "feed-remix-count", onClick = actions.showRemixes)
+        Glyph(StudioIcons.WaveformBadgePlus, engagement?.remixes, label = "Remixes", tag = "feed-remix-count", onClick = actions.showRemixes)
         val didRepost = engagement?.repostedByMe == true
-        Glyph(Icons.Filled.Repeat, engagement?.reposts, tint = if (didRepost) p.mediaAccent else Color.White,
+        Glyph(Icons.Filled.Sync, engagement?.reposts, tint = if (didRepost) p.mediaAccent else Color.White,
             label = if (isMine) "Reposts" else if (didRepost) "Remove repost" else "Repost",
             enabled = !isMine, tag = "feed-repost", onClick = actions.repost)
-        Glyph(Icons.AutoMirrored.Filled.Send, engagement?.shares, label = "Share video", tag = "feed-share", onClick = actions.share)
+        Glyph(Icons.AutoMirrored.Outlined.Send, engagement?.shares, label = "Share video", tag = "feed-share", onClick = actions.share)
         Glyph(if (isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, engagement?.saves,
             tint = if (isSaved) p.mediaAccent else Color.White,
             label = if (isSaved) "Remove from Saved" else "Save privately", tag = "save-performance", onClick = actions.bookmark)

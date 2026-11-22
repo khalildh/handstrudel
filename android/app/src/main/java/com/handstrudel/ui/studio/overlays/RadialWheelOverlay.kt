@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.overlays
 
+import com.handstrudel.ui.theme.StudioFonts
 import android.graphics.BlurMaskFilter
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
@@ -130,7 +131,7 @@ fun RadialWheelOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier) {
                 measurer, melodyNames.getOrElse(i) { "" },
                 WheelGeometry.polar(center.x, center.y, i * melodyWedge, (deadR + splitR) / 2f),
                 TextStyle(
-                    fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded,
                     color = if (isCurrent) Color.White else colors.cyan.copy(alpha = 0.75f),
                     shadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 2.dp.toPx()),
                 ),
@@ -168,7 +169,7 @@ fun RadialWheelOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier) {
                 measurer, chordNames.getOrElse(i) { "" },
                 WheelGeometry.polar(center.x, center.y, i * chordWedge, (splitR + outerR) / 2f),
                 TextStyle(
-                    fontSize = 15.sp, fontWeight = FontWeight.Black,
+                    fontSize = 15.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded,
                     color = if (isCurrent) Color.White else Color.White.copy(alpha = 0.7f),
                     shadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 3.dp.toPx()),
                 ),
@@ -189,7 +190,7 @@ fun RadialWheelOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier) {
             )
             // iOS `.minimumScaleFactor(0.4)` inside the hole with 4 pt side padding.
             val maxWidth = deadR * 2f - 8.dp.toPx()
-            val base = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Black)
+            val base = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded)
             val natural = measurer.measure(cm.currentChordName, base, maxLines = 1, softWrap = false).size.width
             val factor = if (natural > maxWidth && natural > 0) max(0.4f, maxWidth / natural) else 1f
             val layout = measurer.measure(

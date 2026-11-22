@@ -1,5 +1,8 @@
 package com.handstrudel.ui.studio.home
 
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import com.handstrudel.ui.theme.StudioIcons
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,7 +66,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
 import kotlin.math.roundToInt
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -169,14 +171,14 @@ fun MusicHome() {
                 Column(verticalArrangement = Arrangement.spacedBy(17.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Filled.GraphicEq, null, tint = palette.accent, modifier = Modifier.size(16.dp))
-                        Text("handstrudel", fontSize = 15.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, color = palette.ink)
+                        Text("handstrudel", fontSize = 15.sp, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, color = palette.ink)
                         Spacer(Modifier.weight(1f))
                         CircleIconButton(Icons.Outlined.Palette, "Appearance", "music-appearance", filled = true) {
                             stopPreview(); showAppearance = true
                         }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Text("Play the air.", fontSize = 51.sp, lineHeight = 56.sp, fontFamily = FontFamily.Serif, letterSpacing = (-2).sp, color = palette.ink)
+                        Text("Play the air.", fontSize = 51.sp, lineHeight = 56.sp, fontFamily = StudioFonts.SerifDisplay, letterSpacing = (-2).sp, color = palette.ink)
                         Text("Play music with a gesture or a touch.", fontSize = 15.sp, color = palette.muted)
                     }
                 }
@@ -203,7 +205,7 @@ fun MusicHome() {
                             Text(instrument.name, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = palette.ink)
                             Text(
                                 "${key.displayName} ${scale.displayName}  /  ${progression.name}",
-                                fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = palette.muted,
+                                fontSize = 12.sp, fontFamily = StudioFonts.Mono, color = palette.muted,
                             )
                         }
                         Box(
@@ -217,14 +219,14 @@ fun MusicHome() {
                 // iOS: a row normally, a column at accessibility text sizes.
                 if (isAccessibilityTextSize()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LibraryShortcut("Private drafts", Icons.Outlined.Movie, "private-drafts-button", Modifier.fillMaxWidth()) { showDrafts = true }
-                        LibraryShortcut("Presets", Icons.Outlined.Layers, "music-presets-button", Modifier.fillMaxWidth()) { showSetups = true }
+                        LibraryShortcut("Private drafts", StudioIcons.FilmStack, "private-drafts-button", Modifier.fillMaxWidth()) { showDrafts = true }
+                        LibraryShortcut("Presets", StudioIcons.SquareStack, "music-presets-button", Modifier.fillMaxWidth()) { showSetups = true }
                         LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.fillMaxWidth()) { showLoops = true }
                     }
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LibraryShortcut("Private drafts", Icons.Outlined.Movie, "private-drafts-button", Modifier.weight(1f)) { showDrafts = true }
-                        LibraryShortcut("Presets", Icons.Outlined.Layers, "music-presets-button", Modifier.weight(1f)) { showSetups = true }
+                        LibraryShortcut("Private drafts", StudioIcons.FilmStack, "private-drafts-button", Modifier.weight(1f)) { showDrafts = true }
+                        LibraryShortcut("Presets", StudioIcons.SquareStack, "music-presets-button", Modifier.weight(1f)) { showSetups = true }
                         LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.weight(1f)) { showLoops = true }
                     }
                 }
@@ -244,7 +246,7 @@ fun MusicHome() {
                         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                     ) {
                         CircularProgressIndicator(color = palette.accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                        Text("  $status", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = palette.ink)
+                        Text("  $status", fontSize = 12.sp, fontFamily = StudioFonts.Mono, color = palette.ink)
                     }
                 } else {
                     StudioActionButton(Modifier.testTag("start-button"), onClick = { stopPreview(); navigator.startSession() }) {
@@ -344,13 +346,13 @@ private fun InstrumentBrowser(
         ) {
             Text(
                 if (previewFailed) "Preview unavailable" else "‹  Swipe instruments  ›",
-                fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, color = palette.ink,
+                fontSize = 11.sp, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, color = palette.ink,
                 modifier = Modifier.clip(CircleShape).background(palette.background.copy(alpha = 0.9f))
                     .padding(horizontal = 10.dp, vertical = 6.dp),
             )
             Spacer(Modifier.weight(1f))
             CircleIconButton(
-                if (isPreviewing) Icons.Filled.Stop else Icons.AutoMirrored.Filled.VolumeUp,
+                if (isPreviewing) Icons.Filled.Stop else Icons.AutoMirrored.Outlined.VolumeUp,
                 if (isPreviewing) "Stop instrument preview" else "Preview instrument",
                 "studio-instrument-preview", filled = false, enabled = enabled, onClick = onTogglePreview,
             )

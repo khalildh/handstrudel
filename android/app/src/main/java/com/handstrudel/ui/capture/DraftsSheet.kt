@@ -1,5 +1,6 @@
 package com.handstrudel.ui.capture
 
+import com.handstrudel.ui.theme.StudioIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,7 +68,7 @@ internal fun DraftsSheetView(openedDraftId: UUID?, onRetake: (() -> Unit)?, onDi
         containerColor = palette.background,
         dragHandle = null,
     ) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(0.95f).testTag("drafts-sheet")) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight().testTag("drafts-sheet")) {
             val editing = openedDraftId ?: selected?.let(UUID::fromString)
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
@@ -144,7 +145,7 @@ private fun EmptyDrafts(title: String, detail: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
     ) {
-        Icon(Icons.Filled.Movie, null, tint = palette.accent, modifier = Modifier.size(40.dp))
+        Icon(StudioIcons.FilmStack, null, tint = palette.accent, modifier = Modifier.size(40.dp))
         Text(title, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = palette.ink, textAlign = TextAlign.Center)
         if (detail.isNotEmpty()) Text(detail, color = palette.muted, textAlign = TextAlign.Center)
     }

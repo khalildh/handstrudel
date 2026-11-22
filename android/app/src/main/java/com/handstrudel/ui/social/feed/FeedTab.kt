@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -74,7 +75,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTagsAsResourceId
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Velocity
@@ -470,7 +470,7 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
                                     .testTag("feed-options"),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(if (mode == FeedMode.DISCOVER) "Feed" else mode.title, color = ink, fontSize = 33.sp, fontFamily = FontFamily.Serif, maxLines = 1)
+                                Text(if (mode == FeedMode.DISCOVER) "Feed" else mode.title, color = ink, fontSize = 33.sp, fontFamily = StudioFonts.Serif, maxLines = 1)
                                 Spacer(Modifier.size(7.dp))
                                 Icon(Icons.Filled.KeyboardArrowDown, null, tint = ink, modifier = Modifier.size(16.dp))
                             }

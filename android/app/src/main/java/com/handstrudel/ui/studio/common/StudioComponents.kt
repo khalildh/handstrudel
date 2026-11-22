@@ -1,5 +1,8 @@
 package com.handstrudel.ui.studio.common
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.Lock
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -40,7 +44,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -105,14 +108,14 @@ fun StudioSettingRow(
             // iOS stacks title over value at accessibility sizes.
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.ink)
-                if (value != null) Text(value, fontSize = 14.sp, fontFamily = FontFamily.Monospace, color = palette.muted)
+                if (value != null) Text(value, fontSize = 14.sp, fontFamily = StudioFonts.Mono, color = palette.muted)
             }
         } else {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.ink)
             Spacer(Modifier.weight(1f).widthIn(min = 4.dp))
             if (value != null) {
                 Text(
-                    value, fontSize = 14.sp, fontFamily = FontFamily.Monospace, color = palette.muted,
+                    value, fontSize = 14.sp, fontFamily = StudioFonts.Mono, color = palette.muted,
                     textAlign = TextAlign.End, maxLines = 2,
                 )
             }
@@ -180,7 +183,7 @@ fun LockBadge(modifier: Modifier = Modifier) {
     Text(
         if (configured) "PRO" else "Not available yet",
         fontSize = 11.sp,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = StudioFonts.Mono,
         fontWeight = FontWeight.SemiBold,
         color = palette.accent,
         maxLines = 1,
@@ -246,18 +249,23 @@ fun StudioSheet(
     trailingEnabled: Boolean = true,
     trailingTag: String? = null,
     header: (@Composable ColumnScope.() -> Unit)? = null,
+    grabber: Boolean = true,
+    mediumDetent: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val palette = LocalStudioPalette.current
-    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // iOS `.presentationDetents([.large])` (or `[.medium, .large]` when [mediumDetent]): the
+    // sheet is full height and opens fully expanded (or half way); [grabber] mirrors
+    // `.presentationDragIndicator(.visible)`.
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = !mediumDetent)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = state,
         containerColor = palette.background,
         contentColor = palette.ink,
-        dragHandle = null,
+        dragHandle = if (grabber) ({ SheetGrabber() }) else null,
     ) {
-        Column(modifier.fillMaxWidth().navigationBarsPadding()) {
+        Column(modifier.fillMaxWidth().fillMaxHeight().navigationBarsPadding()) {
             Box(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp)) {
                 leadingAction?.let { (label, action) ->
                     SheetTextButton(label, Modifier.align(Alignment.CenterStart), onClick = action)
@@ -279,6 +287,15 @@ fun StudioSheet(
     }
 }
 
+/** iOS sheet drag indicator: a 36x5 capsule at 30 % ink, 5 pt below the sheet's top edge. */
+@Composable
+fun SheetGrabber() {
+    val palette = LocalStudioPalette.current
+    Box(Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 3.dp).testTag("sheet-grabber"), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(width = 36.dp, height = 5.dp).clip(CircleShape).background(palette.ink.copy(alpha = 0.3f)))
+    }
+}
+
 @Composable
 fun SheetTextButton(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, bold: Boolean = false, onClick: () -> Unit) {
     val palette = LocalStudioPalette.current
@@ -297,11 +314,25 @@ fun SheetTextButton(label: String, modifier: Modifier = Modifier, enabled: Boole
 
 /** iOS ControlSheet `sectionHeader`: small icon + tracked rounded caps. */
 @Composable
-fun SectionHeader(title: String, icon: ImageVector, modifier: Modifier = Modifier) {
+fun SectionHeader(title: String, icon: ImageVector, modifier: Modifier = Modifier, notAvailable: Boolean = false) {
     val palette = LocalStudioPalette.current
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Icon(icon, null, tint = palette.accent.copy(alpha = 0.6f), modifier = Modifier.size(12.dp))
-        Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.muted, letterSpacing = 1.5.sp)
+        Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = palette.muted, letterSpacing = 1.5.sp)
+        // Android-only (no store configured): the words for the lock glyphs on this
+        // section's tiles, in the row-badge style, instead of a label on every tile.
+        if (notAvailable && !LocalAppServices.current.store.isConfigured) {
+            Spacer(Modifier.width(2.dp))
+            Row(
+                Modifier.testTag("section-not-available").clip(CircleShape).background(palette.ink.copy(alpha = 0.06f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Icon(Icons.Filled.Lock, null, tint = palette.muted, modifier = Modifier.size(9.dp))
+                Text("Not available yet", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, color = palette.muted, maxLines = 1)
+            }
+        }
     }
 }
 

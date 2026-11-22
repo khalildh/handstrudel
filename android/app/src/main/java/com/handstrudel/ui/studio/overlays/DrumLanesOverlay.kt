@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.overlays
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -159,7 +160,7 @@ fun DrumLanesOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier) {
 
 @Composable
 private fun DrumName(name: String, color: Color) {
-    Text(name, fontSize = 12.sp, fontWeight = FontWeight.Black, color = color, maxLines = 1, softWrap = false)
+    Text(name, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = color, maxLines = 1, softWrap = false)
 }
 
 /** Pure drum lane geometry (JVM-tested). */

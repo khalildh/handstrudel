@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.comments
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -289,7 +290,7 @@ fun CommentsSheet(
                 // Header
                 Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 10.dp, top = 16.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Comments", color = p.ink, fontSize = 22.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif)
+                        Text("Comments", color = p.ink, fontSize = 22.sp, fontFamily = StudioFonts.Serif)
                         video.username?.let { Text("Performance by @$it", color = p.muted, fontSize = 12.sp) }
                     }
                     if (isOwner) {

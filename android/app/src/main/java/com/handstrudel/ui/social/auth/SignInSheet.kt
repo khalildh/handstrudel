@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.auth
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,13 +49,18 @@ fun SignInSheet(onDismiss: () -> Unit, reason: String = "Sign in to post your pe
         val p = LocalStudioPalette.current
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(if (signedIn) 14.dp else 24.dp),
         ) {
             if (signedIn) {
                 ProfileSetupForm(auth)
             } else {
-                Text(reason, color = p.muted, fontSize = 15.sp)
-                GoogleSignInButton(auth)
+                FormSection(null) {
+                    Text(reason, color = p.muted, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+                    if (GoogleSignIn.isAvailable) {
+                        FormDivider()
+                        Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) { GoogleSignInButton(auth) }
+                    }
+                }
                 EmailCodeFlow(auth, showsOrHeader = GoogleSignIn.isAvailable)
             }
         }

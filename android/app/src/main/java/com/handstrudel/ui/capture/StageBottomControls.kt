@@ -1,5 +1,7 @@
 package com.handstrudel.ui.capture
 
+import com.handstrudel.ui.theme.StudioIcons
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -124,8 +126,9 @@ private fun HalfSpeedToggle() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("🐢", fontSize = 12.sp)
-        Text("½×", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (halfSpeed) palette.mediaOnAccent else Color.White)
+        val tint = if (halfSpeed) palette.mediaOnAccent else Color.White
+        Icon(StudioIcons.Tortoise, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+        Text("½×", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = tint)
     }
 }
 
@@ -210,7 +213,7 @@ private fun LoopRecordButton() {
             Box(
                 Modifier.offset(x = 16.dp, y = (-16).dp).size(18.dp).clip(CircleShape).background(palette.mediaAccent),
                 contentAlignment = Alignment.Center,
-            ) { Text("${loops.size}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = palette.mediaOnAccent) }
+            ) { Text("${loops.size}", fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = palette.mediaOnAccent) }
         }
         ui.loopNotice?.let { message ->
             val saved = "saved" in message
@@ -229,7 +232,7 @@ private fun LoopRecordButton() {
                     when { saved -> Icons.Filled.CheckCircle; rec -> Icons.Filled.FiberManualRecord; else -> Icons.Filled.Info },
                     contentDescription = null, tint = tint, modifier = Modifier.size(12.dp),
                 )
-                Text(message, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = tint, softWrap = false)
+                Text(message, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, color = tint, softWrap = false)
             }
         }
     }

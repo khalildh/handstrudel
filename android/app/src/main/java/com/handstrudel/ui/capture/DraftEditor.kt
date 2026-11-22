@@ -1,5 +1,14 @@
 package com.handstrudel.ui.capture
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.handstrudel.ui.studio.common.StudioActionButton
+import androidx.compose.material.icons.outlined.ArrowCircleUp
+import androidx.compose.material.icons.outlined.SmartDisplay
+import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import com.handstrudel.ui.theme.StudioIcons
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -262,18 +271,17 @@ internal fun DraftEditor(
                     color = palette.accent, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             }
         }
-        AndroidView(
-            factory = {
-                PlayerView(it).apply {
-                    // Half-speed takes preview at 2×: show the time bar in output time, like iOS.
-                    this.player = if (draft.outputScale < 1) TimeScaledPlayer(player, draft.outputScale) else player
-                    setShowNextButton(false); setShowPreviousButton(false)
-                }
-            },
-            modifier = Modifier.fillMaxWidth().height(330.dp).clip(RoundedCornerShape(16.dp)).background(Color.Black).testTag("draft-player"),
+        // Half-speed takes preview at 2×: show the time bar in output time, like iOS.
+        val shownPlayer = remember(player) { if (draft.outputScale < 1) TimeScaledPlayer(player, draft.outputScale) else player }
+        DraftPreviewPlayer(
+            shownPlayer,
+            Modifier.fillMaxWidth().height(330.dp).clip(RoundedCornerShape(16.dp)).background(Color.Black).testTag("draft-player"),
         )
         if (draft.recordedAtHalfSpeed == true) {
-            Text("🐢 Recorded at half tempo. Preview and exports play at normal tempo.", fontSize = 13.sp, color = palette.muted)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(StudioIcons.Tortoise, null, tint = palette.muted, modifier = Modifier.size(16.dp))
+                Text("Recorded at half tempo. Preview and exports play at normal tempo.", fontSize = 13.sp, color = palette.muted)
+            }
         }
         message?.let { Text(it, fontSize = 13.sp, color = palette.muted, modifier = Modifier.testTag("draft-message")) }
         if (busy) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -298,7 +306,8 @@ internal fun DraftEditor(
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(
+            BorderedButton(
+                "Save to Gallery", Icons.Outlined.AddPhotoAlternate,
                 enabled = canExport && !busy,
                 onClick = {
                     export { copy ->
@@ -312,14 +321,10 @@ internal fun DraftEditor(
                     }
                 },
                 modifier = Modifier.testTag("draft-save-gallery"),
-            ) { Text("Save to Gallery", color = palette.accent) }
+            )
             Box {
                 var menu by remember { mutableStateOf(false) }
-                OutlinedButton(enabled = canExport && !busy, onClick = { menu = true }, modifier = Modifier.testTag("draft-share")) {
-                    Icon(Icons.Filled.Share, null, tint = palette.accent, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Share", color = palette.accent)
-                }
+                BorderedButton("Share", Icons.Outlined.IosShare, enabled = canExport && !busy, onClick = { menu = true }, modifier = Modifier.testTag("draft-share"))
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Share video") }, onClick = {
                         menu = false
@@ -433,23 +438,46 @@ private fun PostAction(
     onPost: () -> Unit,
 ) {
     val palette = LocalStudioPalette.current
-    val colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent)
-    val modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).testTag("draft-post-action")
+    val modifier = Modifier.testTag("draft-post-action")
+    // iOS `StudioActionStyle` (54 pt, 17 pt corners, headline) with the SF Symbol label.
+    @Composable
+    fun label(text: String, icon: ImageVector?) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                Icon(icon, null, tint = palette.onAccent, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(6.dp))
+            }
+            Text(text, color = palette.onAccent, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, maxLines = 1)
+        }
+    }
     when (submission) {
         is DraftPostSubmission.Pending ->
-            Button(onClick = onCheck, enabled = !checking, colors = colors, modifier = modifier) {
-                Text(if (checking) "Checking post…" else "Check post status", fontWeight = FontWeight.SemiBold)
+            StudioActionButton(modifier, enabled = !checking, onClick = onCheck) {
+                label(if (checking) "Checking post…" else "Check post status", null)
             }
         is DraftPostSubmission.Published ->
-            Button(onClick = { onView(submission.id) }, colors = colors, modifier = modifier) {
-                Icon(Icons.Filled.PlayArrow, null)
-                Spacer(Modifier.width(6.dp))
-                Text("View post", fontWeight = FontWeight.SemiBold)
-            }
+            StudioActionButton(modifier, onClick = { onView(submission.id) }) { label("View post", Icons.Outlined.SmartDisplay) }
         null ->
-            Button(onClick = onPost, enabled = canExport, colors = colors, modifier = modifier) {
-                Text("Post to HandStrudel", fontWeight = FontWeight.SemiBold)
+            // iOS dims it while the take can't be exported (StudioActionButton's disabled fill).
+            StudioActionButton(modifier, enabled = canExport, onClick = onPost) {
+                label("Post to HandStrudel", Icons.Outlined.ArrowCircleUp)
             }
+    }
+}
+
+/** iOS `.buttonStyle(.bordered)` tinted with the accent (a capsule on iOS 26): 15 % accent fill, icon + label. */
+@Composable
+private fun BorderedButton(text: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val palette = LocalStudioPalette.current
+    Row(
+        modifier.alpha(if (enabled) 1f else 0.45f).heightIn(min = 44.dp).clip(CircleShape)
+            .background(palette.accent.copy(alpha = 0.15f)).clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, null, tint = palette.accent, modifier = Modifier.size(18.dp))
+        Text(text, color = palette.accent, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 

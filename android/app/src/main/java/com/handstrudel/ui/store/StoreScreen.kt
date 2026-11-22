@@ -1,5 +1,6 @@
 package com.handstrudel.ui.store
 
+import com.handstrudel.ui.theme.StudioFonts
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -45,7 +46,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -122,7 +122,7 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(28.dp),
     ) {
         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("STORE", fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text("STORE", fontSize = 28.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.White)
             Spacer(Modifier.weight(1f))
             if (state.isLoading) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
         }
@@ -131,7 +131,7 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
             Text(
                 StoreCopy.UNAVAILABLE,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded,
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier
                     .testTag("store-unavailable")
@@ -221,7 +221,7 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
 
 @Composable
 internal fun SectionHeader(title: String) {
-    Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = StoreColors.secondary, letterSpacing = 1.5.sp)
+    Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = StoreColors.secondary, letterSpacing = 1.5.sp)
 }
 
 @Composable
@@ -233,7 +233,7 @@ private fun PackRow(kit: KitRow, unlocked: Boolean, product: StoreProduct?, onBu
     ) {
         Text(kit.emoji, fontSize = 28.sp, modifier = Modifier.width(44.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(kit.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(kit.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White)
             Text(
                 kit.contents.joinToString(" · "), fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -250,8 +250,8 @@ private fun PackRow(kit: KitRow, unlocked: Boolean, product: StoreProduct?, onBu
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text("Buy", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-                Text(product.displayPrice, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace, color = Color.Black)
+                Text("Buy", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = StudioFonts.Rounded, color = Color.Black)
+                Text(product.displayPrice, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Mono, color = Color.Black)
             }
         }
     }
@@ -265,7 +265,7 @@ private fun ProRow(unlocked: Boolean, configured: Boolean, product: StoreProduct
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("⭐", fontSize = 28.sp)
-            Text("HandStrudel Pro", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White, modifier = Modifier.weight(1f))
+            Text("HandStrudel Pro", fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.White, modifier = Modifier.weight(1f))
             if (unlocked) CheckCircle(Modifier.testTag("store-pro-owned"))
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -280,10 +280,10 @@ private fun ProRow(unlocked: Boolean, configured: Boolean, product: StoreProduct
                 if (purchasing) {
                     CircularProgressIndicator(Modifier.size(20.dp), color = Color.Black, strokeWidth = 2.dp)
                 } else {
-                    Text("BUY PRO", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                    Text("BUY PRO", fontSize = 16.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.Black)
                     product?.let {
                         Text("  • ${it.displayPrice}", fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace, color = Color.Black.copy(alpha = 0.7f))
+                            fontFamily = StudioFonts.Mono, color = Color.Black.copy(alpha = 0.7f))
                     }
                 }
             }
@@ -326,23 +326,23 @@ private fun SubscriptionRow(
                         .clickable(onClick = onManage),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("MANAGE SUBSCRIPTION", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("MANAGE SUBSCRIPTION", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White)
                 }
             }
             hasProAccess -> StatusLine("Pro — Lifetime Access", "store-plus-lifetime", Modifier.padding(vertical = 12.dp))
             !configured -> Unit
             offeringAvailable -> GreenButton(testTag = "store-subscribe", onClick = onSubscribe) {
-                Text("SUBSCRIBE", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                Text("SUBSCRIBE", fontSize = 16.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.Black)
             }
             // No RevenueCat offering: plain buttons for whichever Plus plans loaded.
             else -> plans.forEach { plan ->
                 GreenButton(testTag = "store-subscribe-${plan.id.substringAfter(':')}", onClick = { onBuyPlan(plan.id) }) {
                     Text(
                         if (plan.id == ProductIds.PLUS_YEARLY) "SUBSCRIBE YEARLY" else "SUBSCRIBE MONTHLY",
-                        fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.Black,
+                        fontSize = 16.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.Black,
                     )
                     Text("  • ${plan.displayPrice}", fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace, color = Color.Black.copy(alpha = 0.7f))
+                        fontFamily = StudioFonts.Mono, color = Color.Black.copy(alpha = 0.7f))
                 }
             }
         }
@@ -357,15 +357,15 @@ private fun StatusLine(text: String, tag: String, modifier: Modifier = Modifier)
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CheckCircle(size = 18.dp)
-        Text(text, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(text, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White)
     }
 }
 
 @Composable
 private fun FeatureItem(text: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("✓", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = StoreColors.green)
-        Text(text, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f))
+        Text("✓", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = StoreColors.green)
+        Text(text, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.7f))
     }
 }
 
@@ -373,7 +373,7 @@ private fun FeatureItem(text: String) {
 @Composable
 internal fun CheckCircle(modifier: Modifier = Modifier, size: Dp = 22.dp) {
     Box(modifier.size(size).clip(RoundedCornerShape(50)).background(StoreColors.green), contentAlignment = Alignment.Center) {
-        Text("✓", fontSize = (size.value * 0.6f).sp, fontWeight = FontWeight.Black, color = Color.Black)
+        Text("✓", fontSize = (size.value * 0.6f).sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.Black)
     }
 }
 
@@ -402,7 +402,7 @@ internal fun GreenButton(
 @Composable
 private fun LinkText(text: String, tag: String, onClick: () -> Unit) {
     Text(
-        text, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.5f),
+        text, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.5f),
         modifier = Modifier.testTag(tag).clickable(onClick = onClick).padding(vertical = 8.dp),
     )
 }

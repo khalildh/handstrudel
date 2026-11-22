@@ -1,5 +1,7 @@
 package com.handstrudel.ui.studio.stage
 
+import com.handstrudel.ui.theme.StudioIcons
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -56,7 +58,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -384,10 +385,10 @@ private fun TopBar(
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(Icons.Filled.GraphicEq, null, tint = palette.mediaAccent, modifier = Modifier.size(14.dp))
-            Text("handstrudel", fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
+            Text("handstrudel", fontSize = 12.sp, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
         }
         Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
-        RoundButton(Icons.Outlined.Layers, "Presets", "studio-presets-button", enabled = !locked, swipe = swipe, onClick = onPresets)
+        RoundButton(StudioIcons.SquareStack, "Presets", "studio-presets-button", enabled = !locked, swipe = swipe, onClick = onPresets)
         Spacer(Modifier.size(8.dp))
         RoundButton(Icons.Filled.Close, "End session", "close-button", enabled = closeEnabled, swipe = swipe, onClick = onClose)
     }
@@ -468,7 +469,7 @@ private fun CodePill(code: String, modifier: Modifier = Modifier) {
     val green = Color(0xFF30D158)
     Text(
         code.lines().take(3).joinToString("\n"),
-        fontSize = 8.sp, fontFamily = FontFamily.Monospace, color = green.copy(alpha = 0.8f), maxLines = 3,
+        fontSize = 8.sp, fontFamily = StudioFonts.Mono, color = green.copy(alpha = 0.8f), maxLines = 3,
         modifier = modifier.shadow(8.dp, RoundedCornerShape(14.dp), ambientColor = green.copy(alpha = 0.25f), spotColor = green.copy(alpha = 0.25f))
             .clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.5f))
             .border(0.5.dp, green.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
@@ -481,7 +482,7 @@ private fun CodePill(code: String, modifier: Modifier = Modifier) {
 private fun NoteBadge(note: String, beat: Int, hue: Double, modifier: Modifier = Modifier) {
     val s by animateFloatAsState(if (beat == 0) 1.1f else 1f, spring(dampingRatio = 0.5f), label = "badge")
     Text(
-        note, fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.White,
+        note, fontSize = 28.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.White,
         modifier = modifier.scale(s).clip(CircleShape).background(hueColor(hue, 0.6f, 0.3f).copy(alpha = 0.5f))
             .border(2.dp, hueColor(hue, 0.8f, 1f).copy(alpha = 0.6f), CircleShape)
             .padding(horizontal = 20.dp, vertical = 10.dp),
@@ -499,14 +500,14 @@ private fun BeatRing(beat: Int, bpm: Double, modifier: Modifier = Modifier) {
             Modifier.size(50.dp).scale(s).alpha(a)
                 .border(1.5.dp, if (beat % 2 == 0) Color(0xFF30D158).copy(alpha = 0.6f) else Color(0xFFFF375F).copy(alpha = 0.6f), CircleShape),
         )
-        Text("${Math.round(bpm)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White.copy(alpha = 0.5f))
+        Text("${Math.round(bpm)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Mono, color = Color.White.copy(alpha = 0.5f))
     }
 }
 
 @Composable
 private fun Toast(text: String, bg: Color, modifier: Modifier = Modifier) {
     Text(
-        text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White,
+        text, fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White,
         modifier = modifier.padding(bottom = 8.dp).clip(CircleShape).background(bg).padding(horizontal = 20.dp, vertical = 10.dp),
     )
 }

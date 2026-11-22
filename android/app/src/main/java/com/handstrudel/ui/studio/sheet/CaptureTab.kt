@@ -35,7 +35,7 @@ internal fun FiltersSection(paywall: PaywallHost) {
     val engine = LocalAppServices.current.engine
     val selected by engine.selectedFilter.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader("FILTERS", Icons.Filled.PhotoFilter)
+        SectionHeader("FILTERS", Icons.Filled.PhotoFilter, notAvailable = CAMERA_FILTERS.any { it.isPremium && paywall.isLocked(it.packId) })
         TileGrid(CAMERA_FILTERS, columns = 4) { filter ->
             val locked = filter.isPremium && paywall.isLocked(filter.packId)
             EmojiTile(
@@ -54,7 +54,7 @@ internal fun HandThemesSection(paywall: PaywallHost) {
     val engine = LocalAppServices.current.engine
     val selected by engine.selectedHandTheme.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader("HAND THEME", Icons.Filled.PanTool)
+        SectionHeader("HAND THEME", Icons.Filled.PanTool, notAvailable = HAND_THEMES.any { it.isPremium && paywall.isLocked(it.packId) })
         TileGrid(HAND_THEMES, columns = 4) { theme ->
             val locked = theme.isPremium && paywall.isLocked(theme.packId)
             EmojiTile(

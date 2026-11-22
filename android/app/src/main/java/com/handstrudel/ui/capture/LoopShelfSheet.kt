@@ -1,5 +1,8 @@
 package com.handstrudel.ui.capture
 
+import com.handstrudel.ui.studio.common.SheetGrabber
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,7 +58,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -101,19 +103,20 @@ internal fun LoopShelfSheetView(onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = palette.background,
+        dragHandle = { SheetGrabber() },
     ) {
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp).testTag("loop-shelf"),
+            Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp).testTag("loop-shelf"),
             verticalArrangement = Arrangement.spacedBy(15.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.GraphicEq, null, tint = palette.accent, modifier = Modifier.size(14.dp))
-                    Text("PRIVATE AUDIO LIBRARY", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = palette.accent)
+                    Text("PRIVATE AUDIO LIBRARY", fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = palette.accent)
                 }
                 TextButton(onClick = onDismiss) { Text("Done", color = palette.accent, fontWeight = FontWeight.SemiBold) }
             }
-            Text("Loop shelf", fontFamily = FontFamily.Serif, fontSize = 34.sp, color = palette.ink)
+            Text("Loop shelf", fontFamily = StudioFonts.Serif, fontSize = 34.sp, color = palette.ink)
             Text(
                 if (running) "Layer loops with the live instrument." else "Preview captured audio without opening the wheel.",
                 fontSize = 15.sp, color = palette.muted,

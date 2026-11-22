@@ -1,5 +1,7 @@
 package com.handstrudel.ui.studio.sheet
 
+import com.handstrudel.ui.theme.StudioFonts
+import com.handstrudel.ui.theme.StudioIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -87,7 +89,7 @@ private fun PillToggle(label: String, icon: ImageVector, isOn: Boolean, modifier
         ) {
             val tint = if (isOn) palette.accent else palette.ink.copy(alpha = 0.5f)
             Icon(icon, null, tint = tint, modifier = Modifier.size(13.dp))
-            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = tint)
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = tint)
         }
     }
 }
@@ -161,7 +163,7 @@ internal fun SoundTab(paywall: PaywallHost, onOpenPresets: () -> Unit) {
     if (!usesSF) {
         StudioPaddedPanel {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionHeader("SOUND", Icons.Filled.GraphicEq)
+                SectionHeader("SOUND", Icons.Filled.GraphicEq, notAvailable = WAVEFORMS.any { it.isPremium && paywall.isLocked(it.packId) })
                 TileGrid(WAVEFORMS, columns = 4) { wf ->
                     val locked = wf.isPremium && paywall.isLocked(wf.packId)
                     EmojiTile(
@@ -178,7 +180,7 @@ internal fun SoundTab(paywall: PaywallHost, onOpenPresets: () -> Unit) {
     // ---- Presets ----
     StudioSettingsPanel(Modifier.alpha(if (recordingLocked) 0.5f else 1f)) {
         StudioSettingRow(
-            "Presets", Icons.Filled.Layers, modifier = Modifier.testTag("settings-presets"),
+            "Presets", StudioIcons.SquareStack, modifier = Modifier.testTag("settings-presets"),
             onClick = if (recordingLocked) null else onOpenPresets,
         )
     }

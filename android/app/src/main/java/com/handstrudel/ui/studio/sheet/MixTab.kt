@@ -1,5 +1,7 @@
 package com.handstrudel.ui.studio.sheet
 
+import com.handstrudel.ui.theme.StudioIcons
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,7 +52,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -101,14 +102,14 @@ internal fun BpmSection() {
     val manualBPM by engine.manualBPM.collectAsState()
     val bpmIsMapped = engine.bpmIsMapped
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader("BPM", Icons.Filled.Timer)
+        SectionHeader("BPM", StudioIcons.Metronome)
         Text(
             "${ControlSheetLogic.roundedInt(manualBPM)}",
-            fontSize = 32.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = palette.accent,
+            fontSize = 32.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Mono, color = palette.accent,
             textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().testTag("settings-bpm-value"),
         )
         if (bpmIsMapped) {
-            Text("Controlled by hand", fontSize = 11.sp, color = palette.muted)
+            Text("Controlled by hand", fontSize = 11.sp, fontFamily = StudioFonts.Rounded, color = palette.muted)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 CircleIconButton(Icons.Filled.Remove, "Decrease BPM") { engine.setManualBPM(maxOf(50.0, manualBPM - 1)) }
@@ -169,7 +170,7 @@ private fun ParamRow(def: ParamDef, isLocked: Boolean, value: Double, onToggleLo
             }
         }
         Text(
-            def.label, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+            def.label, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded,
             color = if (isLocked) ORANGE else palette.ink, maxLines = 1, modifier = Modifier.width(58.dp),
         )
         if (isLocked) {
@@ -182,7 +183,7 @@ private fun ParamRow(def: ParamDef, isLocked: Boolean, value: Double, onToggleLo
         }
         Text(
             ControlSheetLogic.formatParam(def, value), fontSize = 12.sp, fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.Monospace, color = palette.muted, textAlign = TextAlign.End, maxLines = 1,
+            fontFamily = StudioFonts.Mono, color = palette.muted, textAlign = TextAlign.End, maxLines = 1,
             modifier = Modifier.width(56.dp),
         )
     }
@@ -193,7 +194,7 @@ private fun ParamRow(def: ParamDef, isLocked: Boolean, value: Double, onToggleLo
 internal fun DrumTrackSection(label: String, track: Int, state: DrumTrackState, paywall: PaywallHost) {
     val engine = LocalAppServices.current.engine
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader(label, Icons.Filled.Headphones)
+        SectionHeader(label, Icons.Filled.Headphones, notAvailable = DRUM_LOOPS.any { it.isPremium && paywall.isLocked(it.packId) })
         TileGrid(DRUM_LOOPS, columns = 3) { loop ->
             val locked = loop.isPremium && paywall.isLocked(loop.packId)
             EmojiTile(
@@ -237,15 +238,15 @@ internal fun LoopsSection(loops: List<SavedLoop>) {
                     Modifier.heightIn(min = 36.dp).clip(CircleShape).clickable(role = Role.Button) { engine.stopAllLoops() }
                         .padding(horizontal = 6.dp),
                     contentAlignment = Alignment.Center,
-                ) { Text("Stop All", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.Red.copy(alpha = 0.8f)) }
+                ) { Text("Stop All", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, color = Color.Red.copy(alpha = 0.8f)) }
             }
         }
         Text(
             "Tap the red circle button to record a loop. Loops auto-play and layer on top of each other.",
-            fontSize = 11.sp, color = palette.muted,
+            fontSize = 11.sp, fontFamily = StudioFonts.Rounded, color = palette.muted,
         )
         FlowRowCompat {
-            Text("Length", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = palette.muted, modifier = Modifier.padding(top = 10.dp))
+            Text("Length", fontSize = 11.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.muted, modifier = Modifier.padding(top = 10.dp))
             ControlSheetLogic.LOOP_BAR_OPTIONS.forEach { option ->
                 CapsuleChoice("$option bars", bars == option) { engine.setLoopRecordingBars(option) }
             }
@@ -317,17 +318,17 @@ private fun LoopRow(
                 )
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(loop.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.ink, maxLines = 1)
+                Text(loop.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, color = palette.ink, maxLines = 1)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        loop.mode, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = palette.accent,
+                        loop.mode, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = palette.accent,
                         modifier = Modifier.clip(CircleShape).background(palette.accent.copy(alpha = 0.15f)).padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                     Text(
                         if (loop.hasCapturedAudio) "Captured audio" else "Note events",
-                        fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = palette.muted, maxLines = 1,
+                        fontSize = 10.sp, fontFamily = StudioFonts.Mono, color = palette.muted, maxLines = 1,
                     )
-                    Text(ControlSheetLogic.loopDuration(loop.durationSeconds), fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = palette.muted)
+                    Text(ControlSheetLogic.loopDuration(loop.durationSeconds), fontSize = 10.sp, fontFamily = StudioFonts.Mono, color = palette.muted)
                 }
             }
             if (loop.hasCapturedAudio) {
@@ -354,7 +355,7 @@ private fun LoopRow(
                     size = 28.dp, iconSize = 16.dp, tint = palette.accent, background = Color.Transparent, onClick = onMute,
                 )
                 SheetSlider(loop.gain.toFloat(), 0f..1f, Modifier.weight(1f), steps = 19) { onGain(it.toDouble()) }
-                Text(ControlSheetLogic.percent(loop.gain), fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = palette.muted)
+                Text(ControlSheetLogic.percent(loop.gain), fontSize = 11.sp, fontFamily = StudioFonts.Mono, color = palette.muted)
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.overlays
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,7 +67,7 @@ fun DrumXYPad(modifier: Modifier = Modifier) {
             },
     ) {
         // Quadrant labels.
-        val labelStyle = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.15f))
+        val labelStyle = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.15f))
         Column(Modifier.fillMaxSize().padding(8.dp)) {
             Row(Modifier.fillMaxWidth()) {
                 Text("SOFT", style = labelStyle)

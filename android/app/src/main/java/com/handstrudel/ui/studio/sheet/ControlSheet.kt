@@ -1,5 +1,7 @@
 package com.handstrudel.ui.studio.sheet
 
+import com.handstrudel.ui.studio.common.SheetGrabber
+import com.handstrudel.ui.theme.StudioFonts
 import com.handstrudel.ui.studio.common.isAccessibilityTextSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,7 +51,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -98,7 +99,7 @@ fun ControlSheet(onDismiss: () -> Unit, onOpenLearnPicker: () -> Unit) {
         sheetState = sheetState,
         containerColor = palette.background,
         contentColor = palette.ink,
-        dragHandle = null,
+        dragHandle = { SheetGrabber() },
     ) {
         Column(Modifier.fillMaxWidth().fillMaxHeight().navigationBarsPadding()) {
             SettingsHeader(
@@ -167,7 +168,7 @@ private fun SettingsHeader(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     "Music settings",
-                    fontFamily = FontFamily.Serif,
+                    fontFamily = StudioFonts.Serif,
                     fontSize = 28.sp,
                     color = palette.ink,
                     modifier = Modifier.semantics { heading() },

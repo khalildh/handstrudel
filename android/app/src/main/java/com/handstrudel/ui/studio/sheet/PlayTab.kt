@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.sheet
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -61,7 +62,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -188,7 +188,7 @@ private fun ModeButton(choice: ModeChoice, active: Boolean, modifier: Modifier, 
     ) {
         Icon(choice.icon, null, tint = if (active) palette.accent else palette.ink.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
         Text(
-            choice.label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            choice.label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, maxLines = 1,
             color = if (active) palette.accent else palette.ink.copy(alpha = 0.6f),
         )
     }
@@ -250,10 +250,10 @@ private fun PadVolumeRow(volume: Double, onChange: (Double) -> Unit) {
     val palette = LocalStudioPalette.current
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Pad volume", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.ink.copy(alpha = 0.8f))
+            Text("Pad volume", fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.ink.copy(alpha = 0.8f))
             Spacer(Modifier.weight(1f))
             Text(
-                ControlSheetLogic.padVolumePercent(volume), fontSize = 11.sp, fontFamily = FontFamily.Monospace,
+                ControlSheetLogic.padVolumePercent(volume), fontSize = 11.sp, fontFamily = StudioFonts.Mono,
                 color = palette.muted, modifier = Modifier.testTag("settings-pad-volume-value"),
             )
         }
@@ -272,7 +272,7 @@ private fun QuantizeRow() {
         SheetToggle("Sync to beat (snap notes to the grid)", enabled, Modifier.testTag("settings-quantize")) { engine.setQuantizeEnabled(it) }
         if (enabled) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Grid", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = palette.muted)
+                Text("Grid", fontSize = 11.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.muted)
                 listOf(4 to "1/4", 8 to "1/8", 16 to "1/16").forEach { (d, label) ->
                     CapsuleChoice(label, div == d, monospaced = true) { engine.setQuantizeDiv(d) }
                 }
@@ -291,11 +291,11 @@ private fun GridControls() {
     QuantizeRow()
     Text(
         "Pinch to play notes. Move hand up/down to change pitch.",
-        fontSize = 11.sp, color = palette.muted, modifier = Modifier.padding(top = 2.dp),
+        fontSize = 11.sp, fontFamily = StudioFonts.Rounded, color = palette.muted, modifier = Modifier.padding(top = 2.dp),
     )
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Range", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = palette.muted)
+            Text("Range", fontSize = 11.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.muted)
             listOf(1, 2, 3).forEach { r ->
                 val selected = range == r
                 Box(
@@ -308,19 +308,19 @@ private fun GridControls() {
                             .background(if (selected) palette.accent.copy(alpha = 0.15f) else palette.ink.copy(alpha = 0.04f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("$r", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (selected) palette.accent else palette.muted)
+                        Text("$r", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = if (selected) palette.accent else palette.muted)
                     }
                 }
             }
         }
         Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Oct", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = palette.muted)
+            Text("Oct", fontSize = 11.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.muted)
             CircleIconButton(Icons.Filled.Remove, "Lower octave", size = 24.dp, iconSize = 10.dp, tint = palette.muted) {
                 if (octave > 1) engine.setGridBaseOctave(octave - 1)
             }
             Text(
-                "$octave", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                "$octave", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Mono,
                 color = palette.accent, modifier = Modifier.width(20.dp).testTag("grid-octave"),
             )
             CircleIconButton(Icons.Filled.Add, "Raise octave", size = 24.dp, iconSize = 10.dp, tint = palette.muted) {
@@ -350,7 +350,7 @@ internal fun CustomProgressionEditor() {
                 value = text,
                 onValueChange = { text = it },
                 singleLine = true,
-                textStyle = TextStyle(fontSize = 15.sp, fontFamily = FontFamily.Monospace, color = palette.ink),
+                textStyle = TextStyle(fontSize = 15.sp, fontFamily = StudioFonts.Mono, color = palette.ink),
                 cursorBrush = SolidColor(palette.accent),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Go,
@@ -360,7 +360,7 @@ internal fun CustomProgressionEditor() {
                     .background(palette.background).testTag("progression-input"),
                 decorationBox = { inner ->
                     Box(Modifier.padding(horizontal = 12.dp).heightIn(min = 44.dp), contentAlignment = Alignment.CenterStart) {
-                        if (text.isEmpty()) Text("I V vi IV", fontSize = 15.sp, fontFamily = FontFamily.Monospace, color = palette.muted)
+                        if (text.isEmpty()) Text("I V vi IV", fontSize = 15.sp, fontFamily = StudioFonts.Mono, color = palette.muted)
                         inner()
                     }
                 },

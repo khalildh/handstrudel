@@ -1,5 +1,6 @@
 package com.handstrudel.ui.theme
 
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -39,7 +40,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,7 +69,7 @@ fun StudioThemePickerSheet(onDismiss: () -> Unit) {
         dragHandle = null,
         modifier = Modifier.testTag("appearance-sheet"),
     ) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight().navigationBarsPadding()) {
             // Inline navigation bar: centered title, "Done" as the confirmation action.
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
                 Text(
@@ -138,7 +138,7 @@ private fun ThemeCard(option: StudioTheme, selected: Boolean, palette: StudioPal
             Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = sample.accent, modifier = Modifier.size(26.dp))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(option.title, fontFamily = FontFamily.Serif, fontSize = 20.sp, color = palette.ink)
+            Text(option.title, fontFamily = StudioFonts.Serif, fontSize = 20.sp, color = palette.ink)
             Text(option.subtitle, fontSize = 12.sp, color = palette.muted, textAlign = TextAlign.Start)
         }
         Spacer(Modifier.size(4.dp))

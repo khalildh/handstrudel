@@ -1,5 +1,7 @@
 package com.handstrudel.ui.studio.overlays
 
+import com.handstrudel.ui.theme.StudioIcons
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -49,7 +51,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -204,7 +205,7 @@ fun LearnOverlay(touchEnabled: Boolean, onPickSong: () -> Unit, modifier: Modifi
                         .testTag("learn-lane-$lane"),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(note, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace, color = Color.White, maxLines = 1)
+                    Text(note, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Mono, color = Color.White, maxLines = 1)
                 }
             }
         }
@@ -221,7 +222,7 @@ fun LearnOverlay(touchEnabled: Boolean, onPickSong: () -> Unit, modifier: Modifi
             verticalAlignment = Alignment.CenterVertically,
         ) {
             HudStat(Icons.Filled.Star, colors.yellow, "${learn.score.perfectHits + learn.score.goodHits}")
-            HudStat(Icons.Filled.TrackChanges, colors.cyan, "${(learn.score.accuracy * 100).toInt()}%")
+            HudStat(StudioIcons.Target, colors.cyan, "${(learn.score.accuracy * 100).toInt()}%")
             if (learn.score.currentStreak > 0) HudStat(Icons.Filled.LocalFireDepartment, colors.orange, "${learn.score.currentStreak}")
         }
 
@@ -232,7 +233,7 @@ fun LearnOverlay(touchEnabled: Boolean, onPickSong: () -> Unit, modifier: Modifi
                     "${learn.countdownValue}",
                     style = TextStyle(
                         fontSize = 120.sp,
-                        fontWeight = FontWeight.Black,
+                        fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded,
                         color = Color.White,
                         shadow = androidx.compose.ui.graphics.Shadow(colors.cyan, Offset.Zero, 40f),
                     ),
@@ -266,7 +267,7 @@ private fun noteFill(state: LearnNoteState, colors: OverlayColors): Color = when
 private fun HudStat(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, value: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(11.dp))
-        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Mono, color = Color.White)
     }
 }
 
@@ -314,7 +315,7 @@ private fun SongCompleteCard(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Text(songName, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(songName, fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White)
         val gradient = when {
             score.accuracy >= 0.9 -> listOf(colors.green, colors.cyan)
             score.accuracy >= 0.7 -> listOf(colors.yellow, colors.green)
@@ -322,9 +323,9 @@ private fun SongCompleteCard(
         }
         Text(
             "${(score.accuracy * 100).toInt()}%",
-            style = TextStyle(fontSize = 56.sp, fontWeight = FontWeight.Black, brush = Brush.horizontalGradient(gradient)),
+            style = TextStyle(fontSize = 56.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, brush = Brush.horizontalGradient(gradient)),
         )
-        Text("ACCURACY", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.4f), letterSpacing = 2.sp)
+        Text("ACCURACY", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.4f), letterSpacing = 2.sp)
         Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             ScoreColumn(score.perfectHits, "PERFECT", colors.green)
             ScoreColumn(score.goodHits, "GOOD", colors.yellow)
@@ -332,7 +333,7 @@ private fun SongCompleteCard(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.LocalFireDepartment, contentDescription = null, tint = colors.orange, modifier = Modifier.size(15.dp))
-            Text("Best Streak: ${score.bestStreak}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.7f))
+            Text("Best Streak: ${score.bestStreak}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.7f))
         }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(
@@ -344,7 +345,7 @@ private fun SongCompleteCard(
                     .testTag("learn-play-again"),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("PLAY AGAIN", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                Text("PLAY AGAIN", fontSize = 16.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.Black)
             }
             val pickShape = RoundedCornerShape(12.dp)
             Box(
@@ -357,7 +358,7 @@ private fun SongCompleteCard(
                     .testTag("learn-pick-song"),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("PICK SONG", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+                Text("PICK SONG", fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.8f))
             }
         }
     }
@@ -366,8 +367,8 @@ private fun SongCompleteCard(
 @Composable
 private fun ScoreColumn(value: Int, label: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("$value", fontSize = 24.sp, fontWeight = FontWeight.Black, color = color)
-        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.4f), letterSpacing = 1.sp)
+        Text("$value", fontSize = 24.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = color)
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.4f), letterSpacing = 1.sp)
     }
 }
 

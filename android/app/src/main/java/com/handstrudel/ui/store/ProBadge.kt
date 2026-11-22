@@ -1,12 +1,12 @@
 package com.handstrudel.ui.store
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,7 +28,7 @@ fun ProBadge(modifier: Modifier = Modifier, style: ProBadgeStyle = ProBadgeStyle
         ProBadgeStyle.ROW -> Text(
             "PRO",
             fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = StudioFonts.Mono,
             fontWeight = FontWeight.SemiBold,
             color = palette.accent,
             modifier = modifier

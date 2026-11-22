@@ -67,8 +67,8 @@ fun AccountSettingsMenu(signedIn: Boolean, onOpen: (AccountSheet) -> Unit, onSig
         SocialMaterialTheme {
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 fun go(action: () -> Unit) { open = false; action() }
-                DropdownMenuItem(text = { Text("Appearance") }, leadingIcon = { Icon(Icons.Outlined.Palette, null) }, onClick = { go { onOpen(AccountSheet.APPEARANCE) } })
-                DropdownMenuItem(text = { Text("Usage Analytics") }, leadingIcon = { Icon(Icons.Outlined.BarChart, null) }, onClick = { go { onOpen(AccountSheet.USAGE_ANALYTICS) } })
+                DropdownMenuItem(text = { Text("Appearance") }, trailingIcon = { Icon(Icons.Outlined.Palette, null) }, onClick = { go { onOpen(AccountSheet.APPEARANCE) } })
+                DropdownMenuItem(text = { Text("Usage Analytics") }, trailingIcon = { Icon(Icons.Outlined.BarChart, null) }, onClick = { go { onOpen(AccountSheet.USAGE_ANALYTICS) } })
                 if (signedIn) {
                     DropdownMenuItem(text = { Text("Blocked users") }, onClick = { go { onOpen(AccountSheet.BLOCKED) } }, modifier = Modifier.testTag("menu-blocked-users"))
                     DropdownMenuItem(text = { Text("Sign out") }, onClick = { go(onSignOut) }, modifier = Modifier.testTag("menu-sign-out"))
@@ -78,8 +78,8 @@ fun AccountSettingsMenu(signedIn: Boolean, onOpen: (AccountSheet) -> Unit, onSig
                 DropdownMenuItem(text = { Text("Community Guidelines") }, onClick = { go { openUrl(context, SocialConfig.GUIDELINES_URL) } })
                 DropdownMenuItem(text = { Text("Terms of Use") }, onClick = { go { openUrl(context, SocialConfig.TERMS_URL) } })
                 HorizontalDivider()
-                DropdownMenuItem(text = { Text("Write a review") }, leadingIcon = { Icon(Icons.Outlined.StarOutline, null) }, onClick = { go { openPlayListing(context) } })
-                DropdownMenuItem(text = { Text("Get help") }, leadingIcon = { Icon(Icons.AutoMirrored.Outlined.HelpOutline, null) }, onClick = { go { openUrl(context, SocialConfig.SUPPORT_URL) } })
+                DropdownMenuItem(text = { Text("Write a review") }, trailingIcon = { Icon(Icons.Outlined.StarOutline, null) }, onClick = { go { openPlayListing(context) } })
+                DropdownMenuItem(text = { Text("Get help") }, trailingIcon = { Icon(Icons.AutoMirrored.Outlined.HelpOutline, null) }, onClick = { go { openUrl(context, SocialConfig.SUPPORT_URL) } })
             }
         }
     }

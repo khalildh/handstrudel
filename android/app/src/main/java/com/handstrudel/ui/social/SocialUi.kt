@@ -1,5 +1,8 @@
 package com.handstrudel.ui.social
 
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.Icons
+import com.handstrudel.ui.theme.StudioFonts
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -60,7 +63,6 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -221,17 +223,17 @@ fun ProfileActionButton(
     }
 }
 
-/** iOS `StudioActionStyle`: the full-width accent capsule. */
+/** iOS `StudioActionStyle`: full-width accent button, 54 pt min height, 17 pt corners, `.headline`. */
 @Composable
 fun StudioActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null, enabled: Boolean = true) {
     val p = LocalStudioPalette.current
     Row(
-        modifier.fillMaxWidth().heightIn(min = 50.dp).clip(RoundedCornerShape(50)).background(p.accent)
-            .clickable(enabled = enabled, onClick = onClick).alpha(if (enabled) 1f else 0.5f).padding(horizontal = 18.dp, vertical = 12.dp),
+        modifier.fillMaxWidth().heightIn(min = 54.dp).clip(RoundedCornerShape(17.dp)).background(p.accent)
+            .clickable(enabled = enabled, onClick = onClick).alpha(if (enabled) 1f else 0.5f).padding(horizontal = 18.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) { Icon(icon, null, tint = p.onAccent, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)) }
-        Text(text, color = p.onAccent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(text, color = p.onAccent, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
     }
 }
 
@@ -239,8 +241,12 @@ fun StudioActionButton(text: String, onClick: () -> Unit, modifier: Modifier = M
 @Composable
 fun ProfileEyebrow(title: String) {
     val p = LocalStudioPalette.current
-    Text("∿ $title", color = p.accent, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold,
-        fontSize = 11.sp, letterSpacing = 1.35.sp)
+    // iOS `Label(title, systemImage: "waveform")`.
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Icon(Icons.Filled.GraphicEq, null, tint = p.accent, modifier = Modifier.size(12.dp))
+        Text(title, color = p.accent, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold,
+            fontSize = 11.sp, letterSpacing = 1.35.sp)
+    }
 }
 
 /** A rounded surface card used by empty states. */

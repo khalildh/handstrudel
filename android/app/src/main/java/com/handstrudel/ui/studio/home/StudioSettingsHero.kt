@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.home
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +27,6 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,14 +74,14 @@ fun StudioSettingsHero(
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Icon(Icons.Filled.GraphicEq, null, tint = palette.accent, modifier = Modifier.size(12.dp))
                 Text(
-                    "CURRENT SOUND", fontSize = 11.sp, fontFamily = FontFamily.Monospace,
+                    "CURRENT SOUND", fontSize = 11.sp, fontFamily = StudioFonts.Mono,
                     fontWeight = FontWeight.SemiBold, letterSpacing = 1.6.sp, color = palette.accent,
                 )
             }
-            Text(title, fontSize = 34.sp, fontFamily = FontFamily.Serif, color = palette.ink, lineHeight = 38.sp)
+            Text(title, fontSize = 34.sp, fontFamily = StudioFonts.Serif, color = palette.ink, lineHeight = 38.sp)
             Text(
                 listOfNotNull("${key.displayName} ${scale.displayName}", progression?.name).joinToString(" / "),
-                fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = palette.muted,
+                fontSize = 12.sp, fontFamily = StudioFonts.Mono, color = palette.muted,
             )
         }
     }

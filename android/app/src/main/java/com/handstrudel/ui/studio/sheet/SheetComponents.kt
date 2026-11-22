@@ -1,5 +1,9 @@
 package com.handstrudel.ui.studio.sheet
 
+import androidx.compose.ui.platform.testTag
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.Icons
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,7 +56,7 @@ internal fun SheetToggle(label: String, checked: Boolean, modifier: Modifier = M
         modifier.fillMaxWidth().heightIn(min = 44.dp).clickable { onChange(!checked) },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.ink.copy(alpha = 0.8f), modifier = Modifier.weight(1f))
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.ink.copy(alpha = 0.8f), modifier = Modifier.weight(1f))
         Switch(
             checked = checked,
             onCheckedChange = onChange,
@@ -146,32 +150,48 @@ internal fun EmojiTile(
             Text(emoji, fontSize = emojiSize)
             Text(
                 label,
-                fontSize = if (compact) 9.sp else 10.sp,
+                fontSize = if (compact) 8.sp else 10.sp,
                 fontWeight = FontWeight.SemiBold,
+                fontFamily = StudioFonts.Rounded,
                 color = if (selected) palette.accent else palette.ink.copy(alpha = 0.6f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 2.dp),
             )
         }
-        if (locked) TileProBadge(Modifier.align(Alignment.TopEnd).padding(4.dp))
+        if (locked) TileProBadge(Modifier.align(Alignment.TopEnd).padding(5.dp))
     }
 }
 
-/** The small "PRO" capsule on locked tiles; "Not available yet" when the store isn't configured. */
+/**
+ * iOS's tiny "PRO" capsule on locked tiles (8 pt heavy rounded, ink 80 % on
+ * `.ultraThinMaterial`, 5 pt inset from the top-trailing corner). When the store isn't
+ * configured the WS3 rules say locked items read "Not available yet": the phrase doesn't
+ * fit a PRO-sized capsule on a 48 pt tile without covering the emoji, so the capsule shows
+ * a lock glyph (announced as "Not available yet") and the section header carries the
+ * words ([com.handstrudel.ui.studio.common.SectionHeader] `notAvailable`).
+ */
 @Composable
 internal fun TileProBadge(modifier: Modifier = Modifier) {
     val palette = LocalStudioPalette.current
     val configured = LocalAppServices.current.store.isConfigured
-    Text(
-        if (configured) "PRO" else "Not available yet",
-        fontSize = if (configured) 8.sp else 6.sp,
-        fontWeight = FontWeight.ExtraBold,
-        color = palette.ink.copy(alpha = 0.8f),
-        maxLines = 1,
-        softWrap = false,
-        modifier = modifier.clip(CircleShape).background(palette.ink.copy(alpha = 0.15f)).padding(horizontal = 4.dp, vertical = 1.dp),
-    )
+    val capsule = modifier.clip(CircleShape).background(palette.ink.copy(alpha = 0.12f))
+    if (configured) {
+        Text(
+            "PRO",
+            fontSize = 8.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = StudioFonts.Rounded,
+            color = palette.ink.copy(alpha = 0.8f),
+            maxLines = 1,
+            softWrap = false,
+            modifier = capsule.padding(horizontal = 5.dp, vertical = 2.dp),
+        )
+    } else {
+        Box(capsule.padding(horizontal = 4.dp, vertical = 2.dp).testTag("tile-not-available")) {
+            Icon(Icons.Filled.Lock, contentDescription = "Not available yet", tint = palette.ink.copy(alpha = 0.8f), modifier = Modifier.size(9.dp))
+        }
+    }
 }
 
 /** iOS capsule choice (quantize ¼ ⅛ 1/16, loop length): accent text + 15 % fill when selected. */
@@ -183,7 +203,7 @@ internal fun CapsuleChoice(label: String, selected: Boolean, modifier: Modifier 
             label,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = if (monospaced) FontFamily.Monospace else FontFamily.Default,
+            fontFamily = if (monospaced) StudioFonts.Mono else StudioFonts.Rounded,
             color = if (selected) palette.accent else palette.muted,
             modifier = Modifier.clip(CircleShape)
                 .background(if (selected) palette.accent.copy(alpha = 0.15f) else palette.ink.copy(alpha = 0.04f))
@@ -227,9 +247,9 @@ internal fun LabeledSliderRow(
 ) {
     val palette = LocalStudioPalette.current
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = palette.muted.copy(alpha = 0.6f), modifier = Modifier.width(28.dp))
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = palette.muted.copy(alpha = 0.6f), modifier = Modifier.width(28.dp))
         SheetSlider(value, range, Modifier.weight(1f), steps = steps, onChange = onChange)
-        Text(valueText, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = palette.muted, maxLines = 1, textAlign = TextAlign.End, modifier = Modifier.width(40.dp))
+        Text(valueText, fontSize = 11.sp, fontFamily = StudioFonts.Mono, color = palette.muted, maxLines = 1, textAlign = TextAlign.End, modifier = Modifier.width(40.dp))
     }
 }
 

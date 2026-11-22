@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.overlays
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -174,7 +175,7 @@ fun ChordMelodyZonesOverlay(touchEnabled: Boolean, modifier: Modifier = Modifier
                 softWrap = false,
                 style = TextStyle(
                     fontSize = 56.sp,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded,
                     brush = Brush.horizontalGradient(
                         if (cm.isChordHandPinching) listOf(colors.green, colors.cyan)
                         else listOf(Color.White.copy(alpha = 0.5f), Color.White.copy(alpha = 0.3f)),
@@ -233,13 +234,13 @@ private fun OctaveCell(
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     ZonesGeometry.romanNumeral(degree),
-                    fontSize = 18.sp, fontWeight = FontWeight.Black, maxLines = 1, softWrap = false,
+                    fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, maxLines = 1, softWrap = false,
                     color = if (isCurrentZone) Color.White else Color.White.copy(alpha = 0.55f),
                 )
                 val label = ZonesGeometry.degreeLabel(degree)
                 Text(
                     label,
-                    fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false,
+                    fontSize = 9.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, maxLines = 1, softWrap = false,
                     color = Color.White.copy(alpha = if (isCurrentZone) 0.7f else 0.4f),
                     textAlign = TextAlign.Center,
                 )
@@ -247,7 +248,7 @@ private fun OctaveCell(
         } else {
             Text(
                 if (octave > 0) "+8va" else "−8va",
-                fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false,
+                fontSize = 9.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, maxLines = 1, softWrap = false,
                 color = Color.White.copy(alpha = if (isActive) 0.85f else 0.3f),
             )
         }

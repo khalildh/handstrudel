@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.account
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -39,7 +40,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.handstrudel.social.model.Video
@@ -92,7 +92,7 @@ fun AccountTab() {
     ) {
         Column(Modifier.widthIn(max = 650.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 21.dp).padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Account", color = p.ink, fontSize = 30.sp, fontFamily = FontFamily.Serif, modifier = Modifier.weight(1f))
+                Text("Account", color = p.ink, fontSize = 30.sp, fontFamily = StudioFonts.Serif, modifier = Modifier.weight(1f))
                 AccountSettingsMenu(signedIn = userId != null, onOpen = { sheet = it }, onSignOut = { scope.launch { auth.signOut() } })
             }
             val current = profile
@@ -142,7 +142,7 @@ fun AccountTab() {
                         ProfileArtwork()
                         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             ProfileEyebrow("HANDSTRUDEL / BACKSTAGE")
-                            Text("Your music.\nYour stage.", color = p.ink, fontSize = 34.sp, lineHeight = 40.sp, fontFamily = FontFamily.Serif)
+                            Text("Your music.\nYour stage.", color = p.ink, fontSize = 34.sp, lineHeight = 40.sp, fontFamily = StudioFonts.Serif)
                             Text("Give your performances a home. Share what you play and let others try your sounds.", color = p.muted, fontSize = 15.sp)
                         }
                     }

@@ -1,5 +1,8 @@
 package com.handstrudel.ui.studio.overlays
 
+import androidx.compose.material.icons.outlined.DoNotTouch
+import com.handstrudel.ui.theme.StudioIcons
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +43,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -199,7 +201,7 @@ private fun LaneLabel(name: String, active: Boolean, color: Color, background: C
         name,
         fontSize = if (active) 14.sp else 11.sp,
         fontWeight = if (active) FontWeight.Black else FontWeight.Medium,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = StudioFonts.Mono,
         color = color,
         maxLines = 1,
         softWrap = false,
@@ -240,7 +242,7 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
                 }
             }
         }
-        Text("Oct $baseOctave", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = colors.green)
+        Text("Oct $baseOctave", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Mono, color = colors.green)
 
         // Manual octave steppers (finger octave off).
         if (!fingerOctave) {
@@ -254,9 +256,9 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
 
         Spacer(Modifier.weight(1f))
 
-        // Sync-to-beat (iOS SF Symbol "metronome"; Material has no metronome glyph).
+        // Sync-to-beat (iOS SF Symbol "metronome" / "metronome.fill").
         RoundIconButton(
-            if (quantize) Icons.Filled.Timer else Icons.Outlined.Timer,
+            if (quantize) StudioIcons.MetronomeFill else StudioIcons.Metronome,
             "Sync to beat",
             if (quantize) colors.green else Color.White.copy(alpha = 0.5f),
             if (quantize) colors.green.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.1f),
@@ -265,7 +267,7 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
 
         // Finger octave toggle (iOS "hand.raised.fingers.spread" / "hand.raised.slash").
         RoundIconButton(
-            if (fingerOctave) Icons.Filled.PanTool else Icons.Outlined.PanTool,
+            if (fingerOctave) Icons.Filled.PanTool else Icons.Outlined.DoNotTouch,
             "Finger octave",
             if (fingerOctave) colors.green else Color.White.copy(alpha = 0.5f),
             if (fingerOctave) colors.green.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.1f),
@@ -287,7 +289,7 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "$range", fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    "$range", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded,
                     color = if (selected) Color.Black else Color.White.copy(alpha = 0.6f),
                 )
             }

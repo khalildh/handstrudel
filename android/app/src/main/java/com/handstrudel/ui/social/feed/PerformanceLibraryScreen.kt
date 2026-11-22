@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -131,7 +131,7 @@ fun PerformanceLibraryScreen(kind: LibraryKind, onDismiss: () -> Unit, onRemove:
                 item {
                     val c = kind.challenge
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(c.title, color = p.ink, fontSize = 24.sp, fontFamily = FontFamily.Serif)
+                        Text(c.title, color = p.ink, fontSize = 24.sp, fontFamily = StudioFonts.Serif)
                         Text(c.prompt, color = p.ink)
                         c.endsAtInstant?.let {
                             Text("Ends " + DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)

@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.overlays
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,7 +38,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -94,6 +94,7 @@ fun LearnSongPicker(onPick: (songId: String) -> Unit, onDismiss: () -> Unit) {
         sheetState = state,
         containerColor = Color.Black,
         contentColor = Color.White,
+        dragHandle = null,
     ) {
         Column(
             Modifier
@@ -104,7 +105,7 @@ fun LearnSongPicker(onPick: (songId: String) -> Unit, onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Text(
-                "LEARN", fontSize = 32.sp, fontWeight = FontWeight.Black, color = Color.White,
+                "LEARN", fontSize = 32.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.White,
                 modifier = Modifier.padding(top = 20.dp),
             )
 
@@ -139,7 +140,7 @@ fun LearnSongPicker(onPick: (songId: String) -> Unit, onDismiss: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.AutoMirrored.Outlined.NoteAdd, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
-                Text("Import MIDI", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.5f))
+                Text("Import MIDI", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.5f))
             }
 
             Spacer(Modifier.height(20.dp))
@@ -151,7 +152,7 @@ fun LearnSongPicker(onPick: (songId: String) -> Unit, onDismiss: () -> Unit) {
 private fun SectionHeader(title: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.width(24.dp).height(1.dp).background(Color.White.copy(alpha = 0.15f)))
-        Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.35f), letterSpacing = 2.sp)
+        Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.35f), letterSpacing = 2.sp)
         Box(Modifier.width(24.dp).height(1.dp).background(Color.White.copy(alpha = 0.15f)))
     }
 }
@@ -169,11 +170,11 @@ private fun SongCard(song: LearnSongEntry, modifier: Modifier) {
     ) {
         Text(song.emoji, fontSize = 30.sp)
         Text(
-            song.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White,
+            song.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded, color = Color.White,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         Text(
-            "${song.bpm} BPM", fontSize = 10.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace,
+            "${song.bpm} BPM", fontSize = 10.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Mono,
             color = PickerGreen.copy(alpha = 0.7f),
         )
     }
@@ -193,6 +194,6 @@ private fun PracticeButton(practice: PracticeEntry, onClick: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
         Icon(practiceIcon(practice.label), contentDescription = null, tint = PickerGreen, modifier = Modifier.size(22.dp))
-        Text(practice.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.8f))
+        Text(practice.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.8f))
     }
 }

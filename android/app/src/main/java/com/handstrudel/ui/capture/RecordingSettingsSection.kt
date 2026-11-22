@@ -1,5 +1,7 @@
 package com.handstrudel.ui.capture
 
+import androidx.compose.material.icons.outlined.DoNotTouch
+import com.handstrudel.ui.theme.StudioFonts
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,9 +50,9 @@ internal fun RecordingSettingsSectionView() {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Icon(Icons.Filled.Videocam, null, tint = palette.accent, modifier = Modifier.size(14.dp))
-            Text("RECORDING", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = palette.accent)
+            Text("RECORDING", fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = palette.accent)
         }
-        ToggleRow(Icons.Outlined.PanTool, "Hide hand tracking in recordings", hideSkeleton, "hide-skeleton-recording") {
+        ToggleRow(Icons.Outlined.DoNotTouch, "Hide hand tracking in recordings", hideSkeleton, "hide-skeleton-recording") {
             prefs.setHideSkeletonWhenRecording(it)
         }
         HorizontalDivider(color = palette.border)

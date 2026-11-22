@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.account
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,7 +33,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -85,15 +85,15 @@ fun CreatorProfileHeader(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
                 Box(Modifier.size(68.dp).border(1.dp, p.accent.copy(alpha = 0.45f), CircleShape).padding(3.dp)) {
                     Box(Modifier.size(62.dp).clip(CircleShape).background(p.background), contentAlignment = Alignment.Center) {
-                        Text(artistName.take(1).uppercase(), color = p.accent, fontSize = 30.sp, fontFamily = FontFamily.Serif)
+                        Text(artistName.take(1).uppercase(), color = p.accent, fontSize = 30.sp, fontFamily = StudioFonts.Serif)
                         if (!avatarKey.isNullOrEmpty()) {
                             ProfileImage(ProfileImageStore.Resource(SocialConfig.mediaUrl(avatarKey), ProfileImageStore.Kind.AVATAR), Modifier.size(62.dp))
                         }
                     }
                 }
                 Column {
-                    Text(artistName, color = p.ink, fontSize = 30.sp, fontFamily = FontFamily.Serif, lineHeight = 34.sp)
-                    Text("@$username", color = p.muted, fontSize = 15.sp, fontFamily = FontFamily.Monospace)
+                    Text(artistName, color = p.ink, fontSize = 30.sp, fontFamily = StudioFonts.Serif, lineHeight = 34.sp)
+                    Text("@$username", color = p.muted, fontSize = 15.sp, fontFamily = StudioFonts.Mono)
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -126,7 +126,7 @@ private fun RowScope.Stat(name: String, count: Int?, spokenName: String? = null,
             stateDescription = count?.toString() ?: "Unavailable"
         }.then(if (tag != null) Modifier.testTag(tag) else Modifier),
     ) {
-        Text(count?.let(::compactCount) ?: "–", color = p.ink, fontSize = 19.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(count?.let(::compactCount) ?: "–", color = p.ink, fontSize = 19.sp, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, maxLines = 1)
         Text(name, color = p.muted, fontSize = 11.sp, maxLines = 1)
     }
 }

@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.account
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,7 +51,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -234,7 +234,7 @@ private fun Spotlight(video: Video, onClick: () -> Unit) {
         Box(Modifier.size(width = 60.dp, height = 69.dp).clip(RoundedCornerShape(9.dp))) { Thumbnail(video) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             ProfileEyebrow("LATEST PERFORMANCE")
-            Text(clipTitle(video), color = p.ink, fontSize = 20.sp, fontFamily = FontFamily.Serif, maxLines = 2)
+            Text(clipTitle(video), color = p.ink, fontSize = 20.sp, fontFamily = StudioFonts.Serif, maxLines = 2)
             (video.soundSetup?.instrumentName ?: video.instrument)?.takeIf { it.isNotEmpty() }?.let { Text(it, color = p.muted, fontSize = 12.sp, maxLines = 1) }
             video.viewCount?.let { Text(viewsLabel(it), color = p.muted, fontSize = 12.sp) }
         }

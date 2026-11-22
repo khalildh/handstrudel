@@ -1,5 +1,7 @@
 package com.handstrudel.ui.social.feed
 
+import androidx.compose.material.icons.filled.Sync
+import com.handstrudel.ui.theme.StudioFonts
 import android.view.LayoutInflater
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
@@ -42,7 +44,6 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -264,7 +265,7 @@ private fun PostControls(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.GraphicEq, null, tint = p.mediaAccent, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(video.instrument, color = p.mediaAccent, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                Text(video.instrument, color = p.mediaAccent, fontSize = 12.sp, fontFamily = StudioFonts.Mono)
             }
         }
         val sourceId = video.sourceVideoId
@@ -281,7 +282,7 @@ private fun PostControls(
 @Composable
 private fun RepostLabel(text: String, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.Repeat, null, tint = color, modifier = Modifier.size(14.dp))
+        Icon(Icons.Filled.Sync, null, tint = color, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(4.dp))
         Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }

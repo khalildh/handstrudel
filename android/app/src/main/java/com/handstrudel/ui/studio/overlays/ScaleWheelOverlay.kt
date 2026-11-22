@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.overlays
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -172,10 +173,10 @@ fun SplitScaleWheelOverlay(scaleMode: Boolean, touchEnabled: Boolean, modifier: 
                 else listOf(Color.White.copy(alpha = 0.8f), Color.White.copy(alpha = 0.5f)),
             )
             var fs = 22f
-            var layout = measurer.measure(cm.currentChordName, TextStyle(fontSize = fs.sp, fontWeight = FontWeight.Black, brush = brush), maxLines = 1, softWrap = false)
+            var layout = measurer.measure(cm.currentChordName, TextStyle(fontSize = fs.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, brush = brush), maxLines = 1, softWrap = false)
             while (layout.size.width > deadR * 2 - 8.dp.toPx() && fs > 9f) {
                 fs -= 1f
-                layout = measurer.measure(cm.currentChordName, TextStyle(fontSize = fs.sp, fontWeight = FontWeight.Black, brush = brush), maxLines = 1, softWrap = false)
+                layout = measurer.measure(cm.currentChordName, TextStyle(fontSize = fs.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, brush = brush), maxLines = 1, softWrap = false)
             }
             drawText(layout, topLeft = Offset(center.x - layout.size.width / 2f, center.y - layout.size.height / 2f))
         }
@@ -223,7 +224,7 @@ private var nextPreviewVoice = 0
 
 private fun labelStyle(size: Float, color: Color, shadowAlpha: Float = 0.6f, weight: FontWeight = FontWeight.Black) =
     TextStyle(
-        fontSize = size.sp, fontWeight = weight, color = color,
+        fontSize = size.sp, fontWeight = weight, fontFamily = StudioFonts.Rounded, color = color,
         shadow = Shadow(Color.Black.copy(alpha = shadowAlpha), blurRadius = 6f),
     )
 

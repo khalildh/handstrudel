@@ -1,5 +1,6 @@
 package com.handstrudel.ui.store
 
+import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,7 +31,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -91,9 +91,9 @@ fun PaywallContent(packId: String, store: StoreGate, onDismiss: () -> Unit, modi
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(info.name, fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.White, textAlign = TextAlign.Center,
+                Text(info.name, fontSize = 28.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.White, textAlign = TextAlign.Center,
                     modifier = Modifier.testTag("paywall-name"))
-                Text(info.description, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.5f),
+                Text(info.description, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.5f),
                     textAlign = TextAlign.Center)
             }
 
@@ -105,23 +105,23 @@ fun PaywallContent(packId: String, store: StoreGate, onDismiss: () -> Unit, modi
                 info.items.forEach { item ->
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         CheckCircle(size = 16.dp)
-                        Text(item, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.9f))
+                        Text(item, fontSize = 15.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = Color.White.copy(alpha = 0.9f))
                     }
                 }
             }
 
             when {
                 !store.isConfigured -> Text(
-                    StoreCopy.UNAVAILABLE, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                    StoreCopy.UNAVAILABLE, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded,
                     color = Color.White.copy(alpha = 0.6f), textAlign = TextAlign.Center,
                     modifier = Modifier.testTag("paywall-unavailable").padding(horizontal = 24.dp),
                 )
                 product != null -> Text(
-                    product.displayPrice, fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                    product.displayPrice, fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Mono,
                     color = StoreColors.green, modifier = Modifier.testTag("paywall-price").padding(top = 8.dp),
                 )
                 state.isLoading -> CircularProgressIndicator(Modifier.size(22.dp), color = StoreColors.green, strokeWidth = 2.dp)
-                else -> Text("---", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                else -> Text("---", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Mono,
                     color = StoreColors.green, modifier = Modifier.padding(top = 8.dp))
             }
         }
@@ -159,7 +159,7 @@ fun PaywallContent(packId: String, store: StoreGate, onDismiss: () -> Unit, modi
                 if (purchasing) {
                     CircularProgressIndicator(Modifier.size(22.dp), color = Color.Black, strokeWidth = 2.dp)
                 } else {
-                    Text(if (unlocked) "UNLOCKED" else "UNLOCK", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                    Text(if (unlocked) "UNLOCKED" else "UNLOCK", fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, color = Color.Black)
                 }
             }
 
