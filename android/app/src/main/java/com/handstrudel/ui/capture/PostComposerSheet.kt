@@ -116,7 +116,11 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 AndroidView(
-                    factory = { PlayerView(it).apply { this.player = player } },
+                    factory = {
+                        // TextureView layout so the scrolling sheet clips the video.
+                        (android.view.LayoutInflater.from(it).inflate(com.handstrudel.R.layout.capture_draft_player, null) as PlayerView)
+                            .apply { useController = true; this.player = player }
+                    },
                     modifier = Modifier.height(360.dp).fillMaxWidth(0.55f).clip(RoundedCornerShape(14.dp)).background(Color.Black),
                 )
                 OutlinedTextField(

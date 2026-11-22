@@ -47,7 +47,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.handstrudel.ui.theme.StudioFonts
 import kotlinx.coroutines.delay
@@ -102,10 +101,7 @@ internal fun DraftPreviewPlayer(player: Player, modifier: Modifier = Modifier) {
     ) {
         AndroidView(
             factory = {
-                PlayerView(it).apply {
-                    useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    setShutterBackgroundColor(android.graphics.Color.BLACK)
+                (android.view.LayoutInflater.from(it).inflate(com.handstrudel.R.layout.capture_draft_player, null) as PlayerView).apply {
                     this.player = player
                 }
             },
