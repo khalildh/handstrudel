@@ -246,10 +246,10 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
 
         // Manual octave steppers (finger octave off).
         if (!fingerOctave) {
-            RoundIconButton(Icons.Filled.KeyboardArrowDown, "Octave down", Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.1f)) {
+            RoundIconButton(StudioIcons.ChevronDown, "Octave down", Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.1f)) {
                 if (baseOctave > 1) engine.setGridBaseOctave(baseOctave - 1)
             }
-            RoundIconButton(Icons.Filled.KeyboardArrowUp, "Octave up", Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.1f)) {
+            RoundIconButton(StudioIcons.ChevronUp, "Octave up", Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.1f)) {
                 if (baseOctave < 6) engine.setGridBaseOctave(baseOctave + 1)
             }
         }
@@ -267,7 +267,7 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
 
         // Finger octave toggle (iOS "hand.raised.fingers.spread" / "hand.raised.slash").
         RoundIconButton(
-            if (fingerOctave) Icons.Filled.PanTool else Icons.Outlined.DoNotTouch,
+            if (fingerOctave) StudioIcons.HandRaised else StudioIcons.HandRaisedSlash,
             "Finger octave",
             if (fingerOctave) colors.green else Color.White.copy(alpha = 0.5f),
             if (fingerOctave) colors.green.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.1f),
@@ -288,8 +288,10 @@ fun GridQuickBar(modifier: Modifier = Modifier) {
                     },
                 contentAlignment = Alignment.Center,
             ) {
+                // iOS 12 pt bold SF Rounded: Nunito's Bold is lighter and its digits smaller,
+                // so use its ExtraBold (wght 800) at 13.5 sp to match the measured glyphs.
                 Text(
-                    "$range", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = StudioFonts.Rounded,
+                    "$range", fontSize = 13.5.sp, fontWeight = FontWeight.ExtraBold, fontFamily = StudioFonts.Rounded,
                     color = if (selected) Color.Black else Color.White.copy(alpha = 0.6f),
                 )
             }

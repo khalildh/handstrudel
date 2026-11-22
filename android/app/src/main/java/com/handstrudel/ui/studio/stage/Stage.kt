@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -172,16 +173,21 @@ fun Stage() {
 
     Box(Modifier.fillMaxSize().background(Color.Black).testTag("stage")) {
         // ---- Backdrop ----
-        if (playInput == PlayInput.AIR && cameraIssue == null) {
+        if (playInput == PlayInput.AIR) {
+            // iOS `performanceBackdrop` shows the camera layer for air input whether or not the
+            // camera came up (a camera that fails to start is just black, with the recovery
+            // banner on top); the glow is only for touch input.
             // iOS filters the ZStack of camera + colour overlay, so the matrix tints the overlay too.
             Box(Modifier.fillMaxSize().cameraFilterEffect(filter)) {
-                CameraPreview(modifier = Modifier.fillMaxSize(), handTracker = engine.handTracker)
+                if (cameraIssue == null) CameraPreview(modifier = Modifier.fillMaxSize(), handTracker = engine.handTracker)
                 CameraFilterOverlay(filter, Modifier.fillMaxSize())
             }
         } else {
+            // iOS `RadialGradient(..., startRadius: 10, endRadius: 350)` in points.
+            val glowRadius = with(LocalDensity.current) { 350.dp.toPx() }
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.radialGradient(listOf(palette.mediaAccent.copy(alpha = 0.11f), Color.Black), radius = 1050f),
+                    Brush.radialGradient(listOf(palette.mediaAccent.copy(alpha = 0.11f), Color.Black), radius = glowRadius),
                 ),
             )
         }
@@ -446,7 +452,7 @@ private fun CameraInputStatus(input: PlayInput, issue: CameraIssue?, swipe: Modi
                     .testTag("touch-camera-off"),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                Icon(Icons.Filled.VideocamOff, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                Icon(StudioIcons.VideoSlash, null, tint = Color.White, modifier = Modifier.size(16.dp))
                 Text("Camera off", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
             }
         }
