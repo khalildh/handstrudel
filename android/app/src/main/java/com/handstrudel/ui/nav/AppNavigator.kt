@@ -5,6 +5,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.handstrudel.models.SoundSetup
 import com.handstrudel.social.model.PerformanceLink
 import com.handstrudel.social.model.Video
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** The three tabs. Music is the default. */
@@ -17,6 +18,12 @@ enum class Destination { Feed, Music, Account }
 interface AppNavigator {
     val destination: StateFlow<Destination>
     fun select(d: Destination)
+
+    /**
+     * iOS `startingSession`: true from Start until the engine runs or errors, including
+     * while the camera permission dialog is up. Music home disables Start meanwhile.
+     */
+    val isStartingSession: StateFlow<Boolean> get() = NOT_STARTING
 
     /**
      * iOS `startSession`. With [setup]: apply it (if entitled) and start in its mode; if it
@@ -48,6 +55,8 @@ interface AppNavigator {
      */
     fun requestPermission(permission: String, onResult: (granted: Boolean) -> Unit) = onResult(false)
 }
+
+private val NOT_STARTING: StateFlow<Boolean> = MutableStateFlow(false)
 
 val LocalAppNavigator: ProvidableCompositionLocal<AppNavigator> =
     staticCompositionLocalOf { error("LocalAppNavigator not provided") }
