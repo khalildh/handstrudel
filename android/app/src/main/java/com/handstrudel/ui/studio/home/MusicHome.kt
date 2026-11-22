@@ -11,6 +11,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,11 +36,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.ArrowOutward
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Piano
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Movie
@@ -170,10 +176,10 @@ fun MusicHome() {
                 // Title.
                 Column(verticalArrangement = Arrangement.spacedBy(17.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Filled.GraphicEq, null, tint = palette.accent, modifier = Modifier.size(16.dp))
+                        Icon(StudioIcons.Waveform, null, tint = palette.accent, modifier = Modifier.size(16.dp))
                         Text("handstrudel", fontSize = 15.sp, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, color = palette.ink)
                         Spacer(Modifier.weight(1f))
-                        CircleIconButton(Icons.Outlined.Palette, "Appearance", "music-appearance", filled = true) {
+                        CircleIconButton(Icons.Outlined.Palette, "Appearance", "music-appearance", filled = true, iconSize = 23.dp) {
                             stopPreview(); showAppearance = true
                         }
                     }
@@ -211,7 +217,7 @@ fun MusicHome() {
                         Box(
                             Modifier.size(44.dp).clip(CircleShape).background(palette.accent.copy(alpha = 0.09f)),
                             contentAlignment = Alignment.Center,
-                        ) { Icon(Icons.Filled.Tune, null, tint = palette.accent, modifier = Modifier.size(20.dp)) }
+                        ) { Icon(StudioIcons.SliderHorizontal3, null, tint = palette.accent, modifier = Modifier.size(22.dp)) }
                     }
                 }
 
@@ -221,13 +227,13 @@ fun MusicHome() {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         LibraryShortcut("Private drafts", StudioIcons.FilmStack, "private-drafts-button", Modifier.fillMaxWidth()) { showDrafts = true }
                         LibraryShortcut("Presets", StudioIcons.SquareStack, "music-presets-button", Modifier.fillMaxWidth()) { showSetups = true }
-                        LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.fillMaxWidth()) { showLoops = true }
+                        LibraryShortcut("Loops", StudioIcons.Repeat, "music-loop-shelf", Modifier.fillMaxWidth()) { showLoops = true }
                     }
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         LibraryShortcut("Private drafts", StudioIcons.FilmStack, "private-drafts-button", Modifier.weight(1f)) { showDrafts = true }
                         LibraryShortcut("Presets", StudioIcons.SquareStack, "music-presets-button", Modifier.weight(1f)) { showSetups = true }
-                        LibraryShortcut("Loops", Icons.Filled.Repeat, "music-loop-shelf", Modifier.weight(1f)) { showLoops = true }
+                        LibraryShortcut("Loops", StudioIcons.Repeat, "music-loop-shelf", Modifier.weight(1f)) { showLoops = true }
                     }
                 }
             }
@@ -354,14 +360,15 @@ private fun InstrumentBrowser(
             CircleIconButton(
                 if (isPreviewing) Icons.Filled.Stop else Icons.AutoMirrored.Outlined.VolumeUp,
                 if (isPreviewing) "Stop instrument preview" else "Preview instrument",
-                "studio-instrument-preview", filled = false, enabled = enabled, onClick = onTogglePreview,
+                "studio-instrument-preview", filled = false, enabled = enabled, iconSize = 21.dp, onClick = onTogglePreview,
             )
         }
     }
 }
 
 @Composable
-private fun CircleIconButton(icon: ImageVector, label: String, tag: String, filled: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+// iOS glyphs: paintpalette 17 pt semibold (~22 pt wide), speaker.wave.2 14 pt semibold (~19 pt).
+private fun CircleIconButton(icon: ImageVector, label: String, tag: String, filled: Boolean, enabled: Boolean = true, iconSize: androidx.compose.ui.unit.Dp = 18.dp, onClick: () -> Unit) {
     val palette = LocalStudioPalette.current
     Box(
         Modifier.size(44.dp).clip(CircleShape)
@@ -370,7 +377,7 @@ private fun CircleIconButton(icon: ImageVector, label: String, tag: String, fill
             .clickable(enabled = enabled, onClick = onClick)
             .testTag(tag).semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = palette.accent, modifier = Modifier.size(18.dp)) }
+    ) { Icon(icon, null, tint = palette.accent, modifier = Modifier.size(iconSize)) }
 }
 
 @Composable
@@ -380,8 +387,29 @@ private fun LibraryShortcut(title: String, icon: ImageVector, tag: String, modif
         modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).testTag(tag).padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = palette.muted, modifier = Modifier.size(16.dp))
-        Text(" $title", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.muted, maxLines = 2)
+        // iOS `Label` at `.subheadline.weight(.semibold)`: the SF glyph is ~1.25x the text
+        // and sits ~8 pt from a centred title that wraps (e.g. "Private drafts").
+        Icon(icon, null, tint = palette.muted, modifier = Modifier.size(19.dp))
+        Spacer(Modifier.width(8.dp))
+        ShrinkWrappedText(title, TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.muted, textAlign = TextAlign.Center))
+    }
+}
+
+/**
+ * A wrapped Compose `Text` keeps the full available width, which pushed the shortcut icon away
+ * from a two-line title. SwiftUI's `Label` hugs the widest line, so measure the lines and size
+ * the text to them.
+ */
+@Composable
+private fun RowScope.ShrinkWrappedText(text: String, style: TextStyle) {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    BoxWithConstraints(Modifier.weight(1f, fill = false)) {
+        val layout = remember(text, style, constraints.maxWidth) {
+            measurer.measure(text, style, maxLines = 2, constraints = Constraints(maxWidth = constraints.maxWidth))
+        }
+        val widest = (0 until layout.lineCount).maxOfOrNull { layout.getLineRight(it) - layout.getLineLeft(it) } ?: 0f
+        Text(text, style = style, maxLines = 2, modifier = Modifier.width(with(density) { kotlin.math.ceil(widest).toDp() }))
     }
 }
 
@@ -403,7 +431,7 @@ fun SoundSetupSheet(onDismiss: () -> Unit) {
         ) {
             StudioSettingsHero(instrument.name, key, scale, progression, instrument)
             StudioSettingsPanel {
-                StudioSettingRow("Instrument", Icons.Filled.GraphicEq, instrument.name, Modifier.testTag("sounds-instrument")) { picker = "instrument" }
+                StudioSettingRow("Instrument", StudioIcons.Waveform, instrument.name, Modifier.testTag("sounds-instrument")) { picker = "instrument" }
                 StudioSettingsDivider()
                 StudioKeyMenu(key) { engine.setKey(it) }
                 StudioSettingsDivider()
