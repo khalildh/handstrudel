@@ -85,30 +85,3 @@ fun AccountSettingsMenu(signedIn: Boolean, onOpen: (AccountSheet) -> Unit, onSig
     }
 }
 
-/**
- * iOS `UsageAnalyticsSettings`. TODO(shell): swap for shell's `UsageAnalyticsScreen` once it
- * exists (spec WS5 → "Usage Analytics opens shell's UsageAnalyticsScreen"); this binds the same
- * `AppAnalytics` opt-in so behaviour is identical meanwhile.
- */
-@Composable
-fun UsageAnalyticsSheet(onDismiss: () -> Unit) {
-    val analytics = LocalAppServices.current.analytics
-    val enabled by analytics.isEnabled.collectAsState()
-    val p = LocalStudioPalette.current
-    SocialScreen("Usage Analytics", onDismiss) {
-        Column(Modifier.padding(20.dp)) {
-            Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(p.surface).padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Text("Share usage analytics", color = p.ink, modifier = Modifier.weight(1f))
-                Switch(checked = enabled, onCheckedChange = {
-                    analytics.setEnabled(it)
-                    if (it) analytics.record(AppAnalyticsEvent.ACTIVE_DAY)
-                })
-            }
-            Text(
-                "Help improve HandStrudel by sharing counts of app use, first notes, and recordings. We don't send audio, camera or gesture data, custom scale names, or account or device IDs. You can turn this off at any time.",
-                color = p.muted, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
-    }
-}

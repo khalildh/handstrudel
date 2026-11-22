@@ -1,5 +1,8 @@
 package com.handstrudel.ui
 
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.semantics.semantics
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -67,6 +70,7 @@ import kotlinx.coroutines.delay
  * the hidden Strudel WebView, and the global notice. Deep-link sheets and the alert sit
  * above. Also drives the status bar, system back and the in-app review prompt.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun HandStrudelApp(services: AppServices, navigator: DefaultAppNavigator) {
     val theme by services.prefs.studioTheme.collectAsState()
@@ -87,7 +91,7 @@ fun HandStrudelApp(services: AppServices, navigator: DefaultAppNavigator) {
             SystemBars(hideStatusBar = running || feedFullscreen, lightBackground = theme.isLight && !forceDark && !running)
             BackHandler(enabled = running || destination != Destination.Music) { navigator.handleBack() }
 
-            Box(Modifier.fillMaxSize().background(if (running || feedFullscreen) Color.Black else palette.background)) {
+            Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }.background(if (running || feedFullscreen) Color.Black else palette.background)) {
                 if (socialConfigured) {
                     val feedVisible = destination == Destination.Feed && !running
                     Box(Modifier.fillMaxSize().alpha(if (feedVisible) 1f else 0f).then(if (feedVisible) Modifier else Modifier.clearAndSetSemantics {})) {

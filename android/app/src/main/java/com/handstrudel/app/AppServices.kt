@@ -41,7 +41,8 @@ class AppServices(
             val app = context.applicationContext
             val prefsStore = SharedPrefsStore(app)
             val prefs = StoreBackedAppPrefs(prefsStore)
-            val auth: AuthSession = SignedOutAuthSession()                 // social
+            val auth: AuthSession =                                        // social
+                com.handstrudel.social.SocialServices.getOrNull(app)?.auth ?: SignedOutAuthSession()
             val store: StoreGate = StoreManager.create(app)                // store
             store.bind(auth.userId)
             val analytics = createAnalytics(prefs, prefsStore)              // shell

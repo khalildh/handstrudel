@@ -154,7 +154,7 @@ fun AccountTab() {
     if (showEdit) EditProfileSheet(onDismiss = { showEdit = false })
     when (sheet) {
         AccountSheet.APPEARANCE -> StudioThemePickerSheet(onDismiss = { sheet = null })
-        AccountSheet.USAGE_ANALYTICS -> UsageAnalyticsSheet(onDismiss = { sheet = null })
+        AccountSheet.USAGE_ANALYTICS -> com.handstrudel.ui.settings.UsageAnalyticsScreen(onDismiss = { sheet = null })
         AccountSheet.BLOCKED -> BlockedUsersScreen(onDismiss = { sheet = null })
         AccountSheet.DELETE_ACCOUNT -> DeleteAccountDialog(onDismiss = { sheet = null }, onConfirm = {
             sheet = null

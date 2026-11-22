@@ -637,7 +637,7 @@ class CaptureControllerImpl(
                 backingAutoplayPending = true
                 val setup: SoundSetup? = source.soundSetup?.takeIf { sound -> sound.requiredPacks.all { store.isUnlocked(it) } }
                 navigator?.startSession(setup, useCurrentSoundAsFallback = true)
-                    ?: Log.w(TAG, "prepareBacking: no navigator attached") // TODO(shell): call capture.attach(navigator)
+                    ?: Log.w(TAG, "prepareBacking: no navigator attached")
             } catch (e: CancellationException) {
                 if (backing == null) _state.update { it.copy(backing = null) }
                 throw e
