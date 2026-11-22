@@ -518,8 +518,10 @@ class CaptureControllerImpl(
     fun onReviewShown() { if (engine.isRunning.value) engine.pause() }
 
     fun requestRetake() {
+        // Clearing reviewingDraftId removes the sheet without its onDismissRequest, so run the
+        // dismissal here: resume the engine, then start the new take (iOS retakeRequested).
         retakeRequested = true
-        _ui.update { it.copy(reviewingDraftId = null) }
+        onReviewDismissed()
     }
 
     fun onReviewDismissed() {
