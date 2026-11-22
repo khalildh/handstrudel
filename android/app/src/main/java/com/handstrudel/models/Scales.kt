@@ -36,7 +36,7 @@ data class CustomScale(
             val trimmed = name.trim()
             val scalars = trimmed.codePointCount(0, trimmed.length)
             if (trimmed.isEmpty() || scalars > 40) return null
-            if (trimmed.codePoints().anyMatch { Character.getType(it) == Character.CONTROL.toInt() }) return null
+            if (TextRules.containsControl(trimmed)) return null // Cc + Cf, like `CharacterSet.controlCharacters`
             if (intervals.size !in 3..12 || intervals.first() != 0) return null
             if (intervals != intervals.sorted() || intervals.last() >= 12) return null
             if (intervals.toSet().size != intervals.size) return null

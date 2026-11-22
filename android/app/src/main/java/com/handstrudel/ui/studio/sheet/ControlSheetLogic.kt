@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.sheet
 
+import com.handstrudel.models.TextRules
 import com.handstrudel.engine.StudioMode
 import com.handstrudel.models.ChordProgression
 import com.handstrudel.models.NOTES
@@ -105,7 +106,7 @@ object ControlSheetLogic {
     // ---- Presets ------------------------------------------------------------------
 
     /** iOS `SoundSetupsView.cleanName`: trimmed, first 40 characters. */
-    fun cleanPresetName(name: String): String = name.trim().take(40)
+    fun cleanPresetName(name: String): String = TextRules.prefixGraphemes(name.trim(), 40)
 
     /** iOS: Save disabled when the name is empty or the same (name, sound) exists. */
     fun canSavePreset(name: String, sound: SoundSetup, setups: List<NamedSoundSetup>): Boolean {
@@ -124,7 +125,7 @@ object ControlSheetLogic {
         if (imported == 0) "These presets are already saved on this device." else "Imported $imported of $total presets."
 
     /** iOS `RecordedLoop.cleanName`: control characters dropped, trimmed, ≤40. */
-    fun cleanLoopName(value: String): String = value.filterNot { it.isISOControl() }.trim().take(40)
+    fun cleanLoopName(value: String): String = com.handstrudel.engine.persistence.cleanLoopName(value)
 
     /** iOS `"%.1f"s` loop duration. */
     fun loopDuration(seconds: Double): String = String.format(Locale.US, "%.1fs", seconds)
