@@ -456,9 +456,13 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
             Column(
                 Modifier.align(Alignment.TopCenter).fillMaxWidth()
                     .then(if (hasVideos && !isFullscreen) Modifier.background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.8f), Color.Black.copy(alpha = 0.38f), Color.Transparent))) else Modifier)
+                    // Measure the header's full extent from the top of the screen, as the rail,
+                    // toast and empty state are placed in this full-screen box. Measured after the
+                    // paddings it missed the status bar and the 7 dp top padding, so at large font
+                    // sizes the action rail was allowed to grow up into the mute/fullscreen row.
+                    .onSizeChanged { headerHeight = with(density) { it.height.toDp() } }
                     .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 16.dp).padding(top = 7.dp)
-                    .onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
+                    .padding(horizontal = 16.dp).padding(top = 7.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 if (!isFullscreen) {
