@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -417,7 +418,15 @@ fun CommentsSheet(
                                     modifier = Modifier.weight(1f).focusRequester(composerFocus).testTag("comment-text"),
                                 )
                                 Box(
-                                    Modifier.size(44.dp).clip(CircleShape).background(p.accent).alpha(if (valid) 1f else 0.45f)
+                                    Modifier.size(44.dp)
+                                        // One layer for the circle clip and the dimming, applied to the
+                                        // whole button like iOS `.opacity`. With `.clip()` then
+                                        // `.background()` then `.alpha()` the circle sat in the clip layer
+                                        // and the alpha layer nested inside it; at alpha 1 (a valid draft)
+                                        // the circle was dropped from the frame, so only the empty
+                                        // tappable area was left.
+                                        .graphicsLayer { alpha = if (valid) 1f else 0.45f; shape = CircleShape; clip = true }
+                                        .background(p.accent)
                                         .clickable(enabled = !busy && valid, onClick = ::submit)
                                         .semantics { contentDescription = "Post comment" }.testTag("post-comment"),
                                     contentAlignment = Alignment.Center,
