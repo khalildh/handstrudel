@@ -199,6 +199,7 @@ fun PerformanceDetail(
                     clip, isCurrent = true, aspectFit = true,
                     onToggleFullscreenControls = if (isFullscreen) ({ showsFullscreenControls = !showsFullscreenControls }) else null,
                     onSwipe = onSwipe,
+                    showsFullscreenControls = showsFullscreenControls,
                 )
                 if (!isFullscreen || showsFullscreenControls) {
                     PlaybackControls(clip, showsPause = isFullscreen, muted = muted, toggleMute = { prefs.setFeedMuted(!muted) },

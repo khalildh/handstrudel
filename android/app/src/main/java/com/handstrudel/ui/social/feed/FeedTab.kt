@@ -390,6 +390,8 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
                     creator = { creatorVideo = video },
                     showSound = { soundVideo = video },
                     source = ::openSource,
+                    // iOS pager "Next video" / "Previous video" accessibility actions.
+                    onAccessibilityMove = { movePage(it) },
                 )
             }
         } else {
