@@ -68,7 +68,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -261,7 +263,13 @@ internal fun DraftEditor(
             }
         }
         AndroidView(
-            factory = { PlayerView(it).apply { this.player = player; setShowNextButton(false); setShowPreviousButton(false) } },
+            factory = {
+                PlayerView(it).apply {
+                    // Half-speed takes preview at 2×: show the time bar in output time, like iOS.
+                    this.player = if (draft.outputScale < 1) TimeScaledPlayer(player, draft.outputScale) else player
+                    setShowNextButton(false); setShowPreviousButton(false)
+                }
+            },
             modifier = Modifier.fillMaxWidth().height(330.dp).clip(RoundedCornerShape(16.dp)).background(Color.Black).testTag("draft-player"),
         )
         if (draft.recordedAtHalfSpeed == true) {
@@ -585,6 +593,16 @@ private fun TrimHandle(
             .semantics {
                 contentDescription = if (isStart) "Trim start" else "Trim end"
                 stateDescription = String.format(Locale.US, "%.2f seconds", value * outputScale)
+                // iOS `accessibilityAdjustableAction`: increment/decrement by 0.1 s of output, committed.
+                val step = 0.1 / outputScale
+                customActions = listOf(1, -1).map { direction ->
+                    CustomAccessibilityAction(if (direction > 0) "0.1 seconds later" else "0.1 seconds earlier") {
+                        val next = latestTrim.moving(edge, (if (isStart) latestTrim.start else latestTrim.end) + direction * step)
+                        if (next == latestTrim) return@CustomAccessibilityAction false
+                        latestOnEdit(next, if (isStart) next.start else next.end, true)
+                        true
+                    }
+                }
             }
             .testTag(if (isStart) "draft-trim-start" else "draft-trim-end")
             .pointerInputDrag(

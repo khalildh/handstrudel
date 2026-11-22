@@ -3,6 +3,7 @@ package com.handstrudel.ui.capture
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -118,12 +119,13 @@ internal fun LoopShelfSheetView(onDismiss: () -> Unit) {
                 fontSize = 15.sp, color = palette.muted,
             )
             Text("New recording length", fontSize = 13.sp, color = palette.muted)
-            Row(Modifier.testTag("loop-recording-length"), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // iOS Picker labels ("1 bar", "N bars"); six labelled chips need to scroll on a phone.
+            Row(Modifier.testTag("loop-recording-length").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 LOOP_BAR_OPTIONS.forEach { option ->
                     FilterChip(
                         selected = bars == option,
                         onClick = { engine.setLoopRecordingBars(option) },
-                        label = { Text(if (option == 1) "1 bar" else "$option", fontSize = 12.sp) },
+                        label = { Text(if (option == 1) "1 bar" else "$option bars", fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(selectedContainerColor = palette.accent, selectedLabelColor = palette.onAccent, labelColor = palette.ink),
                     )
                 }

@@ -42,9 +42,27 @@ class DraftExport private constructor(val file: File, val audioOnly: Boolean) {
     companion object {
         fun exportsDir(context: Context): File = File(context.cacheDir, "exports").apply { mkdirs() }
 
-        /** Removes copies left behind by a previous run (share sheets have no completion callback). */
-        fun sweep(context: Context) {
-            exportsDir(context).listFiles()?.forEach { it.delete() }
+        /**
+         * How long a copy handed to another app is kept. Android's share sheet returns as soon as
+         * a target is picked, and the target may still be reading the `content://` URI, so copies
+         * are not deleted on return (iOS deletes once the share sheet has gone, when the target has
+         * already taken the file). They're removed by [sweep] once older than this.
+         */
+        const val SHARED_COPY_LIFETIME_MS: Long = 60 * 60 * 1000L
+
+        /**
+         * Removes copies older than [maxAgeMs]: at launch (copies left by a previous run) and
+         * before each share. Newer copies may still be in use by another app or by this one.
+         */
+        fun sweep(context: Context, maxAgeMs: Long = SHARED_COPY_LIFETIME_MS, nowMs: Long = System.currentTimeMillis()) {
+            sweepOlderThan(exportsDir(context), maxAgeMs, nowMs)
+        }
+
+        /** Deletes the files directly in [dir] last modified more than [maxAgeMs] before [nowMs]. */
+        fun sweepOlderThan(dir: File, maxAgeMs: Long, nowMs: Long) {
+            dir.listFiles()?.forEach { file ->
+                if (file.isFile && nowMs - file.lastModified() > maxAgeMs) file.delete()
+            }
         }
 
         suspend fun make(context: Context, store: RecordingDrafts, draft: RecordingDraft, audioOnly: Boolean = false): DraftExport {
@@ -168,6 +186,9 @@ object Media {
         output.delete()
         suspendCancellableCoroutine { cont ->
             val builder = Transformer.Builder(context)
+                // Encode portrait frames as portrait (720×H, no rotation flag), like iOS bakes the
+                // transform into the pixels. Without it Media3 encodes H×720 with a 90° matrix.
+                .setPortraitEncodingEnabled(true)
                 .setVideoMimeType(MimeTypes.VIDEO_H264)
                 .setAudioMimeType(MimeTypes.AUDIO_AAC)
                 .addListener(object : Transformer.Listener {

@@ -192,10 +192,17 @@ dependencies {
     // --- end studio-ui ---
 
     // --- capture ---
-    implementation("androidx.media3:media3-transformer:1.4.1")
-    implementation("androidx.media3:media3-effect:1.4.1")
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
+    // Media3 1.5.1: Transformer.Builder.setPortraitEncodingEnabled (posts and trimmed or
+    // half-speed exports are encoded upright, like iOS). Pure Java, so the Kotlin 2.0.21 pin is
+    // unaffected. Gradle resolves social's 1.4.1 media3 lines up to this version; the constraint
+    // keeps datasource-okhttp (declared only there) on the same release, as Media3 requires.
+    implementation("androidx.media3:media3-transformer:1.5.1")
+    implementation("androidx.media3:media3-effect:1.5.1")
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-ui:1.5.1")
+    constraints {
+        implementation("androidx.media3:media3-datasource-okhttp:1.5.1")
+    }
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("androidx.lifecycle:lifecycle-service:2.8.7")

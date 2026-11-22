@@ -133,6 +133,8 @@ class CaptureControllerImpl(
 
     init {
         DraftExport.sweep(context)
+        // Nothing is in flight at launch: backing audio and loop captures left by a crash are stale.
+        CaptureTempFiles.sweepCrashLeftovers(context)
         (context.applicationContext as? Application)?.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) { startedActivities++ }
             override fun onActivityStopped(activity: Activity) {
@@ -202,7 +204,8 @@ class CaptureControllerImpl(
         backing?.pause()
         setBackingPlaying(false)
         when {
-            recording -> stopRecording(interrupted = true)
+            // iOS saves silently when the app goes to the background: no alert, no review.
+            recording -> stopRecording()
             _state.value.isLoopCapturing && activeLoop != null -> finishAudioLoop()
             // The consent and permission dialogs are activities too; don't cancel while they're up.
             !busy && _ui.value.consent == null -> cancelCountdown()
@@ -400,7 +403,7 @@ class CaptureControllerImpl(
             recorder = started
             _state.update { it.copy(isBusy = false, isRecording = true) }
             analytics.record(AppAnalyticsEvent.RECORDING_STARTED)
-            if (!isForeground) { stopRecording(interrupted = true); return@launch }
+            if (!isForeground) { stopRecording(); return@launch }
             if (draft.recordedAtHalfSpeed == true && !engine.supportsHalfSpeedRecording) { stopRecording(); return@launch }
             if (!started.hasAudio) {
                 navigator?.showNotice("Recording without app sound. Allow microphone access in Settings so Android can capture HandStrudel's audio.")
@@ -444,10 +447,14 @@ class CaptureControllerImpl(
             when {
                 !completed -> {
                     drafts.discardUnfinished(draft)
-                    recordingError("Couldn’t save this take. ${(stopError?.message ?: "")}".trim())
+                    // iOS: the delegate interruption vs. a `stopRecording` error.
+                    val prefix = if (interrupted) "Recording stopped before the take could be saved." else "Couldn’t save this take."
+                    recordingError("$prefix ${(stopError?.message ?: "")}".trim())
                 }
-                interrupted || stopError != null ->
+                interrupted ->
                     recordingError("Recording interrupted. Check Private drafts for the saved take.")
+                stopError != null ->
+                    recordingError("Recording was interrupted. Check Private drafts for the saved take.")
                 else -> {
                     if (hadAudio && !heardSound) {
                         navigator?.showNotice("This take has no app sound. Some devices block audio capture.")
@@ -521,7 +528,7 @@ class CaptureControllerImpl(
                 recordingError("Audio capture isn't available right now.")
                 return@launch
             }
-            val capture = LoopCapture(File(File(context.cacheDir, "loop-capture"), "${UUID.randomUUID()}.wav"), audio)
+            val capture = LoopCapture(File(CaptureTempFiles.loopCaptureDir(context), "${UUID.randomUUID()}.wav"), audio)
             try {
                 capture.start()
             } catch (e: Exception) {
@@ -627,6 +634,7 @@ class CaptureControllerImpl(
                 }
                 stopBacking()
                 track.setVolume(prefs.playAlongBackingVolume.value)
+                track.onError = { error -> onBackingError(track, error) }
                 backing = track
                 _state.update { it.copy(backing = BackingState(track.credit, volume = BackingTrackVolume.clamped(prefs.playAlongBackingVolume.value))) }
                 navigator?.select(Destination.Music)
@@ -662,6 +670,23 @@ class CaptureControllerImpl(
         val ok = track.play()
         setBackingPlaying(ok)
         if (!ok) soundError("Couldn't start the backing audio. Tap Play to try again.")
+    }
+
+    /**
+     * ExoPlayer reports playback failures asynchronously, after `play()` returned. Treat them
+     * like iOS treats `AVAudioPlayer.play()` returning false: block the take while recording
+     * (so it isn't shared without its backing), otherwise ask to try again.
+     */
+    private fun onBackingError(track: BackingTrack, error: Exception) {
+        if (backing !== track) return
+        Log.w(TAG, "backing playback failed", error)
+        setBackingPlaying(false)
+        if (recording) {
+            recordingError("The backing track couldn't start. Check the take before sharing.")
+            stopRecording()
+        } else {
+            soundError("Couldn't start the backing audio. Tap Play to try again.")
+        }
     }
 
     private fun stopBacking() {
