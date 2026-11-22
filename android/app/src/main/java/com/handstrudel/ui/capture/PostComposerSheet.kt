@@ -1,5 +1,6 @@
 package com.handstrudel.ui.capture
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -93,6 +94,7 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
     }
 
     ModalBottomSheet(
+        modifier = Modifier.statusBarsPadding(),
         onDismissRequest = { if (!busy) onDismiss() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !busy }),
         containerColor = palette.background,

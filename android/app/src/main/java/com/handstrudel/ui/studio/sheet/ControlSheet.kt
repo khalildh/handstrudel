@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.sheet
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.studio.common.SheetGrabber
 import com.handstrudel.ui.theme.StudioFonts
 import com.handstrudel.ui.studio.common.isAccessibilityTextSize
@@ -95,6 +96,7 @@ fun ControlSheet(onDismiss: () -> Unit, onOpenLearnPicker: () -> Unit) {
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
+        modifier = Modifier.statusBarsPadding(),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = palette.background,

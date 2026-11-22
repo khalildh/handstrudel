@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.overlays
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -90,6 +91,7 @@ fun LearnSongPicker(onPick: (songId: String) -> Unit, onDismiss: () -> Unit) {
         onDismiss()
     }
     ModalBottomSheet(
+        modifier = Modifier.statusBarsPadding(),
         onDismissRequest = onDismiss,
         sheetState = state,
         containerColor = Color.Black,

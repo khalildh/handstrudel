@@ -1,5 +1,6 @@
 package com.handstrudel.ui.theme
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -67,7 +68,7 @@ fun StudioThemePickerSheet(onDismiss: () -> Unit) {
         containerColor = palette.background,
         contentColor = palette.ink,
         dragHandle = null,
-        modifier = Modifier.testTag("appearance-sheet"),
+        modifier = Modifier.statusBarsPadding().testTag("appearance-sheet"),
     ) {
         Column(Modifier.fillMaxWidth().fillMaxHeight().navigationBarsPadding()) {
             // Inline navigation bar: centered title, "Done" as the confirmation action.

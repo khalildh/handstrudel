@@ -1,5 +1,6 @@
 package com.handstrudel.ui.store
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.theme.StudioFonts
 import android.app.Activity
 import android.content.Context
@@ -81,6 +82,7 @@ internal const val TERMS_URL = "https://handstrudel.com/terms"
 @Composable
 fun StoreScreen(onDismiss: () -> Unit, store: StoreGate = LocalAppServices.current.store) {
     ModalBottomSheet(
+        modifier = Modifier.statusBarsPadding(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color.Black,

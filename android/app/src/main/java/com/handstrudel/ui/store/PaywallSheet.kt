@@ -1,5 +1,6 @@
 package com.handstrudel.ui.store
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +53,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun PaywallSheet(packId: String, onDismiss: () -> Unit, store: StoreGate = LocalAppServices.current.store) {
     ModalBottomSheet(
+        modifier = Modifier.statusBarsPadding(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color.Black,

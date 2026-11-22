@@ -1,5 +1,6 @@
 package com.handstrudel.ui.capture
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.studio.common.SheetGrabber
 import androidx.compose.foundation.layout.fillMaxHeight
 import com.handstrudel.ui.theme.StudioFonts
@@ -100,6 +101,7 @@ internal fun LoopShelfSheetView(onDismiss: () -> Unit) {
     }
 
     ModalBottomSheet(
+        modifier = Modifier.statusBarsPadding(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = palette.background,

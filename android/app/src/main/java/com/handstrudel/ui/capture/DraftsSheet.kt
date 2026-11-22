@@ -1,5 +1,6 @@
 package com.handstrudel.ui.capture
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.theme.StudioIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,6 +64,7 @@ internal fun DraftsSheetView(openedDraftId: UUID?, onRetake: (() -> Unit)?, onDi
     }
 
     ModalBottomSheet(
+        modifier = Modifier.statusBarsPadding(),
         onDismissRequest = { if (!editorBusy) onDismiss() },
         sheetState = sheetState,
         containerColor = palette.background,

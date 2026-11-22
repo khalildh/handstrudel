@@ -1,5 +1,6 @@
 package com.handstrudel.ui.social.feed
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,7 +44,7 @@ fun FeedSoundSheet(video: Video, onDismiss: () -> Unit, onStart: (PerformanceSta
     val p = LocalStudioPalette.current
     val title = video.soundSetup?.instrumentName ?: video.instrument ?: "Sound"
     SocialMaterialTheme {
-        ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = p.background) {
+        ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.statusBarsPadding(), sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = p.background) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Sound options", color = p.ink, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))

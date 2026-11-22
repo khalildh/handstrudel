@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.common
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Lock
 import com.handstrudel.ui.theme.StudioFonts
@@ -259,6 +260,7 @@ fun StudioSheet(
     // `.presentationDragIndicator(.visible)`.
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = !mediumDetent)
     ModalBottomSheet(
+        modifier = Modifier.statusBarsPadding(),
         onDismissRequest = onDismiss,
         sheetState = state,
         containerColor = palette.background,

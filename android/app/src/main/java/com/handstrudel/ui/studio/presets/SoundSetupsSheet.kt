@@ -1,5 +1,6 @@
 package com.handstrudel.ui.studio.presets
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -146,6 +147,7 @@ fun SoundSetupsSheet(onApply: (SoundSetup) -> Unit, onDismiss: () -> Unit) {
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
+        modifier = Modifier.statusBarsPadding(),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = palette.background,

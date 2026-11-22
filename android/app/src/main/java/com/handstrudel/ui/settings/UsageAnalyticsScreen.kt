@@ -1,5 +1,6 @@
 package com.handstrudel.ui.settings
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,7 +57,7 @@ fun UsageAnalyticsScreen(onDismiss: () -> Unit) {
         containerColor = palette.background,
         contentColor = palette.ink,
         dragHandle = null,
-        modifier = Modifier.testTag("usage-analytics-sheet"),
+        modifier = Modifier.statusBarsPadding().testTag("usage-analytics-sheet"),
     ) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
