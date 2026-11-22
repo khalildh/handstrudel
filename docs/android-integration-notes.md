@@ -35,3 +35,20 @@
 - social: presetDetails TODO(engine) in PerformanceStart.kt.
 - Counts: iOS wins (144 progressions, 23 filters, 8 songs + practice).
 - Not verified: live instrument/key/progression change stuck notes; preset pack SAF import; loop record/playback with capture; real camera/speakers.
+
+## Integration (claude/android-parity-1.0.1) — resolved
+- engine: AppServices builds `HandStrudelEngine` directly; `EngineController` / `LegacyStudioEngine` deleted.
+- studio-ui switched to engine members: previewStart/NoteOn/Stop, BUNDLED_SONGS/PRACTICE ids, learn countdown,
+  melodyOctaveShift + melodyLaneCount (Scale), Zones octave rows by touch row, finger-octave dots/toggle,
+  Chords / Circle of 5ths pills, bpmIsMapped / mappedParamIds / manualValues, ParamDef.format,
+  ChordProgression.category (picker tabs) and .parse, previewPresetPack, cameraAspect.
+- CameraPreview reports bind failures (`onCameraBindFailed`) and CameraX camera-in-use (`onCameraInUse`, cleared on reopen).
+- drumPad: already correct (`drumPad(intensity = 1 - padY, complexity = padX)`); no change.
+- One `SoundSetup.presetDetails` (engine's); social/capture copies removed. PerformanceAudio uses `SocialConfig.mediaUrl`.
+- Mix > Loops has the iOS "Export WAV" button (capture's `exportLoop`). RecordingSettingsSection is padded once.
+- Stage close still calls `capture.onSessionEnded()` before `engine.stop()` (idempotent; ends a take before the engine stops).
+- Store button hidden when `!store.isConfigured`.
+- launchMode: `singleTop`. A duplicate MainActivity (created when an intent lands while a system dialog is on top:
+  camera prompt + deep link, or the MediaProjection "Share one app" relaunch) relays its intent to the live instance,
+  moves that task forward if needed (REORDER_TASKS) and finishes in onCreate. Both flows verified on an API 36 emulator.
+- Release: proguard-rules.pro keeps MediaPipe, JNA/UniFFI, @JavascriptInterface, serializers; dontwarn for AutoValue/Ktor.
