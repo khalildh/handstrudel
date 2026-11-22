@@ -1,4 +1,5 @@
 package com.handstrudel.ui.settings
+import com.handstrudel.ui.theme.IosSwitch
 
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.background
@@ -92,14 +93,7 @@ fun UsageAnalyticsScreen(onDismiss: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text("Share usage analytics", modifier = Modifier.weight(1f), color = palette.ink, fontSize = 17.sp)
-                    Switch(
-                        checked = optedIn,
-                        onCheckedChange = null,
-                        colors = SwitchDefaults.colors(
-                            checkedTrackColor = palette.accent,
-                            checkedThumbColor = palette.onAccent,
-                        ),
-                    )
+                    IosSwitch(checked = optedIn, onCheckedChange = null)
                 }
                 Text(
                     USAGE_ANALYTICS_FOOTER,

@@ -664,7 +664,7 @@ private fun EmptyState(
                 }
                 TextButton(onClick = onRefresh, modifier = Modifier.heightIn(min = 44.dp)) {
                     // iOS: a plain 17 pt Button in the feed's white (primary) tint.
-                    Text(if (error == null) "Refresh" else "Try again", color = p.ink, fontSize = 17.sp)
+                    Text(if (error == null) "Refresh" else "Try again", color = p.ink, fontSize = 17.sp, fontWeight = FontWeight.Normal)
                 }
             }
         }

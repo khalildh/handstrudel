@@ -1,4 +1,5 @@
 package com.handstrudel.ui.social.auth
+import com.handstrudel.ui.theme.IosSwitch
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -76,7 +77,7 @@ fun ProfileSetupForm(auth: AuthManager) {
             ) { offset ->
                 text.getStringAnnotations("url", offset, offset).firstOrNull()?.let { openUrl(context, it.item) } ?: run { agreed = !agreed }
             }
-            Switch(checked = agreed, onCheckedChange = { agreed = it }, modifier = Modifier.testTag("profile-agree"))
+            IosSwitch(checked = agreed, onCheckedChange = { agreed = it }, modifier = Modifier.testTag("profile-agree"), tint = p.accent)
         }
         ProfileActionButton(
             "Continue", primary = true, enabled = Profile.isValidUsername(username) && agreed && !busy,

@@ -130,7 +130,7 @@ internal fun ParamsSection() {
     val manual by engine.manualValues.collectAsState()
     val mapped = engine.mappedParamIds.toSet().ifEmpty { ControlSheetLogic.DEFAULT_MAPPED_PARAM_IDS }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader("PARAMETERS", Icons.Filled.Tune)
+        SectionHeader("PARAMETERS", StudioIcons.SliderHorizontal3)
         PARAM_DEFS.filter { it.id in mapped }.forEach { def ->
             val isLocked = def.id in locked
             val current = if (isLocked) manual[def.id] ?: def.defaultValue else smoothed[def.id] ?: def.defaultValue
@@ -193,7 +193,7 @@ private fun ParamRow(def: ParamDef, isLocked: Boolean, value: Double, onToggleLo
 internal fun DrumTrackSection(label: String, track: Int, state: DrumTrackState, paywall: PaywallHost) {
     val engine = LocalAppServices.current.engine
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader(label, Icons.Filled.Headphones, notAvailable = DRUM_LOOPS.any { it.isPremium && paywall.isLocked(it.packId) })
+        SectionHeader(label, StudioIcons.BeatsHeadphones, notAvailable = DRUM_LOOPS.any { it.isPremium && paywall.isLocked(it.packId) })
         TileGrid(DRUM_LOOPS, columns = 3) { loop ->
             val locked = loop.isPremium && paywall.isLocked(loop.packId)
             EmojiTile(

@@ -435,9 +435,9 @@ fun SoundSetupSheet(onDismiss: () -> Unit) {
                 StudioSettingsDivider()
                 StudioKeyMenu(key) { engine.setKey(it) }
                 StudioSettingsDivider()
-                StudioSettingRow("Scale", Icons.Filled.Piano, scale.displayName, Modifier.testTag("scale-picker")) { picker = "scale" }
+                StudioSettingRow("Scale", StudioIcons.PianoKeys, scale.displayName, Modifier.testTag("scale-picker")) { picker = "scale" }
                 StudioSettingsDivider()
-                StudioSettingRow("Chords", Icons.AutoMirrored.Filled.QueueMusic, progression.name, Modifier.testTag("sounds-progression")) { picker = "progression" }
+                StudioSettingRow("Chords", StudioIcons.MusicNoteList, progression.name, Modifier.testTag("sounds-progression")) { picker = "progression" }
             }
         }
     }

@@ -1,4 +1,6 @@
 package com.handstrudel.ui.social.feed
+import com.handstrudel.ui.theme.IosSlider
+import com.handstrudel.ui.theme.IosControls
 
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Row
@@ -64,7 +66,7 @@ fun FeedProgressStrip(
             } else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Slider(
+        IosSlider(
             value = (shown?.seconds ?: 0.0).toFloat(),
             valueRange = 0f..maxOf(0.001f, (shown?.duration ?: 1.0).toFloat()),
             enabled = shown != null && !failed,
@@ -73,7 +75,9 @@ fun FeedProgressStrip(
                 clip.setSeconds(it.toDouble())
             },
             onValueChangeFinished = { editing = false; clip.setEditing(false) },
-            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = p.mediaAccent, inactiveTrackColor = Color.White.copy(alpha = 0.3f)),
+            // iOS `UISlider` with only `minimumTrackTintColor` set: white thumb, dark-appearance grey track.
+            tint = p.mediaAccent,
+            inactiveTrack = IosControls.offTrack(light = false),
             modifier = Modifier.weight(1f).testTag("feed-video-progress").semantics {
                 contentDescription = "Video progress"
                 stateDescription = if (failed) "Playback unavailable" else "$elapsed of $duration"

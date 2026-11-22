@@ -21,10 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -44,33 +40,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.handstrudel.app.LocalAppServices
 import com.handstrudel.ui.theme.LocalStudioPalette
+import com.handstrudel.ui.theme.IosSlider
+import com.handstrudel.ui.theme.IosSwitch
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 
 // Small building blocks shared by the control-sheet tabs (iOS ControlSheet
 // toggles, emoji tiles with PRO badges, capsule choices, circle steppers).
 
-/** iOS `Toggle` with the 11 pt rounded label used throughout `modeSection`. */
+/**
+ * iOS `Toggle` row in `modeSection`: 11 pt medium rounded label (Nunito drawn at 11.5 sp to
+ * match SF Rounded's width) and the shared iOS switch; the row is the switch's 31 pt tall.
+ */
 @Composable
 internal fun SheetToggle(label: String, checked: Boolean, modifier: Modifier = Modifier, onChange: (Boolean) -> Unit) {
     val palette = LocalStudioPalette.current
     Row(
-        modifier.fillMaxWidth().heightIn(min = 44.dp).clickable { onChange(!checked) },
+        modifier.fillMaxWidth().heightIn(min = 31.dp)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.ink.copy(alpha = 0.8f), modifier = Modifier.weight(1f))
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedTrackColor = palette.accent,
-                checkedThumbColor = palette.onAccent,
-                uncheckedTrackColor = palette.ink.copy(alpha = 0.08f),
-                uncheckedThumbColor = palette.muted,
-                uncheckedBorderColor = palette.border,
-            ),
-        )
+        Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.ink.copy(alpha = 0.8f), modifier = Modifier.weight(1f))
+        IosSwitch(checked = checked, onCheckedChange = null)
     }
 }
 
+/** iOS `Slider(...).tint(...)` via the shared [IosSlider]. */
 @Composable
 internal fun SheetSlider(
     value: Float,
@@ -81,21 +76,14 @@ internal fun SheetSlider(
     onValueChangeFinished: (() -> Unit)? = null,
     onChange: (Float) -> Unit,
 ) {
-    val palette = LocalStudioPalette.current
-    Slider(
-        value = value.coerceIn(range.start, range.endInclusive),
+    IosSlider(
+        value = value,
         onValueChange = onChange,
+        modifier = modifier,
         valueRange = range,
         steps = steps,
         onValueChangeFinished = onValueChangeFinished,
-        modifier = modifier,
-        colors = SliderDefaults.colors(
-            thumbColor = tint,
-            activeTrackColor = tint,
-            inactiveTrackColor = palette.ink.copy(alpha = 0.1f),
-            activeTickColor = Color.Transparent,
-            inactiveTickColor = Color.Transparent,
-        ),
+        tint = tint,
     )
 }
 

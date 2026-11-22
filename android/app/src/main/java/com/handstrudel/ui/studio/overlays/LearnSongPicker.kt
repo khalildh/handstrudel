@@ -76,8 +76,8 @@ internal fun learnSongId(name: String): String =
 private fun practiceIcon(label: String): ImageVector = when (label) {
     "Ascending" -> Icons.Filled.ArrowUpward
     "Descending" -> Icons.Filled.ArrowDownward
-    "Arpeggio" -> StudioIcons.Waveform
-    else -> Icons.Filled.Casino
+    "Arpeggio" -> StudioIcons.WaveformPath
+    else -> StudioIcons.Dice
 }
 
 private val PickerGreen = Color(0xFF30D158)

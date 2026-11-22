@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +29,8 @@ import com.handstrudel.app.LocalAppServices
 import com.handstrudel.engine.CameraIssue
 import com.handstrudel.engine.PlayInput
 import com.handstrudel.ui.theme.LocalStudioPalette
+import com.handstrudel.ui.theme.LocalStudioTheme
+import androidx.compose.ui.graphics.Color
 
 /**
  * iOS `StudioInputPicker`: segmented "Air + touch" / "Touch only", a caption,
@@ -43,17 +44,21 @@ fun StudioInputPicker(selection: PlayInput, onChange: (PlayInput) -> Unit, modif
     val issue by engine.cameraIssue.collectAsState()
     val context = LocalContext.current
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        // iOS `.pickerStyle(.segmented)` (measured on 1.0.1): a 32 pt track of
+        // rgba(118,118,128) at 24 % (12 % light) with the selected segment inset 2 pt,
+        // white at 28 % over the track in dark appearance and opaque white in light.
+        val light = LocalStudioTheme.current.isLight
         val shape = RoundedCornerShape(9.dp)
         Row(
             Modifier.fillMaxWidth().testTag("studio-play-input").clip(shape)
-                .background(palette.ink.copy(alpha = 0.08f)).padding(2.dp),
+                .background(Color(0xFF767680).copy(alpha = if (light) 0.12f else 0.24f)).padding(2.dp),
         ) {
             PlayInput.entries.forEach { input ->
                 val selected = input == selection
+                val segment = RoundedCornerShape(7.dp)
                 Box(
-                    Modifier.weight(1f).heightIn(min = 36.dp).clip(RoundedCornerShape(7.dp))
-                        .background(if (selected) palette.surface else palette.surface.copy(alpha = 0f))
-                        .then(if (selected) Modifier.border(1.dp, palette.border, RoundedCornerShape(7.dp)) else Modifier)
+                    Modifier.weight(1f).heightIn(min = 28.dp).clip(segment)
+                        .background(if (!selected) Color.Transparent else if (light) Color.White else Color.White.copy(alpha = 0.28f))
                         .clickable { if (!selected) onChange(input) }
                         .testTag("studio-play-input-${input.raw}"),
                     contentAlignment = Alignment.Center,

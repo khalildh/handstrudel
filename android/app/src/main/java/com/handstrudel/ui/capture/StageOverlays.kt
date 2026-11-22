@@ -1,4 +1,6 @@
 package com.handstrudel.ui.capture
+import com.handstrudel.ui.theme.IosSlider
+import com.handstrudel.ui.theme.IosControls
 
 import com.handstrudel.ui.theme.StudioFonts
 import android.Manifest
@@ -179,12 +181,14 @@ private fun BackingControls() {
                     Text("${(BackingTrackVolume.clamped(volume) * 100).roundToInt()}%", color = Color.White, fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold)
                 }
-                Slider(
+                IosSlider(
                     value = volume.toFloat(),
                     onValueChange = { controller.setBackingVolume(((it / 0.05f).roundToInt() * 0.05).coerceIn(0.0, 1.0)) },
                     valueRange = 0f..1f,
                     steps = 19,
-                    colors = SliderDefaults.colors(thumbColor = palette.mediaAccent, activeTrackColor = palette.mediaAccent),
+                    tint = palette.mediaAccent,
+                    // Over the camera: iOS dark-appearance grey for the unfilled part.
+                    inactiveTrack = IosControls.offTrack(light = false),
                     modifier = Modifier.semantics { contentDescription = "Backing volume" }.heightIn(min = 44.dp),
                 )
             }

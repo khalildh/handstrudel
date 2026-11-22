@@ -75,6 +75,8 @@ import com.handstrudel.ui.studio.common.SectionHeader
 import com.handstrudel.ui.studio.common.StudioPaddedPanel
 import com.handstrudel.ui.studio.home.StudioInputPicker
 import com.handstrudel.ui.theme.LocalStudioPalette
+import com.handstrudel.ui.theme.LocalStudioTheme
+import androidx.compose.ui.graphics.Color
 
 /** iOS ControlSheet `.play`: play input, other modes, and the per-mode PERFORMANCE section. */
 @Composable
@@ -95,7 +97,7 @@ internal fun PlayTab(onOpenLearnPicker: () -> Unit) {
     if (ControlSheetLogic.hasModeContextControls(mode)) {
         StudioPaddedPanel {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SectionHeader("PERFORMANCE", Icons.Filled.PanTool)
+                SectionHeader("PERFORMANCE", StudioIcons.HandRaised)
                 ModeSection(mode)
             }
         }
@@ -106,24 +108,24 @@ private data class ModeChoice(val label: String, val icon: ImageVector, val mode
 
 private val MODE_ROWS: List<List<ModeChoice>> = listOf(
     listOf(
-        ModeChoice("Split", Icons.Filled.Contrast, StudioMode.SPLIT),
-        ModeChoice("Scale", Icons.Filled.MusicNote, StudioMode.SCALE),
-        ModeChoice("Radial", Icons.Filled.TrackChanges, StudioMode.RADIAL),
+        ModeChoice("Split", StudioIcons.CircleLeftHalfFilled, StudioMode.SPLIT),
+        ModeChoice("Scale", StudioIcons.MusicQuarterNote3, StudioMode.SCALE),
+        ModeChoice("Radial", StudioIcons.CircleCircle, StudioMode.RADIAL),
     ),
     listOf(
-        ModeChoice("Chord+Melody", Icons.Filled.PanTool, StudioMode.CHORD_MELODY),
-        ModeChoice("SoundFont", Icons.Filled.Piano, StudioMode.SOUNDFONT),
-        ModeChoice("Melodic", Icons.Outlined.Piano, StudioMode.MELODIC),
+        ModeChoice("Chord+Melody", StudioIcons.HandRaised, StudioMode.CHORD_MELODY),
+        ModeChoice("SoundFont", StudioIcons.PianoKeysInverse, StudioMode.SOUNDFONT),
+        ModeChoice("Melodic", StudioIcons.PianoKeys, StudioMode.MELODIC),
     ),
     listOf(
         ModeChoice("Flow", StudioIcons.Waveform, StudioMode.FLOW),
-        ModeChoice("Hybrid", Icons.Filled.Waves, StudioMode.HYBRID),
-        ModeChoice("Lead", Icons.Filled.Audiotrack, StudioMode.LEAD),
+        ModeChoice("Hybrid", StudioIcons.WaveformPath, StudioMode.HYBRID),
+        ModeChoice("Lead", StudioIcons.Guitars, StudioMode.LEAD),
     ),
     listOf(
-        ModeChoice("Grid", Icons.Filled.GridOn, StudioMode.GRID),
-        ModeChoice("Drums", Icons.Filled.Headphones, StudioMode.DRUM),
-        ModeChoice("Learn", Icons.Filled.LibraryMusic, StudioMode.LEARN),
+        ModeChoice("Grid", StudioIcons.SquareGrid3x3, StudioMode.GRID),
+        ModeChoice("Drums", StudioIcons.BeatsHeadphones, StudioMode.DRUM),
+        ModeChoice("Learn", StudioIcons.MusicNoteList, StudioMode.LEARN),
     ),
 )
 
@@ -152,11 +154,11 @@ internal fun OtherModesPicker(mode: StudioMode, onOpenLearnPicker: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(Icons.Filled.MoreHoriz, null, tint = palette.ink, modifier = Modifier.size(20.dp))
+            Icon(StudioIcons.EllipsisCircle, null, tint = palette.ink, modifier = Modifier.size(20.dp))
             Text("Other modes", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.ink)
             Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
             Text(modeName, fontSize = 12.sp, color = palette.muted)
-            Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null, tint = palette.ink, modifier = Modifier.size(18.dp))
+            Icon(if (expanded) StudioIcons.ChevronUp else StudioIcons.ChevronDown, null, tint = palette.ink, modifier = Modifier.size(13.dp))
         }
         if (expanded) {
             MODE_ROWS.forEach { row ->
@@ -185,9 +187,10 @@ private fun ModeButton(choice: ModeChoice, active: Boolean, modifier: Modifier, 
             .semantics { selected = active }
             .testTag("mode-${choice.mode.raw}"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically),
     ) {
-        Icon(choice.icon, null, tint = if (active) palette.accent else palette.ink.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+        // iOS: SF Symbol at 20 pt (~22-24 pt glyph box) over an 11 pt label, 6 pt apart in a 48 pt tile.
+        Icon(choice.icon, null, tint = if (active) palette.accent else palette.ink.copy(alpha = 0.5f), modifier = Modifier.size(22.dp))
         Text(
             choice.label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, maxLines = 1,
             color = if (active) palette.accent else palette.ink.copy(alpha = 0.6f),
@@ -251,10 +254,10 @@ private fun PadVolumeRow(volume: Double, onChange: (Double) -> Unit) {
     val palette = LocalStudioPalette.current
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Pad volume", fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.ink.copy(alpha = 0.8f))
+            Text("Pad volume", fontSize = 11.5.sp, fontWeight = FontWeight.Medium, fontFamily = StudioFonts.Rounded, color = palette.ink.copy(alpha = 0.8f))
             Spacer(Modifier.weight(1f))
             Text(
-                ControlSheetLogic.padVolumePercent(volume), fontSize = 11.sp, fontFamily = StudioFonts.Mono,
+                ControlSheetLogic.padVolumePercent(volume), fontSize = 10.sp, fontFamily = StudioFonts.Mono,
                 color = palette.muted, modifier = Modifier.testTag("settings-pad-volume-value"),
             )
         }
@@ -339,6 +342,7 @@ internal fun CustomProgressionEditor() {
     val focus = LocalFocusManager.current
     var text by rememberSaveable { mutableStateOf("") }
     val preview = ControlSheetLogic.customProgression(text)
+    val placeholder = if (LocalStudioTheme.current.isLight) Color(0xFF3C3C43).copy(alpha = 0.3f) else Color(0xFFEBEBF5).copy(alpha = 0.3f)
     fun apply() {
         val parsed = ControlSheetLogic.customProgression(text) ?: return
         engine.setProgression(parsed)
@@ -361,7 +365,8 @@ internal fun CustomProgressionEditor() {
                     .background(palette.background).testTag("progression-input"),
                 decorationBox = { inner ->
                     Box(Modifier.padding(horizontal = 12.dp).heightIn(min = 44.dp), contentAlignment = Alignment.CenterStart) {
-                        if (text.isEmpty()) Text("I V vi IV", fontSize = 15.sp, fontFamily = StudioFonts.Mono, color = palette.muted)
+                        // iOS `placeholderText`: rgba(235,235,245,0.3) dark / rgba(60,60,67,0.3) light.
+                        if (text.isEmpty()) Text("I V vi IV", fontSize = 15.sp, fontFamily = StudioFonts.Mono, color = placeholder)
                         inner()
                     }
                 },
@@ -372,10 +377,9 @@ internal fun CustomProgressionEditor() {
                     .testTag("progression-set"),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    "Set", fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                    color = if (preview != null) palette.accent else palette.muted.copy(alpha = 0.5f),
-                )
+                // iOS 1.0.1 draws this `Button("Set")` in the sheet's ink (measured #F3F6EE),
+                // not the accent, and doesn't dim it while disabled.
+                Text("Set", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.ink)
             }
         }
     }

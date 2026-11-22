@@ -1,4 +1,5 @@
 package com.handstrudel.ui.capture
+import com.handstrudel.ui.theme.IosSlider
 
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.filled.UnfoldMore
@@ -281,11 +282,11 @@ private fun LoopRow(
             ) {
                 Icon(if (loop.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp, null, tint = palette.accent)
             }
-            Slider(
+            IosSlider(
                 value = gain,
                 onValueChange = { gain = ((it / 0.05f).roundToInt() * 0.05f).coerceIn(0f, 1f); engine.setLoopGain(loop.id, gain.toDouble()) },
                 valueRange = 0f..1f, steps = 19,
-                colors = SliderDefaults.colors(thumbColor = palette.accent, activeTrackColor = palette.accent),
+                tint = palette.accent,
                 modifier = Modifier.weight(1f).semantics { contentDescription = "Volume for ${loop.name}" },
             )
             Text("${(gain * 100).roundToInt()}%", fontSize = 12.sp, color = palette.muted, modifier = Modifier.width(40.dp))

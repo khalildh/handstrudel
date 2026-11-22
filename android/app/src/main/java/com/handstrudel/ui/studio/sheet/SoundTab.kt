@@ -142,17 +142,17 @@ internal fun SoundTab(paywall: PaywallHost, onOpenPresets: () -> Unit) {
             StudioKeyMenu(selection = key, onSelect = { engine.setKey(it) })
             StudioSettingsDivider()
             StudioSettingRow(
-                "Scale", Icons.Filled.Piano, value = scale.displayName, modifier = Modifier.testTag("scale-picker"),
+                "Scale", StudioIcons.PianoKeys, value = scale.displayName, modifier = Modifier.testTag("scale-picker"),
             ) { showScalePicker = true }
             if (chordFamily) {
                 StudioSettingsDivider()
-                StudioSettingRow("Chords", Icons.Filled.LibraryMusic, value = progression.name) { showProgressionPicker = true }
+                StudioSettingRow("Chords", StudioIcons.MusicNoteList, value = progression.name) { showProgressionPicker = true }
             }
         }
         // iOS `harmonyToggles` (HStack, wrapping when it doesn't fit).
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            PillToggle("Chords", Icons.Filled.LibraryMusic, chordMode, Modifier.testTag("harmony-chords")) { engine.setChordMode(!chordMode) }
-            PillToggle("Circle of 5ths", Icons.Filled.RadioButtonChecked, circleOfFifths, Modifier.testTag("harmony-circle-of-fifths")) {
+            PillToggle("Chords", StudioIcons.MusicNoteList, chordMode, Modifier.testTag("harmony-chords")) { engine.setChordMode(!chordMode) }
+            PillToggle("Circle of 5ths", StudioIcons.CircleCircle, circleOfFifths, Modifier.testTag("harmony-circle-of-fifths")) {
                 engine.setCircleOfFifths(!circleOfFifths)
             }
         }

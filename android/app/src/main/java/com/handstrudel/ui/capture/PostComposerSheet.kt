@@ -1,4 +1,5 @@
 package com.handstrudel.ui.capture
+import com.handstrudel.ui.theme.IosSwitch
 
 import androidx.compose.foundation.layout.statusBarsPadding
 import android.net.Uri
@@ -226,7 +227,6 @@ private fun SwitchRow(label: String, checked: Boolean, enabled: Boolean, tag: St
     val palette = LocalStudioPalette.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, fontSize = 15.sp, color = palette.ink, modifier = Modifier.weight(1f))
-        Switch(checked, onChange, enabled = enabled, modifier = Modifier.testTag(tag),
-            colors = SwitchDefaults.colors(checkedTrackColor = palette.accent, checkedThumbColor = palette.onAccent))
+        IosSwitch(checked, onChange, enabled = enabled, modifier = Modifier.testTag(tag))
     }
 }
