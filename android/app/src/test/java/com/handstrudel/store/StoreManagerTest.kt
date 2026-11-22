@@ -92,6 +92,29 @@ class StoreManagerTest {
         assertNull(store.state.value.purchasingProductId)
     }
 
+    @Test fun refresh_clearsStalePurchaseError() = runTest(UnconfinedTestDispatcher()) {
+        val backend = FakePurchasesBackend()
+        backend.purchaseHandler = { throw IllegalStateException("Payment declined") }
+        val store = store(backend)
+        store.purchase(Activity(), ProductIds.PRO)
+        assertEquals("Payment declined", store.state.value.lastError)
+
+        store.refresh()
+        assertNull(store.state.value.lastError)
+    }
+
+    @Test fun purchaseWithoutLoadedProduct_stillReachesBackend() = runTest(UnconfinedTestDispatcher()) {
+        // The store screen offers BUY PRO before products load; the backend fetches on demand (iOS).
+        val backend = FakePurchasesBackend()
+        backend.purchaseHandler = { customer(ProductIds.PRO, listOf(Entitlements.PRO)) }
+        val store = store(backend)
+        assertTrue(store.state.value.products.isEmpty())
+
+        assertEquals(PurchaseResult.Success, store.purchase(Activity(), ProductIds.PRO))
+        assertEquals(listOf(ProductIds.PRO), backend.purchases)
+        assertTrue(store.hasProAccess)
+    }
+
     @Test fun refresh_loadsProductsAndOffering() = runTest(UnconfinedTestDispatcher()) {
         val backend = FakePurchasesBackend()
         backend.productsResult = listOf(StoreProduct(ProductIds.PRO, "Pro", "", "$9.99", false))

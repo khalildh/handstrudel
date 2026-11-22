@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.handstrudel.app.LocalAppServices
 import com.handstrudel.store.ProductIds
+import com.handstrudel.store.PurchaseResult
 import com.handstrudel.store.StoreCopy
 import com.handstrudel.store.StoreGate
 import com.handstrudel.store.StoreProduct
@@ -96,13 +97,18 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showPaywall by remember { mutableStateOf(false) }
+    var pendingNotice by remember { mutableStateOf<String?>(null) }
 
     // Always reload: a previous failed load would leave products missing.
     LaunchedEffect(store) { store.refresh() }
 
     fun buy(productId: String) {
         val activity = context.findActivity() ?: return
-        scope.launch { store.purchase(activity, productId) }
+        pendingNotice = null
+        scope.launch {
+            // Play can leave a purchase pending; say so instead of looking like nothing happened.
+            if (store.purchase(activity, productId) == PurchaseResult.Pending) pendingNotice = StoreCopy.PENDING
+        }
     }
     fun product(id: String): StoreProduct? = state.products.firstOrNull { it.id == id }
 
@@ -152,6 +158,7 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
         Section("PRO") {
             ProRow(
                 unlocked = store.hasProAccess,
+                configured = store.isConfigured,
                 product = product(ProductIds.PRO).takeIf { store.isConfigured },
                 purchasing = state.purchasingProductId == ProductIds.PRO,
                 onBuy = { buy(ProductIds.PRO) },
@@ -178,6 +185,8 @@ fun StoreContent(store: StoreGate, modifier: Modifier = Modifier) {
 
         state.lastError?.let {
             Text(it, fontSize = 12.sp, color = StoreColors.red.copy(alpha = 0.8f), modifier = Modifier.fillMaxWidth())
+        } ?: pendingNotice?.let {
+            Text(it, fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.fillMaxWidth().testTag("store-pending"))
         }
 
         if (store.isConfigured) RestorePurchasesButton(store)
@@ -249,7 +258,7 @@ private fun PackRow(kit: KitRow, unlocked: Boolean, product: StoreProduct?, onBu
 }
 
 @Composable
-private fun ProRow(unlocked: Boolean, product: StoreProduct?, purchasing: Boolean, onBuy: () -> Unit) {
+private fun ProRow(unlocked: Boolean, configured: Boolean, product: StoreProduct?, purchasing: Boolean, onBuy: () -> Unit) {
     Column(
         Modifier.testTag("store-pro").card(unlocked).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -265,14 +274,17 @@ private fun ProRow(unlocked: Boolean, product: StoreProduct?, purchasing: Boolea
             FeatureItem("Every chord progression")
             FeatureItem("One-time purchase")
         }
-        if (!unlocked && product != null) {
+        // iOS always offers BUY PRO and fetches the product on demand; the price shows once it loaded.
+        if (!unlocked && configured) {
             GreenButton(testTag = "store-buy-pro", enabled = !purchasing, onClick = onBuy) {
                 if (purchasing) {
                     CircularProgressIndicator(Modifier.size(20.dp), color = Color.Black, strokeWidth = 2.dp)
                 } else {
                     Text("BUY PRO", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.Black)
-                    Text("  • ${product.displayPrice}", fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace, color = Color.Black.copy(alpha = 0.7f))
+                    product?.let {
+                        Text("  • ${it.displayPrice}", fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace, color = Color.Black.copy(alpha = 0.7f))
+                    }
                 }
             }
         }

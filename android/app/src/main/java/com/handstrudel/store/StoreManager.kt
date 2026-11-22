@@ -149,7 +149,8 @@ class StoreManager(
 
     override suspend fun refresh() {
         val backend = backend ?: return
-        _state.update { it.copy(isLoading = true) }
+        // A failure from an earlier purchase (e.g. in a paywall) shouldn't greet the next visit.
+        _state.update { it.copy(isLoading = true, lastError = null) }
         try {
             val products = runCatching { backend.products(ProductIds.playFetchIds) }.getOrDefault(emptyList())
             val offering = runCatching { backend.hasCurrentOffering() }.getOrDefault(false)
