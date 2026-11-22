@@ -90,6 +90,7 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
     val credit = draft.backingCredit
     val checkingAudio = credit == null && hasAudio == null
     val locked = busy || submission != null
+    val busyNow = androidx.compose.runtime.rememberUpdatedState(busy)
 
     val player = remember(clip) {
         ExoPlayer.Builder(context).build().apply {
@@ -107,7 +108,8 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
     ModalBottomSheet(
         modifier = Modifier.statusBarsPadding(),
         onDismissRequest = { if (!busy) onDismiss() },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !busy }),
+        // The state remembers its first lambda, so read busy through rememberUpdatedState (iOS: interactiveDismissDisabled(uploader.isBusy)).
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !busyNow.value }),
         // iOS: the composer sets no background, so the sheet shows the system elevated colour.
         containerColor = IosGrouped.background(iosLight()),
         dragHandle = null,
