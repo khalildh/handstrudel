@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -185,7 +186,13 @@ class PaywallHost internal constructor(val store: StoreGate) {
     var packId by mutableStateOf<String?>(null)
         internal set
 
-    fun isLocked(packId: String?): Boolean = !store.isUnlocked(packId)
+    /** Mirrors `store.state`, so every composable that asks [isLocked] (lazy rows too) recomposes after a purchase or restore. */
+    internal var storeState by mutableStateOf(store.state.value)
+
+    fun isLocked(packId: String?): Boolean {
+        storeState // snapshot read
+        return !store.isUnlocked(packId)
+    }
 
     fun open(packId: String) {
         if (store.isConfigured) this.packId = packId
@@ -202,6 +209,7 @@ class PaywallHost internal constructor(val store: StoreGate) {
 fun rememberPaywallHost(): PaywallHost {
     val store = LocalAppServices.current.store
     val host = remember(store) { PaywallHost(store) }
+    LaunchedEffect(host) { store.state.collect { host.storeState = it } }
     host.packId?.let { id -> PaywallSheet(packId = id, onDismiss = { host.packId = null }) }
     return host
 }

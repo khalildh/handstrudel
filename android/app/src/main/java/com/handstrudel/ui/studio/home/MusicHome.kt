@@ -268,6 +268,7 @@ private fun InstrumentBrowser(
     val key by engine.selectedKey.collectAsState()
     val scale by engine.selectedScale.collectAsState()
     val progression by engine.chordMelodyProgression.collectAsState()
+    services.store.state.collectAsState().value // re-filter the carousel after a purchase or restore
     val instruments = SOUNDFONT_INSTRUMENTS.filter { it.id == selected.id || services.store.isUnlocked(it.packId) }
     val n = instruments.size.coerceAtLeast(1)
     val virtualCount = if (n > 1) n * 1000 else 1
