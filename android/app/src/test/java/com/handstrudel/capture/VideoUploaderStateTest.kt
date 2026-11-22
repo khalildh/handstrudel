@@ -37,6 +37,7 @@ class VideoUploaderStateTest {
         val statuses: ArrayDeque<Pair<Int, String>>,
         var functionsAccount: UUID = account,
         val source: Video? = null,
+        val prepareError: Exception? = null,
     ) : UploadPlatform {
         val calls = mutableListOf<String>()
         var store: RecordingDrafts? = null
@@ -46,7 +47,7 @@ class VideoUploaderStateTest {
 
         override suspend fun fetchVideo(id: UUID) = source
         override suspend fun hasAudio(clip: File) = true
-        override suspend fun prepare(clip: File) =
+        override suspend fun prepare(clip: File) = prepareError?.let { throw it } ?:
             PreparedClip(tmp.newFile().apply { writeBytes(ByteArray(100)) }, ByteArray(10), 720, 1280, 7.0)
         override suspend fun put(url: String, contentType: String, file: File?, bytes: ByteArray?) {
             puts += url to contentType
@@ -222,5 +223,21 @@ class VideoUploaderStateTest {
         assertFalse(uploader.postDraft(store, draft, BackingCredit(UUID.randomUUID(), "maker")))
         assertEquals(VideoUploader.Phase.Failed("The creator no longer allows new play-along posts. Your private draft is safe."), uploader.phase.value)
         assertTrue(fake.calls.isEmpty())
+    }
+
+    @Test fun platformErrorsGetTheGenericCopy() = runTest {
+        val fake = Fake(q(), prepareError = IllegalStateException("Codec exception: CodecInfo{type=VideoDecoder}"))
+        val (store, draft) = setup(fake)
+        val uploader = uploader(fake)
+        assertFalse(uploader.postDraft(store, draft))
+        assertEquals(VideoUploader.Phase.Failed("Couldn't post this video. Your private draft is safe."), uploader.phase.value)
+    }
+
+    @Test fun ownMessagesAreShownAsIs() = runTest {
+        val fake = Fake(q(), prepareError = com.handstrudel.capture.upload.CaptureMessageException("Trim the recording to 60 seconds or less to post it."))
+        val (store, draft) = setup(fake)
+        val uploader = uploader(fake)
+        assertFalse(uploader.postDraft(store, draft))
+        assertEquals(VideoUploader.Phase.Failed("Trim the recording to 60 seconds or less to post it."), uploader.phase.value)
     }
 }

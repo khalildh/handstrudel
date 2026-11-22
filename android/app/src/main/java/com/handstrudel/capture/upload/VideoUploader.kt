@@ -129,7 +129,9 @@ class VideoUploader(
             _phase.value = Phase.Failed(e.detail ?: "Couldn't post this video. Your private draft is safe.")
             return false
         } catch (e: Exception) {
-            _phase.value = Phase.Failed(e.message ?: "Couldn't post this video. Your private draft is safe.")
+            // Our own messages are written for people; platform ones (a MediaCodec dump, an
+            // OkHttp connect error) are not, so those get the generic copy.
+            _phase.value = Phase.Failed((e as? CaptureMessageException)?.message ?: "Couldn't post this video. Your private draft is safe.")
             return false
         } finally {
             prepared?.video?.delete()
