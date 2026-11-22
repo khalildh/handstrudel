@@ -1,5 +1,7 @@
 package com.handstrudel.ui.studio.overlays
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
@@ -25,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Casino
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.automirrored.outlined.NoteAdd
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -75,7 +76,7 @@ internal fun learnSongId(name: String): String =
 private fun practiceIcon(label: String): ImageVector = when (label) {
     "Ascending" -> Icons.Filled.ArrowUpward
     "Descending" -> Icons.Filled.ArrowDownward
-    "Arpeggio" -> Icons.Filled.GraphicEq
+    "Arpeggio" -> StudioIcons.Waveform
     else -> Icons.Filled.Casino
 }
 

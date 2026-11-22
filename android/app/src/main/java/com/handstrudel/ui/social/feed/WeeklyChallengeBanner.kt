@@ -1,5 +1,7 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -10,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,7 +41,7 @@ fun WeeklyChallengeBanner(challenge: WeeklyChallenge, overVideo: Boolean, onOpen
             .semantics { contentDescription = "Weekly play-along: ${challenge.title}" }.testTag("weekly-challenge"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.GraphicEq, null, tint = tint, modifier = Modifier.size(14.dp))
+        Icon(StudioIcons.Waveform, null, tint = tint, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(6.dp))
         Text(challenge.title, color = tint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

@@ -1,5 +1,7 @@
 package com.handstrudel.ui.social.account
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -22,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -70,7 +71,7 @@ import com.handstrudel.ui.theme.LocalStudioPalette
 import kotlinx.coroutines.launch
 
 private enum class PortfolioTab(val title: String, val icon: ImageVector) {
-    CLIPS("Performances", Icons.Filled.GridView), SOUNDS("Sounds", Icons.Filled.GraphicEq), REPOSTS("Reposts", Icons.Filled.Repeat);
+    CLIPS("Performances", Icons.Filled.GridView), SOUNDS("Sounds", StudioIcons.Waveform), REPOSTS("Reposts", Icons.Filled.Repeat);
     val tag: String get() = "profile-${title.lowercase()}"
 }
 
@@ -291,7 +292,7 @@ private fun Thumbnail(video: Video) {
     val p = LocalStudioPalette.current
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         ProfileArtwork()
-        Icon(Icons.Filled.GraphicEq, null, tint = p.accent.copy(alpha = 0.8f))
+        Icon(StudioIcons.Waveform, null, tint = p.accent.copy(alpha = 0.8f))
         if (video.hidden != true) {
             ProfileImage(ProfileImageStore.Resource(video.thumbUrl, ProfileImageStore.Kind.THUMBNAIL), Modifier.fillMaxSize())
         }
@@ -307,7 +308,7 @@ private fun Sounds(videos: List<Video>, loading: Boolean, failed: Boolean, trySo
         if (v.hidden == true || sound == null || sound in seen) false else { seen += sound; true }
     }
     if (clips.isEmpty() && !loading && !failed) {
-        EmptyCard("No playable sounds yet", "When a performance includes a sound setup, you can play it here.", Icons.Filled.GraphicEq)
+        EmptyCard("No playable sounds yet", "When a performance includes a sound setup, you can play it here.", StudioIcons.Waveform)
     }
     clips.forEach { video ->
         val sound = video.soundSetup ?: return@forEach
@@ -317,7 +318,7 @@ private fun Sounds(videos: List<Video>, loading: Boolean, failed: Boolean, trySo
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {
             Box(Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(p.accent.copy(alpha = 0.09f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.GraphicEq, null, tint = p.accent)
+                Icon(StudioIcons.Waveform, null, tint = p.accent)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(sound.instrumentName ?: "Performance sound", color = p.ink, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)

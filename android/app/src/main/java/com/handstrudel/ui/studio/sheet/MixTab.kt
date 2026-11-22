@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayCircle
@@ -231,7 +230,7 @@ internal fun LoopsSection(loops: List<SavedLoop>) {
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionHeader("LOOPS", Icons.Filled.GraphicEq)
+            SectionHeader("LOOPS", StudioIcons.Waveform)
             Spacer(Modifier.weight(1f))
             if (playing.isNotEmpty()) {
                 Box(

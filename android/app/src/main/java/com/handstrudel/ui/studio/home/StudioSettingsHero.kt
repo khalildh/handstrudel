@@ -1,5 +1,7 @@
 package com.handstrudel.ui.studio.home
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -11,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,7 +73,7 @@ fun StudioSettingsHero(
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Icon(Icons.Filled.GraphicEq, null, tint = palette.accent, modifier = Modifier.size(12.dp))
+                Icon(StudioIcons.Waveform, null, tint = palette.accent, modifier = Modifier.size(12.dp))
                 Text(
                     "CURRENT SOUND", fontSize = 11.sp, fontFamily = StudioFonts.Mono,
                     fontWeight = FontWeight.SemiBold, letterSpacing = 1.6.sp, color = palette.accent,

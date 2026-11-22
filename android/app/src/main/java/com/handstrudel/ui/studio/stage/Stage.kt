@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material3.Icon
@@ -384,26 +383,27 @@ private fun TopBar(
             swipe.clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 11.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(Icons.Filled.GraphicEq, null, tint = palette.mediaAccent, modifier = Modifier.size(14.dp))
+            Icon(StudioIcons.Waveform, null, tint = palette.mediaAccent, modifier = Modifier.size(14.dp))
             Text("handstrudel", fontSize = 12.sp, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
         }
         Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
-        RoundButton(StudioIcons.SquareStack, "Presets", "studio-presets-button", enabled = !locked, swipe = swipe, onClick = onPresets)
+        // iOS: square.stack 17 pt semibold in white; xmark 16 pt bold at 85% white (default HStack spacing 8).
+        RoundButton(StudioIcons.SquareStack, "Presets", "studio-presets-button", enabled = !locked, swipe = swipe, iconSize = 25.dp, alpha = 1f, onClick = onPresets)
         Spacer(Modifier.size(8.dp))
-        RoundButton(Icons.Filled.Close, "End session", "close-button", enabled = closeEnabled, swipe = swipe, onClick = onClose)
+        RoundButton(StudioIcons.XMark, "End session", "close-button", enabled = closeEnabled, swipe = swipe, iconSize = 20.dp, onClick = onClose)
     }
 }
 
 @Composable
 private fun RoundButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, tag: String, enabled: Boolean,
-    swipe: Modifier, onClick: () -> Unit,
+    swipe: Modifier, iconSize: androidx.compose.ui.unit.Dp = 18.dp, alpha: Float = 0.85f, onClick: () -> Unit,
 ) {
     Box(
         swipe.size(44.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f))
             .clickable(enabled = enabled, onClick = onClick).testTag(tag).semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = Color.White.copy(alpha = if (enabled) 0.85f else 0.35f), modifier = Modifier.size(18.dp)) }
+    ) { Icon(icon, null, tint = Color.White.copy(alpha = if (enabled) alpha else 0.35f), modifier = Modifier.size(iconSize)) }
 }
 
 /** iOS top-bar beat dots: 7 pt, current one ×1.5 in the media accent. */

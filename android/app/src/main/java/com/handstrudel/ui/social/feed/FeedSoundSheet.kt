@@ -1,5 +1,7 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,7 +53,7 @@ fun FeedSoundSheet(video: Video, onDismiss: () -> Unit, onStart: (PerformanceSta
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.GraphicEq, null, tint = p.ink, modifier = Modifier.size(22.dp))
+                        Icon(StudioIcons.Waveform, null, tint = p.ink, modifier = Modifier.size(22.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(title, color = p.ink, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                     }
@@ -63,7 +64,7 @@ fun FeedSoundSheet(video: Video, onDismiss: () -> Unit, onStart: (PerformanceSta
                         modifier = Modifier.fillMaxWidth().testTag("play-clip-preset"), onClick = { onStart(PerformanceStart.Preset(setup)) })
                 }
                 if (video.backingEnabled == true) {
-                    ProfileActionButton("Play along", primary = video.soundSetup == null, icon = Icons.Filled.GraphicEq,
+                    ProfileActionButton("Play along", primary = video.soundSetup == null, icon = StudioIcons.Waveform,
                         modifier = Modifier.fillMaxWidth().testTag("play-along"), onClick = { onStart(PerformanceStart.Backing(video)) })
                 }
                 video.soundSetup?.let { setup -> SavePresetButton(setup, savedName(title, video.username)) }

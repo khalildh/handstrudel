@@ -1,5 +1,7 @@
 package com.handstrudel.ui.nav
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SmartDisplay
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,7 +48,7 @@ val Destination.title: String get() = name
 private val Destination.icon: ImageVector
     get() = when (this) {
         Destination.Feed -> Icons.Outlined.SmartDisplay   // play.rectangle
-        Destination.Music -> Icons.Rounded.GraphicEq      // waveform
+        Destination.Music -> StudioIcons.Waveform      // waveform
         Destination.Account -> Icons.Outlined.Person      // person
     }
 

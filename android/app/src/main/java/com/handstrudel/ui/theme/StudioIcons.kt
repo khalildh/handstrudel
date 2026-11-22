@@ -30,12 +30,27 @@ object StudioIcons {
             }
         }.build()
 
-    /** SF `square.stack`: a rounded square with the top edge of a second one behind it. */
+    /**
+     * SF `square.stack` (measured from iOS at 17 pt semibold: 15 x 20 pt): a rounded square
+     * with two shorter rails stacked above it.
+     */
     val SquareStack: ImageVector = icon(
         "square.stack",
-        "M6.5,8.5h11a3,3 0 0 1 3,3v6.5a3,3 0 0 1 -3,3h-11a3,3 0 0 1 -3,-3v-6.5a3,3 0 0 1 3,-3z",
-        "M6,5.5h12",
-        "M8.5,2.75h7",
+        "M7.5,8h9a3,3 0 0 1 3,3v7.5a3,3 0 0 1 -3,3h-9a3,3 0 0 1 -3,-3v-7.5a3,3 0 0 1 3,-3z",
+        "M7,5H17",
+        "M9,2.2H15",
+        stroke = 1.9f,
+    )
+
+    /** SF `xmark` at a bold weight. */
+    val XMark: ImageVector = icon("xmark", "M5.5,5.5L18.5,18.5M18.5,5.5L5.5,18.5", stroke = 2.4f)
+
+    /** SF `repeat`: two rounded rails with arrowheads, wider than tall. */
+    val Repeat: ImageVector = icon(
+        "repeat",
+        "M3,12.5V10.5a3.5,3.5 0 0 1 3.5,-3.5H20", "M16.5,3.5L20,7L16.5,10.5",
+        "M21,11.5V13.5a3.5,3.5 0 0 1 -3.5,3.5H4", "M7.5,13.5L4,17L7.5,20.5",
+        stroke = 2.1f,
     )
 
     /** SF `tortoise`: domed shell, head, two legs. */
@@ -100,4 +115,34 @@ object StudioIcons {
         "M7,12a5,5 0 1 0 10,0a5,5 0 1 0 -10,0z",
         fills = listOf("M10.25,12a1.75,1.75 0 1 0 3.5,0a1.75,1.75 0 1 0 -3.5,0z"),
     )
+
+    /** SF `slider.horizontal.3`: three rails, each with a ring knob (right, left, right). */
+    val SliderHorizontal3: ImageVector = icon(
+        "slider.horizontal.3",
+        "M3,6H13.6M18.4,6H21", "M13.6,6a2.4,2.4 0 1 0 4.8,0a2.4,2.4 0 1 0 -4.8,0z",
+        "M3,12H5.6M10.4,12H21", "M5.6,12a2.4,2.4 0 1 0 4.8,0a2.4,2.4 0 1 0 -4.8,0z",
+        "M3,18H13.6M18.4,18H21", "M13.6,18a2.4,2.4 0 1 0 4.8,0a2.4,2.4 0 1 0 -4.8,0z",
+        stroke = 1.9f,
+    )
+
+    /** SF `arrow.up.arrow.down`: an up arrow on the left, a down arrow on the right. */
+    val ArrowUpArrowDown: ImageVector = icon(
+        "arrow.up.arrow.down",
+        "M7,20V4", "M2.8,8.2L7,4L11.2,8.2",
+        "M17,4V20", "M12.8,15.8L17,20L21.2,15.8",
+        stroke = 1.6f,
+    )
+
+    /**
+     * SF `waveform`: six rounded bars (measured heights 5.1, 12.9, 20, 10.4, 15.7, 6.7 on a
+     * 20-unit span). Material's GraphicEq has five even bars and reads differently.
+     */
+    val Waveform: ImageVector = icon(
+        "waveform",
+        "M2,9.45V14.55", "M6,5.55V18.45", "M10,2V22", "M14,6.8V17.2", "M18,4.15V19.85", "M22,8.65V15.35",
+        stroke = 2.0f,
+    )
+
+    /** SF `checkmark` at a bold weight. */
+    val Checkmark: ImageVector = icon("checkmark", "M4,12.8L9.4,18.2L20,5.8", stroke = 2.7f)
 }

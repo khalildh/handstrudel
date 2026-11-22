@@ -22,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -136,7 +135,7 @@ private fun ThemeCard(option: StudioTheme, selected: Boolean, palette: StudioPal
                 .background(Brush.linearGradient(listOf(sample.glow, sample.background))),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = sample.accent, modifier = Modifier.size(26.dp))
+            Icon(StudioIcons.Waveform, contentDescription = null, tint = sample.accent, modifier = Modifier.size(26.dp))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(option.title, fontFamily = StudioFonts.Serif, fontSize = 20.sp, color = palette.ink)

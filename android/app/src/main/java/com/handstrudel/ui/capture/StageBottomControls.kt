@@ -104,7 +104,7 @@ internal fun StageBottomControlsView(onOpenSettings: () -> Unit, itemModifier: M
                 .clickable(enabled = !locked, onClick = onOpenSettings)
                 .alpha(if (locked) 0.5f else 1f),
             contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Filled.Tune, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp)) }
+        ) { Icon(StudioIcons.SliderHorizontal3, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp)) }
     }
 
     if (showLoops) LoopShelfSheetView(onDismiss = { showLoops = false })
@@ -124,10 +124,11 @@ private fun HalfSpeedToggle() {
             .clickable { services.prefs.setRecordAtHalfSpeed(!halfSpeed) }
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val tint = if (halfSpeed) palette.mediaOnAccent else Color.White
-        Icon(StudioIcons.Tortoise, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+        // iOS Label at `.caption`: the tortoise glyph is ~20 pt wide.
+        Icon(StudioIcons.Tortoise, contentDescription = null, tint = tint, modifier = Modifier.size(21.dp))
         Text("½×", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = tint)
     }
 }
@@ -206,7 +207,7 @@ private fun LoopRecordButton() {
                 }
                 Icon(Icons.Filled.Stop, contentDescription = null, tint = palette.recording, modifier = Modifier.size(15.dp))
             } else {
-                Icon(Icons.Filled.Repeat, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(StudioIcons.Repeat, contentDescription = null, tint = Color.White, modifier = Modifier.size(23.dp))
             }
         }
         if (loops.isNotEmpty() && !loopRecording) {

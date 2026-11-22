@@ -1,5 +1,7 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import androidx.compose.material.icons.filled.Sync
 import com.handstrudel.ui.theme.StudioFonts
 import android.view.LayoutInflater
@@ -21,7 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Repeat
@@ -255,7 +256,7 @@ private fun PostControls(
                     .semantics { contentDescription = "Sound options: $title" }.testTag("feed-sound-options"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.GraphicEq, null, tint = p.mediaAccent, modifier = Modifier.size(14.dp))
+                Icon(StudioIcons.Waveform, null, tint = p.mediaAccent, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(title, color = p.mediaAccent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 Spacer(Modifier.width(6.dp))
@@ -263,7 +264,7 @@ private fun PostControls(
             }
         } else if (video.instrument != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.GraphicEq, null, tint = p.mediaAccent, modifier = Modifier.size(14.dp))
+                Icon(StudioIcons.Waveform, null, tint = p.mediaAccent, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(video.instrument, color = p.mediaAccent, fontSize = 12.sp, fontFamily = StudioFonts.Mono)
             }

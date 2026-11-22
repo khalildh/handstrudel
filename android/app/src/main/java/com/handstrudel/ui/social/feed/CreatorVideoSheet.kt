@@ -1,5 +1,7 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +25,6 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
@@ -224,14 +225,14 @@ fun PerformanceDetail(
                     ClipPresetCard(setup, video.username ?: social.auth.profile.value?.username, onTrySound?.let { play -> { s: SoundSetup -> clip.setPaused(true); play(s) } })
                 } else if (video.instrument != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.GraphicEq, null, tint = p.muted, modifier = Modifier.size(14.dp))
+                        Icon(StudioIcons.Waveform, null, tint = p.muted, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp)); Text(video.instrument, color = p.muted, fontSize = 12.sp)
                     }
                 }
                 if (video.caption.isNotEmpty()) Text(video.caption, color = p.ink, fontSize = 16.sp)
                 notification?.let { NotificationCard(it) { showComments = true } }
                 if (video.backingEnabled == true && onPlayAlong != null) {
-                    StudioActionButton("Play along", icon = Icons.Filled.GraphicEq, onClick = { clip.setPaused(true); onPlayAlong(video) })
+                    StudioActionButton("Play along", icon = StudioIcons.Waveform, onClick = { clip.setPaused(true); onPlayAlong(video) })
                 }
                 if (allowsSharing && canDownloadAudio) {
                     TextButton(onClick = ::downloadAudio, modifier = Modifier.heightIn(min = 44.dp)) {
@@ -287,7 +288,7 @@ private fun ClipPresetCard(setup: SoundSetup, username: String?, onPlay: ((Sound
     val title = setup.instrumentName ?: "Performance preset"
     Column(Modifier.clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.7f)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.GraphicEq, null, tint = p.mediaAccent, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp))
+            Icon(StudioIcons.Waveform, null, tint = p.mediaAccent, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp))
             Text(title, color = p.mediaAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
         }
         Text(setup.presetDetails, color = Color.White, fontSize = 12.sp, maxLines = 2)

@@ -1,5 +1,7 @@
 package com.handstrudel.ui.social.feed
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -141,7 +142,7 @@ fun PerformanceLibraryScreen(kind: LibraryKind, onDismiss: () -> Unit, onRemove:
                         if (s != null) {
                             TextButton(onClick = { selected = s }) { Icon(Icons.Outlined.PlayCircle, null, tint = p.accent); Text("  Watch the backing clip", color = p.accent) }
                             TextButton(onClick = { onStart(PerformanceStart.Backing(s)) }, modifier = Modifier.testTag("challenge-play-along")) {
-                                Icon(Icons.Filled.GraphicEq, null, tint = p.accent); Text("  Play along", color = p.accent, fontWeight = FontWeight.SemiBold)
+                                Icon(StudioIcons.Waveform, null, tint = p.accent); Text("  Play along", color = p.accent, fontWeight = FontWeight.SemiBold)
                             }
                         } else if (!loading && error == null) {
                             Text("This challenge is no longer available.", color = p.muted)
@@ -153,7 +154,7 @@ fun PerformanceLibraryScreen(kind: LibraryKind, onDismiss: () -> Unit, onRemove:
                 source?.let { s ->
                     item {
                         TextButton(onClick = { onStart(PerformanceStart.Backing(s)) }, modifier = Modifier.padding(horizontal = 12.dp)) {
-                            Icon(Icons.Filled.GraphicEq, null, tint = p.accent); Text("  Play along", color = p.accent, fontWeight = FontWeight.SemiBold)
+                            Icon(StudioIcons.Waveform, null, tint = p.accent); Text("  Play along", color = p.accent, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

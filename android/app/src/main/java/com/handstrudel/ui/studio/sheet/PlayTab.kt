@@ -1,5 +1,7 @@
 package com.handstrudel.ui.studio.sheet
 
+import com.handstrudel.ui.theme.StudioIcons
+
 import com.handstrudel.ui.theme.StudioFonts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,7 +29,6 @@ import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -115,7 +116,7 @@ private val MODE_ROWS: List<List<ModeChoice>> = listOf(
         ModeChoice("Melodic", Icons.Outlined.Piano, StudioMode.MELODIC),
     ),
     listOf(
-        ModeChoice("Flow", Icons.Filled.GraphicEq, StudioMode.FLOW),
+        ModeChoice("Flow", StudioIcons.Waveform, StudioMode.FLOW),
         ModeChoice("Hybrid", Icons.Filled.Waves, StudioMode.HYBRID),
         ModeChoice("Lead", Icons.Filled.Audiotrack, StudioMode.LEAD),
     ),

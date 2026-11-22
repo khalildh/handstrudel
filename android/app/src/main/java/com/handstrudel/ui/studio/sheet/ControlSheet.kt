@@ -1,5 +1,9 @@
 package com.handstrudel.ui.studio.sheet
 
+import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.TouchApp
+import com.handstrudel.ui.theme.StudioIcons
+
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.handstrudel.ui.studio.common.SheetGrabber
 import com.handstrudel.ui.theme.StudioFonts
@@ -24,7 +28,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Videocam
@@ -64,10 +67,11 @@ import com.handstrudel.ui.theme.LocalStudioPalette
 
 /** iOS `ControlSheet.SettingsSection`. */
 internal enum class SettingsSection(val title: String, val icon: ImageVector) {
-    SOUND("Sound", Icons.Filled.GraphicEq),
-    PLAY("Play", Icons.Filled.TouchApp),
-    MIX("Mix", Icons.Filled.Tune),
-    CAPTURE("Capture", Icons.Filled.Videocam);
+    SOUND("Sound", StudioIcons.Waveform),
+    // iOS SF symbols: hand.tap, slider.horizontal.3 and video are outline glyphs.
+    PLAY("Play", Icons.Outlined.TouchApp),
+    MIX("Mix", StudioIcons.SliderHorizontal3),
+    CAPTURE("Capture", Icons.Outlined.Videocam);
 
     val tag: String get() = "music-settings-${name.lowercase()}"
 }

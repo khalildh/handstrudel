@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -135,7 +134,7 @@ internal fun SoundTab(paywall: PaywallHost, onOpenPresets: () -> Unit) {
         StudioSettingsPanel {
             if (usesSF) {
                 StudioSettingRow(
-                    "Instrument", Icons.Filled.GraphicEq, value = instrument.name,
+                    "Instrument", StudioIcons.Waveform, value = instrument.name,
                     modifier = Modifier.testTag("settings-instrument-picker"),
                 ) { showInstrumentPicker = true }
                 StudioSettingsDivider()
@@ -163,7 +162,7 @@ internal fun SoundTab(paywall: PaywallHost, onOpenPresets: () -> Unit) {
     if (!usesSF) {
         StudioPaddedPanel {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionHeader("SOUND", Icons.Filled.GraphicEq, notAvailable = WAVEFORMS.any { it.isPremium && paywall.isLocked(it.packId) })
+                SectionHeader("SOUND", StudioIcons.Waveform, notAvailable = WAVEFORMS.any { it.isPremium && paywall.isLocked(it.packId) })
                 TileGrid(WAVEFORMS, columns = 4) { wf ->
                     val locked = wf.isPremium && paywall.isLocked(wf.packId)
                     EmojiTile(
