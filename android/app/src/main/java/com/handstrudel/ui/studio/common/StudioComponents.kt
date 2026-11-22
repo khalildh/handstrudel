@@ -41,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -350,7 +351,13 @@ fun PickerRow(
 ) {
     val palette = LocalStudioPalette.current
     Row(
-        modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 8.dp),
+        // iOS `List(.plain)` row: 44 pt minimum, hairline separator inset to the text (20 pt).
+        modifier.fillMaxWidth().heightIn(min = 44.dp)
+            .drawBehind {
+                val y = size.height - 0.5.dp.toPx()
+                drawLine(palette.border, androidx.compose.ui.geometry.Offset(20.dp.toPx(), y), androidx.compose.ui.geometry.Offset(size.width, y), 0.5.dp.toPx())
+            }
+            .clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -361,7 +368,8 @@ fun PickerRow(
         if (locked) LockBadge()
         Spacer(Modifier.weight(1f))
         if (selected && !locked) {
-            Icon(Icons.Filled.Check, null, tint = palette.accent, modifier = Modifier.size(18.dp))
+            // iOS `checkmark` at 14 pt bold.
+            Icon(com.handstrudel.ui.theme.StudioIcons.Checkmark, null, tint = palette.accent, modifier = Modifier.size(18.dp))
         }
     }
 }

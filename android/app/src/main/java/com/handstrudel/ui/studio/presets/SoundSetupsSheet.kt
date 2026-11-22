@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -36,8 +35,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -167,7 +164,7 @@ fun SoundSetupsSheet(onApply: (SoundSetup) -> Unit, onDismiss: () -> Unit) {
                             }
                             .testTag("preset-transfer"),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Filled.SwapVert, null, tint = palette.accent) }
+                    ) { Icon(com.handstrudel.ui.theme.StudioIcons.ArrowUpArrowDown, null, tint = palette.accent, modifier = Modifier.size(26.dp)) }
                     DropdownMenu(expanded = transferMenu, onDismissRequest = { transferMenu = false }) {
                         DropdownMenuItem(
                             text = { Text("Import preset file") },
@@ -191,23 +188,29 @@ fun SoundSetupsSheet(onApply: (SoundSetup) -> Unit, onDismiss: () -> Unit) {
                     item { ListSectionTitle("Current sound") }
                     item {
                         ListGroup {
-                            OutlinedTextField(
+                            // iOS `Form { TextField("Preset name") }`: a borderless 17 pt field in
+                            // the row, placeholder in the tertiary label colour, inset divider below.
+                            androidx.compose.foundation.text.BasicTextField(
                                 value = name,
                                 onValueChange = { name = it },
                                 singleLine = true,
-                                placeholder = { Text("Preset name") },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = palette.accent, unfocusedBorderColor = palette.border,
-                                    cursorColor = palette.accent, focusedTextColor = palette.ink, unfocusedTextColor = palette.ink,
-                                ),
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).testTag("preset-name"),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp, color = palette.ink),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(palette.accent),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).testTag("preset-name"),
+                                decorationBox = { inner ->
+                                    Box(Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(horizontal = 20.dp), contentAlignment = Alignment.CenterStart) {
+                                        if (name.isEmpty()) Text("Preset name", fontSize = 17.sp, color = palette.muted.copy(alpha = 0.6f))
+                                        inner()
+                                    }
+                                },
                             )
+                            Box(Modifier.padding(start = 20.dp).fillMaxWidth().height(0.5.dp).background(palette.border))
                             val canSave = ControlSheetLogic.canSavePreset(name, current, setups)
                             ListRow(enabled = canSave, modifier = Modifier.testTag("preset-save"), onClick = {
                                 // iOS ignores a rejected save (duplicate / invalid) silently.
                                 if (engine.addPreset(current, ControlSheetLogic.cleanPresetName(name))) name = ""
                             }) {
-                                Text("Save current preset", fontSize = 16.sp, color = if (canSave) palette.accent else palette.muted.copy(alpha = 0.5f))
+                                Text("Save current preset", fontSize = 17.sp, color = if (canSave) palette.accent else palette.muted.copy(alpha = 0.6f))
                             }
                         }
                     }
@@ -218,7 +221,7 @@ fun SoundSetupsSheet(onApply: (SoundSetup) -> Unit, onDismiss: () -> Unit) {
                         if (setups.isEmpty()) {
                             Text(
                                 "Save a sound from the studio or from a performance in the feed.",
-                                fontSize = 15.sp, color = palette.muted, modifier = Modifier.padding(16.dp),
+                                fontSize = 17.sp, color = palette.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 11.dp),
                             )
                         }
                         setups.forEach { setup ->
@@ -280,11 +283,11 @@ private fun PresetRow(
     ) {
         Row(
             Modifier.weight(1f).heightIn(min = 56.dp).clickable(enabled = valid, role = Role.Button) { onUse(locked) }
-                .alpha(if (locked || !valid) 0.5f else 1f).padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                .alpha(if (locked || !valid) 0.5f else 1f).padding(start = 20.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(setup.name, fontSize = 16.sp, color = palette.ink)
+                Text(setup.name, fontSize = 17.sp, color = palette.ink)
                 Text(ControlSheetLogic.presetSubtitle(setup.sound), fontSize = 12.sp, color = palette.muted)
             }
             if (locked) {
@@ -321,8 +324,9 @@ private fun PresetRow(
 private fun ListSectionTitle(title: String) {
     val palette = LocalStudioPalette.current
     Text(
-        title.uppercase(), fontSize = 12.sp, color = palette.muted,
-        modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 20.dp, bottom = 6.dp),
+        title.uppercase(), fontSize = 13.sp, color = palette.muted,
+        // iOS inset-grouped section header: 20 pt card inset + 20 pt text inset.
+        modifier = Modifier.padding(start = 40.dp, end = 40.dp, top = 24.dp, bottom = 7.dp),
     )
 }
 
@@ -330,15 +334,15 @@ private fun ListSectionTitle(title: String) {
 private fun ListGroup(content: @Composable () -> Unit) {
     val palette = LocalStudioPalette.current
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(12.dp)).background(palette.surface),
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp).clip(RoundedCornerShape(10.dp)).background(palette.surface),
     ) { content() }
 }
 
 @Composable
 private fun ListRow(enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit, content: @Composable () -> Unit) {
     Row(
-        modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp),
+        modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         content()

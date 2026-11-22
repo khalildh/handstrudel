@@ -198,14 +198,16 @@ fun ScalePickerSheet(onDismiss: () -> Unit) {
             item { SectionLabel("Your scales") }
             item {
                 Row(
-                    Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("create-custom-scale")
+                    Modifier.fillMaxWidth().heightIn(min = 44.dp).testTag("create-custom-scale")
                         .clickable { if (hasPro) editor = EditorRequest(null) else paywall.open(PRO) }
                         .padding(horizontal = 20.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Icon(Icons.Filled.AddCircleOutline, null, tint = palette.accent, modifier = Modifier.size(20.dp))
-                    Text("Create Custom Scale", fontSize = 15.sp, color = palette.accent)
+                    // iOS List `Label("Create Custom Scale", systemImage: "plus.circle")`: tinted
+                    // glyph, primary-colour 17 pt title.
+                    Icon(Icons.Filled.AddCircleOutline, null, tint = palette.accent, modifier = Modifier.size(22.dp))
+                    Text("Create Custom Scale", fontSize = 17.sp, color = palette.ink)
                     Spacer(Modifier.weight(1f))
                     if (!hasPro) LockBadge()
                 }
@@ -261,8 +263,8 @@ private data class EditorRequest(val scale: CustomScale?)
 private fun SectionLabel(text: String) {
     val palette = LocalStudioPalette.current
     Text(
-        text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.muted,
-        modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp),
+        text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.muted,
+        modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 6.dp),
     )
 }
 
