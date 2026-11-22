@@ -627,6 +627,7 @@ class CaptureControllerImpl(
                 }
                 stopBacking()
                 track.setVolume(prefs.playAlongBackingVolume.value)
+                track.onError = { error -> onBackingError(track, error) }
                 backing = track
                 _state.update { it.copy(backing = BackingState(track.credit, volume = BackingTrackVolume.clamped(prefs.playAlongBackingVolume.value))) }
                 navigator?.select(Destination.Music)
@@ -662,6 +663,23 @@ class CaptureControllerImpl(
         val ok = track.play()
         setBackingPlaying(ok)
         if (!ok) soundError("Couldn't start the backing audio. Tap Play to try again.")
+    }
+
+    /**
+     * ExoPlayer reports playback failures asynchronously, after `play()` returned. Treat them
+     * like iOS treats `AVAudioPlayer.play()` returning false: block the take while recording
+     * (so it isn't shared without its backing), otherwise ask to try again.
+     */
+    private fun onBackingError(track: BackingTrack, error: Exception) {
+        if (backing !== track) return
+        Log.w(TAG, "backing playback failed", error)
+        setBackingPlaying(false)
+        if (recording) {
+            recordingError("The backing track couldn't start. Check the take before sharing.")
+            stopRecording()
+        } else {
+            soundError("Couldn't start the backing audio. Tap Play to try again.")
+        }
     }
 
     private fun stopBacking() {
