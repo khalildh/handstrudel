@@ -1,7 +1,27 @@
 package com.handstrudel.ui.studio.overlays
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -61,15 +81,46 @@ fun SplitScaleWheelOverlay(scaleMode: Boolean, touchEnabled: Boolean, modifier: 
     val melodyCount = max(1, if (scaleMode && cm.melodyLaneCount == melodyNames.size) cm.melodyLaneCount else melodyNames.size)
 
     var touches by remember { mutableStateOf<Map<Long, Zone>>(emptyMap()) }
-    val touchedChords = touches.values.filterIsInstance<Zone.Chord>().map { it.sub }.toSet() +
+    // Accessibility previews (iOS `previewVoices`): voice id → zone, lit like a touch.
+    val previews = remember { mutableStateMapOf<String, Zone>() }
+    val active = touches.values + previews.values
+    val touchedChords = active.filterIsInstance<Zone.Chord>().map { it.sub }.toSet() +
         cm.touchedChordZones.map { ChordSubzone(it.wedge, it.octave) }
-    val touchedLanes = touches.values.filterIsInstance<Zone.Melody>().map { it.lane }.toSet() + cm.touchedMelodyLanes
+    val touchedLanes = active.filterIsInstance<Zone.Melody>().map { it.lane }.toSet() + cm.touchedMelodyLanes
+
+    fun enter(id: String, zone: Zone) = when (zone) {
+        is Zone.Chord ->
+            if (scaleMode) engine.scaleTouchEnterChord(id, zone.sub.wedge, zone.sub.octave)
+            else engine.splitTouchEnterChord(id, zone.sub.wedge, zone.sub.octave)
+        is Zone.Melody ->
+            if (scaleMode) engine.scaleTouchEnterMelody(id, zone.lane)
+            else engine.splitTouchEnterMelody(id, zone.lane)
+    }
+    fun exit(id: String) = if (scaleMode) engine.scaleTouchExit(id) else engine.splitTouchExit(id)
+
+    // iOS `preview(_:)`: a 0.32 s note per activation, at most 8 at once.
+    val scope = rememberCoroutineScope()
+    fun preview(zone: Zone): Boolean {
+        if (!touchEnabled || previews.size >= 8) return false
+        val id = "splittouch-a11y-${nextPreviewVoice++}"
+        previews[id] = zone
+        enter(id, zone)
+        scope.launch {
+            delay(320)
+            if (previews.remove(id) != null) exit(id)
+        }
+        return true
+    }
+    // Release any preview still sounding when the wheel goes away.
+    DisposableEffect(Unit) { onDispose { previews.keys.toList().forEach { exit(it) }; previews.clear() } }
     // iOS `currentMelodyOctaveShift` (Scale mode's melody ±1 band).
     val melodyOctaveShift = cm.melodyOctaveShift
 
     val measurer = rememberTextMeasurer()
+    var boxSize by remember { mutableStateOf(IntSize.Zero) }
+    Box(modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
     Canvas(
-        modifier
+        Modifier
             .fillMaxSize()
             .testTag(if (scaleMode) "scale-wheel" else "split-wheel")
             .zoneMultitouch(
@@ -77,17 +128,8 @@ fun SplitScaleWheelOverlay(scaleMode: Boolean, touchEnabled: Boolean, modifier: 
                 resolve = { p, size ->
                     WheelGeometry.splitZoneForPoint(p.x, p.y, size.width.toFloat(), size.height.toFloat(), zoneCount, melodyCount, swap)
                 },
-                onEnter = { id, zone ->
-                    when (zone) {
-                        is Zone.Chord ->
-                            if (scaleMode) engine.scaleTouchEnterChord(id, zone.sub.wedge, zone.sub.octave)
-                            else engine.splitTouchEnterChord(id, zone.sub.wedge, zone.sub.octave)
-                        is Zone.Melody ->
-                            if (scaleMode) engine.scaleTouchEnterMelody(id, zone.lane)
-                            else engine.splitTouchEnterMelody(id, zone.lane)
-                    }
-                },
-                onExit = { id -> if (scaleMode) engine.scaleTouchExit(id) else engine.splitTouchExit(id) },
+                onEnter = { id, zone -> enter(id, zone) },
+                onExit = { id -> exit(id) },
                 onActiveChanged = { touches = it },
             ),
     ) {
@@ -138,7 +180,46 @@ fun SplitScaleWheelOverlay(scaleMode: Boolean, touchEnabled: Boolean, modifier: 
             drawText(layout, topLeft = Offset(center.x - layout.size.width / 2f, center.y - layout.size.height / 2f))
         }
     }
+
+    // iOS per-wedge accessibility elements (only while the wheel takes touches). They carry
+    // semantics only, no pointer input, so finger touches still reach the wheel above.
+    if (touchEnabled && boxSize != IntSize.Zero) {
+        val density = LocalDensity.current
+        val wedges = WheelGeometry.splitAccessibleWedges(
+            boxSize.width.toFloat(), boxSize.height.toFloat(),
+            chordLabels = chordNames,
+            melodyLabels = melodyMidis.map { StudioMusic.midiNoteName(it) },
+            swapHands = swap,
+            minSize = with(density) { 22.dp.toPx() }, maxSize = with(density) { 44.dp.toPx() },
+        )
+        for (w in wedges) {
+            val side = with(density) { w.size.toDp() }
+            Box(
+                Modifier
+                    .offset { IntOffset((w.x - w.size / 2).roundToInt(), (w.y - w.size / 2).roundToInt()) }
+                    .size(side)
+                    .testTag(w.id)
+                    .semantics {
+                        contentDescription = w.label
+                        role = Role.Button
+                        // TalkBack reads this as "Double-tap to play" (iOS hint).
+                        onClick(label = "play") { preview(w.zone) }
+                        val chord = w.zone as? Zone.Chord
+                        if (chord != null) {
+                            customActions = listOf(
+                                CustomAccessibilityAction("Play an octave lower") { preview(Zone.Chord(ChordSubzone(chord.sub.wedge, -1))) },
+                                CustomAccessibilityAction("Play an octave higher") { preview(Zone.Chord(ChordSubzone(chord.sub.wedge, 1))) },
+                            )
+                        }
+                    },
+            )
+        }
+    }
+    }
 }
+
+/** iOS `SplitTouchUIView.nextVoiceCounter`. */
+private var nextPreviewVoice = 0
 
 private fun labelStyle(size: Float, color: Color, shadowAlpha: Float = 0.6f, weight: FontWeight = FontWeight.Black) =
     TextStyle(
