@@ -13,6 +13,7 @@ import com.handstrudel.social.model.Profile
 import com.handstrudel.social.model.Video
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.OtpType
+import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.providers.builtin.OTP
@@ -67,6 +68,26 @@ class AuthManager(
             signOut()
             return AccountDeletionResult.DELETED
         }
+
+        /** supabase-swift `Session.isExpired`: a token expiring within 30 s counts as expired. */
+        const val EXPIRY_MARGIN_MILLIS = 30_000L
+
+        fun isExpired(expiresAtMillis: Long, nowMillis: Long): Boolean = expiresAtMillis - nowMillis < EXPIRY_MARGIN_MILLIS
+
+        /**
+         * The session the UI treats as signed in, given a supabase-kt status (iOS `apply(_:)`
+         * signs the UI out for a missing or expired session). [lastSession] is the last
+         * Authenticated session: during [SessionStatus.RefreshFailure] (offline, server error)
+         * supabase-kt keeps retrying, so the UI stays signed in until that token expires.
+         */
+        fun activeSession(status: SessionStatus, lastSession: UserSession?, nowMillis: Long): UserSession? {
+            val session = when (status) {
+                is SessionStatus.Authenticated -> status.session
+                is SessionStatus.RefreshFailure -> lastSession
+                is SessionStatus.NotAuthenticated, SessionStatus.Initializing -> null
+            }
+            return session?.takeUnless { isExpired(it.expiresAt.toEpochMilliseconds(), nowMillis) }
+        }
     }
 
     enum class AccountDeletionResult { DELETED, UNCONFIRMED }
@@ -103,15 +124,39 @@ class AuthManager(
 
     private var profileRequest = UUID.randomUUID()
 
+    /** The last Authenticated session (kept through refresh failures to check its expiry). */
+    private var lastSession: UserSession? = null
+    private var expiryJob: kotlinx.coroutines.Job? = null
+
     init {
         scope.launch {
             auth.sessionStatus.collect { status ->
-                when (status) {
-                    is SessionStatus.Authenticated -> { _initialized.value = true; apply(status.session) }
-                    is SessionStatus.NotAuthenticated -> { _initialized.value = true; apply(null) }
-                    is SessionStatus.RefreshFailure -> _initialized.value = true // keep the session; refresh retries
-                    SessionStatus.Initializing -> Unit
+                if (status is SessionStatus.Initializing) return@collect
+                _initialized.value = true
+                lastSession = when (status) {
+                    is SessionStatus.Authenticated -> status.session
+                    is SessionStatus.NotAuthenticated -> null
+                    else -> lastSession
                 }
+                applyStatus(status)
+            }
+        }
+    }
+
+    /**
+     * iOS signs the UI out when the session has expired. While supabase-kt can't refresh
+     * (offline, server error) it keeps retrying in RefreshFailure; once the old token runs
+     * out, the UI shows signed out, and a later successful refresh signs it back in.
+     */
+    private fun applyStatus(status: SessionStatus) {
+        expiryJob?.cancel()
+        val session = activeSession(status, lastSession, System.currentTimeMillis())
+        apply(session)
+        if (session != null && status is SessionStatus.RefreshFailure) {
+            val wait = session.expiresAt.toEpochMilliseconds() - EXPIRY_MARGIN_MILLIS - System.currentTimeMillis()
+            expiryJob = scope.launch {
+                kotlinx.coroutines.delay(wait.coerceAtLeast(0))
+                if (auth.sessionStatus.value is SessionStatus.RefreshFailure) applyStatus(auth.sessionStatus.value)
             }
         }
     }
@@ -255,8 +300,9 @@ class AuthManager(
         _profile.value = updated.copy(avatarKey = result.avatarKey)
     }
 
+    /** iOS `signOut()`: supabase-swift revokes every session (`.global`); supabase-kt defaults to LOCAL. */
     suspend fun signOut() {
-        runCatching { auth.signOut() }
+        runCatching { auth.signOut(SignOutScope.GLOBAL) }
         if (auth.currentSessionOrNull() != null) runCatching { auth.clearSession() }
     }
 
