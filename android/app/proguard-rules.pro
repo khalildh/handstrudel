@@ -1,6 +1,11 @@
 # ---- MediaPipe (reflection + JNI) -------------------------------------------------
 -keep class com.google.mediapipe.** { *; }
 -dontwarn com.google.mediapipe.proto.**
+# MediaPipe's TaskRunner logs through Flogger, which finds its caller by class name on the stack.
+-keep class com.google.common.flogger.** { *; }
+-dontwarn com.google.common.flogger.**
+# Task options/results are protobuf-lite messages read reflectively.
+-keep class * extends com.google.protobuf.GeneratedMessageLite { *; }
 # AutoValue's processor ships inside a MediaPipe dependency; its javax.lang.model refs are compile-time only.
 -dontwarn javax.lang.model.**
 -dontwarn autovalue.shaded.**
