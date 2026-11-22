@@ -1,5 +1,6 @@
 package com.handstrudel.capture
 
+import android.os.Build
 import android.app.Activity
 import android.app.Application
 import android.content.Context
@@ -128,6 +129,8 @@ class CaptureControllerImpl(
     private var consentResult: CompletableDeferred<Any?>? = null
     private var launchedConsentId = 0
     private var explainerShown = false
+    /** The session's screen-capture consent, kept on Android 10-13 to restart the projection silently. */
+    private var reusableConsent: Pair<Int, Intent>? = null
 
     private val uploaders = mutableMapOf<UUID, VideoUploader>()
 
@@ -214,6 +217,8 @@ class CaptureControllerImpl(
 
     private fun onProjectionStopped() {
         // The user or the system ended screen capture (status-bar chip, another app took over…).
+        // Don't silently restart it for the next take.
+        reusableConsent = null
         if (activeLoop != null && _state.value.isLoopCapturing) {
             resolveAudioLoop(activeLoop!!, interrupted = true)
             return
@@ -258,6 +263,10 @@ class CaptureControllerImpl(
      */
     private suspend fun ensureProjection(): Boolean? {
         if (CaptureProjection.isActive) return true
+        reusableConsent?.let { (code, data) ->
+            if (startProjection(code, data)) return true
+            reusableConsent = null // the system no longer honours it: ask again
+        }
         if (!AppAudioCapture.hasRecordPermission(context)) ask(ConsentStep.AUDIO_PERMISSION)
         if (!explainerShown) {
             if (ask(ConsentStep.EXPLAINER) != true) return null
@@ -268,6 +277,11 @@ class CaptureControllerImpl(
         val data = result.second as? Intent
         if (code != Activity.RESULT_OK || data == null) return null
         Log.d(TAG, "screen capture granted; starting the projection service")
+        if (ProjectionPolicy.canReuseConsent(Build.VERSION.SDK_INT)) reusableConsent = code to data
+        return startProjection(code, data)
+    }
+
+    private suspend fun startProjection(code: Int, data: Intent): Boolean {
         val started = CaptureProjection.beginStart()
         CaptureService.start(context, code, data)
         return try {
@@ -465,9 +479,19 @@ class CaptureControllerImpl(
         }
     }
 
-    /** Release the projection if the session ended while a take or loop was finishing. */
+    /**
+     * Release the projection when nothing is capturing: always once the session has ended,
+     * and between takes where Android lets the consent be reused (see [ProjectionPolicy]) so
+     * the system's screen-capture indicator goes away like iOS's does after a take.
+     */
     private fun releaseProjectionIfIdle() {
-        if (!engine.isRunning.value && !recording && activeLoop == null) CaptureService.stop(context)
+        if (recording || activeLoop != null) return
+        if (!engine.isRunning.value) {
+            reusableConsent = null
+            CaptureService.stop(context)
+        } else if (reusableConsent != null) {
+            CaptureService.stop(context)
+        }
     }
 
     private fun completeLiveRecording(draft: RecordingDraft) {
