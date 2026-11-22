@@ -234,13 +234,14 @@ private fun OctaveCell(
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     ZonesGeometry.romanNumeral(degree),
-                    fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded, maxLines = 1, softWrap = false,
-                    color = if (isCurrentZone) Color.White else Color.White.copy(alpha = 0.55f),
+                    // iOS `Text` has no line limit here: a narrow lane wraps "vii°" / "TONIC".
+                    fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = StudioFonts.Rounded,
+                    color = if (isCurrentZone) Color.White else Color.White.copy(alpha = 0.55f), textAlign = TextAlign.Center,
                 )
                 val label = ZonesGeometry.degreeLabel(degree)
                 Text(
                     label,
-                    fontSize = 9.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded, maxLines = 1, softWrap = false,
+                    fontSize = 9.sp, fontWeight = FontWeight.SemiBold, fontFamily = StudioFonts.Rounded,
                     color = Color.White.copy(alpha = if (isCurrentZone) 0.7f else 0.4f),
                     textAlign = TextAlign.Center,
                 )

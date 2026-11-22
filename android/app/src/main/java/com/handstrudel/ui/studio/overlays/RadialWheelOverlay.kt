@@ -339,6 +339,27 @@ internal fun DrawScope.glowRoundRect(color: Color, radiusPx: Float, cornerPx: Fl
 internal fun Modifier.iosGlow(color: Color, radiusDp: Float, cornerDp: Float): Modifier =
     if (color.alpha <= 0f) this else drawBehind { glowRoundRect(color, radiusDp.dp.toPx(), cornerDp.dp.toPx()) }
 
+/**
+ * iOS draws the octave hints as `Text("↑")`/`Text("↓")` in the SF system font (bold). The
+ * Rounded stand-in has no arrow glyph, so the fallback rendered a hairline arrow about half
+ * the size; draw SF's arrow instead: an 11 pt bold arrow is ~8.3 pt tall with a ~6.6 pt head
+ * and a ~1.3 pt stroke. [fontSize] is the iOS point size (11 chord, 9 melody).
+ */
+internal fun DrawScope.drawArrowGlyph(at: Pair<Float, Float>, up: Boolean, fontSize: Float, color: Color, shadowAlpha: Float = 0f) {
+    val u = (fontSize / 11f) * 1.dp.toPx()
+    val half = 4.15f * u
+    val head = 3.3f * u
+    val d = if (up) -1f else 1f
+    val (x, y) = at
+    val path = androidx.compose.ui.graphics.Path().apply {
+        moveTo(x, y - d * half); lineTo(x, y + d * half)
+        moveTo(x - head, y + d * (half - head)); lineTo(x, y + d * half); lineTo(x + head, y + d * (half - head))
+    }
+    val stroke = Stroke(width = 1.35f * u, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+    if (shadowAlpha > 0f) drawPath(path, Color.Black.copy(alpha = shadowAlpha * 0.5f), style = Stroke(width = 3.5f * u, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+    drawPath(path, color, style = stroke)
+}
+
 internal fun DrawScope.drawCenteredText(measurer: TextMeasurer, text: String, at: Pair<Float, Float>, style: TextStyle) {
     if (text.isEmpty()) return
     val layout = measurer.measure(text, style, maxLines = 1, softWrap = false)

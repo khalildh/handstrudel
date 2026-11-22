@@ -263,10 +263,10 @@ private fun DrawScope.drawChordHalf(
         )
         val sign = if (chordIsRight) -1 else 1
         val arrowR = (octaveR + outerR) / 2f
-        drawCenteredText(measurer, "↑", WheelGeometry.polar(center.x, center.y, centerAngle + sign * wedge / 4, arrowR),
-            labelStyle(11f, if (upActive) Color.White else Color.White.copy(alpha = 0.35f), weight = FontWeight.Bold))
-        drawCenteredText(measurer, "↓", WheelGeometry.polar(center.x, center.y, centerAngle - sign * wedge / 4, arrowR),
-            labelStyle(11f, if (downActive) Color.White else Color.White.copy(alpha = 0.35f), weight = FontWeight.Bold))
+        drawArrowGlyph(WheelGeometry.polar(center.x, center.y, centerAngle + sign * wedge / 4, arrowR), up = true, fontSize = 11f,
+            color = if (upActive) Color.White else Color.White.copy(alpha = 0.35f), shadowAlpha = 0.6f)
+        drawArrowGlyph(WheelGeometry.polar(center.x, center.y, centerAngle - sign * wedge / 4, arrowR), up = false, fontSize = 11f,
+            color = if (downActive) Color.White else Color.White.copy(alpha = 0.35f), shadowAlpha = 0.6f)
     }
 }
 
@@ -359,9 +359,9 @@ private fun DrawScope.drawScaleMelodyHalf(
         val upMid = if (melodyIsRight) c - wedge / 4 else c + wedge / 4
         val dnMid = if (melodyIsRight) c + wedge / 4 else c - wedge / 4
         val arrowR = (octaveR + outerR) / 2f
-        drawCenteredText(measurer, "↑", WheelGeometry.polar(center.x, center.y, upMid, arrowR),
-            labelStyle(9f, if (isCurrent && octaveShift == 1) Color.White else tone.copy(alpha = 0.35f), 0f, FontWeight.Bold))
-        drawCenteredText(measurer, "↓", WheelGeometry.polar(center.x, center.y, dnMid, arrowR),
-            labelStyle(9f, if (isCurrent && octaveShift == -1) Color.White else tone.copy(alpha = 0.35f), 0f, FontWeight.Bold))
+        drawArrowGlyph(WheelGeometry.polar(center.x, center.y, upMid, arrowR), up = true, fontSize = 9f,
+            color = if (isCurrent && octaveShift == 1) Color.White else tone.copy(alpha = 0.35f))
+        drawArrowGlyph(WheelGeometry.polar(center.x, center.y, dnMid, arrowR), up = false, fontSize = 9f,
+            color = if (isCurrent && octaveShift == -1) Color.White else tone.copy(alpha = 0.35f))
     }
 }
