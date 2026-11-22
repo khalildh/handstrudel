@@ -123,20 +123,50 @@ internal object EngineDebugReceiver {
         }
     }
 
-    /** Real MediaPipe on real images, standing in for CameraX when the emulator has no hands to film. */
+    /** Bumped by each `handframes` command; an older playback thread stops when it changes. */
+    private val handFramesGeneration = java.util.concurrent.atomic.AtomicInteger(0)
+    private val handFramesLock = Any()
+    private var lastFrameTimestamp = 0L
+
+    /**
+     * MediaPipe's live-stream mode needs strictly increasing timestamps. Two overlapping
+     * playbacks used to interleave the same clock reading and crash the graph ("received
+     * packets having a smaller timestamp"), so frames are stamped from one monotonic clock.
+     */
+    private fun feedFrame(e: HandStrudelEngine, raw: android.graphics.Bitmap) {
+        val frame = com.handstrudel.ui.studio.orientFrameForDetection(raw, 0)
+        synchronized(handFramesLock) {
+            lastFrameTimestamp = maxOf(android.os.SystemClock.uptimeMillis(), lastFrameTimestamp + 1)
+            e.handTracker.detectAsync(frame, lastFrameTimestamp)
+        }
+    }
+
+    /**
+     * Real MediaPipe on real images, standing in for CameraX when the emulator has no hands to
+     * film. A new command replaces the running one; when playback ends a few blank frames are
+     * sent so the stage drops the hands instead of freezing on the last pose.
+     */
     private fun playHandFrames(e: HandStrudelEngine, seconds: Double) {
         val dir = java.io.File(appContext.filesDir, "handframes")
         val files = dir.listFiles { f -> f.extension.lowercase() in setOf("jpg", "jpeg", "png") }?.sortedBy { it.name }.orEmpty()
         if (files.isEmpty()) { Log.w(TAG, "handframes: no images in $dir"); return }
+        val generation = handFramesGeneration.incrementAndGet()
         Thread {
             val frames = files.mapNotNull { android.graphics.BitmapFactory.decodeFile(it.path) }
             if (frames.isEmpty()) { Log.w(TAG, "handframes: no readable images in $dir"); return@Thread }
             val end = android.os.SystemClock.uptimeMillis() + (seconds * 1000).toLong()
             var i = 0
-            while (android.os.SystemClock.uptimeMillis() < end) {
+            while (android.os.SystemClock.uptimeMillis() < end && handFramesGeneration.get() == generation) {
                 val raw = frames[i++ % frames.size]
-                e.handTracker.detectAsync(com.handstrudel.ui.studio.orientFrameForDetection(raw, 0), android.os.SystemClock.uptimeMillis())
+                feedFrame(e, raw)
                 Thread.sleep(33)
+            }
+            if (handFramesGeneration.get() == generation) {
+                val blank = android.graphics.Bitmap.createBitmap(frames[0].width, frames[0].height, android.graphics.Bitmap.Config.ARGB_8888)
+                repeat(3) {
+                    feedFrame(e, blank)
+                    Thread.sleep(33)
+                }
             }
             Log.i(TAG, "handframes: played $i frames from ${frames.size} images")
         }.start()
