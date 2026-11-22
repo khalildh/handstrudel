@@ -172,7 +172,8 @@ private fun SettingsHeader(
                     modifier = Modifier.semantics { heading() },
                 )
                 Spacer(Modifier.weight(1f).widthIn(min = 4.dp))
-                Box(
+                // No RevenueCat key in this build: nothing to sell, so no Store entry.
+                if (com.handstrudel.app.LocalAppServices.current.store.isConfigured) Box(
                     Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).clickable(role = Role.Button, onClick = onStore)
                         .semantics { contentDescription = "Store" }.testTag("music-settings-store"),
                     contentAlignment = Alignment.Center,
