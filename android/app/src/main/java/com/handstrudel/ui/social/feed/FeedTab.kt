@@ -140,6 +140,20 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
     }
     val generation by pool.generation.collectAsState()
 
+    // Hardware decoders are scarce (the emulator's pool ran out and a post failed with NO_MEMORY).
+    // A stage session, recording, draft previews and exports need them, so the feed lets go of
+    // its pre-warmed players then and warms them again when the Feed is next shown. At launch it
+    // stays warm on the Music tab (iOS a09c0631 warms the first clip at launch).
+    val sessionRunning by services.engine.isRunning.collectAsState()
+    val decoderDemand by com.handstrudel.capture.VideoDecoderDemand.active.collectAsState()
+    var keepWarm by remember { mutableStateOf(true) }
+    LaunchedEffect(isActive, sessionRunning, decoderDemand) {
+        if (isActive) keepWarm = true
+        else if (sessionRunning || decoderDemand) keepWarm = false
+    }
+    val holdsPlayers = isActive || keepWarm
+    LaunchedEffect(holdsPlayers) { if (!holdsPlayers) pool.releaseAll() }
+
     val userId by auth.userId.collectAsState()
     val videos by model.videos.collectAsState()
     val current by model.current.collectAsState()
@@ -353,7 +367,7 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
     }
 
     // ---- Selection: one visit restarts the clip -------------------------------------------
-    val currentClip = selectedVideo?.let { video -> remember(video.id, generation) { pool.acquire(video) } }
+    val currentClip = selectedVideo?.takeIf { holdsPlayers }?.let { video -> remember(video.id, generation) { pool.acquire(video) } }
     DisposableEffect(currentClip) { onDispose { currentClip?.let(pool::release) } }
     LaunchedEffect(selectedVideo?.id) { currentClip?.prepareForVisit() }
 
@@ -363,7 +377,7 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
             .then(if (isActive) Modifier.semantics { testTagsAsResourceId = true } else Modifier.clearAndSetSemantics { }),
     ) {
         val viewportHeight = maxHeight
-        if (hasVideos) {
+        if (hasVideos && holdsPlayers) {
             VerticalPager(
                 state = pagerState,
                 // Warm only the selected clip while the tab is hidden (iOS a09c0631).
@@ -396,7 +410,7 @@ fun FeedTab(isActive: Boolean, onFullscreenChanged: (Boolean) -> Unit, tabBar: @
                     onAccessibilityMove = { movePage(it) },
                 )
             }
-        } else {
+        } else if (!hasVideos) {
             EmptyState(
                 loading = loading, error = error, followingOnly = mode == FeedMode.FOLLOWING, signedIn = signedIn,
                 confirmedNoFollows = confirmedNoFollows,

@@ -171,6 +171,7 @@ internal fun DraftEditor(
             player.release()
         }
     }
+    com.handstrudel.capture.HoldVideoDecoders()
 
     val savedTrim = DraftTrimSelection.of(duration, draft.trimStart, draft.trimEnd)
     val canExport = savedTrim != null && pendingTrim == null

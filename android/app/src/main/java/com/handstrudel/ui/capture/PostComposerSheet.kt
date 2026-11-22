@@ -97,6 +97,7 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
         }
     }
     DisposableEffect(player) { onDispose { player.release() } }
+    com.handstrudel.capture.HoldVideoDecoders()
     LaunchedEffect(clip) {
         if (credit == null) hasAudio = withContext(Dispatchers.IO) { MediaInfo.hasAudioTrack(clip.file) }
     }

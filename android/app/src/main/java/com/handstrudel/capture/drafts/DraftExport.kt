@@ -164,6 +164,18 @@ object Media {
         removeVideo: Boolean = false,
         videoEffects: List<androidx.media3.common.Effect> = emptyList(),
         configure: (Transformer.Builder) -> Unit = {},
+    ) = com.handstrudel.capture.VideoDecoderDemand.hold { transformOnMain(context, source, output, startSeconds, endSeconds, speed, removeVideo, videoEffects, configure) }
+
+    private suspend fun transformOnMain(
+        context: Context,
+        source: File,
+        output: File,
+        startSeconds: Double,
+        endSeconds: Double?,
+        speed: Float,
+        removeVideo: Boolean,
+        videoEffects: List<androidx.media3.common.Effect>,
+        configure: (Transformer.Builder) -> Unit,
     ) = withContext(Dispatchers.Main) {
         val clipping = MediaItem.ClippingConfiguration.Builder()
             .setStartPositionMs((startSeconds * 1000).toLong())
