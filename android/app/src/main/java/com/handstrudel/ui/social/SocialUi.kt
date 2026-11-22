@@ -362,6 +362,13 @@ fun DialogResizesForKeyboard(): androidx.compose.ui.unit.Dp {
             ?: (view.parent as? androidx.compose.ui.window.DialogWindowProvider))?.window
         @Suppress("DEPRECATION")
         window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+        // Full-screen dialog: let the window cover the system bars too. By default a dialog window
+        // fits the visible status bar, so it was placed below it at full screen height and its
+        // bottom (the comment composer) ran off screen. The content pads itself for the bars.
+        if (window != null && android.os.Build.VERSION.SDK_INT >= 30) {
+            window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+            window.attributes = window.attributes.apply { fitInsetsTypes = 0 }
+        }
         val decor = window?.decorView
         decor?.let {
             androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(it) { v, insets ->
