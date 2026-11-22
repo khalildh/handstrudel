@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ backup rules (capture WS).
+    Private drafts stay on this device, like iOS (PerformanceDrafts is isExcludedFromBackup).
+    Captured loop audio is kept out of cloud backup: a few WAV loops exceed the 25 MB
+    Auto Backup quota, and an app over quota gets no cloud backup at all. Device-to-device
+    transfer has no quota, so loops move with the phone there (iOS backs AudioLoops up).
+    Everything else (shared preferences: settings, presets, loop metadata) is backed up.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="drafts/" />
+        <exclude domain="file" path="loops/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="drafts/" />
+    </device-transfer>
+</data-extraction-rules>

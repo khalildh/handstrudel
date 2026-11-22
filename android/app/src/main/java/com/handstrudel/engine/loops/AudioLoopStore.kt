@@ -21,7 +21,9 @@ import java.util.UUID
  * Main thread.
  */
 class AudioLoopStore(private val dir: File, private val persistence: EnginePersistence) {
-    private val _loops = MutableStateFlow(persistence.loadLoops(dir))
+    // Loop audio is kept out of cloud backup (res/xml/data_extraction_rules.xml), so after a
+    // restore the metadata can outlive its file. Drop those rows instead of showing dead loops.
+    private val _loops = MutableStateFlow(persistence.loadLoops(dir).filter { !it.hasCapturedAudio || it.file?.isFile == true })
     val loops: StateFlow<List<SavedLoop>> = _loops
     private val _playing = MutableStateFlow<Set<UUID>>(emptySet())
     val playing: StateFlow<Set<UUID>> = _playing
