@@ -1,6 +1,7 @@
 package com.handstrudel.capture.upload
 
 import com.handstrudel.capture.drafts.RecordingDrafts
+import com.handstrudel.capture.graphemePrefix
 import com.handstrudel.social.AccountChangedException
 import com.handstrudel.social.SupabaseFunctionsInvoker
 import com.handstrudel.social.model.BackingCredit
@@ -108,7 +109,7 @@ class VideoUploader(
             _phase.value = Phase.Uploading(0.9)
             platform.put(signed.thumbUploadUrl, "image/jpeg", null, ready.thumb)
             val fields = VideoPostFields(
-                caption = caption.take(150), instrument = instrument, mode = mode,
+                caption = caption.graphemePrefix(150), instrument = instrument, mode = mode,
                 durationS = ready.durationSeconds, width = ready.width, height = ready.height,
                 soundSetup = soundSetup, commentsEnabled = if (commentsEnabled) null else false,
                 backingEnabled = if (backingEnabled) true else null, sourceVideoId = backingCredit?.videoId,

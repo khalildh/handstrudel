@@ -204,7 +204,8 @@ class CaptureControllerImpl(
         backing?.pause()
         setBackingPlaying(false)
         when {
-            recording -> stopRecording(interrupted = true)
+            // iOS saves silently when the app goes to the background: no alert, no review.
+            recording -> stopRecording()
             _state.value.isLoopCapturing && activeLoop != null -> finishAudioLoop()
             // The consent and permission dialogs are activities too; don't cancel while they're up.
             !busy && _ui.value.consent == null -> cancelCountdown()
@@ -402,7 +403,7 @@ class CaptureControllerImpl(
             recorder = started
             _state.update { it.copy(isBusy = false, isRecording = true) }
             analytics.record(AppAnalyticsEvent.RECORDING_STARTED)
-            if (!isForeground) { stopRecording(interrupted = true); return@launch }
+            if (!isForeground) { stopRecording(); return@launch }
             if (draft.recordedAtHalfSpeed == true && !engine.supportsHalfSpeedRecording) { stopRecording(); return@launch }
             if (!started.hasAudio) {
                 navigator?.showNotice("Recording without app sound. Allow microphone access in Settings so Android can capture HandStrudel's audio.")
@@ -446,10 +447,14 @@ class CaptureControllerImpl(
             when {
                 !completed -> {
                     drafts.discardUnfinished(draft)
-                    recordingError("Couldn’t save this take. ${(stopError?.message ?: "")}".trim())
+                    // iOS: the delegate interruption vs. a `stopRecording` error.
+                    val prefix = if (interrupted) "Recording stopped before the take could be saved." else "Couldn’t save this take."
+                    recordingError("$prefix ${(stopError?.message ?: "")}".trim())
                 }
-                interrupted || stopError != null ->
+                interrupted ->
                     recordingError("Recording interrupted. Check Private drafts for the saved take.")
+                stopError != null ->
+                    recordingError("Recording was interrupted. Check Private drafts for the saved take.")
                 else -> {
                     if (hadAudio && !heardSound) {
                         navigator?.showNotice("This take has no app sound. Some devices block audio capture.")

@@ -49,6 +49,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.handstrudel.capture.CaptureControllerImpl
+import com.handstrudel.capture.graphemePrefix
 import com.handstrudel.capture.drafts.DraftExport
 import com.handstrudel.capture.drafts.MediaInfo
 import com.handstrudel.capture.drafts.RecordingDraft
@@ -118,7 +119,7 @@ internal fun PostComposerSheet(controller: CaptureControllerImpl, draft: Recordi
                 )
                 OutlinedTextField(
                     value = caption,
-                    onValueChange = { caption = it.take(150) },
+                    onValueChange = { caption = it.graphemePrefix(150) },
                     placeholder = { Text("Say something about it…") },
                     enabled = !locked,
                     minLines = 1, maxLines = 3,
