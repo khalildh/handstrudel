@@ -168,6 +168,9 @@ object Media {
         output.delete()
         suspendCancellableCoroutine { cont ->
             val builder = Transformer.Builder(context)
+                // Encode portrait frames as portrait (720×H, no rotation flag), like iOS bakes the
+                // transform into the pixels. Without it Media3 encodes H×720 with a 90° matrix.
+                .setPortraitEncodingEnabled(true)
                 .setVideoMimeType(MimeTypes.VIDEO_H264)
                 .setAudioMimeType(MimeTypes.AUDIO_AAC)
                 .addListener(object : Transformer.Listener {
