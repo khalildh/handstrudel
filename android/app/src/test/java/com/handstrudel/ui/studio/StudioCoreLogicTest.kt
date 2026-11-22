@@ -201,12 +201,49 @@ class StudioCoreLogicTest {
         assertEquals(GMCategory.SOUND_FX, GMCategory.of(127))
     }
 
-    @Test fun shakeFiresOncePerCooldown() {
+    /** Feeds [gate] 50 Hz samples from [fromMs] to [toMs]; returns the times it fired. */
+    private fun feed(gate: ShakeGate, fromMs: Long, toMs: Long, sample: (Long) -> Triple<Float, Float, Float>): List<Long> {
+        val fired = mutableListOf<Long>()
+        var t = fromMs
+        while (t < toMs) {
+            val (x, y, z) = sample(t)
+            if (gate.onSample(x, y, z, t)) fired += t
+            t += 20
+        }
+        return fired
+    }
+
+    private fun shake(t: Long, amp: Float = 25f, hz: Double = 5.0) =
+        Triple((amp * kotlin.math.sin(2 * Math.PI * hz * t / 1000.0)).toFloat(), 0f, 9.81f)
+
+    @Test fun shakeIgnoresGravityTiltAndBumps() {
         val gate = ShakeGate()
-        assertFalse(gate.onSample(0f, 0f, 9.8f, 0))
-        assertTrue(gate.onSample(30f, 0f, 9.8f, 100))
-        assertFalse(gate.onSample(30f, 0f, 9.8f, 500))
-        assertTrue(gate.onSample(30f, 0f, 9.8f, 1200))
+        // Resting flat, then on its side: gravity alone never fires.
+        assertTrue(feed(gate, 0, 1000) { Triple(0f, 0f, 9.81f) }.isEmpty())
+        assertTrue(feed(gate, 1000, 2000) { Triple(9.81f, 0f, 0f) }.isEmpty())
+        // Slow tilt through 90° over a second.
+        assertTrue(
+            feed(gate, 2000, 3000) {
+                val a = (it - 2000) / 1000.0 * Math.PI / 2
+                Triple((9.81 * kotlin.math.sin(a)).toFloat(), 0f, (9.81 * kotlin.math.cos(a)).toFloat())
+            }.isEmpty(),
+        )
+        // One sharp bump (a tap on the table).
+        assertTrue(feed(gate, 3000, 4000) { if (it in 3500L..3520L) Triple(30f, 0f, 9.81f) else Triple(0f, 0f, 9.81f) }.isEmpty())
+        // Gentle hand-held wobble (~0.3 g).
+        assertTrue(feed(gate, 4000, 6000) { shake(it, amp = 3f, hz = 2.0) }.isEmpty())
+    }
+
+    @Test fun vigorousShakeFiresOncePerCooldown() {
+        val gate = ShakeGate()
+        feed(gate, 0, 500) { Triple(0f, 0f, 9.81f) }
+        val fired = feed(gate, 500, 2600) { shake(it) }
+        assertTrue(fired.isNotEmpty())
+        // First fire within half a second of the shake starting; then at most once per second.
+        assertTrue(fired.first() - 500 <= 500)
+        fired.zipWithNext().forEach { (a, b) -> assertTrue(b - a >= 1000) }
+        // A fresh gate and a short (0.2 s) burst is not a shake.
+        assertTrue(feed(ShakeGate(), 0, 1000) { if (it < 200) shake(it) else Triple(0f, 0f, 9.81f) }.isEmpty())
     }
 
     @Test fun randomizeUsesEntitledScalesAndBpmRange() {
