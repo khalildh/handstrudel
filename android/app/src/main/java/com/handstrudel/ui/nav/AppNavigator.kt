@@ -2,6 +2,7 @@ package com.handstrudel.ui.nav
 
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.handstrudel.engine.PlayInput
 import com.handstrudel.models.SoundSetup
 import com.handstrudel.social.model.PerformanceLink
 import com.handstrudel.social.model.Video
@@ -47,6 +48,12 @@ interface AppNavigator {
      * immediately with true when it already is. Fakes may keep the default.
      */
     fun requestPermission(permission: String, onResult: (granted: Boolean) -> Unit) = onResult(false)
+
+    /**
+     * iOS `changePlayInput` (control sheet PLAY INPUT): persists the choice and switches the
+     * engine. Air asks for the camera first when needed; a denial falls back to touch.
+     */
+    fun changePlayInput(input: PlayInput) = Unit
 }
 
 val LocalAppNavigator: ProvidableCompositionLocal<AppNavigator> =

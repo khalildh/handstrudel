@@ -1,12 +1,19 @@
 package com.handstrudel.engine
 
+import android.Manifest
+import android.app.Activity
+import android.app.Application
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.view.Choreographer
+import android.view.View
 import android.webkit.WebView
+import androidx.core.content.ContextCompat
 import com.handstrudel.BuildConfig
 import com.handstrudel.app.SharedPrefsStore
 import com.handstrudel.engine.audio.SoundFontEngine
@@ -26,6 +33,7 @@ import com.handstrudel.models.ChordProgression
 import com.handstrudel.models.CustomScale
 import com.handstrudel.models.DEFAULT_MAPPING
 import com.handstrudel.models.DEFAULT_PROGRESSION
+import com.handstrudel.models.LearnSong
 import com.handstrudel.models.MusicKey
 import com.handstrudel.models.NOTES
 import com.handstrudel.models.NOTE_DISPLAY
@@ -91,11 +99,29 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     internal val learnManager = LearnModeManager()
     internal val quantize = QuantizeClock()
 
-    /** Portrait screen aspect for the wheel / lane mapping (iOS `UIScreen.main.bounds`). */
-    internal val screenAspect: Double = appContext.resources.displayMetrics.let {
-        val w = minOf(it.widthPixels, it.heightPixels).toDouble()
-        val h = maxOf(it.widthPixels, it.heightPixels).toDouble()
-        if (w > 0 && h > 0) w / h else 0.46
+    /**
+     * Width / height of the stage the wheel / lanes are drawn into, for the hand mapping
+     * (iOS reads the full-screen bounds every tick). Follows the visible activity's content
+     * view (the Stage fills it edge to edge), so fold/unfold and window resizes take effect.
+     */
+    internal var screenAspect: Double = appContext.resources.displayMetrics.let {
+        stageAspect(it.widthPixels.toDouble(), it.heightPixels.toDouble()) ?: 0.46
+    }
+        private set
+
+    private val stageLayoutListener = View.OnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> updateStageAspect(v) }
+
+    private fun updateStageAspect(v: View) {
+        stageAspect(v.width.toDouble(), v.height.toDouble())?.let { screenAspect = it }
+    }
+
+    private fun trackStage(activity: Activity, attach: Boolean) {
+        val content = activity.findViewById<View>(android.R.id.content) ?: return
+        content.removeOnLayoutChangeListener(stageLayoutListener)
+        if (attach) {
+            content.addOnLayoutChangeListener(stageLayoutListener)
+            updateStageAspect(content)
+        }
     }
 
     // =====================================================================================
@@ -231,19 +257,48 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     override fun resume() {
         _isPaused.value = false
         updateLearnPause()
-        loopStore.resumeAll()
+        if (sceneActive) loopStore.resumeAll()
     }
 
+    /**
+     * Shell forwards the activity's ON_START/ON_STOP. The process-wide [foreground] count
+     * decides: ON_STOP only backgrounds the engine once no activity is visible (checked
+     * after the stop has been counted).
+     */
     override fun setSceneActive(active: Boolean) {
+        if (active) applySceneActive(true)
+        else main.post { if (!foreground.isForeground) applySceneActive(false) }
+    }
+
+    /**
+     * iOS has no background audio mode, so going home suspends the app: drum loops, Strudel
+     * patterns, layered audio loops and held notes all go silent, and the session is still
+     * running when the user comes back. The backing track is paused by capture.
+     */
+    private fun applySceneActive(active: Boolean) {
+        val changed = sceneActive != active
         sceneActive = active
         updateLearnPause()
         if (!active) {
             stopInstrumentPreview()
             persistState()
-        } else if (_isRunning.value && handTracker.cameraIssue.value != null) {
-            startCameraIfRequested()
+            if (changed && _isRunning.value) {
+                if (!_isPaused.value) loopStore.pauseAll()
+                silenceAll()
+                clearTouches()
+                currentHands = HandsState()
+                _handsState.value = HandsState()
+            }
+        } else {
+            if (changed && _isRunning.value && !_isPaused.value) {
+                loopStore.resumeAll()
+                lastStructKey = "" // re-evaluate the pattern and drum loops on the next tick
+            }
+            if (_isRunning.value && handTracker.cameraIssue.value != null) startCameraIfRequested()
         }
     }
+
+    private val foreground = ForegroundTracker { visible -> applySceneActive(visible) }
 
     /** Kill all active sounds without stopping the engine (iOS `silenceAll`). */
     override fun silenceAll() {
@@ -284,8 +339,22 @@ class HandStrudelEngine(context: Context) : StudioEngine {
 
     override fun reportCameraIssue(issue: CameraIssue?) = handTracker.reportCameraIssue(issue)
 
+    /**
+     * iOS `HandTrackingManager.startSession`: clear the last issue and re-check camera access
+     * on every start, so access granted later in Settings takes effect. No access reports
+     * PERMISSION_DENIED, which falls back to touch. (The shell asks for the permission
+     * before switching to Air; this is the check, not the prompt.)
+     */
     override fun startCameraIfRequested() {
         if (_playInput.value != PlayInput.AIR) return
+        val issue = handTracker.cameraIssue.value
+        if (handTracker.isActive && issue == null) return
+        handTracker.reportCameraIssue(null)
+        if (ContextCompat.checkSelfPermission(appContext, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            handTracker.isActive = false
+            handTracker.reportCameraIssue(CameraIssue.PERMISSION_DENIED)
+            return
+        }
         handTracker.isActive = true
     }
 
@@ -299,7 +368,7 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     }
 
     private fun handleHandsUpdate(hands: HandsState) {
-        if (_playInput.value != PlayInput.AIR) return
+        if (_playInput.value != PlayInput.AIR || !sceneActive) return
         applyHands(hands)
     }
 
@@ -537,7 +606,7 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     override val drumTrack2: StateFlow<DrumTrackState> = _drum2
     private fun track(n: Int) = if (n == 2) _drum2 else _drum1
     override fun setDrumLoop(track: Int, loopId: String) { track(track).value = track(track).value.copy(loopId = drumLoop(loopId).id) }
-    override fun setDrumVolume(track: Int, volume: Double) { track(track).value = track(track).value.copy(volume = volume.coerceIn(0.0, 1.0)) }
+    override fun setDrumVolume(track: Int, volume: Double) { track(track).value = track(track).value.copy(volume = clampDrumVolume(volume)) }
     override fun setDrumBPM(track: Int, bpm: Double) { track(track).value = track(track).value.copy(bpm = bpm.coerceIn(20.0, 400.0)) }
     private val _drumIntensity = MutableStateFlow(0.5)
     override val drumIntensity: StateFlow<Double> = _drumIntensity
@@ -702,7 +771,8 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     private fun tick() {
         updateManualOverrides()
         ParamSmoother.smooth(rawParams, smoothed)
-        if (_isPaused.value) return
+        // In the background nothing may re-evaluate (iOS is suspended).
+        if (_isPaused.value || !sceneActive) return
         val mode = activeMode
         if (!strudel.isReady && mode !is SoundFontModeController) return
         if (recordingTempoScale != 1.0) {
@@ -775,7 +845,18 @@ class HandStrudelEngine(context: Context) : StudioEngine {
 
     /** iOS `loadLearnSong`: the song sets key, scale and tempo. */
     override fun loadLearnSong(songId: String) {
-        val song = learnSong(songId) ?: return
+        learnSong(songId)?.let(::loadLearnSong)
+    }
+
+    /** iOS `currentLearnSong`. */
+    private var currentLearnSong: LearnSong? = null
+
+    override fun replayLearnSong() {
+        currentLearnSong?.let(::loadLearnSong)
+    }
+
+    private fun loadLearnSong(song: LearnSong) {
+        currentLearnSong = song
         _key.value = song.suggestedKey
         _scale.value = song.suggestedScale
         recomputeScaleNotes()
@@ -815,7 +896,9 @@ class HandStrudelEngine(context: Context) : StudioEngine {
     }
 
     private fun updateLearnPause() {
-        learnManager.setPaused(_isPaused.value || !sceneActive || _mode.value != StudioMode.LEARN, elapsed())
+        // iOS `updateLearnPause`: only the control sheet and the scene pause the song clock;
+        // leaving Learn mode doesn't (the song keeps running and unplayed notes become misses).
+        learnManager.setPaused(_isPaused.value || !sceneActive, elapsed())
     }
 
     // =====================================================================================
@@ -1217,6 +1300,21 @@ class HandStrudelEngine(context: Context) : StudioEngine {
             if (issue == CameraIssue.PERMISSION_DENIED || issue == CameraIssue.RESTRICTED) main.post { fallBackToTouch() }
         }
         handTracker.onHandsDetected = { hands -> main.post { handleHandsUpdate(hands) } }
+        (appContext as? Application)?.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: Activity) {
+                trackStage(activity, attach = true)
+                foreground.activityStarted()
+            }
+            override fun onActivityStopped(activity: Activity) {
+                trackStage(activity, attach = false)
+                foreground.activityStopped()
+            }
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+            override fun onActivityResumed(activity: Activity) = Unit
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
         if (BuildConfig.DEBUG) com.handstrudel.engine.debug.EngineDebugReceiver.register(appContext, this)
     }
 
@@ -1227,6 +1325,13 @@ class HandStrudelEngine(context: Context) : StudioEngine {
         /** `bars × 4 × 60 / bpm`, capped at 90 s. */
         fun loopDuration(bars: Int, bpm: Double): Double =
             minOf(StudioEngine.MAX_LOOP_SECONDS, bars * 4 * 60.0 / bpm.coerceIn(20.0, 400.0))
+
+        /** Width / height of the stage as laid out (iOS `bounds.width / bounds.height`); null when empty. */
+        fun stageAspect(width: Double, height: Double): Double? =
+            if (width > 0 && height > 0 && width.isFinite() && height.isFinite()) width / height else null
+
+        /** The Mix tab's VOL slider runs 20–200% (iOS `Slider(in: 0.2...2.0)`); iOS doesn't clamp further. */
+        fun clampDrumVolume(volume: Double): Double = if (volume.isFinite()) volume.coerceIn(0.0, 2.0) else 1.0
 
         internal fun stackCode(parts: List<String>): String =
             if (parts.isEmpty()) "silence" else if (parts.size == 1) parts[0] else "stack(${parts.joinToString(", ")})"

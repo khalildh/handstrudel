@@ -246,7 +246,7 @@ fun LearnOverlay(touchEnabled: Boolean, onPickSong: () -> Unit, modifier: Modifi
                     songName = songName,
                     score = learn.score,
                     colors = colors,
-                    onPlayAgain = { learn.currentSongId?.let(engine::loadLearnSong) },
+                    onPlayAgain = engine::replayLearnSong,
                     onPickSong = onPickSong,
                 )
             }
