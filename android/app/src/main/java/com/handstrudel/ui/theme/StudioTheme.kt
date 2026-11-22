@@ -2,6 +2,10 @@ package com.handstrudel.ui.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -118,6 +122,28 @@ fun StudioPalette.materialColorScheme(light: Boolean): ColorScheme {
 fun StudioMaterialTheme(theme: StudioTheme, forceDark: Boolean = false, content: @Composable () -> Unit) {
     val palette = theme.palette
     CompositionLocalProvider(LocalStudioPalette provides palette, LocalStudioTheme provides theme) {
-        MaterialTheme(colorScheme = palette.materialColorScheme(light = theme.isLight && !forceDark), content = content)
+        MaterialTheme(
+            colorScheme = palette.materialColorScheme(light = theme.isLight && !forceDark),
+            typography = StudioTypography,
+            content = content,
+        )
     }
+}
+
+/**
+ * Material 3's default type scale adds letter spacing (0.5 sp on body text) and fixed line
+ * heights (24 sp on body text, whatever the font size). Every `Text` inherits `bodyLarge`, so a
+ * 12 sp caption sat in a 24 sp line and tracked wider than iOS, where SwiftUI text has no extra
+ * tracking and uses the font's natural line height. Drop both so explicit `fontSize`s render
+ * like their iOS text styles.
+ */
+val StudioTypography: Typography = Typography().let { t ->
+    fun TextStyle.ios() = copy(letterSpacing = 0.sp, lineHeight = TextUnit.Unspecified)
+    Typography(
+        displayLarge = t.displayLarge.ios(), displayMedium = t.displayMedium.ios(), displaySmall = t.displaySmall.ios(),
+        headlineLarge = t.headlineLarge.ios(), headlineMedium = t.headlineMedium.ios(), headlineSmall = t.headlineSmall.ios(),
+        titleLarge = t.titleLarge.ios(), titleMedium = t.titleMedium.ios(), titleSmall = t.titleSmall.ios(),
+        bodyLarge = t.bodyLarge.ios(), bodyMedium = t.bodyMedium.ios(), bodySmall = t.bodySmall.ios(),
+        labelLarge = t.labelLarge.ios(), labelMedium = t.labelMedium.ios(), labelSmall = t.labelSmall.ios(),
+    )
 }

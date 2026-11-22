@@ -1,6 +1,7 @@
 package com.handstrudel.ui.social
 
-import androidx.compose.material.icons.filled.GraphicEq
+import com.handstrudel.ui.theme.StudioIcons
+
 import androidx.compose.material.icons.Icons
 import com.handstrudel.ui.theme.StudioFonts
 import android.content.ActivityNotFoundException
@@ -100,7 +101,7 @@ fun SocialMaterialTheme(dark: Boolean? = null, content: @Composable () -> Unit) 
         surfaceContainer = p.surface, surfaceContainerHigh = p.surface, surfaceContainerHighest = p.surface,
         surfaceContainerLow = p.background, outline = p.border, secondary = p.accent, error = p.recording,
     )
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(colorScheme = scheme, typography = com.handstrudel.ui.theme.StudioTypography, content = content)
 }
 
 private fun Color.luminance(): Float = 0.2126f * red + 0.7152f * green + 0.0722f * blue
@@ -243,7 +244,7 @@ fun ProfileEyebrow(title: String) {
     val p = LocalStudioPalette.current
     // iOS `Label(title, systemImage: "waveform")`.
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Icon(Icons.Filled.GraphicEq, null, tint = p.accent, modifier = Modifier.size(12.dp))
+        Icon(StudioIcons.Waveform, null, tint = p.accent, modifier = Modifier.size(12.dp))
         Text(title, color = p.accent, fontFamily = StudioFonts.Mono, fontWeight = FontWeight.SemiBold,
             fontSize = 11.sp, letterSpacing = 1.35.sp)
     }
