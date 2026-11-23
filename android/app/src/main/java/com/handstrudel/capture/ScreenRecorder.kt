@@ -89,6 +89,9 @@ class ScreenRecorder(
     val heardSound: Boolean get() = audio?.heardSound == true
     val hasAudio: Boolean get() = audio != null
 
+    /** Whether any video frame reached the file. False means the take can't be played. */
+    val hasVideo: Boolean get() = synchronized(lock) { muxedVideoSamples > 0 }
+
     /**
      * Stops and finalizes the file. Blocking: call off the main thread. Throws if
      * nothing usable was written (the caller then discards the draft).

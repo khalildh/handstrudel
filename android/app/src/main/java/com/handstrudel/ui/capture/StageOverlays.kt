@@ -230,8 +230,17 @@ private fun ConsentFlow() {
             onDismissRequest = { controller.onConsentStepResult(false) },
             title = { Text("Record your stage") },
             text = {
-                Text("Android asks for permission each studio session before HandStrudel can record. " +
-                    "Choose “A single app” and HandStrudel to capture only the stage and its sound.")
+                // Before Android 14 the system dialog has no app picker ("Start now" captures the
+                // whole screen), so don't send people looking for "A single app".
+                Text(
+                    if (Build.VERSION.SDK_INT >= 34) {
+                        "Android asks for permission each studio session before HandStrudel can record. " +
+                            "Choose “A single app” and HandStrudel to capture only the stage and its sound."
+                    } else {
+                        "Android asks for permission each studio session before HandStrudel can record. " +
+                            "Tap “Start now” to record the stage and its sound."
+                    },
+                )
             },
             confirmButton = { TextButton(onClick = { controller.onConsentStepResult(true) }, Modifier.testTag("capture-consent-continue")) { Text("Continue") } },
             dismissButton = { TextButton(onClick = { controller.onConsentStepResult(false) }) { Text("Not now") } },

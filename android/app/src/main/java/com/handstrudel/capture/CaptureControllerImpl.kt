@@ -457,7 +457,9 @@ class CaptureControllerImpl(
             val hadAudio = active.hasAudio
             finishRecordingUI()
             releaseProjectionIfIdle()
-            val completed = runCatching { completeLiveRecording(draft) }.isSuccess
+            // A file with no video frames (the virtual display never delivered one) isn't a take:
+            // discard it instead of keeping an unplayable private draft.
+            val completed = active.hasVideo && runCatching { completeLiveRecording(draft) }.isSuccess
             when {
                 !completed -> {
                     drafts.discardUnfinished(draft)
