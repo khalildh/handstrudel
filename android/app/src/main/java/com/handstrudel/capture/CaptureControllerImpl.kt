@@ -357,6 +357,8 @@ class CaptureControllerImpl(
         if (!countingDown && countInJob == null) return
         countInJob?.cancel()
         clearCountdown()
+        // No take follows: on Android 10-13 drop the projection (and its cast indicator) as after a take.
+        releaseProjectionIfIdle()
     }
 
     private fun clearCountdown() {
