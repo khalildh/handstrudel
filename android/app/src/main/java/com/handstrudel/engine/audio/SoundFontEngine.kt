@@ -38,16 +38,16 @@ class SoundFontEngine(private val context: Context) {
     private fun ensureLoaded(): TinySoundFont? = synchronized(loadLock) {
         tsf?.let { return it }
         if (loadFailed) return null
-        val bytes = try {
-            context.assets.open(SF2_ASSET).use { it.readBytes() }
-        } catch (e: Exception) {
-            Log.e(TAG, "no .sf2 in assets: SoundFont routing will be silent", e)
-            loadFailed = true
-            return null
-        }
         // iOS: AVAudioUnitSampler at unity gain into the main mixer, SF2 velocity curve
         // (amplitude = velocity², built into tsf.h via TSF_SF2_VELOCITY_CURVE). Same levels here.
-        val loaded = TinySoundFont.load(bytes, output.sampleRate, IOS_SAMPLER_GAIN_DB)
+        // Loaded natively from the APK so the font never needs ~32 MB of Java heap.
+        val loaded = try {
+            TinySoundFont.loadAsset(context.assets, SF2_ASSET, output.sampleRate, IOS_SAMPLER_GAIN_DB)
+        } catch (e: Throwable) {
+            Log.e(TAG, "couldn't load $SF2_ASSET: SoundFont routing will be silent", e)
+            null
+        }
+        if (loaded == null) Log.e(TAG, "no usable .sf2 at $SF2_ASSET: SoundFont routing will be silent")
         if (loaded == null) loadFailed = true
         tsf = loaded
         loaded

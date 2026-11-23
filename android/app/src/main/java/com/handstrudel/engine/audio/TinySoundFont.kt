@@ -32,6 +32,11 @@ internal class TinySoundFont private constructor(private val handle: Long) {
         fun load(sf2: ByteArray, sampleRate: Int, gainDb: Float): TinySoundFont? =
             nativeLoad(sf2, sampleRate, gainDb).takeIf { it != 0L }?.let(::TinySoundFont)
 
+        /** Loads an .sf2 from the APK's assets in native memory (never on the Java heap). */
+        fun loadAsset(assets: android.content.res.AssetManager, path: String, sampleRate: Int, gainDb: Float): TinySoundFont? =
+            nativeLoadAsset(assets, path, sampleRate, gainDb).takeIf { it != 0L }?.let(::TinySoundFont)
+
+        @JvmStatic private external fun nativeLoadAsset(assets: android.content.res.AssetManager, path: String, sampleRate: Int, gainDb: Float): Long
         @JvmStatic private external fun nativeLoad(sf2Bytes: ByteArray, sampleRate: Int, gainDb: Float): Long
         @JvmStatic private external fun nativeClose(handle: Long)
         @JvmStatic private external fun nativeSetProgram(handle: Long, program: Int): Boolean

@@ -4,6 +4,8 @@
 // one-shot channel for accents, CC120-style hard stops per channel).
 
 #include <jni.h>
+#include <android/asset_manager.h>
+#include <android/asset_manager_jni.h>
 #include <mutex>
 
 #define TSF_IMPLEMENTATION
@@ -25,6 +27,38 @@ inline SfHandle* fromPtr(jlong h) { return reinterpret_cast<SfHandle*>(h); }
 #define TSF_FN(name) Java_com_handstrudel_engine_audio_TinySoundFont_##name
 #define LOCKED(h) SfHandle* sh = fromPtr(h); if (sh == nullptr || sh->synth == nullptr) return; std::lock_guard<std::mutex> lock(sh->mu)
 #define LOCKED_RET(h, r) SfHandle* sh = fromPtr(h); if (sh == nullptr || sh->synth == nullptr) return r; std::lock_guard<std::mutex> lock(sh->mu)
+
+namespace {
+jlong finishLoad(tsf* s, jint sampleRate, jfloat gainDb) {
+    if (s == nullptr) return 0L;
+    tsf_set_output(s, TSF_STEREO_INTERLEAVED, static_cast<int>(sampleRate), gainDb);
+    tsf_set_max_voices(s, 96);
+    // Allocate all 16 MIDI channels up front (GM bank 0, program 0).
+    for (int ch = 0; ch < 16; ch++) tsf_channel_set_bank_preset(s, ch, 0, 0);
+    auto* h = new SfHandle{};
+    h->synth = s;
+    return reinterpret_cast<jlong>(h);
+}
+} // namespace
+
+// Reads the .sf2 straight from the APK in native memory, so the ~32 MB font never
+// lands on the Java heap (Android 10 devices can cap apps at 48 MB of heap).
+extern "C" JNIEXPORT jlong JNICALL
+TSF_FN(nativeLoadAsset)(JNIEnv* env, jclass, jobject assetManager, jstring path, jint sampleRate, jfloat gainDb) {
+    if (assetManager == nullptr || path == nullptr) return 0L;
+    AAssetManager* am = AAssetManager_fromJava(env, assetManager);
+    if (am == nullptr) return 0L;
+    const char* cpath = env->GetStringUTFChars(path, nullptr);
+    if (cpath == nullptr) return 0L;
+    AAsset* asset = AAssetManager_open(am, cpath, AASSET_MODE_BUFFER);
+    env->ReleaseStringUTFChars(path, cpath);
+    if (asset == nullptr) return 0L;
+    const void* buf = AAsset_getBuffer(asset);
+    off_t len = AAsset_getLength(asset);
+    tsf* s = (buf != nullptr && len > 0) ? tsf_load_memory(buf, static_cast<int>(len)) : nullptr;
+    AAsset_close(asset);
+    return finishLoad(s, sampleRate, gainDb);
+}
 
 extern "C" JNIEXPORT jlong JNICALL
 TSF_FN(nativeLoad)(JNIEnv* env, jclass, jbyteArray sf2Bytes, jint sampleRate, jfloat gainDb) {

@@ -20,4 +20,4 @@ add_library(handstrudel_tsf SHARED
 )
 
 find_library(log-lib log)
-target_link_libraries(handstrudel_tsf ${log-lib})
+target_link_libraries(handstrudel_tsf android ${log-lib})
