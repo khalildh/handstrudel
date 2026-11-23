@@ -1,11 +1,13 @@
 package com.handstrudel.capture
 
 import android.content.Context
+import android.graphics.Point
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -250,10 +252,17 @@ class ScreenRecorder(
 
         /** The portrait screen scaled to ≤1080 wide, 16-aligned and supported by the AVC encoder. */
         fun captureSize(context: Context): Size {
-            val bounds = context.getSystemService(WindowManager::class.java).maximumWindowMetrics.bounds
+            val windowManager = context.getSystemService(WindowManager::class.java)
+            // WindowMetrics is API 30+; Android 10 reads the display's real size instead.
+            val (screenWidth, screenHeight) = if (Build.VERSION.SDK_INT >= 30) {
+                windowManager.maximumWindowMetrics.bounds.let { it.width() to it.height() }
+            } else {
+                @Suppress("DEPRECATION")
+                Point().also { windowManager.defaultDisplay.getRealSize(it) }.let { it.x to it.y }
+            }
             val dpi = context.resources.displayMetrics.densityDpi
-            var width = minOf(bounds.width(), bounds.height())
-            var height = maxOf(bounds.width(), bounds.height())
+            var width = minOf(screenWidth, screenHeight)
+            var height = maxOf(screenWidth, screenHeight)
             val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
                 .filter { it.isEncoder && it.supportedTypes.any { t -> t.equals(MediaFormat.MIMETYPE_VIDEO_AVC, true) } }
             var scale = minOf(1.0, MAX_WIDTH.toDouble() / width)
