@@ -31,6 +31,7 @@ fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
+    val binding = remember { CameraBinding() }
 
     AndroidView(
         modifier = modifier,
@@ -42,6 +43,7 @@ fun CameraPreview(
 
             val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
             cameraProviderFuture.addListener({
+                if (binding.disposed) return@addListener
                 val cameraProvider = try {
                     cameraProviderFuture.get()
                 } catch (e: Exception) {
@@ -73,6 +75,7 @@ fun CameraPreview(
                     val camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner, cameraSelector, preview, imageAnalysis
                     )
+                    binding.bound = Triple(cameraProvider, preview, imageAnalysis)
                     // Another app holding the camera (iOS `.interrupted`); clears once it reopens.
                     camera.cameraInfo.cameraState.observe(lifecycleOwner) { state ->
                         when (state.error?.code) {
@@ -94,8 +97,27 @@ fun CameraPreview(
     )
 
     DisposableEffect(Unit) {
-        onDispose { executor.shutdown() }
+        onDispose {
+            // The use cases are bound to the activity, which outlives the stage. Unbind them
+            // before shutting the analyzer's executor down: otherwise CameraX keeps converting
+            // frames to RGBA for an executor that rejects them, the frames are never closed, and
+            // its ImageReader throws "maxImages (4) has already been acquired" on a CameraX thread,
+            // killing the app when a session ends. It also leaves the camera on after the session.
+            binding.disposed = true
+            binding.bound?.let { (provider, preview, analysis) ->
+                analysis.clearAnalyzer()
+                runCatching { provider.unbind(preview, analysis) }
+            }
+            binding.bound = null
+            executor.shutdown()
+        }
     }
+}
+
+/** The stage's bound camera use cases, so leaving the stage can unbind them. Main thread. */
+private class CameraBinding {
+    var disposed = false
+    var bound: Triple<ProcessCameraProvider, Preview, ImageAnalysis>? = null
 }
 
 private fun processFrame(imageProxy: ImageProxy, handTracker: HandTrackingManager) {
