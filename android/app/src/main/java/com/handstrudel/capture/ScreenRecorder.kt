@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Surface
 import android.view.WindowManager
 import java.io.File
 import java.nio.ByteBuffer
@@ -48,6 +49,9 @@ class ScreenRecorder(
     private var audioThread: Thread? = null
     private val finished = CountDownLatch(2)
     private var baseUs = 0L
+    private var surface: Surface? = null
+    private var size: Size? = null
+    private var screenHidden = false
 
     /** Starts encoding. Main thread (it binds the virtual display). */
     fun start() {
@@ -62,7 +66,8 @@ class ScreenRecorder(
         }
         videoCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
         videoCodec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        val surface = videoCodec.createInputSurface()
+        val surface = videoCodec.createInputSurface().also { this.surface = it }
+        this.size = size
         muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         if (audio != null) {
             val audioFormat = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, AppAudioCapture.SAMPLE_RATE, AppAudioCapture.CHANNELS).apply {
@@ -85,6 +90,26 @@ class ScreenRecorder(
         } else {
             finished.countDown()
         }
+    }
+
+    /**
+     * Stops sending the screen to the encoder while the app isn't in front. The projection
+     * mirrors the whole display, so without this the frames between leaving the app and the
+     * take stopping (onStop comes after the transition) show the launcher or another app.
+     * The encoder repeats the last stage frame meanwhile. Main thread.
+     */
+    fun hideScreen() {
+        if (screenHidden || stopping) return
+        screenHidden = true
+        runCatching { CaptureProjection.bindSurface(null, 0, 0, 0) }
+    }
+
+    /** Resumes sending the screen after [hideScreen]. Main thread. */
+    fun showScreen() {
+        if (!screenHidden || stopping) return
+        screenHidden = false
+        val size = size ?: return
+        runCatching { CaptureProjection.bindSurface(surface, size.width, size.height, size.densityDpi) }
     }
 
     /** Whether the take heard any app sound (false when audio capture was unavailable). */

@@ -104,6 +104,7 @@ class CaptureControllerImpl(
 
     private var navigator: AppNavigator? = null
     private var startedActivities = 0
+    private var resumedActivities = 0
     private val isForeground: Boolean get() = startedActivities > 0
 
     // Recording
@@ -145,8 +146,16 @@ class CaptureControllerImpl(
                 if (startedActivities == 0) handleBackgrounded()
             }
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
-            override fun onActivityResumed(activity: Activity) = Unit
-            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivityResumed(activity: Activity) {
+                resumedActivities++
+                recorder?.showScreen()
+            }
+            override fun onActivityPaused(activity: Activity) {
+                resumedActivities = max(0, resumedActivities - 1)
+                // Leaving the app: stop capturing the screen now, not at onStop, so the
+                // take doesn't end with frames of the launcher or the next app.
+                if (resumedActivities == 0) recorder?.hideScreen()
+            }
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
             override fun onActivityDestroyed(activity: Activity) = Unit
         })
@@ -417,6 +426,7 @@ class CaptureControllerImpl(
                 return@launch
             }
             recorder = started
+            if (resumedActivities == 0) started.hideScreen()
             _state.update { it.copy(isBusy = false, isRecording = true) }
             analytics.record(AppAnalyticsEvent.RECORDING_STARTED)
             if (!isForeground) { stopRecording(); return@launch }
