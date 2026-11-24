@@ -1,0 +1,17 @@
+{
+  "name": "Haunted Choir",
+  "instrument": "choir",
+  "key": "D",
+  "scale": "Minor",
+  "bpm": 60,
+  "beatsPerChord": 4,
+  "chords": [
+    "I",
+    "VI",
+    "IV",
+    "I",
+    "VII",
+    "I"
+  ],
+  "melody": "1:2 5:2  6:3 5:1  6:2 4:2  5:2 3:2  4:2 2:2  1:4"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "Rainy Window Piano",
+  "instrument": "grand_piano",
+  "key": "E",
+  "scale": "Minor",
+  "bpm": 72,
+  "beatsPerChord": 4,
+  "chords": [
+    "I",
+    "VI",
+    "III",
+    "VII",
+    "I",
+    "IV",
+    "VII",
+    "I"
+  ],
+  "melody": "5:1.5 3:0.5 1:2  6:1.5 5:0.5 3:2  5:1 7:1 5:1 3:1  4:1.5 2:0.5 7,:2  1:1 3:1 5:1 8:1  8:1.5 6:0.5 4:2  7:1 4:1 2:1 7,:1  1:4"
+}

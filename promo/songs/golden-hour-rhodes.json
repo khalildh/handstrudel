@@ -1,0 +1,19 @@
+{
+  "name": "Golden Hour Rhodes",
+  "instrument": "electric_piano_1",
+  "key": "F",
+  "scale": "Major",
+  "bpm": 80,
+  "beatsPerChord": 4,
+  "chords": [
+    "IV",
+    "V",
+    "iii",
+    "vi",
+    "ii",
+    "V",
+    "I",
+    "I"
+  ],
+  "melody": "6:1.5 5:0.5 4:1 1:1  2:1 5:1 7:1.5 5:0.5  5:2 3:1 7,:1  1:1 3:1 6:2  6:1 4:1 2:1 4:1  5:1 7:1 8:1 7:1  8:2 5:1 3:1  1:4"
+}
