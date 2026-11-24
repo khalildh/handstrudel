@@ -38,8 +38,9 @@ struct SplitChordMelodyOverlayView: View {
     /// Chord sub-zones currently held by a touch (separate from hand state).
     /// Lights them up the same way as the hand-driven active zone.
     var touchedChordSubzones: Set<ChordSubzone> = []
-    /// Melody lanes currently held by a touch.
-    var touchedMelodyLanes: Set<Int> = []
+    /// Melody notes currently held by a touch, with the octave band each is in.
+    var touchedMelodyNotes: Set<MelodySubzone> = []
+    private var touchedMelodyLanes: Set<Int> { Set(touchedMelodyNotes.map(\.lane)) }
     /// Lane indices that are *chord tones* of the currently-held chord —
     /// drawn with the chord's accent color so the player can see which
     /// scale notes are consonant landing targets. Only set in Scale mode;
@@ -48,11 +49,13 @@ struct SplitChordMelodyOverlayView: View {
     /// Melody-side octave shift driven by the outer radial band (Scale mode).
     /// 0 in Split since the melody side doesn't have an octave band.
     var melodyOctaveShift: Int = 0
+    /// Scale layout: the notes side always shows its up/down octave band.
+    var scaleLayout = false
 
     /// In Scale mode the melody half gets the same inner-band + outer-octave
-    /// treatment as the chord side. Detected by the presence of either
-    /// chord-tone lanes or a non-zero octave shift.
-    private var isScaleMode: Bool { !chordToneLanes.isEmpty || melodyOctaveShift != 0 }
+    /// treatment as the chord side. Callers that don't say so explicitly fall
+    /// back to detecting it from chord-tone lanes or an octave shift.
+    private var isScaleMode: Bool { scaleLayout || !chordToneLanes.isEmpty || melodyOctaveShift != 0 }
 
     private var zoneCount: Int { max(1, chordNames.count) }
     private var melodyCount: Int { max(1, melodyNames.count) }
@@ -282,8 +285,12 @@ struct SplitChordMelodyOverlayView: View {
         let isChordTone = chordToneLanes.contains(i)
         let toneColor: Color = isChordTone ? Color.green : Color.cyan
         let handActive = melodyLane == i && !melodyResting
-        let isCurrent = handActive || touchedMelodyLanes.contains(i)
         let isHeld = handActive && melodyHandPinching
+        // A band lights for the hand's octave or for any touch in that band.
+        let touchedOctaves = Set(touchedMelodyNotes.filter { $0.lane == i }.map(\.octave))
+        let active: (Int) -> Bool = { octave in
+            (handActive && melodyOctaveShift == octave) || touchedOctaves.contains(octave)
+        }
 
         // The melody side mirrors the chord side: index 0 sits at the bottom
         // (lowest pitch) — same `melodyCenterAngle` math as Split.
@@ -291,7 +298,7 @@ struct SplitChordMelodyOverlayView: View {
         let start = Angle(degrees: centerAngle - wedge / 2)
         let end = Angle(degrees: centerAngle + wedge / 2)
 
-        let baseActive = isCurrent && melodyOctaveShift == 0
+        let baseActive = active(0)
         let baseHeld = isHeld && melodyOctaveShift == 0
 
         // Inner band — base octave. Resting fill is bumped + we stack a black
@@ -328,12 +335,12 @@ struct SplitChordMelodyOverlayView: View {
 
         scaleMelodyOctaveSubzone(center: center, innerR: octaveR, outerR: outerR,
                                  start: upRange.0, end: upRange.1, toneColor: toneColor,
-                                 isCurrent: isCurrent && melodyOctaveShift == 1,
+                                 isCurrent: active(1),
                                  isHeld: isHeld && melodyOctaveShift == 1,
                                  isChordTone: isChordTone)
         scaleMelodyOctaveSubzone(center: center, innerR: octaveR, outerR: outerR,
                                  start: downRange.0, end: downRange.1, toneColor: toneColor,
-                                 isCurrent: isCurrent && melodyOctaveShift == -1,
+                                 isCurrent: active(-1),
                                  isHeld: isHeld && melodyOctaveShift == -1,
                                  isChordTone: isChordTone)
 
@@ -348,11 +355,11 @@ struct SplitChordMelodyOverlayView: View {
         let downMidpoint = melodyIsRightHalf ? (centerAngle + wedge / 4) : (centerAngle - wedge / 4)
         Text("↑")
             .font(.system(size: 9, weight: .bold))
-            .foregroundColor(isCurrent && melodyOctaveShift == 1 ? .white : toneColor.opacity(0.35))
+            .foregroundColor(active(1) ? .white : toneColor.opacity(0.35))
             .position(polar(center: center, angleDeg: wrappedAngle(upMidpoint), radius: (octaveR + outerR) / 2))
         Text("↓")
             .font(.system(size: 9, weight: .bold))
-            .foregroundColor(isCurrent && melodyOctaveShift == -1 ? .white : toneColor.opacity(0.35))
+            .foregroundColor(active(-1) ? .white : toneColor.opacity(0.35))
             .position(polar(center: center, angleDeg: wrappedAngle(downMidpoint), radius: (octaveR + outerR) / 2))
     }
 

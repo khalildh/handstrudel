@@ -1149,7 +1149,7 @@ final class SocialTests: XCTestCase {
         XCTAssertLessThan(updated[2].accessibilityFrameInContainerSpace.midX, 195)
         let released = expectation(description: "Preview voice was released")
         var voiceID: String?
-        wheel.onZoneEnter = { id, zone in voiceID = id; XCTAssertEqual(zone, .melody(0)) }
+        wheel.onZoneEnter = { id, zone in voiceID = id; XCTAssertEqual(zone, .melody(MelodySubzone(lane: 0))) }
         wheel.onZoneExit = { id in XCTAssertEqual(id, voiceID); released.fulfill() }
         XCTAssertTrue(updated[2].accessibilityActivate())
         await fulfillment(of: [released], timeout: 1)
@@ -2523,5 +2523,50 @@ final class ProSoundUnlockTests: XCTestCase {
         analytics.record(.lockedSoundTapped)
         analytics.record(.lockedSoundUnlocked)
         XCTAssertEqual(sent, [.lockedSoundTapped, .lockedSoundUnlocked])
+    }
+}
+
+/// Touching the Scale-mode wheel: notes and chords share the same up/down octave band.
+@MainActor
+final class WheelTouchOctaveTests: XCTestCase {
+    private let wheel = SplitTouchUIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+    private let center = CGPoint(x: 195, y: 422)
+    private let wedge = 180.0 / 7
+
+    /// A point at `degrees` clockwise from 12 o'clock, `radius` × the wheel radius out.
+    private func point(_ degrees: Double, _ radius: Double) -> CGPoint {
+        let a = degrees * .pi / 180
+        return CGPoint(x: center.x + sin(a) * 195 * radius, y: center.y - cos(a) * 195 * radius)
+    }
+
+    override func setUp() {
+        wheel.zoneCount = 7
+        wheel.melodyCount = 7
+        wheel.melodyOctaveBand = true
+    }
+
+    func testScaleNotesUseTheOuterBandForOctaveUpAndDown() {
+        // Notes sit on the right; wedge 2 from the top is lane 4.
+        XCTAssertEqual(wheel.zone(at: point(2.5 * wedge, 0.6)), .melody(MelodySubzone(lane: 4, octave: 0)))
+        XCTAssertEqual(wheel.zone(at: point(2.25 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: 1)))
+        XCTAssertEqual(wheel.zone(at: point(2.75 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: -1)))
+    }
+
+    func testChordsKeepTheirBandAndTheRestHoleSelectsNothing() {
+        XCTAssertEqual(wheel.zone(at: point(360 - 2.25 * wedge, 0.9)), .chord(ChordSubzone(wedge: 2, octave: 1)))
+        XCTAssertEqual(wheel.zone(at: point(360 - 2.5 * wedge, 0.6)), .chord(ChordSubzone(wedge: 2, octave: 0)))
+        XCTAssertNil(wheel.zone(at: center))
+    }
+
+    func testLayoutsWithoutANoteBandPlayTheBaseNoteAcrossTheWholeWedge() {
+        wheel.melodyOctaveBand = false
+        XCTAssertEqual(wheel.zone(at: point(2.25 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: 0)))
+        XCTAssertEqual(wheel.zone(at: point(2.75 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: 0)))
+    }
+
+    func testSwappedHandsPutNotesOnTheLeft() {
+        wheel.swapHands = true
+        XCTAssertEqual(wheel.zone(at: point(360 - 2.25 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: 1)))
+        XCTAssertEqual(wheel.zone(at: point(2.25 * wedge, 0.9)), .chord(ChordSubzone(wedge: 2, octave: 1)))
     }
 }
