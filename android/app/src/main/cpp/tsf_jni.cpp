@@ -10,6 +10,8 @@
 
 #define TSF_IMPLEMENTATION
 #include "tsf.h"
+#include "sampler_levels.h"
+#include <cmath>
 
 namespace {
 
@@ -95,7 +97,12 @@ extern "C" JNIEXPORT jboolean JNICALL
 TSF_FN(nativeSetProgram)(JNIEnv*, jclass, jlong handle, jint program) {
     LOCKED_RET(handle, JNI_FALSE);
     if (tsf_get_presetindex(sh->synth, 0, program) < 0) return JNI_FALSE;
-    for (int ch = 0; ch < 16; ch++) tsf_channel_set_bank_preset(sh->synth, ch, 0, program);
+    // Match iOS AVAudioUnitSampler's level for this instrument (see sampler_levels.h).
+    const float trim = (program >= 0 && program < 128) ? std::pow(10.0f, kSamplerLevelTrimDb[program] / 20.0f) : 1.0f;
+    for (int ch = 0; ch < 16; ch++) {
+        tsf_channel_set_bank_preset(sh->synth, ch, 0, program);
+        tsf_channel_set_volume(sh->synth, ch, trim);
+    }
     return JNI_TRUE;
 }
 
