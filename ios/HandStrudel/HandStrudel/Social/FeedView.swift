@@ -6,6 +6,7 @@ import UIKit
 private enum PerformanceStart {
     case backing(Video)
     case preset(SoundSetup)
+    case learn(LearnToPlayRequest)
 }
 
 /// Full-screen, vertically paged feed of public posts.
@@ -348,6 +349,9 @@ struct FeedView<Navigation: View>: View {
         switch start {
         case .backing(let video): onPlayAlong(video)
         case .preset(let sound): onTrySound(sound)
+        case .learn(let request):
+            request.send()
+            onTrySound(request.setup)
         }
     }
 
@@ -1624,6 +1628,15 @@ private struct PerformanceDetail: View {
             }
             if !video.caption.isEmpty { Text(verbatim: video.caption) }
             if let notification { notificationCard(notification) }
+            if let learn = LearnToPlayRequest(video: video), let onTrySound {
+                Button("Learn to play", systemImage: "graduationcap") {
+                    paused = true
+                    learn.send()
+                    onTrySound(learn.setup)
+                }
+                .buttonStyle(StudioActionStyle())
+                .accessibilityIdentifier("learn-clip-notes")
+            }
             if video.backingEnabled == true, let onPlayAlong {
                 Button("Play along", systemImage: "waveform.badge.plus") {
                     paused = true
@@ -2356,6 +2369,12 @@ private struct FeedSoundSheet: View {
                             .buttonStyle(ProfileActionStyle(primary: true))
                             .accessibilityHint("Opens this setup in the Music tab")
                             .accessibilityIdentifier("play-clip-preset")
+                    }
+                    if let learn = LearnToPlayRequest(video: video) {
+                        Button("Learn to play", systemImage: "graduationcap") { onStart(.learn(learn)) }
+                            .buttonStyle(ProfileActionStyle())
+                            .accessibilityHint("Teaches the notes from this performance in Learn mode")
+                            .accessibilityIdentifier("learn-clip-notes")
                     }
                     if video.backingEnabled == true {
                         Button("Play along", systemImage: "waveform.badge.plus") { onStart(.backing(video)) }

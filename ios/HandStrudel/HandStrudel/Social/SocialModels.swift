@@ -69,6 +69,8 @@ struct Video: Codable, Equatable, Identifiable {
     var activityAt: String?
     var repostedBy: String?
     var repostedByID: UUID?
+    /// Whether the post saved its notes for "Learn to play" (nil when the source didn't say).
+    var hasNoteTrack: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, caption, instrument, mode, width, height, hidden, username
@@ -92,7 +94,11 @@ struct Video: Codable, Equatable, Identifiable {
         case activityAt = "activity_at"
         case repostedBy = "reposted_by"
         case repostedByID = "reposted_by_id"
+        case hasNoteTrack = "has_note_track"
     }
+
+    /// Read-only keys that aren't part of the stored video row model.
+    private enum ExtraKeys: String, CodingKey { case noteTrack = "note_track" }
 
     init(from decoder: Decoder) throws {
         let row = try decoder.container(keyedBy: CodingKeys.self)
@@ -126,8 +132,13 @@ struct Video: Codable, Equatable, Identifiable {
         activityAt = try row.decodeIfPresent(String.self, forKey: .activityAt)
         repostedBy = try row.decodeIfPresent(String.self, forKey: .repostedBy)
         repostedByID = try row.decodeIfPresent(UUID.self, forKey: .repostedByID)
+        if let flag = try? row.decodeIfPresent(Bool.self, forKey: .hasNoteTrack) {
+            hasNoteTrack = flag
+        } else if let extra = try? decoder.container(keyedBy: ExtraKeys.self), extra.contains(.noteTrack) {
+            // Rows read straight from `videos` carry the track itself.
+            hasNoteTrack = (try? extra.decodeNil(forKey: .noteTrack)) == false
+        }
     }
-
     var videoURL: URL { SocialConfig.mediaURL(videoKey) }
     var feedCursorTimestamp: String { rawCreatedAt ?? ISO8601DateFormatter.feed.string(from: createdAt) }
     var thumbURL: URL { SocialConfig.mediaURL(thumbKey) }
@@ -147,6 +158,7 @@ struct VideoPostFields: Codable, Equatable {
     let width: Int
     let height: Int
     var soundSetup: SoundSetup? = nil
+    var noteTrack: NoteTrack? = nil
     var commentsEnabled: Bool? = nil
     var backingEnabled: Bool? = nil
     var sourceVideoId: UUID? = nil
@@ -155,6 +167,7 @@ struct VideoPostFields: Codable, Equatable {
         case caption, instrument, mode, width, height
         case durationS = "duration_s"
         case soundSetup = "sound_setup"
+        case noteTrack = "note_track"
         case commentsEnabled = "comments_enabled"
         case backingEnabled = "backing_enabled"
         case sourceVideoId = "source_video_id"
@@ -428,4 +441,25 @@ struct PublishUploadRequest: Encodable {
 struct PublishUploadResponse: Decodable {
     enum Status: String, Decodable { case reserved, checking, published, held, failed }
     let status: Status
+}
+
+/// Asks the Music tab to teach a post's notes in Learn mode.
+struct LearnToPlayRequest {
+    let videoID: UUID
+    let setup: SoundSetup
+    let title: String
+
+    init?(video: Video) {
+        guard video.hasNoteTrack == true, let setup = video.soundSetup else { return nil }
+        videoID = video.id
+        self.setup = setup
+        title = video.username.map { "@\($0)'s part" } ?? "This performance"
+    }
+
+    /// Registers the lesson; the caller then opens `setup` the same way as "Play this sound".
+    func send() { NotificationCenter.default.post(name: .learnToPlayPost, object: self) }
+}
+
+extension Notification.Name {
+    static let learnToPlayPost = Notification.Name("learnToPlayPost")
 }

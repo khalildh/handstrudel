@@ -36,7 +36,7 @@ final class VideoUploader: ObservableObject {
     nonisolated static let outputWidth = 720
 
     func post(clip: URL, draftID: UUID, accountID: UUID, store: RecordingDrafts,
-              caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?,
+              caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?, noteTrack: NoteTrack? = nil,
               commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?,
               onScreeningStarted: () -> Void = {}) async -> Bool {
         guard !isBusy else { return false }
@@ -68,7 +68,7 @@ final class VideoUploader: ObservableObject {
             let fields = VideoPostFields(
                 caption: String(caption.prefix(150)), instrument: instrument, mode: mode,
                 durationS: prepared.duration, width: prepared.width, height: prepared.height,
-                soundSetup: soundSetup, commentsEnabled: commentsEnabled ? nil : false,
+                soundSetup: soundSetup, noteTrack: noteTrack, commentsEnabled: commentsEnabled ? nil : false,
                 backingEnabled: backingEnabled ? true : nil, sourceVideoId: backingCredit?.videoId)
             let pending = DraftPostSubmission.pending(id: signed.id, fields: fields)
             // Persist before submitting: even a lost HTTP response can mean the server accepted it.

@@ -14,6 +14,12 @@ struct PostSharingOptions {
         return setup
     }
 
+    /// The notes behind "Learn to play" travel with the playable preset, never without it.
+    func sharedNotes(_ track: NoteTrack?, setup: SoundSetup?) -> NoteTrack? {
+        guard sharedPreset(setup) != nil, let track, track.isValid else { return nil }
+        return track
+    }
+
     static func canShareBacking(hasAudio: Bool, backingCredit: BackingCredit?) -> Bool {
         hasAudio && backingCredit == nil
     }
@@ -55,6 +61,7 @@ struct PostComposerView: View {
     }
 
     private var checkingAudio: Bool { backingCredit == nil && hasAudio == nil }
+    private var noteTrack: NoteTrack? { drafts.drafts.first { $0.id == draftID }?.postedNoteTrack }
 
     var body: some View {
         NavigationStack {
@@ -80,7 +87,9 @@ struct PostComposerView: View {
                             Toggle("Share playable preset", isOn: $sharing.sharePlayablePreset)
                                 .font(.subheadline)
                                 .disabled(uploader.isBusy || submission != nil)
-                            Text(sharing.sharePlayablePreset ? soundSetup.presetDetails : "Your instrument settings won't be shared.")
+                            Text(sharing.sharePlayablePreset
+                                 ? soundSetup.presetDetails + (noteTrack == nil ? "" : " · Learn to play")
+                                 : "Your instrument settings and notes won't be shared.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -159,6 +168,7 @@ struct PostComposerView: View {
     private func post() {
         guard let accountID = auth.userId, submission != nil || !checkingAudio else { return }
         let preset = sharing.sharedPreset(soundSetup)
+        let notes = sharing.sharedNotes(noteTrack, setup: soundSetup)
         let allowBacking = sharing.sharesBacking(hasAudio: hasAudio == true, backingCredit: backingCredit)
         Task {
             var handedOff = false
@@ -169,7 +179,7 @@ struct PostComposerView: View {
             }
             let posted = await uploader.post(clip: clip, draftID: draftID, accountID: accountID, store: drafts,
                                              caption: caption, instrument: instrument, mode: mode,
-                                             soundSetup: preset, commentsEnabled: commentsEnabled,
+                                             soundSetup: preset, noteTrack: notes, commentsEnabled: commentsEnabled,
                                              backingEnabled: allowBacking, backingCredit: backingCredit) {
                 guard auth.userId == accountID else { return }
                 leaveComposer()
