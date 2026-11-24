@@ -45,7 +45,7 @@ internal class SoundFontModeController : ModeController {
                 }
             }
         }
-        ChordMelodyModeController.publishZones(engine)
+        ChordMelodyModeController.publishZonesIfNeeded(engine, actions.isNotEmpty())
 
         val chordMidi = manager.currentChordMidi()
         if (engine.autoStrum && chordMidi.isNotEmpty() && engine.currentBeat.value != lastBeat) {

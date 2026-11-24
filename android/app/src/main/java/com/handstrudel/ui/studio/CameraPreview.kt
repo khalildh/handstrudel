@@ -122,6 +122,8 @@ private class CameraBinding {
 
 private fun processFrame(imageProxy: ImageProxy, handTracker: HandTrackingManager) {
     try {
+        // Skip the RGBA conversion while the tracker is still busy with the last frame.
+        if (!handTracker.wantsFrame()) return
         // Canonical MediaPipe HandLandmarker camera-frame prep, matching the
         // google-ai-edge/mediapipe-samples helper: rotate the bitmap to the
         // device's display orientation ourselves and horizontally mirror it for

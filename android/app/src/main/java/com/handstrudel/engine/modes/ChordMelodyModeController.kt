@@ -1,6 +1,7 @@
 package com.handstrudel.engine.modes
 
 import com.handstrudel.engine.HandStrudelEngine
+import com.handstrudel.engine.HandsState
 import com.handstrudel.engine.StudioMode
 import com.handstrudel.models.PARAM_MAP
 import com.handstrudel.models.chordNotes
@@ -51,7 +52,7 @@ internal class ChordMelodyModeController : ModeController {
                 }
             }
         }
-        publishZones(engine)
+        publishZonesIfNeeded(engine, actions.isNotEmpty())
 
         // Melody-hand X → low-pass cutoff (timbre).
         val melodyHand = if (engine.swapHandsOn) engine.currentHands.left else engine.currentHands.right
@@ -72,18 +73,48 @@ internal class ChordMelodyModeController : ModeController {
     }
 
     companion object {
+        private var preparedManager: Any? = null
+        private var preparedLayout: Any? = null
+        private var preparedSwap: Boolean? = null
+        private var preparedVideoAspect = Double.NaN
+        private var preparedScreenAspect = Double.NaN
+
+        /**
+         * Push layout, hand swap and aspects into the manager when they change. They are plain
+         * setters in Rust, and each Rust call costs a slow phone a noticeable slice of a frame.
+         */
         fun prepareManager(engine: HandStrudelEngine) {
             val manager = engine.chordMelodyManager
-            manager.setLayout(engine.layout)
-            manager.setSwapHands(engine.swapHandsOn)
-            manager.setAspects(engine.handTracker.videoAspect, engine.screenAspect)
+            if (manager !== preparedManager) {
+                preparedManager = manager; preparedLayout = null; preparedSwap = null
+                preparedVideoAspect = Double.NaN; preparedScreenAspect = Double.NaN
+            }
+            val layout = engine.layout
+            if (layout != preparedLayout) { manager.setLayout(layout); preparedLayout = layout }
+            val swap = engine.swapHandsOn
+            if (swap != preparedSwap) { manager.setSwapHands(swap); preparedSwap = swap }
+            val video = engine.handTracker.videoAspect
+            val screen = engine.screenAspect
+            if (video != preparedVideoAspect || screen != preparedScreenAspect) {
+                manager.setAspects(video, screen); preparedVideoAspect = video; preparedScreenAspect = screen
+            }
         }
 
         /**
          * iOS chordTones/melodyTones closures as tables per degree: triads (7ths in
          * Scale) and the melody snap targets (triad × 3 octaves, or one scale octave).
          */
+        private var tablesKey: Any? = null
+        private var tables: ChordToneTables? = null
+
+        /** [buildToneTables], rebuilt only when the key, scale or mode changes (ticks every frame). */
         fun toneTables(engine: HandStrudelEngine): ChordToneTables {
+            val key = Triple(engine.key, engine.scale, engine.mode.value == StudioMode.SCALE)
+            if (key == tablesKey) tables?.let { return it }
+            return buildToneTables(engine).also { tablesKey = key; tables = it }
+        }
+
+        private fun buildToneTables(engine: HandStrudelEngine): ChordToneTables {
             val scaleMode = engine.mode.value == StudioMode.SCALE
             // Progressions use degrees 0–6; chordNotes wraps them for shorter scales (iOS closures do too).
             val degrees = 0 until maxOf(7, engine.scale.intervals.size)
@@ -108,6 +139,24 @@ internal class ChordMelodyModeController : ModeController {
         }
 
         /** Publish zones every frame (touch overrides change state without actions). */
+        private var publishedHands: HandsState? = null
+        private var publishedAtNanos = 0L
+
+        /**
+         * [publishZones] when the hands changed or something played, otherwise at most every
+         * [IDLE_PUBLISH_NANOS] (touch overrides change state without actions). Each publish is
+         * about ten Rust calls, which cost a slow phone most of its frame budget at 60 Hz.
+         */
+        fun publishZonesIfNeeded(engine: HandStrudelEngine, played: Boolean) {
+            val now = System.nanoTime()
+            if (!played && engine.currentHands === publishedHands && now - publishedAtNanos < IDLE_PUBLISH_NANOS) return
+            publishedHands = engine.currentHands
+            publishedAtNanos = now
+            publishZones(engine)
+        }
+
+        private const val IDLE_PUBLISH_NANOS = 50_000_000L
+
         fun publishZones(engine: HandStrudelEngine) {
             val manager = engine.chordMelodyManager
             val zones = manager.currentZones(engine.currentHands.core())
