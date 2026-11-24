@@ -1,280 +1,415 @@
 import SwiftUI
 import RevenueCat
-import RevenueCatUI
 
+/// The one place HandStrudel sells anything: Pro (one-time, all the music) and
+/// HandStrudel+ (monthly or yearly: everything in Pro plus camera filters and
+/// hand themes). Opened from the bag icon, and from any locked item with that
+/// item's `highlight` offer, a headline about it, and `unlocks` — the item's
+/// pack id — so the sheet closes itself once the item is unlocked.
 struct StoreView: View {
     @ObservedObject var storeManager: StoreManager
+    var highlight: StoreManager.Offer? = nil
+    var headline: String? = nil
+    var detail: String? = nil
+    var unlocks: String? = nil
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.studioPalette) private var palette
+    @State private var plan: Plan = .yearly
+    @State private var purchasing: String?
+    @State private var errorMessage: String?
+    @State private var showManageSubscription = false
+
+    enum Plan: Hashable { case monthly, yearly }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                // Title
-                Text("STORE")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.top, 16)
-
-                // Drum Kits
-                sectionHeader("DRUM KITS")
-                packRow(
-                    id: StoreManager.kit808,
-                    name: "808 Kit",
-                    emoji: "🥁",
-                    contents: ["Boom Bap", "Drill", "Lo-Fi Hip Hop", "R&B", "Afrobeat", "Bounce", "Jersey Club", "Memphis", "Bossa Nova", "Reggae"],
-                    description: "10 hip-hop, urban & world drum patterns"
-                )
-                packRow(
-                    id: StoreManager.kitElectronic,
-                    name: "Electronic Kit",
-                    emoji: "⚡",
-                    contents: ["Techno", "Breakbeat", "IDM", "Jungle", "Ambient", "Industrial", "2-Step", "Synthwave"],
-                    description: "8 electronic drum patterns"
-                )
-
-                // Pro
-                sectionHeader("PRO")
-                proRow
-
-                // HandStrudel+
-                sectionHeader("HANDSTRUDEL+")
-                subscriptionRow
-
-                RestorePurchasesButton(storeManager: storeManager)
-
-                // Required policy links — also surfaced inside the RevenueCat
-                // paywall, but kept here so they're always reachable from the
-                // Store screen regardless of paywall state.
-                HStack(spacing: 20) {
-                    Link("Privacy Policy", destination: URL(string: "https://handstrudel.com/privacy")!)
-                    Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    hero
+                    // Lead with what the player came for, or the plan they're on.
+                    if highlight == .plus || (highlight == nil && storeManager.hasSubscription) {
+                        plusCard
+                        proCard
+                    } else {
+                        proCard
+                        plusCard
+                    }
+                    footer
                 }
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.5))
+                .padding(.horizontal, 20)
+                .padding(.bottom, 28)
+                .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 8)
-
-                Spacer().frame(height: 20)
             }
-            .padding(.horizontal, 20)
+            .background(background.ignoresSafeArea())
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .accessibilityIdentifier("store-done")
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
         }
-        .background(Color.black.ignoresSafeArea())
-        .task {
-            // Always reload — if a previous load failed, products would be
-            // missing and pack buttons would show "---" with no action.
-            await storeManager.loadProducts()
+        .tint(palette.accent)
+        .foregroundStyle(palette.ink)
+        .task { await storeManager.loadProducts() }
+        .onChange(of: isTargetUnlocked) { unlocked in
+            if unlocked { dismiss() }
+        }
+        .manageSubscriptionsSheet(isPresented: $showManageSubscription)
+        .alert("Purchase didn't go through", isPresented: Binding(
+            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 
-    // MARK: - Components
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundColor(.secondary)
-            .tracking(1.5)
+    /// The locked item that opened the store is now playable.
+    private var isTargetUnlocked: Bool {
+        guard let unlocks else { return false }
+        return storeManager.isUnlocked(unlocks)
     }
 
-    private func packRow(id: String, name: String, emoji: String, contents: [String], description: String) -> some View {
-        let unlocked = storeManager.isUnlocked(id)
-        let product = storeManager.products.first(where: { $0.productIdentifier == id })
-
-        return HStack(spacing: 14) {
-            Text(emoji)
-                .font(.system(size: 28))
-                .frame(width: 44)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(name)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                Text(contents.joined(separator: " · "))
-                    .font(.system(size: 11, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            if unlocked {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundColor(.green)
-            } else {
-                Button(action: {
-                    Task { try? await storeManager.purchase(productId: id) }
-                }) {
-                    HStack(spacing: 6) {
-                        Text("Buy")
-                            .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        if let price = product?.localizedPriceString {
-                            Text(price)
-                                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        }
-                    }
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.green)
-                    .cornerRadius(10)
-                }
-            }
+    private var background: some View {
+        ZStack(alignment: .top) {
+            palette.background
+            RadialGradient(colors: [palette.glow.opacity(0.9), palette.background.opacity(0)],
+                           center: .top, startRadius: 0, endRadius: 420)
+                .frame(height: 460)
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(unlocked ? Color.green.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
-        )
     }
 
-    private var proRow: some View {
-        let unlocked = storeManager.hasProAccess
-        let product = storeManager.products.first(where: { $0.productIdentifier == StoreManager.pro })
+    // MARK: - Hero
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("⭐")
-                    .font(.system(size: 28))
-                Text("HandStrudel Pro")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                Spacer()
-                if unlocked {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(.green)
-                }
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ZStack {
+                Circle().fill(palette.accent.opacity(0.14))
+                Circle().strokeBorder(palette.accent.opacity(0.35))
+                Image(systemName: "waveform")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(palette.accent)
             }
+            .frame(width: 60, height: 60)
+            .accessibilityHidden(true)
+            .padding(.top, 6)
 
-            VStack(alignment: .leading, spacing: 6) {
-                featureItem("120+ instruments")
-                featureItem("Every scale — modes, harmonic minor, exotic")
-                featureItem("Every chord progression")
-                featureItem("One-time purchase")
-            }
-
-            if !unlocked {
-                Button(action: {
-                    Task { try? await storeManager.purchase(productId: StoreManager.pro) }
-                }) {
-                    HStack(spacing: 8) {
-                        Text("BUY PRO")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
-                        if let price = product?.localizedPriceString {
-                            Text("• \(price)")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                .opacity(0.7)
-                        }
-                    }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Color.green)
-                    .cornerRadius(12)
-                }
-            }
+            Text(headline ?? "Play every sound")
+                .font(.system(.largeTitle, design: .serif).weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("store-headline")
+            Text(detail ?? "Own all the music once with Pro, or get it all with HandStrudel+.")
+                .font(.body)
+                .foregroundStyle(palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(unlocked ? Color.green.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
-        )
+        .padding(.bottom, 4)
     }
 
-    @State private var showPaywall = false
-    @State private var showCustomerCenter = false
+    // MARK: - Pro
 
-    private var subscriptionRow: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                featureItem("Everything in Pro")
-                featureItem("Premium camera filters")
-                featureItem("Premium hand themes")
-                featureItem("Early access to new content")
-            }
-
-            if storeManager.hasSubscription {
-                VStack(spacing: 10) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Subscribed")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    Button(action: { showCustomerCenter = true }) {
-                        Text("MANAGE SUBSCRIPTION")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 40)
-                            .background(Color.white.opacity(0.08))
-                            .cornerRadius(10)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                            )
-                    }
-                }
-                .padding(.vertical, 4)
+    private var proCard: some View {
+        let product = product(StoreManager.pro)
+        return OfferCard(featured: highlight == .pro, accessibilityID: "store-pro") {
+            cardHeader(title: "Pro", tag: "One-time", price: product?.localizedPriceString)
+            features([
+                ("pianokeys", "128 instruments"),
+                ("music.quarternote.3", "Every scale, from modes to exotic"),
+                ("arrow.triangle.2.circlepath", "Every chord progression"),
+                ("square.stack.3d.up", "Every preset and drum pack"),
+            ])
+            if storeManager.ownsPro {
+                status("You own Pro", id: "store-pro-owned")
             } else if storeManager.hasProAccess {
-                // One-time Pro purchase — no subscription to manage
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("Pro — Lifetime Access")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                status("Included with HandStrudel+", id: "store-pro-included")
+                secondaryButton("Own it forever", price: product?.localizedPriceString,
+                                productId: StoreManager.pro, id: "store-buy-pro")
             } else {
-                Button(action: { showPaywall = true }) {
-                    Text("SUBSCRIBE")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Color.green)
-                        .cornerRadius(12)
-                }
+                primaryButton("Unlock Pro", price: product?.localizedPriceString,
+                              productId: StoreManager.pro, id: "store-buy-pro",
+                              prominent: highlight != .plus)
             }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(storeManager.hasProAccess ? Color.green.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
-        )
-        .sheet(isPresented: $showPaywall) {
-            PaywallView(displayCloseButton: true)
-        }
-        .sheet(isPresented: $showCustomerCenter) {
-            CustomerCenterView()
         }
     }
 
-    private func featureItem(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.green)
-            Text(text)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.7))
+    // MARK: - HandStrudel+
+
+    private var plusCard: some View {
+        let monthly = product(StoreManager.plusMonthly)
+        let yearly = product(StoreManager.plusYearly)
+        let selected = plan == .yearly ? yearly : monthly
+        return OfferCard(featured: highlight != .pro, accessibilityID: "store-plus") {
+            cardHeader(title: "HandStrudel+", tag: "Everything in Pro, and more", price: nil)
+            features([
+                ("checkmark.seal", "Everything in Pro"),
+                ("camera.filters", "Premium camera filters"),
+                ("hand.raised", "Premium hand themes"),
+                ("sparkles", "New sounds first"),
+            ])
+            if storeManager.hasSubscription {
+                status("You're a member", id: "store-plus-member")
+                Button { showManageSubscription = true } label: {
+                    Text("Manage subscription")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .accessibilityIdentifier("store-manage-subscription")
+            } else {
+                if storeManager.ownsPro {
+                    Label("You already own Pro. HandStrudel+ adds the looks and gets new sounds to you first.",
+                          systemImage: "info.circle")
+                        .font(.footnote)
+                        .foregroundStyle(palette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("store-plus-pro-note")
+                }
+                HStack(spacing: 10) {
+                    planTile(.yearly, product: yearly, badge: savings(monthly: monthly, yearly: yearly))
+                    planTile(.monthly, product: monthly, badge: nil)
+                }
+                primaryButton(trialText(selected) ?? "Subscribe",
+                              price: selected.map { "\($0.localizedPriceString)\(periodSuffix($0))" },
+                              productId: plan == .yearly ? StoreManager.plusYearly : StoreManager.plusMonthly,
+                              id: "store-subscribe", prominent: highlight != .pro || storeManager.hasProAccess)
+                Text("Renews automatically until you cancel. Cancel anytime in Settings at least a day before it renews.")
+                    .font(.caption2)
+                    .foregroundStyle(palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+
+    private func planTile(_ option: Plan, product: StoreProduct?, badge: String?) -> some View {
+        let isSelected = plan == option
+        return Button { plan = option } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(option == .yearly ? "Yearly" : "Monthly")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 2)
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? palette.accent : palette.muted)
+                        .accessibilityHidden(true)
+                }
+                Text(product.map { "\($0.localizedPriceString)\(periodSuffix($0))" } ?? "—")
+                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                Text(option == .yearly ? (product?.localizedPricePerMonth.map { "\($0)/mo" } ?? " ") : "Billed monthly")
+                    .font(.caption)
+                    .foregroundStyle(palette.muted)
+                if let badge {
+                    Text(badge)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(palette.onAccent)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(palette.accent, in: Capsule())
+                        .padding(.top, 2)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+            .background(isSelected ? palette.accent.opacity(0.1) : palette.background.opacity(0.35),
+                        in: RoundedRectangle(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(isSelected ? palette.accent : palette.border, lineWidth: isSelected ? 1.5 : 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(option == .yearly ? "store-plan-yearly" : "store-plan-monthly")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        VStack(spacing: 6) {
+            RestorePurchasesButton(storeManager: storeManager, packId: unlocks,
+                                   onRestored: unlocks == nil ? nil : { dismiss() })
+            HStack(spacing: 18) {
+                Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                Link("Privacy Policy", destination: URL(string: "https://handstrudel.com/privacy")!)
+            }
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(palette.muted)
+            Text("Payment is charged to your Apple Account. Packs you bought before stay unlocked.")
+                .font(.caption2)
+                .foregroundStyle(palette.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+    }
+
+    // MARK: - Pieces
+
+    private func cardHeader(title: String, tag: String, price: String?) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(.title2, design: .serif).weight(.semibold))
+                Text(tag.uppercased())
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.2)
+                    .foregroundStyle(palette.accent)
+            }
+            Spacer(minLength: 8)
+            if let price {
+                Text(price)
+                    .font(.system(.title2, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+            }
+        }
+    }
+
+    private func features(_ items: [(String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(items, id: \.1) { icon, text in
+                HStack(spacing: 11) {
+                    Image(systemName: icon)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(palette.accent)
+                        .frame(width: 26, height: 26)
+                        .background(palette.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
+                        .accessibilityHidden(true)
+                    Text(text).font(.subheadline)
+                }
+            }
+        }
+    }
+
+    private func status(_ text: String, id: String) -> some View {
+        Label(text, systemImage: "checkmark.circle.fill")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(palette.accent)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .accessibilityIdentifier(id)
+    }
+
+    private func primaryButton(_ title: String, price: String?, productId: String, id: String,
+                               prominent: Bool) -> some View {
+        Button { buy(productId) } label: {
+            HStack(spacing: 8) {
+                if purchasing == productId {
+                    ProgressView().tint(prominent ? palette.onAccent : palette.accent)
+                } else {
+                    Text(title).fontWeight(.semibold)
+                    if let price { Text("· \(price)").opacity(0.75) }
+                }
+            }
+            .font(.body)
+            .foregroundStyle(prominent ? palette.onAccent : palette.accent)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(prominent ? palette.accent : palette.accent.opacity(0.12), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(purchasing != nil || storeManager.isRestoring || product(productId) == nil)
+        .accessibilityIdentifier(id)
+    }
+
+    private func secondaryButton(_ title: String, price: String?, productId: String, id: String) -> some View {
+        Button { buy(productId) } label: {
+            Text([title, price].compactMap { $0 }.joined(separator: " · "))
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .disabled(purchasing != nil || product(productId) == nil)
+        .accessibilityIdentifier(id)
+    }
+
+    // MARK: - Logic
+
+    private func product(_ id: String) -> StoreProduct? {
+        storeManager.products.first { $0.productIdentifier == id }
+    }
+
+    private func buy(_ productId: String) {
+        purchasing = productId
+        Task {
+            defer { purchasing = nil }
+            do {
+                try await storeManager.purchase(productId: productId)
+            } catch {
+                // Backing out of Apple's sheet isn't an error worth showing.
+                if (error as NSError).code == ErrorCode.purchaseCancelledError.rawValue { return }
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func periodSuffix(_ product: StoreProduct) -> String {
+        switch product.subscriptionPeriod?.unit {
+        case .year: return "/yr"
+        case .month: return "/mo"
+        case .week: return "/wk"
+        case .day: return "/day"
+        default: return ""
+        }
+    }
+
+    /// "Save 44%" when a year costs less than twelve months.
+    private func savings(monthly: StoreProduct?, yearly: StoreProduct?) -> String? {
+        guard let monthly, let yearly, monthly.price > 0 else { return nil }
+        // Plain Doubles: NSDecimalNumber.intValue is unreliable for long decimals.
+        let full = NSDecimalNumber(decimal: monthly.price).doubleValue * 12
+        let yearlyPrice = NSDecimalNumber(decimal: yearly.price).doubleValue
+        let percent = Int(((full - yearlyPrice) / full * 100).rounded(.down))
+        return percent >= 5 ? "Save \(percent)%" : nil
+    }
+
+    private func trialText(_ product: StoreProduct?) -> String? {
+        guard let intro = product?.introductoryDiscount, intro.paymentMode == .freeTrial else { return nil }
+        let period = intro.subscriptionPeriod
+        let (count, unit): (Int, String)
+        switch period.unit {
+        case .day where period.value % 7 == 0: (count, unit) = (period.value / 7, "week")
+        case .day: (count, unit) = (period.value, "day")
+        case .week: (count, unit) = (period.value, "week")
+        case .month: (count, unit) = (period.value, "month")
+        case .year: (count, unit) = (period.value, "year")
+        @unknown default: return nil
+        }
+        return "Try \(count) \(unit)\(count == 1 ? "" : "s") free"
+    }
+}
+
+/// A store card: surface panel; the featured one gets an accent edge and glow.
+private struct OfferCard<Content: View>: View {
+    @Environment(\.studioPalette) private var palette
+    let featured: Bool
+    let accessibilityID: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) { content }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(palette.surface)
+                    .overlay {
+                        if featured {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(LinearGradient(colors: [palette.glow.opacity(0.55), .clear],
+                                                     startPoint: .topLeading, endPoint: .center))
+                        }
+                    }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 24)
+                    .strokeBorder(featured ? palette.accent.opacity(0.7) : palette.border, lineWidth: featured ? 1.5 : 1)
+                    .allowsHitTesting(false)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(accessibilityID)
     }
 }
 
@@ -284,6 +419,7 @@ struct RestorePurchasesButton: View {
     var onRestoreStarted: (() -> Void)? = nil
     var onRestored: (() -> Void)? = nil
 
+    @Environment(\.studioPalette) private var palette
     @State private var outcome: StoreManager.RestoreOutcome?
 
     var body: some View {
@@ -301,7 +437,7 @@ struct RestorePurchasesButton: View {
             HStack {
                 if storeManager.isRestoring {
                     ProgressView()
-                        .tint(.white)
+                        .tint(palette.muted)
                         .accessibilityHidden(true)
                     Text("Restoring Purchases…")
                 } else {
@@ -309,10 +445,11 @@ struct RestorePurchasesButton: View {
                 }
             }
             .font(.subheadline.weight(.medium))
-            .foregroundColor(.white.opacity(0.75))
+            .foregroundStyle(palette.muted)
             .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .disabled(storeManager.isRestoring)
         .accessibilityIdentifier("store-restore-purchases")
         .alert(item: $outcome) { result in
