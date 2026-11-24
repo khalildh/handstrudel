@@ -1,0 +1,52 @@
+package com.handstrudel.models
+
+/// Port of iOS `Waveform` / `WAVEFORMS` (`Engine/EngineController.swift`). Owner: engine.
+/// Ids are the Strudel sound names and must match `bundled-instruments.json`.
+data class Waveform(
+    val id: String,
+    val name: String,
+    val emoji: String,
+    val isPremium: Boolean = false,
+    val packId: String? = null,
+)
+
+val WAVEFORMS: List<Waveform> = listOf(
+    Waveform("sawtooth", "Saw", "🪚", false, null),
+    Waveform("square", "Square", "⬜", false, null),
+    Waveform("triangle", "Triangle", "🔺", false, null),
+    Waveform("sine", "Sine", "🔮", false, null),
+    Waveform("pluck", "Pluck", "🪕", false, null),
+    Waveform("supersaw", "Supersaw", "🌊", false, null),
+    Waveform("pulse", "Pulse", "👾", false, null),
+    Waveform("fm", "FM Bell", "🔔", false, null),
+    Waveform("piano", "Piano", "🎹", false, null),
+    Waveform("epiano", "E.Piano", "🎛️", false, null),
+    Waveform("organ", "Organ", "🎚️", false, null),
+    Waveform("pipeorgan", "Pipe Organ", "⛪️", false, null),
+    Waveform("strings", "Strings", "🎻", false, null),
+    Waveform("sax", "Sax", "🎷", false, null),
+    Waveform("marimba", "Marimba", "🪘", false, null),
+    Waveform("kalimba", "Kalimba", "🎼", false, null),
+    Waveform("flute", "Flute", "🎶", false, null),
+    Waveform("bells", "Bells", "🔔", false, null),
+    Waveform("steinway", "Steinway", "🎹", false, null),
+    Waveform("folkharp", "Folk Harp", "🪕", false, null),
+    Waveform("clavisynth", "Clavinet", "⚡️", false, null),
+    Waveform("organ8", "Organ 8'", "🎹", false, null),
+    Waveform("pipeorgan_loud", "Pipe Loud", "⛪️", false, null),
+    Waveform("harmonica", "Harmonica", "🪗", false, null),
+    Waveform("vibraphone", "Vibraphone", "🔔", false, null),
+    Waveform("tubularbells", "Tubular", "🛎️", false, null),
+    Waveform("xylophone", "Xylophone", "🪵", false, null),
+    Waveform("balafon", "Balafon", "🪘", false, null),
+    Waveform("handchimes", "Handchimes", "🔔", false, null),
+    Waveform("dantranh", "Đàn Tranh", "🪕", false, null),
+    Waveform("ocarina", "Ocarina", "🪈", false, null),
+    Waveform("recorder_soprano", "Recorder S", "🪈", false, null),
+    Waveform("recorder_tenor", "Recorder T", "🪈", false, null),
+    Waveform("recorder_bass", "Recorder B", "🪈", false, null),
+    Waveform("saxello", "Saxello", "🎷", false, null),
+    Waveform("sax_vib", "Sax Vibrato", "🎷", false, null),
+    Waveform("psaltery", "Psaltery", "🪕", false, null),
+    Waveform("kalimba2", "Kalimba 2", "🎼", false, null),
+)

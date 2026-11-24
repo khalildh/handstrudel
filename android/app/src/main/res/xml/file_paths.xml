@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider roots. Created in Phase 0; capture may extend it. -->
+<paths>
+    <cache-path name="exports" path="exports/" />
+    <files-path name="drafts" path="drafts/" />
+</paths>

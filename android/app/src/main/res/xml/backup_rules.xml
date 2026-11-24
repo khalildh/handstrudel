@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 10-11 Auto Backup rules (capture WS). Same intent as data_extraction_rules.xml:
+    private drafts stay on this device, and captured loop audio is kept out of the 25 MB quota.
+    These rules also apply to device-to-device transfer on these versions.
+-->
+<full-backup-content>
+    <exclude domain="file" path="drafts/" />
+    <exclude domain="file" path="loops/" />
+</full-backup-content>
