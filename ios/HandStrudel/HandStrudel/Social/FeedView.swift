@@ -1481,7 +1481,7 @@ private struct ClipPresetCard: View {
                 .lineLimit(2)
             HStack(spacing: 8) {
                 if let onPlay {
-                    Button { onPlay(setup) } label: {
+                    Button { Funnel.playThisSoundTapped(); onPlay(setup) } label: {
                         Label(isSoundLocked(setup) ? "Unlock & play" : "Play this sound",
                               systemImage: isSoundLocked(setup) ? "lock.open.fill" : "play.fill")
                             .lineLimit(1)
@@ -1912,7 +1912,7 @@ private struct PerformanceLibraryView: View {
         if let setup = source.soundSetup {
             let locked = isSoundLocked(setup)
             Button(locked ? "Unlock & play this sound" : "Play this sound",
-                   systemImage: locked ? "lock.open.fill" : "play.fill") { onPlay(.preset(setup)) }
+                   systemImage: locked ? "lock.open.fill" : "play.fill") { Funnel.playThisSoundTapped(); onPlay(.preset(setup)) }
                 .accessibilityIdentifier("challenge-play-sound")
             if locked {
                 Text("This sound uses Pro.").font(.caption).foregroundStyle(.secondary)

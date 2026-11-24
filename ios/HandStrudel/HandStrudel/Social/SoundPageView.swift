@@ -298,7 +298,10 @@ struct SoundPageView: View {
             if let setup {
                 let locked = isSoundLocked(setup)
                 Button(locked ? "Unlock & play" : "Play this sound",
-                       systemImage: locked ? "lock.open.fill" : "play.fill") { onStart(.preset(setup)) }
+                       systemImage: locked ? "lock.open.fill" : "play.fill") {
+                    Funnel.playThisSoundTapped()
+                    onStart(.preset(setup))
+                }
                     .buttonStyle(ProfileActionStyle(primary: true))
                     .accessibilityHint(locked ? "Unlock Pro, then open this setup in the Music tab" : "Opens this setup in the Music tab")
                     .accessibilityIdentifier("play-clip-preset")
