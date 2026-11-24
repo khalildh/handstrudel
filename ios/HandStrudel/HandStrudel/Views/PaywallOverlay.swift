@@ -128,3 +128,25 @@ struct PaywallOverlay: View {
         }
     }
 }
+
+/// The single Pro purchase screen. Every locked instrument, scale and progression
+/// unlocks with Pro, so callers only change the headline.
+@MainActor
+func proPaywall(storeManager: StoreManager, title: String = "Pro Upgrade",
+                detail: String = "Unlock every instrument, scale, and chord progression.") -> PaywallOverlay {
+    let resolved = StoreManager.productId(for: "pro")
+    let product = storeManager.products.first(where: { $0.productIdentifier == resolved })
+    return PaywallOverlay(
+        packId: resolved,
+        packName: title,
+        packDescription: detail,
+        price: product?.localizedPriceString ?? "---",
+        items: [
+            "120+ additional GM instruments",
+            "Every scale — modes, harmonic minor, exotic",
+            "Every chord progression — jazz, cinematic, world, and more",
+            "One-time purchase",
+        ],
+        storeManager: storeManager
+    )
+}
