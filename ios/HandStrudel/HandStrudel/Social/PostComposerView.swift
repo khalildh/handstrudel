@@ -94,6 +94,7 @@ struct PostComposerView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    DailyTakeHint(setup: soundSetup, sharesPreset: sharing.sharePlayablePreset)
                     Toggle("Allow comments", isOn: $commentsEnabled)
                         .font(.subheadline)
                         .disabled(uploader.isBusy || submission != nil)

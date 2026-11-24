@@ -325,7 +325,7 @@ struct CreatorProfileHeader<Actions: View>: View {
                 }
                 .fixedSize(horizontal: false, vertical: true)
             }
-            stats
+            stats.dailyStreakStrip(username: username)
             HStack(spacing: 8) {
                 actions()
                     .frame(maxWidth: .infinity)

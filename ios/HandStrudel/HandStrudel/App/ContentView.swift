@@ -424,6 +424,15 @@ struct ContentView: View {
                 .presentationDragIndicator(.visible)
         }
         .environment(\.isSoundLocked) { setup in setup.isLocked(unlocked: storeManager.isUnlocked) }
+        .task(id: auth.userId) {
+            guard SocialConfig.isConfigured else { return }
+            if auth.userId == nil { DailySoundStore.shared.clear() }
+            await DailySoundStore.shared.refresh(viewer: auth.userId, maxAge: 30)
+        }
+        .onReceive(DailySoundStore.shared.$themeLoan) { loan in
+            storeManager.streakThemeLoan = loan
+            if !storeManager.isUnlocked(theme: engine.selectedHandTheme) { engine.selectedHandTheme = HAND_THEMES[0] }
+        }
     }
 
     private var destinations: some View {
@@ -443,7 +452,10 @@ struct ContentView: View {
                         onStart: { startSession() },
                         onDrafts: { showDrafts = true },
                         onLoops: { showLoops = true },
-                        onSetups: { showSetups = true }
+                        onSetups: { showSetups = true },
+                        dailyCard: SocialConfig.isConfigured ? AnyView(DailySoundCard(
+                            store: .shared, auth: auth, onPlay: trySharedSound, onPlayAlong: prepareBacking,
+                            onSignIn: { destination = .account })) : nil
                     )
                 case .account:
                     if SocialConfig.isConfigured {
