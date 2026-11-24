@@ -1123,6 +1123,24 @@ private struct NotificationPerformanceView: View {
     }
 }
 
+/// A creator's public profile, opened from outside the feed (the Profile intro tracker).
+struct CreatorProfileSheet: View {
+    let creatorId: UUID
+    @ObservedObject var auth: AuthManager
+    let onTrySound: (SoundSetup) -> Void
+    let onPlayAlong: (Video) -> Void
+
+    var body: some View {
+        PublicCreatorView(creatorId: creatorId, auth: auth, onFollowChange: {}) { start in
+            switch start {
+            case .preset(let sound): onTrySound(sound)
+            case .backing(let video): onPlayAlong(video)
+            case .learn(let request): onTrySound(request.setup)
+            }
+        }
+    }
+}
+
 private struct PublicCreatorView: View {
     @Environment(\.studioPalette) private var palette
     let creatorId: UUID
@@ -1163,6 +1181,7 @@ private struct PublicCreatorView: View {
                                 .accessibilityIdentifier("profile-follow")
                             }
                         }
+                        PublicIntroBadge(userID: creatorId)
                         CreatorPortfolio(videos: videos, loading: loading || busy, failed: postsFailed, more: more,
                                          isOwner: false, open: { opened = $0 }, trySound: { onStart(.preset($0)) },
                                          retry: { Task { await loadVideos(append: more) } },
@@ -1752,7 +1771,7 @@ private struct VideoShareSheet: View {
     var onRecorded: () async -> Void = {}
 
     var body: some View {
-        ShareSheet(activityItems: [video.watchURL]) {
+        ShareSheet(activityItems: [InviteManager.shared.shareURL(for: video)]) {
             Task {
                 guard (try? await FeedService.recordShare(for: video.id)) != nil else { return }
                 await onRecorded()

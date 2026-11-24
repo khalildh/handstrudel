@@ -3,6 +3,7 @@ import { screenUpload } from "../_shared/sightengine.ts";
 import { readPrivateVideo } from "../_shared/private-video.ts";
 import { videoUploadsEnabledFor } from "../_shared/video-rollout.ts";
 import { noteTrack } from "../_shared/note-track.ts";
+import { grantInviteRewardsFor } from "../_shared/invite-grant-store.ts";
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
@@ -57,6 +58,7 @@ async function checkAndPublish(post: Reservation, privateBucket: string) {
       upload_id: post.id, fields: post.post_fields, checked_attempt: post.attempt,
     });
     if (error) throw new Error("Could not publish screened post");
+    await grantInviteRewardsFor(post.user_id);
   } catch (error) {
     console.error("Video check failed", post.id, error instanceof Error ? error.message : "unknown error");
     // A past or ambiguous attempt cannot change an already published or newly claimed post.

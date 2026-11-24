@@ -5,7 +5,9 @@
         "appIDs": ["TVAG3T3Y65.com.handstrudel.app"],
         "components": [
           { "/": "/watch", "?": { "v": "*" } },
-          { "/": "/watch/", "?": { "v": "*" } }
+          { "/": "/watch/", "?": { "v": "*" } },
+          { "/": "/invite", "?": { "c": "*" } },
+          { "/": "/invite/", "?": { "c": "*" } }
         ]
       }
     ]

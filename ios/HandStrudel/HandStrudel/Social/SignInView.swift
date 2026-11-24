@@ -102,6 +102,9 @@ struct ProfileSetupView: View {
     @State private var username = ""
     @State private var agreed = false
     @State private var busy = false
+    @State private var inviteCode = InviteManager.shared.pendingCode ?? ""
+    @State private var introducer: IntroducerCandidate?
+    @State private var inviteError: String?
 
     var body: some View {
         Form {
@@ -121,13 +124,36 @@ struct ProfileSetupView: View {
                         .font(.footnote)
                 }
             }
+            IntroducerEntry(code: $inviteCode, picked: $introducer, error: inviteError)
             Section {
                 Button("Continue") {
-                    Task { busy = true; _ = await auth.completeProfile(username: username); busy = false }
+                    Task { busy = true; await finish(); busy = false }
                 }
                 .disabled(!Profile.isValidUsername(username) || !agreed || busy)
             }
         }
         .onAppear { username = auth.profile?.username ?? "" }
+        .onChange(of: inviteCode) { _ in inviteError = nil }
+        .onChange(of: introducer) { _ in inviteError = nil }
+    }
+
+    /// Records who introduced this account (if anyone) before saving the profile, since saving
+    /// closes this screen. The intro counts now; the reward waits for the first screened post.
+    private func finish() async {
+        let invites = InviteManager.shared
+        let outcome: InviteRedeemOutcome?
+        if let introducer {
+            outcome = await invites.redeem(introducer: introducer.id)
+        } else if !inviteCode.isEmpty {
+            outcome = await invites.redeem(inviteCode)
+        } else {
+            invites.setPending(nil)
+            outcome = nil
+        }
+        if case .rejected(let message) = outcome {
+            inviteError = message + " Clear it to continue without it."
+            return
+        }
+        _ = await auth.completeProfile(username: username)
     }
 }

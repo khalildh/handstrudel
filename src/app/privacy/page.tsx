@@ -34,6 +34,10 @@ export default function Privacy() {
       </ul>
       <p>We use this only to run HandStrudel: to sign you in, show your posts, power the feed, keep the community safe, and contact you about your account. We don&apos;t sell your data, show ads, or track you across other apps or websites.</p>
 
+      <h2>Invites</h2>
+      <p>Your account has an invite code. If someone signs up with it, we record that they used your code so we can grant the reward and keep your intro tally. You can see the username and profile photo of each person who joined with your code, and whether they&apos;ve posted. The person who joined can see who invited them. Nobody else can see who introduced whom. Your intro count and milestone badge are public on your profile.</p>
+      <p>We don&apos;t use device identifiers, IP addresses or other device signals for invites. Rewards are granted through RevenueCat using your account ID.</p>
+
       <h2>Public video views</h2>
       <p>Public videos also show aggregate view counts. We count playback, not just loading the page, and use a random code for each watched clip to avoid counting the same session's replays. The code is not reused across clips and is separate from optional usage analytics.</p>
       <p>Public performance metrics also include a total of saves and completed in-app shares. Your Saved list stays private. We do not store who received a shared link.</p>

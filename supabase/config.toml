@@ -443,3 +443,6 @@ verify_jwt = false
 
 [functions.send-push]
 verify_jwt = false
+
+[functions.grant-invite-rewards]
+verify_jwt = false

@@ -260,6 +260,7 @@ struct ContentView: View {
             PushManager.shared.pendingLink = nil
             openSocialLink(url)
         }
+        .inviteRewards(auth: auth)
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { openSocialLink(url) }
         }
@@ -693,6 +694,7 @@ struct ContentView: View {
     }
 
     private func openSocialLink(_ url: URL) {
+        if InviteManager.shared.capture(url, signedInAndReady: auth.isSignedIn && !auth.needsProfileSetup) { return }
         guard let link = PerformanceLink(url: url) else { return }
         openPerformance(link)
     }
@@ -712,7 +714,7 @@ struct ContentView: View {
     private func showDraftPostUpdate(_ update: DraftPostUpdate) {
         switch update {
         case .checking: draftPostNotice = "Video submitted for checking."
-        case .posted: draftPostNotice = "Video posted."
+        case .posted: draftPostNotice = "Video posted."; InviteManager.shared.postPublished()
         case .failed(let detail): draftPostNotice = detail
         }
     }

@@ -265,6 +265,7 @@ struct ProfileView: View {
                     Button("Edit profile", systemImage: "pencil") { showEdit = true }
                         .buttonStyle(ProfileActionStyle())
                 }
+                InviteFriendsCard(auth: auth, onTrySound: onTrySound, onPlayAlong: onPlayAlong)
                 CreatorPortfolio(videos: portfolio.videos, loading: !portfolio.hasLoadedPage || portfolio.isLoadingMore,
                                  failed: portfolio.failed, more: portfolio.more, isOwner: true, open: { playing = $0 },
                                  trySound: onTrySound, retry: { Task { await portfolio.load(for: profile.id) } },
@@ -274,7 +275,11 @@ struct ProfileView: View {
             .padding(.horizontal, 21)
             .padding(.bottom, 24)
         }
-        .refreshable { await portfolio.load(for: profile.id) }
+        .refreshable {
+            async let invites: Void = InviteManager.shared.loadSummary()
+            await portfolio.load(for: profile.id)
+            await invites
+        }
         .task(id: profile.id) { await portfolio.load(for: profile.id) }
     }
 

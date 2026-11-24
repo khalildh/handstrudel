@@ -22,6 +22,8 @@ Legacy clips and profile photos keep using `media.handstrudel.com`.
 - `migrations/20261121000000_push_notifications.sql`: push notifications. `device_tokens` (each account manages only its own), `notification_preferences` (per type, all on by default), and the `notifications` queue/log, filled by triggers on new posts, play-alongs, comments, likes (batched to one push per post per hour), and weekly challenges when their window opens. A pg_cron job wakes `send-push` every minute when something is due. Take replies call `push_internal.notify_take_reply(reply_video, replied_to_video)` from their own trigger.
 - `functions/send-push`: drains the queue through APNs (token-based .p8 auth, ES256 JWT, HTTP/2), skips blocked pairs, turned-off types and your own actions, and deletes tokens APNs reports as gone (410 or `BadDeviceToken`).
 - `migrations/20261121040000_daily_sound_streaks.sql`: the daily sound, its takes, posting streaks with a weekly freeze, streak badges and the 7-day hand theme loan. See [Daily sound](#daily-sound).
+- `migrations/20261121030000_invite_rewards.sql`: personal invite codes, one redemption per new account, the reward queue (`invite_reward_grants`) filled by a trigger on an invited account's first screened post, and private abuse signals in the `invite_internal` schema. See [Invite rewards](#invite-rewards).
+- `functions/grant-invite-rewards`: grants queued rewards through RevenueCat. `publish-upload` also tries right after publishing.
 - `tests/database/feed.test.sql`: pgTAP tests for RLS and triggers. Run them with `supabase test db`.
 - `tests/database/comments.test.sql`: pgTAP tests for comment permissions, thread visibility, and moderation.
 - `functions/sign-upload` and `functions/publish-upload`: reserve a private R2 upload and publish only after Sightengine clears the video and thumbnail. Set up the private bucket, secrets, and cutover using the [video upload release checklist](../docs/video-upload-release.md).
@@ -40,7 +42,7 @@ To use the local stack, set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MEDIA_BASE_URL
 
 ## Production setup (one time)
 1. Create the Supabase project, then `supabase link --project-ref <ref>` and `supabase db push`.
-2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload publish-upload delete-video delete-account profile-avatar`.
+2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload publish-upload delete-video delete-account profile-avatar grant-invite-rewards`.
 3. Auth providers:
    - **Apple:** add the bundle ID `com.handstrudel.app` as a client ID (native sign-in needs no Services ID or key).
    - **Email:** enable it, and change the "Magic Link" email template to include `{{ .Token }}`, so users get a 6-digit code for the in-app code entry.
@@ -119,3 +121,28 @@ select day, event, events from public.app_usage_daily order by day desc, event;
 
 ## iOS Universal Links
 Deploy the site with `public/.well-known/apple-app-site-association` and `vercel.json`, and verify the file returns HTTPS 200 with JSON and no redirect. Enable Associated Domains for the iOS app ID in Apple's developer portal, then rebuild with a matching provisioning profile and test a `https://handstrudel.com/watch?v=…` link from Messages on a physical iPhone. The website remains the fallback.
+
+## Invite rewards
+Each account has an invite link, `https://handstrudel.com/invite?c=<CODE>`. Posts shared by their creator also carry it as `&invite=<CODE>`. When a new account enters the code and then publishes a first take that passes screening, the trigger queues 7 days of HandStrudel+ for both people. The queue is granted through RevenueCat's promotional API (`plus_features` and `pro`, `duration=weekly`). `pro` is also granted so 1.0.1 clients, which only check `pro`, unlock Pro sounds too.
+
+Rules enforced by `redeem_invite_code`. Anti-abuse is intentionally light, at the owner's request:
+- No self-invites.
+- One introducer per account, recorded once.
+- Before the account's first post, since that post is what triggers the reward.
+- One reward per redemption, granted idempotently.
+- At most `invite_reward_limit()` (10) rewarded weeks per inviter. That function is the single place to change the cap. Friends can still join past the cap: they get their own week and still count as intros.
+- The introducer can be named by code (link, typed or pasted) or by picking their @username. The same rules apply to both.
+
+Intro tracker: every redemption counts toward the inviter's tally, with no cap. A trigger stores milestone badges in `invite_milestones` at 1, 5, 10 and 25 intros (Spark, Bandleader, Connector, Headliner). These are kept once earned. `intro_stats(profile_id)` is public and returns only the count and the highest badge. `my_intros()` lists your own intros, and `my_introducer()` returns who introduced you. Both lists are visible only to the two people involved.
+
+Setup:
+1. Apply the migration with `supabase db push` after reviewing `supabase db push --dry-run`.
+2. In RevenueCat, create a secret API key (v1, `sk_…`) for the project. Then run `supabase secrets set REVENUECAT_SECRET_KEY=sk_…`. Without it, rewards stay queued and nothing is lost.
+3. Deploy with `supabase functions deploy grant-invite-rewards publish-upload`.
+4. Optional retry sweep: set `INVITE_WORKER_TOKEN`, then schedule a `POST` to `grant-invite-rewards` with the header `X-Invite-Worker-Token`. The app already retries each time its owner opens it.
+
+Monitor stuck grants with:
+
+```sql
+select status, count(*), max(last_error) from public.invite_reward_grants group by status;
+```
