@@ -576,6 +576,181 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(pause.waitForExistence(timeout: 5))
     }
 
+    // MARK: - Take replies
+
+    /// Fixture: `FIXTURE_REPLIES=1 FIXTURE_DRAFT_POSTING=1 node scripts/notification-ui-fixture.mjs`.
+    private func launchWithReplyFixture(extraArguments: [String] = []) throws -> String {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_REPLY_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with FIXTURE_REPLIES=1 (and FIXTURE_DRAFT_POSTING=1 for posting).")
+        }
+        app.launchArguments = ["--uitesting", "-hasSeenOnboarding", "YES"] + extraArguments
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        return endpoint
+    }
+
+    /// The Music tab's current-sound card ("Change sound"), which reflects the engine's live key and scale.
+    private func currentSoundShows(_ text: String) -> Bool {
+        app.buttons["Change sound"].staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH %@", text)).firstMatch.waitForExistence(timeout: 5)
+    }
+
+    func testReplyWithTakeOpensTheSoundReadyToAnswerThePost() throws {
+        // Start from a different key so the test proves the post's sound (D Minor) was loaded.
+        _ = try launchWithReplyFixture(extraArguments: ["-lastKey", "E"])
+        XCTAssertTrue(currentSoundShows("E "), "Precondition: the studio starts in E")
+        XCTAssertFalse(currentSoundShows("D Minor"))
+        element("tab-feed").tap()
+        let replies = app.buttons["feed-reply-count"].firstMatch
+        XCTAssertTrue(replies.waitForExistence(timeout: 8))
+        XCTAssertEqual(replies.label, "1 take in reply")
+        captureIfRequested("Feed-Reply-Count")
+
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 5))
+        sound.tap()
+        let reply = app.buttons["reply-with-take"].firstMatch
+        XCTAssertTrue(reply.waitForExistence(timeout: 5))
+        captureIfRequested("Feed-Sound-Options-Reply")
+        reply.tap()
+
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10), app.alerts.firstMatch.debugDescription)
+        let pill = app.staticTexts["Replying to @loopmaker"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 5))
+        captureIfRequested("Studio-Replying-To")
+        app.buttons["cancel-reply"].tap()
+        XCTAssertFalse(pill.waitForExistence(timeout: 1))
+        element("close-button").tap()
+        XCTAssertTrue(currentSoundShows("D Minor"), "The reply recorder must open with the post's sound")
+        XCTAssertEqual(app.buttons["Change sound"].value as? String, "Grand Piano")
+    }
+
+    func testReplyStripOpensTheAnsweringTake() throws {
+        _ = try launchWithReplyFixture()
+        element("tab-feed").tap()
+        let replies = app.buttons["feed-reply-count"].firstMatch
+        XCTAssertTrue(replies.waitForExistence(timeout: 8))
+        replies.tap()
+
+        let strip = element("reply-strip")
+        for _ in 0..<4 where !strip.exists { app.swipeUp() }
+        XCTAssertTrue(strip.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1 take in reply"].exists)
+        let clip = app.buttons["Take by @secondartist"]
+        XCTAssertTrue(clip.waitForExistence(timeout: 5))
+        captureIfRequested("Post-Reply-Strip")
+        clip.tap()
+        XCTAssertTrue(app.navigationBars["@secondartist"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Reply to @loopmaker"].waitForExistence(timeout: 5))
+    }
+
+    func testChallengeLinkOpensThePostWithTheReplyRecorderReady() throws {
+        _ = try launchWithReplyFixture()
+        XCTAssertTrue(element("tab-feed").waitForExistence(timeout: 5))
+        guard #available(iOS 16.4, *) else { throw XCTSkip("Opening a link needs iOS 16.4.") }
+        app.open(URL(string: "handstrudel://reply/30000000-0000-0000-0000-000000000001")!)
+        let card = element("challenge-card")
+        XCTAssertTrue(card.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["You've been challenged"].exists)
+        captureIfRequested("Challenge-Link")
+        XCTAssertTrue(app.buttons["performance-share-menu"].exists, "The post's share menu offers Challenge a friend")
+        app.buttons["challenge-reply-with-take"].tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10), app.alerts.firstMatch.debugDescription)
+        XCTAssertTrue(app.staticTexts["Replying to @loopmaker"].waitForExistence(timeout: 5))
+        element("close-button").tap()
+        XCTAssertTrue(currentSoundShows("D Minor"), "The challenge opens the challenged post's sound")
+    }
+
+    /// Against the local Supabase stack, seeded with `scripts/reply-ui-seed.sql` (a reply published
+    /// through `publish_screened_video`). Checks the real view's count, strip and label in the app.
+    func testLocalBackendCountsAndShowsAPublishedReply() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let api = env["HANDSTRUDEL_LOCAL_SUPABASE_URL"], let key = env["HANDSTRUDEL_LOCAL_SUPABASE_ANON_KEY"] else {
+            throw XCTSkip("Seed the local stack with scripts/reply-ui-seed.sql and set HANDSTRUDEL_LOCAL_SUPABASE_URL/_ANON_KEY.")
+        }
+        app.launchArguments = ["--uitesting", "-hasSeenOnboarding", "YES"]
+        app.launchEnvironment["SUPABASE_URL"] = api
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launchEnvironment["MEDIA_BASE_URL"] = env["HANDSTRUDEL_REPLY_FIXTURE_URL"] ?? "http://127.0.0.1:1"
+        app.launch()
+        element("tab-feed").tap()
+        // Newest first: the reply leads the feed, labelled with the post it answers.
+        let credit = app.buttons["Reply to @original_maker"].firstMatch
+        XCTAssertTrue(credit.waitForExistence(timeout: 10))
+        captureIfRequested("Local-Feed-Reply-Label")
+        credit.tap()
+        XCTAssertTrue(app.navigationBars["@original_maker"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Answer my loop"].exists)
+        let strip = element("reply-strip")
+        for _ in 0..<4 where !strip.exists { app.swipeUp() }
+        XCTAssertTrue(strip.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1 take in reply"].exists, "The original counts the published reply")
+        let take = app.buttons["Take by @take_replier"]
+        XCTAssertTrue(take.waitForExistence(timeout: 5))
+        captureIfRequested("Local-Reply-Strip")
+        take.tap()
+        XCTAssertTrue(app.navigationBars["@take_replier"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["My answer"].exists)
+    }
+
+    func testFeedShareMenuOffersChallengeAFriend() throws {
+        _ = try launchWithReplyFixture()
+        element("tab-feed").tap()
+        let share = app.buttons["feed-share"].firstMatch
+        XCTAssertTrue(share.waitForExistence(timeout: 8))
+        share.tap()
+        let challenge = app.buttons["Challenge a friend"]
+        XCTAssertTrue(challenge.waitForExistence(timeout: 5))
+        captureIfRequested("Feed-Share-Menu")
+        challenge.tap()
+        // The system share sheet carries the challenge link.
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 8)
+                      || app.navigationBars["UIActivityContentView"].waitForExistence(timeout: 2))
+        captureIfRequested("Challenge-Share-Sheet")
+    }
+
+    @MainActor
+    func testPostingAReplyTakeSendsTheReplyTarget() async throws {
+        guard let file = ProcessInfo.processInfo.environment["HANDSTRUDEL_DRAFT_TEST_CLIP"] else {
+            throw XCTSkip("Requires a simulator-readable MP4 in HANDSTRUDEL_DRAFT_TEST_CLIP.")
+        }
+        app.launchEnvironment["HANDSTRUDEL_TEST_CLIP"] = file
+        let address = try launchWithReplyFixture(extraArguments: ["--uitest-draft-after-start"])
+        signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 10))
+        element("tab-feed").tap()
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 8))
+        sound.tap()
+        app.buttons["reply-with-take"].firstMatch.tap()
+
+        XCTAssertTrue(app.navigationBars["Review take"].waitForExistence(timeout: 10))
+        let compose = app.buttons["Post to HandStrudel"]
+        if !compose.isHittable { app.swipeUp() }
+        compose.tap()
+        XCTAssertTrue(app.navigationBars["New post"].waitForExistence(timeout: 8))
+        let asReply = app.switches["post-as-reply"]
+        XCTAssertTrue(asReply.waitForExistence(timeout: 5))
+        XCTAssertEqual(asReply.value as? String, "1")
+        captureIfRequested("Composer-Reply")
+        let post = app.buttons["Post publicly"]
+        if !post.isHittable { app.swipeUp() }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND hittable == true"), object: post)
+        await fulfillment(of: [ready], timeout: 8)
+        post.tap()
+        let wheel = element("close-button")
+        let resumed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: wheel)
+        // Transcoding to the posted size can be slow on a shared simulator host.
+        await fulfillment(of: [resumed], timeout: 90)
+
+        let fieldsURL = try XCTUnwrap(URL(string: "\(address)/__fixture/last-post-fields"))
+        let (data, _) = try await URLSession.shared.data(from: fieldsURL)
+        let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual((fields["reply_to_id"] as? String)?.lowercased(), "30000000-0000-0000-0000-000000000001")
+    }
+
     func testFeedAdvancesWhenAClipFinishes() throws {
         guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_PLAY_ALONG_FIXTURE_URL"] else {
             throw XCTSkip("Requires the feed fixture with a real MP4.")

@@ -72,6 +72,11 @@ struct ContentView: View {
     @State private var soundError: String?
     /// A post whose notes to teach once the session opened with its sound is running.
     @State private var pendingLearn: LearnToPlayRequest?
+    /// "Reply with a take": the post the session's takes will answer, once its sound is running.
+    @State private var pendingReply: ReplyTarget?
+    @State private var replyTarget: ReplyTarget?
+    /// A post opened from a "Challenge a friend" link, shown with the reply recorder ready.
+    @State private var linkedChallenge: Video?
     @State private var learnLoad: Task<Void, Never>?
     /// A posted Pro sound the viewer tapped without Pro; shows the unlock screen.
     @State private var lockedSound: LockedSoundOffer?
@@ -130,7 +135,7 @@ struct ContentView: View {
     private var canShowReview: Bool {
         reviewReadyThisSession && scenePhase == .active && destination == .music
             && !engine.isRunning && !startingSession && !showDrafts && !showLoops && !showSetups && reviewingDraft == nil
-            && linkedComments == nil && linkedPerformance == nil && draftPostToOpen == nil && soundError == nil && recordingError == nil
+            && linkedComments == nil && linkedPerformance == nil && linkedChallenge == nil && draftPostToOpen == nil && soundError == nil && recordingError == nil
             && jamInvitation == nil && jamError == nil
     }
 
@@ -264,6 +269,12 @@ struct ContentView: View {
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { openSocialLink(url) }
         }
+        .sheet(item: $linkedChallenge) { video in
+            CreatorVideoView(video: video, auth: auth, challenged: true, onTrySound: { sound in
+                linkedChallenge = nil
+                trySharedSound(sound)
+            })
+        }
         .sheet(item: $linkedPerformance) { video in
             CreatorVideoView(video: video, auth: auth, onPlayAlong: { source in
                 linkedPerformance = nil
@@ -343,6 +354,8 @@ struct ContentView: View {
         .onChange(of: engine.isRunning) { running in
             if running {
                 startingSession = false
+                replyTarget = pendingReply
+                pendingReply = nil
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--uitest-draft-after-start"),
                    let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
@@ -358,6 +371,7 @@ struct ContentView: View {
                     beginLearnToPlay(learn)
                 }
             } else {
+                replyTarget = nil
                 learnLoad?.cancel()
                 cancelCountdown()
                 backingLoad?.cancel()
@@ -418,6 +432,10 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .learnToPlayPost)) { notification in
             guard let request = notification.object as? LearnToPlayRequest else { return }
             pendingLearn = request
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .replyWithTake)) { notification in
+            guard let request = notification.object as? ReplyTakeRequest else { return }
+            pendingReply = request.target
         }
         .sheet(item: $lockedSound, onDismiss: resumeUnlockedSound) { offer in
             proPaywall(storeManager: storeManager, title: offer.title, detail: offer.detail)
@@ -575,6 +593,7 @@ struct ContentView: View {
         lastLockedSound = nil
         guard !offer.setup.isLocked(unlocked: storeManager.isUnlocked) else {
             pendingLearn = nil
+            pendingReply = nil
             return
         }
         AppAnalytics.shared.record(.lockedSoundUnlocked)
@@ -620,12 +639,13 @@ struct ContentView: View {
     private func trySharedSound(_ setup: SoundSetup) {
         guard !engine.isRunning, !startingSession else {
             pendingLearn = nil
+            pendingReply = nil
             soundError = "Close your current session, then open this sound again."
             return
         }
         startSession(setup: setup)
-        // Keep a lesson waiting while its sound's unlock screen is up.
-        if !startingSession && !engine.isRunning && lastLockedSound == nil { pendingLearn = nil }
+        // Keep a lesson or reply waiting while its sound's unlock screen is up.
+        if !startingSession && !engine.isRunning && lastLockedSound == nil { pendingLearn = nil; pendingReply = nil }
     }
 
     private func recordReviewMilestone(_ id: UUID) {
@@ -733,8 +753,10 @@ struct ContentView: View {
                 let video = try await FeedService.video(id: link.videoID)
                 guard !Task.isCancelled else { return }
                 switch link {
-                case .watch:
-                    if let video { linkedPerformance = video }
+                case .watch, .challenge:
+                    if let video {
+                        if link == .challenge(video.id) { linkedChallenge = video } else { linkedPerformance = video }
+                    }
                     else { soundError = "This performance is no longer available." }
                 case .comments:
                     if let video, video.commentsEnabled != nil { linkedComments = video }
@@ -1228,6 +1250,9 @@ struct ContentView: View {
                 if let backing, !isRecording, !recorderBusy, recordCountdown == 0 {
                     backingControls(backing)
                         .padding(.horizontal, 16)
+                }
+                if let replyTarget, !isRecording, !recorderBusy, recordCountdown == 0 {
+                    ReplyingToPill(target: replyTarget) { self.replyTarget = nil }
                 }
                 if !isRecording, !recorderBusy, recordCountdown == 0,
                    hasSeenOnboarding || !engine.scaleChordMelodyModeEnabled {
@@ -2309,7 +2334,7 @@ struct ContentView: View {
         do {
             let sound = engine.currentSoundSetup
             draft = try drafts.begin(instrument: sound?.instrumentName, mode: currentModeName, soundSetup: sound,
-                                     backingCredit: backing?.credit, halfSpeed: recordAtHalfSpeed)
+                                     backingCredit: backing?.credit, replyTo: replyTarget, halfSpeed: recordAtHalfSpeed)
         } catch {
             recordingError = "Couldn’t create a private draft. \(error.localizedDescription)"
             return
@@ -2435,7 +2460,8 @@ struct ContentView: View {
     #if DEBUG
     private func openSampleDraft(at url: URL) {
         do {
-            let draft = try drafts.begin(instrument: engine.selectedSoundFontInstrument.name, mode: currentModeName)
+            let draft = try drafts.begin(instrument: engine.selectedSoundFontInstrument.name, mode: currentModeName,
+                                         replyTo: replyTarget)
             do {
                 try FileManager.default.copyItem(at: url, to: drafts.videoURL(for: draft.id))
                 try drafts.complete(draft)

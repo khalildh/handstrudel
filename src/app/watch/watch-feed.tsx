@@ -5,12 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { creatorHref, describeClipChords, describeClipScale, formatVideoViews, isVideoID, loadPublicVideos, mediaURL, PAGE_SIZE, postSearch, type PublicVideo } from "../../lib/public-feed";
 import { useVideoViews } from "../../lib/use-video-views";
+import { appStoreUrl } from "../../lib/app-store";
 import WatchComments from "./watch-comments";
 import { clipDuration, clipTitle, WatchArtwork, WatchFooter, WatchHeader, WatchIcon, WatchThumbnail } from "./watch-design";
 
 export default function WatchFeed() {
   const router = useRouter();
-  const id = useSearchParams().get("v")?.toLowerCase();
+  const params = useSearchParams();
+  const id = params.get("v")?.toLowerCase();
+  // "Challenge a friend" links add reply=1. Web playback of the sound comes later; send them to the app.
+  const challenged = params.get("reply") === "1" && !!id && isVideoID(id);
   const [videos, setVideos] = useState<PublicVideo[]>([]);
   const [shared, setShared] = useState<{ id: string; video?: PublicVideo; error?: boolean }>();
   const [loading, setLoading] = useState(true);
@@ -206,6 +210,22 @@ export default function WatchFeed() {
           <p className="watch-intro">Watch what people make when the air is the instrument.</p>
         </div>
       </div>
+      {challenged && (
+        <aside className="watch-challenge" aria-label="Challenge">
+          <WatchIcon name="wave" />
+          <div>
+            <h2>You&apos;ve been challenged</h2>
+            <p>{selected?.id === id && selected.username
+              ? `Answer @${selected.username}'s performance with your own take. `
+              : "Answer this performance with your own take. "}
+            Play the same sound in HandStrudel on iPhone and post your reply.</p>
+          </div>
+          <div className="watch-challenge-actions">
+            <a className="watch-action watch-primary" href={`handstrudel://reply/${id}`}>Reply in the app <WatchIcon name="arrow" /></a>
+            <a className="watch-app-link" href={appStoreUrl}>Get HandStrudel on the App Store</a>
+          </div>
+        </aside>
+      )}
       <div className="watch-grid">
         <section ref={stage} className="watch-stage" aria-label="Video player">
           {selected ? (

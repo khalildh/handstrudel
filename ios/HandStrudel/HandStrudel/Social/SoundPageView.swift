@@ -303,6 +303,12 @@ struct SoundPageView: View {
                     .accessibilityHint(locked ? "Unlock Pro, then open this setup in the Music tab" : "Opens this setup in the Music tab")
                     .accessibilityIdentifier("play-clip-preset")
             }
+            if let reply = ReplyTakeRequest(video: reference) {
+                Button("Reply with a take", systemImage: "arrowshape.turn.up.left") { onStart(.reply(reply)) }
+                    .buttonStyle(ProfileActionStyle())
+                    .accessibilityHint("Opens this sound and posts your next take as a reply")
+                    .accessibilityIdentifier("reply-with-take")
+            }
             if let learn = LearnToPlayRequest(video: reference) {
                 Button("Learn to play", systemImage: "graduationcap") { onStart(.learn(learn)) }
                     .buttonStyle(ProfileActionStyle())
