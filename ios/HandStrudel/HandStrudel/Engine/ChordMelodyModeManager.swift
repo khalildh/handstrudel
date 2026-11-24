@@ -666,22 +666,22 @@ final class ChordMelodyModeManager {
         if let h = melodyHand(hands) {
             switch layout {
             case .grid:
-                let count = max(currentChordMidi.count, 9)
-                lastMelodyLane = yToMelodyLane(h.pinchY, noteCount: count)
+                lastMelodyLane = yToMelodyLane(h.pinchY, noteCount: max(1, lastMelodyTargetCount))
                 melodyResting = false
             case .radial:
                 let v = radialVector(x: h.pinchX, y: h.pinchY)
                 melodyResting = v.radius < Self.radialDeadzone
                 if !melodyResting {
-                    lastMelodyLane = radialWedgeIndex(angle: v.angle, count: 9)
+                    lastMelodyLane = radialWedgeIndex(angle: v.angle, count: max(1, lastMelodyTargetCount))
                 }
             case .split:
                 let v = radialVector(x: h.pinchX, y: h.pinchY)
                 if v.radius < Self.splitDeadzone {
                     melodyResting = true
-                } else if let wedge = splitWedgeIndex(side: melodySide, angle: v.angle, count: 9) {
+                } else if let wedge = splitWedgeIndex(side: melodySide, angle: v.angle,
+                                                       count: max(1, lastMelodyTargetCount)) {
                     // Same inversion as readMelodyHand: top of arc = highest pitch.
-                    lastMelodyLane = 9 - 1 - wedge
+                    lastMelodyLane = max(1, lastMelodyTargetCount) - 1 - wedge
                     melodyResting = false
                 } else {
                     melodyResting = true

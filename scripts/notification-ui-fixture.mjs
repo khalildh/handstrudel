@@ -31,7 +31,9 @@ const post = {
   view_count: countViews ? 7 : undefined,
   sound_setup: {
     version: 1, instrument: "grand_piano", waveform: "sine", key: "D", scale: "Minor", progression: "free",
-    mode: "soundfont", bpm: 96, useSoundFont: true, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2,
+    mode: process.env.FIXTURE_SOUND_MODE ?? "soundfont", bpm: 96, useSoundFont: true, autoStrum: false, padVolume: 0.3,
+    gridOctave: 3, gridRange: 2,
+    ...(process.env.FIXTURE_CHORD_VOICING ? { chordVoicing: process.env.FIXTURE_CHORD_VOICING } : {}),
   },
 };
 const secondPost = {

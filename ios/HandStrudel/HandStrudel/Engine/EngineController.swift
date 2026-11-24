@@ -231,6 +231,14 @@ final class EngineController: ObservableObject {
     @Published var chordMelodyMelodyLane: Int? = nil
     @Published var chordMelodyOctaveShift: Int = 0        // -1, 0, +1 from chord hand Y
     @Published var chordMelodyAutoStrum: Bool = false     // re-articulate chord on each beat
+    /// Chord voicing the player picked, per mode. No entry = the mode's
+    /// default (`defaultChordVoicing(for:)`). Read through `chordVoicing`.
+    /// Persisted, so the pick survives relaunch.
+    @Published var chordVoicingOverrides: [SoundSetup.Mode: ChordVoicing] = PersistenceManager.shared.chordVoicingOverrides {
+        didSet {
+            if chordVoicingOverrides != oldValue { PersistenceManager.shared.chordVoicingOverrides = chordVoicingOverrides }
+        }
+    }
 
     /// Currently selected chord progression (subset of diatonic degrees the
     /// chord hand cycles through). Defaults to "Free" — all 7 diatonic chords.
@@ -433,7 +441,8 @@ final class EngineController: ObservableObject {
         delayedWebFixture = arguments.contains("--uitest-delayed-web-audio")
         let realWebFixture = arguments.contains("--uitest-real-web-audio")
         if realWebFixture { switchMode(grid: false, drums: false, learn: false) }
-        if arguments.contains("--uitesting"), !delayedWebFixture, !realWebFixture {
+        // Scripted hands (DemoDirector) need the real session loop.
+        if arguments.contains("--uitesting"), !delayedWebFixture, !realWebFixture, DemoDirector.shared == nil {
             startCameraIfRequested()
             isRunning = true
             return
@@ -528,6 +537,9 @@ final class EngineController: ObservableObject {
             if ProcessInfo.processInfo.arguments.contains("--uitest-camera-denied") {
                 handTracker.simulatePermissionDeniedForUITest()
             }
+            // Scripted hands (DemoDirector) stand in for the camera, so UI
+            // tests can drive real hand-tracked chords.
+            if DemoDirector.shared != nil { handTracker.startSession() }
             return
         }
         #endif
@@ -758,24 +770,15 @@ final class EngineController: ObservableObject {
 
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         let scaleMode = scaleChordMelodyModeEnabled
-
         let chordTones: (Int) -> [Int] = { [weak self] degree in
-            guard let self else { return [] }
-            return scaleMode
-                ? chordNotesWithSeventh(key: self.selectedKey, scale: self.selectedScale, degree: degree)
-                : chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
+            self?.wheelChordTones(degree: degree) ?? []
         }
         let melodyTones: (Int) -> [Int] = { [weak self] degree in
             guard let self else { return [] }
             if scaleMode {
                 return scaleNotesOneOctave(key: self.selectedKey, scale: self.selectedScale)
             }
-            let triad = chordNotes(key: self.selectedKey, scale: self.selectedScale, degree: degree)
-            var lanes: [Int] = []
-            for octave in 0..<3 {
-                for note in triad { lanes.append(note + octave * 12) }
-            }
-            return lanes.sorted()
+            return self.wheelMelodyLanes(degree: degree)
         }
 
         // SoundFont mode intentionally runs free-time — passing quantize here
@@ -1414,6 +1417,48 @@ final class EngineController: ObservableObject {
             soundFontEngine.startIfNeeded(program: selectedSoundFontInstrument.program)
         }
         jamSession.replayRemoteVoices()
+    }
+
+    /// The Scale wheel voices 7ths by default; every other mode voices triads.
+    func defaultChordVoicing(for mode: SoundSetup.Mode) -> ChordVoicing {
+        .defaultFor(scaleWheel: mode == .scalechordmelody)
+    }
+
+    func chordVoicing(for mode: SoundSetup.Mode) -> ChordVoicing {
+        chordVoicingOverrides[mode] ?? defaultChordVoicing(for: mode)
+    }
+
+    /// Choosing the mode's default clears the override, so presets saved
+    /// with the default keep following it.
+    func setChordVoicing(_ voicing: ChordVoicing?, for mode: SoundSetup.Mode) {
+        chordVoicingOverrides[mode] = voicing == defaultChordVoicing(for: mode) ? nil : voicing
+    }
+
+    /// The voicing every wheel chord in the current mode uses (camera and
+    /// touch, sound and labels).
+    var chordVoicing: ChordVoicing {
+        get { SoundSetup.Mode(rawValue: currentModeString).map(chordVoicing(for:)) ?? .triad }
+        set { if let mode = SoundSetup.Mode(rawValue: currentModeString) { setChordVoicing(newValue, for: mode) } }
+    }
+
+    /// The notes of the wheel chord on `degree`, voiced the player's way.
+    /// Hand-tracked pads, accents, auto-strum and touch chords all use this.
+    func wheelChordTones(degree: Int) -> [Int] {
+        chordVoicing.notes(key: selectedKey, scale: selectedScale, degree: degree)
+    }
+
+    /// The melody hand's notes on the chord-tone wheels (Split, Radial, Grid
+    /// chord+melody, SoundFont): the voiced chord across three octaves, so
+    /// 7ths add the 7th to the melody too. Deduplicated because on six-note
+    /// scales the 7th lands on the next octave's root.
+    func wheelMelodyLanes(degree: Int) -> [Int] {
+        let tones = wheelChordTones(degree: degree)
+        return Array(Set((0..<3).flatMap { octave in tones.map { $0 + octave * 12 } })).sorted()
+    }
+
+    /// A wheel wedge's chord name, with "⁷" when the voicing is 7ths.
+    func wheelChordName(degree: Int) -> String {
+        chordDisplayName(key: selectedKey, scale: selectedScale, degree: degree) + chordVoicing.chordNameSuffix
     }
 
     /// Persisted/loop-record label for the current mode.
