@@ -446,3 +446,6 @@ verify_jwt = false
 
 [functions.grant-invite-rewards]
 verify_jwt = false
+
+[functions.moderation-media]
+verify_jwt = false

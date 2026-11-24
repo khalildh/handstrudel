@@ -2,6 +2,7 @@
 // The app uploads both files to their permanent private keys, then calls publish-upload.
 import { admin, caller, handler, HttpError, presignPut, privateVideoBucketUrl, uploadKeys } from "../_shared/r2.ts";
 import { videoUploadsEnabledFor } from "../_shared/video-rollout.ts";
+import { bannedMessage } from "../_shared/moderation.ts";
 
 const MAX_VIDEO = 15 * 1024 * 1024;
 const MAX_THUMB = 1 * 1024 * 1024;
@@ -27,6 +28,7 @@ Deno.serve(handler(async (req) => {
     uploader: user.id, video_size: videoBytes, thumb_size: thumbBytes,
   });
   if (error?.message === "UPLOAD_LIMIT") throw new HttpError(429, "Limit of 20 uploads per day.");
+  if (error?.message === "ACCOUNT_BANNED") throw new HttpError(403, bannedMessage);
   if (error || typeof id !== "string") throw new Error("Could not reserve video upload");
   const { videoKey, thumbKey } = uploadKeys(user.id, id);
   return {

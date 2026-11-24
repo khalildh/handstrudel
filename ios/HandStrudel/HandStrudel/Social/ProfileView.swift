@@ -114,6 +114,8 @@ struct ProfileView: View {
     let onMakeMusic: () -> Void
     let onTrySound: (SoundSetup) -> Void
     let onPlayAlong: (Video) -> Void
+    @ObservedObject private var moderation = ModerationAccess.shared
+    @State private var showModeration = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -190,6 +192,8 @@ struct ProfileView: View {
         .alert("Couldn't delete this post", isPresented: $deleteError) {
             Button("OK", role: .cancel) {}
         }
+        .sheet(isPresented: $showModeration) { ModerationView() }
+        .task(id: auth.userId) { await moderation.refresh(signedIn: auth.isSignedIn) }
         .environment(\.profileImageStore, portfolio.images)
     }
 
@@ -207,6 +211,10 @@ struct ProfileView: View {
                     Button("Blocked users") { showBlocked = true }
                     Button("Sign out") { Task { await auth.signOut() } }
                     Button("Delete account…", role: .destructive) { confirmDeleteAccount = true }
+                }
+                if auth.isSignedIn && moderation.isModerator {
+                    Button("Moderation", systemImage: "shield.lefthalf.filled") { showModeration = true }
+                        .accessibilityIdentifier("profile-moderation")
                 }
                 Link("Community Guidelines", destination: SocialConfig.guidelinesURL)
                 Link("Terms of Use", destination: SocialConfig.termsURL)

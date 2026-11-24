@@ -4,6 +4,7 @@ import { readPrivateVideo } from "../_shared/private-video.ts";
 import { videoUploadsEnabledFor } from "../_shared/video-rollout.ts";
 import { noteTrack } from "../_shared/note-track.ts";
 import { grantInviteRewardsFor } from "../_shared/invite-grant-store.ts";
+import { bannedMessage, isAccountBanned } from "../_shared/moderation.ts";
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
@@ -60,6 +61,12 @@ async function checkAndPublish(post: Reservation, privateBucket: string) {
     const { error } = await db.rpc("publish_screened_video", {
       upload_id: post.id, fields: post.post_fields, checked_attempt: post.attempt,
     });
+    if (error?.message === "ACCOUNT_BANNED") {
+      // Banned while screening: retrying can't succeed, so stop now.
+      const { error: failError } = await updateAttempt({ status: "failed", post_fields: null, retry_at: null });
+      if (failError) console.error("Could not fail banned upload", post.id);
+      return;
+    }
     if (error) throw new Error("Could not publish screened post");
     await grantInviteRewardsFor(post.user_id);
   } catch (error) {
@@ -147,6 +154,7 @@ Deno.serve(handler(async (req) => {
   if (body.action !== "submit") throw new HttpError(400, "Invalid upload action.");
   if (upload.status !== "reserved") return { status: upload.status };
   if (!videoUploadsEnabledFor(user.id)) throw new HttpError(503, "Posting is temporarily unavailable.");
+  if (await isAccountBanned(db, user.id)) throw new HttpError(403, bannedMessage);
   const metadata = postFields(body.fields);
   const privateBucket = privateVideoBucketUrl();
   const { data: claimed, error: claimError } = await db.from("pending_video_uploads")
