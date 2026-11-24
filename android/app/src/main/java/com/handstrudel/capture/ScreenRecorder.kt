@@ -198,7 +198,13 @@ class ScreenRecorder(
                         } else {
                             val read = capture.read(pcm, frames)
                             if (read < 0) throw IllegalStateException("Audio capture failed ($read).")
-                            if (startUs < 0) startUs = System.nanoTime() / 1000 - read * 1_000_000L / AppAudioCapture.SAMPLE_RATE
+                            if (startUs < 0) {
+                                val readTimeUs = System.nanoTime() / 1000 - read * 1_000_000L / AppAudioCapture.SAMPLE_RATE
+                                val stampedUs = capture.firstFrameNanos()?.div(1000)
+                                // Trust the capture's timestamp only when it is plausible (up to 1 s earlier).
+                                startUs = if (stampedUs != null && stampedUs <= readTimeUs && readTimeUs - stampedUs < 1_000_000L) stampedUs else readTimeUs
+                                android.util.Log.i("ScreenRecorder", "audio start: read-time ${readTimeUs}us, stamped ${stampedUs}us, using ${startUs}us (offset ${(readTimeUs - startUs) / 1000} ms)")
+                            }
                             buffer.clear()
                             buffer.asShortBuffer().put(pcm, 0, read * AppAudioCapture.CHANNELS)
                             codec.queueInputBuffer(input, 0, read * AppAudioCapture.CHANNELS * 2, presentationUs(startUs, written), 0)

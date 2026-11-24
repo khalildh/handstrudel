@@ -81,7 +81,7 @@ internal class NativeAudioOutput(override val sampleRate: Int) : AppAudioTap {
             if (sf != null) sf.render(buf, CHUNK) else buf.fill(0f)
             var p = 0f
             for (i in buf.indices) {
-                val v = buf[i].coerceIn(-1f, 1f)
+                val v = softClip(buf[i])
                 buf[i] = v
                 val a = abs(v)
                 if (a > p) p = a
@@ -98,6 +98,19 @@ internal class NativeAudioOutput(override val sampleRate: Int) : AppAudioTap {
                 Thread.sleep(5)
             }
         }
+    }
+
+    /**
+     * Transparent below [KNEE]; above it, eases into ±1 instead of hard clipping. Stacked
+     * pad and melody voices can sum past full scale, and a hard clip there sounds buzzy,
+     * especially in recordings (iOS's mixer has float headroom before the output).
+     */
+    private fun softClip(x: Float): Float {
+        val a = abs(x)
+        if (a <= KNEE) return x
+        val over = (a - KNEE) / (1f - KNEE)
+        val shaped = KNEE + (1f - KNEE) * kotlin.math.tanh(over)
+        return if (x < 0) -shaped else shaped
     }
 
     @Synchronized
@@ -117,5 +130,6 @@ internal class NativeAudioOutput(override val sampleRate: Int) : AppAudioTap {
     companion object {
         private const val TAG = "NativeAudioOutput"
         const val CHUNK = 256
+        private const val KNEE = 0.8f
     }
 }

@@ -61,6 +61,20 @@ class AppAudioCapture private constructor(
         return read
     }
 
+    /**
+     * Monotonic time (ns) of the first app-audio frame, from the capture's own timestamp, or
+     * null when the device doesn't report one. Playback capture runs through a buffered
+     * submix, so the time a read returns is a few hundred ms later than when the audio was
+     * mixed; the video's timestamps are compositor times, so stamping audio by read time
+     * leaves it late (≈0.3 s on a Nokia G10).
+     */
+    fun firstFrameNanos(): Long? {
+        val ts = android.media.AudioTimestamp()
+        if (app.getTimestamp(ts, android.media.AudioTimestamp.TIMEBASE_MONOTONIC) != AudioRecord.SUCCESS) return null
+        if (ts.nanoTime <= 0L) return null
+        return ts.nanoTime - ts.framePosition * 1_000_000_000L / SAMPLE_RATE
+    }
+
     fun stop() {
         runCatching { app.stop() }
         runCatching { mic?.stop() }
