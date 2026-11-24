@@ -44,6 +44,7 @@ final class AuthManager: NSObject, ObservableObject {
             userId = nil; email = nil; profile = nil
             isLoadingProfile = false
             accountPortfolio.selectAccount(nil)
+            PushManager.shared.accountChanged(to: nil)
             return
         }
         let changed = userId != session.user.id
@@ -55,6 +56,7 @@ final class AuthManager: NSObject, ObservableObject {
         }
         userId = session.user.id
         email = session.user.email
+        PushManager.shared.accountChanged(to: session.user.id)
         if changed {
             async let profileRefresh: Void = refreshProfile()
             // RevenueCat purchases follow the account across devices.
@@ -196,6 +198,7 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func signOut() async {
+        await PushManager.shared.signingOut()
         try? await supabase.auth.signOut()
         _ = try? await Purchases.shared.logOut()
     }

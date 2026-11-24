@@ -30,6 +30,7 @@ export default function Privacy() {
         <li><strong>Your posts:</strong> the videos, thumbnails, and captions you post, plus the instrument and play mode used. <strong>Posts are public.</strong></li>
         <li><strong>Your comments:</strong> the text you post, its timestamp, and the video or comment you reply to. <strong>Comments and your username are public.</strong></li>
         <li><strong>Activity:</strong> likes, follows, blocks, reports, and the performances you save. Your saved list is private to your account.</li>
+        <li><strong>Push notifications:</strong> if you allow notifications, your device&apos;s Apple push token, linked to your account, and which notification types you&apos;ve turned on. We keep a log of the notifications we send you.</li>
       </ul>
       <p>We use this only to run HandStrudel: to sign you in, show your posts, power the feed, keep the community safe, and contact you about your account. We don&apos;t sell your data, show ads, or track you across other apps or websites.</p>
 
@@ -53,7 +54,7 @@ export default function Privacy() {
         <li><strong>Sightengine</strong> — automated content screening of videos and thumbnails you submit for public posting. Recordings kept in Private drafts are not submitted.</li>
         <li><strong>Resend</strong> — sending sign-in code emails.</li>
         <li><strong>Vercel</strong> — hosting the website and providing website analytics.</li>
-        <li><strong>Apple</strong> — Sign in with Apple and in-app purchases (we never see payment details).</li>
+        <li><strong>Apple</strong> — Sign in with Apple, in-app purchases (we never see payment details), and delivering push notifications.</li>
         <li><strong>RevenueCat</strong> — managing in-app purchase status, linked to your account ID when you&apos;re signed in.</li>
       </ul>
 
@@ -63,6 +64,7 @@ export default function Privacy() {
         <li>Replace or remove your public photo from Edit Profile. Previously shared image URLs may remain in caches for a limited time.</li>
         <li>Delete your comments using the menu beside them.</li>
         <li>Delete your account from your profile (<strong>⋯ → Delete account</strong>). This permanently removes your profile, posts, comments, and files from our systems.</li>
+        <li>Choose which notifications you get in Account settings (<strong>Notifications</strong>), or turn them off in iPhone Settings. Signing out removes this device&apos;s push token from your account.</li>
         <li>Email us to ask for a copy of your data or to correct it.</li>
       </ul>
 

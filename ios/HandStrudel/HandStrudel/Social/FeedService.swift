@@ -429,6 +429,7 @@ enum FeedService {
         struct Row: Encodable { let follower_id: UUID; let followee_id: UUID }
         if follow {
             try await supabase.from("follows").insert(Row(follower_id: user, followee_id: target)).execute()
+            PushManager.shared.askAfterMilestone()
         } else {
             try await supabase.from("follows").delete()
                 .eq("follower_id", value: user).eq("followee_id", value: target).execute()
