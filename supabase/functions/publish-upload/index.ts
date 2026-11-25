@@ -2,6 +2,9 @@ import { admin, caller, deleteKeys, handler, HttpError, privateVideoBucketUrl, u
 import { screenUpload } from "../_shared/sightengine.ts";
 import { readPrivateVideo } from "../_shared/private-video.ts";
 import { videoUploadsEnabledFor } from "../_shared/video-rollout.ts";
+import { noteTrack } from "../_shared/note-track.ts";
+import { grantInviteRewardsFor } from "../_shared/invite-grant-store.ts";
+import { bannedMessage, isAccountBanned } from "../_shared/moderation.ts";
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
@@ -20,7 +23,8 @@ function postFields(input: unknown) {
   const dimension = (v: unknown) => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 8192;
   if (typeof p.duration_s !== "number" || !Number.isFinite(p.duration_s) || p.duration_s <= 0 || p.duration_s > 60 ||
       !dimension(p.width) || !dimension(p.height) ||
-      (p.source_video_id != null && (typeof p.source_video_id !== "string" || !uuid.test(p.source_video_id)))) {
+      (p.source_video_id != null && (typeof p.source_video_id !== "string" || !uuid.test(p.source_video_id))) ||
+      (p.reply_to_id != null && (typeof p.reply_to_id !== "string" || !uuid.test(p.reply_to_id)))) {
     throw new HttpError(400, "Invalid video details.");
   }
   return {
@@ -28,8 +32,11 @@ function postFields(input: unknown) {
     instrument: typeof p.instrument === "string" ? p.instrument.slice(0, 150) : null,
     mode: typeof p.mode === "string" ? p.mode.slice(0, 150) : null,
     duration_s: p.duration_s, width: p.width, height: p.height,
-    sound_setup: p.sound_setup ?? null, comments_enabled: p.comments_enabled !== false,
+    sound_setup: p.sound_setup ?? null, note_track: p.sound_setup ? noteTrack(p.note_track) : null,
+    comments_enabled: p.comments_enabled !== false,
     backing_enabled: p.backing_enabled === true, source_video_id: p.source_video_id ?? null,
+    // The database drops the link if the target is gone or blocked by the time the take is published.
+    reply_to_id: p.reply_to_id ?? null,
   };
 }
 
@@ -54,7 +61,14 @@ async function checkAndPublish(post: Reservation, privateBucket: string) {
     const { error } = await db.rpc("publish_screened_video", {
       upload_id: post.id, fields: post.post_fields, checked_attempt: post.attempt,
     });
+    if (error?.message === "ACCOUNT_BANNED") {
+      // Banned while screening: retrying can't succeed, so stop now.
+      const { error: failError } = await updateAttempt({ status: "failed", post_fields: null, retry_at: null });
+      if (failError) console.error("Could not fail banned upload", post.id);
+      return;
+    }
     if (error) throw new Error("Could not publish screened post");
+    await grantInviteRewardsFor(post.user_id);
   } catch (error) {
     console.error("Video check failed", post.id, error instanceof Error ? error.message : "unknown error");
     // A past or ambiguous attempt cannot change an already published or newly claimed post.
@@ -140,6 +154,7 @@ Deno.serve(handler(async (req) => {
   if (body.action !== "submit") throw new HttpError(400, "Invalid upload action.");
   if (upload.status !== "reserved") return { status: upload.status };
   if (!videoUploadsEnabledFor(user.id)) throw new HttpError(503, "Posting is temporarily unavailable.");
+  if (await isAccountBanned(db, user.id)) throw new HttpError(403, bannedMessage);
   const metadata = postFields(body.fields);
   const privateBucket = privateVideoBucketUrl();
   const { data: claimed, error: claimError } = await db.from("pending_video_uploads")

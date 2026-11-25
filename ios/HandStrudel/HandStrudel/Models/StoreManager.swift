@@ -4,7 +4,11 @@ import RevenueCat
 @MainActor
 final class StoreManager: ObservableObject {
 
-    // MARK: - Product IDs (legacy — kept for callers that still reference them)
+    // MARK: - Product IDs
+    //
+    // Two things are for sale: Pro (one-time) and HandStrudel+ (monthly or
+    // yearly). The four old packs are no longer sold; their ids stay so people
+    // who bought one keep it (see `isUnlocked`).
 
     static let studioPack = "com.handstrudel.pack.studio"
     static let partyPack = "com.handstrudel.pack.party"
@@ -14,12 +18,28 @@ final class StoreManager: ObservableObject {
     static let plusMonthly = "com.handstrudel.plus.monthly"
     static let plusYearly = "com.handstrudel.plus.yearly"
 
-    static let allProductIds: Set<String> = [
-        studioPack, partyPack,
-        kit808, kitElectronic,
-        pro,
-        plusMonthly, plusYearly
-    ]
+    /// Products the store sells.
+    static let allProductIds: Set<String> = [pro, plusMonthly, plusYearly]
+
+    /// What a locked item asks the player to buy.
+    enum Offer: Hashable, Identifiable {
+        /// Music: instruments, scales, progressions, preset and drum packs.
+        /// Pro unlocks it once; HandStrudel+ includes it.
+        case pro
+        /// Looks: premium camera filters and hand themes. HandStrudel+ only.
+        case plus
+
+        var id: Self { self }
+    }
+
+    /// Item pack ids that only HandStrudel+ unlocks. Everything else is music,
+    /// which Pro unlocks — including unknown ids, so a new item can never end
+    /// up subscription-only by accident.
+    static let plusOnlyPackIds: Set<String> = ["filter_pack", "visual_pack", "theme_pack"]
+
+    static func offer(for packId: String) -> Offer {
+        plusOnlyPackIds.contains(packId) ? .plus : .pro
+    }
 
     // MARK: - Entitlement IDs (must match RevenueCat dashboard)
 
@@ -100,8 +120,10 @@ final class StoreManager: ObservableObject {
     }
 
     func purchase(_ product: StoreProduct) async throws {
+        Funnel.purchaseStarted(productId: product.productIdentifier)
         let result = try await Purchases.shared.purchase(product: product)
         apply(result.customerInfo)
+        if !result.userCancelled { Funnel.purchaseCompleted(productId: product.productIdentifier) }
     }
 
     /// Convenience: purchase by product ID. Fetches the product on demand if it
@@ -195,21 +217,14 @@ final class StoreManager: ObservableObject {
 
     // MARK: - Access Checks
 
-    /// Map content packIds to the RevenueCat entitlement that unlocks them.
-    /// - Music content (packs, kits) → individual entitlements granted by Pro or Plus.
-    /// - Cosmetic / premium features (filters, themes, premium scales) → `plus_features`,
-    ///   which only Plus subscriptions grant. Pro one-time buyers do NOT get these.
-    static func entitlementId(for packId: String) -> String {
+    /// The entitlement of a pack people could once buy on its own, if any.
+    static func legacyPackEntitlement(for packId: String) -> String? {
         switch packId {
         case "studio", studioPack: return entitlementStudio
         case "party", partyPack: return entitlementParty
         case "kit_808", kit808: return entitlementKit808
         case "kit_electronic", kitElectronic: return entitlementKitElectronic
-        case "pro", pro: return entitlementPro
-        // Filters, hand themes, premium scales — Plus-only features
-        case "filter_pack", "visual_pack", "theme_pack", "scale_pack":
-            return entitlementPlusFeatures
-        default: return entitlementPlusFeatures
+        default: return nil
         }
     }
 
@@ -222,18 +237,6 @@ final class StoreManager: ObservableObject {
         case entitlementKitElectronic: return kitElectronic
         case entitlementPro: return pro
         default: return nil
-        }
-    }
-
-    /// Legacy: kept for callers that pass packId/productId strings
-    static func productId(for packId: String) -> String {
-        switch packId {
-        case "studio", studioPack: return studioPack
-        case "party", partyPack: return partyPack
-        case "kit_808", kit808: return kit808
-        case "kit_electronic", kitElectronic: return kitElectronic
-        case "pro", "filter_pack", "visual_pack": return pro
-        default: return pro
         }
     }
 
@@ -255,30 +258,75 @@ final class StoreManager: ObservableObject {
         #endif
         // NOTE: DEBUG bypass disabled for testing purchase flows.
         // Re-enable by wrapping the body below in `#if DEBUG\nreturn true\n#else ... #endif`.
-        guard let info = customerInfo else { return false }
-        let entId = Self.entitlementId(for: packId)
-        return info.entitlements[entId]?.isActive == true
+        switch Self.offer(for: packId) {
+        case .plus:
+            return hasPlusFeatures
+        case .pro:
+            if hasProAccess { return true }
+            guard let entitlement = Self.legacyPackEntitlement(for: packId) else { return false }
+            return customerInfo?.entitlements[entitlement]?.isActive == true
+        }
     }
+
+    /// A HandStrudel+ hand theme lent for a week by a 7-day daily-sound streak. The server
+    /// grants and times it (`daily_theme_grants`); DailySoundStore passes it in.
+    @Published var streakThemeLoan: StreakThemeLoan?
+
+    func isUnlocked(theme: HandTheme) -> Bool {
+        guard theme.isPremium else { return true }
+        if let packId = theme.packId, isUnlocked(packId) { return true }
+        return streakThemeLoan?.isActive(for: theme.id) == true
+    }
+
+    func isUnlocked(_ offer: Offer) -> Bool {
+        switch offer {
+        case .pro: return hasProAccess
+        case .plus: return hasPlusFeatures
+        }
+    }
+
+    /// Bought the one-time Pro unlock (as opposed to getting Pro through +).
+    var ownsPro: Bool {
+        #if DEBUG
+        if let state = Self.uiTestState { return state == "pro" }
+        #endif
+        return customerInfo?.allPurchasedProductIdentifiers.contains(Self.pro) == true
+    }
+
+    #if DEBUG
+    /// UI tests: `--uitest-store-state=pro|plus|none` fakes what the player owns.
+    static let uiTestState: String? = ProcessInfo.processInfo.arguments
+        .first { $0.hasPrefix("--uitest-store-state=") }
+        .map { String($0.dropFirst("--uitest-store-state=".count)) }
+    #endif
 
     /// True when the user owns Pro music content (via Pro one-time or Plus subscription).
     var hasProAccess: Bool {
         #if DEBUG
         if ProcessInfo.processInfo.environment["HANDSTRUDEL_DEMO_SCRIPT"] != nil { return true }
+        if let state = Self.uiTestState { return state != "none" }
         #endif
         guard let info = customerInfo else { return false }
-        return info.entitlements[Self.entitlementPro]?.isActive == true
+        // HandStrudel+ includes everything in Pro, whatever the dashboard maps.
+        return info.entitlements[Self.entitlementPro]?.isActive == true || hasPlusFeatures
     }
 
-    /// True when the user has Plus-only features (filters, themes, premium scales).
+    /// True when the user has Plus-only features (camera filters, hand themes).
     /// Only Plus subscriptions grant this — Pro one-time does not.
     var hasPlusFeatures: Bool {
+        #if DEBUG
+        if let state = Self.uiTestState { return state == "plus" }
+        #endif
         guard let info = customerInfo else { return false }
-        return info.entitlements[Self.entitlementPlusFeatures]?.isActive == true
+        return info.entitlements[Self.entitlementPlusFeatures]?.isActive == true || hasSubscription
     }
 
     /// True when the user has an active recurring subscription (monthly/yearly).
     /// Does NOT include the one-time Pro purchase — `hasProAccess` covers both.
     var hasSubscription: Bool {
+        #if DEBUG
+        if let state = Self.uiTestState { return state == "plus" }
+        #endif
         guard let info = customerInfo else { return false }
         return info.activeSubscriptions.contains(Self.plusMonthly)
             || info.activeSubscriptions.contains(Self.plusYearly)

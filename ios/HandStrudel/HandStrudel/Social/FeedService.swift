@@ -115,6 +115,14 @@ enum FeedService {
         return rows.first
     }
 
+    /// The notes behind "Learn to play", read only when a viewer opens it.
+    static func noteTrack(for video: UUID) async throws -> NoteTrack? {
+        struct Row: Decodable { let note_track: NoteTrack? }
+        let rows: [Row] = try await supabase.from("videos").select("note_track")
+            .eq("id", value: video).limit(1).execute().value
+        return rows.first?.note_track.flatMap { $0.isValid ? $0 : nil }
+    }
+
     static func bookmarks(after last: Video? = nil,
                           from: (String) -> PostgrestQueryBuilder = supabase.from) async throws -> [Video] {
         let query = from("saved_videos").select()
@@ -203,6 +211,7 @@ enum FeedService {
             case "COMMENT_FILTERED": throw SocialError.message("This comment was filtered. Remove links or harmful language and try again.")
             case "COMMENT_RATE_LIMITED": throw SocialError.message("You're commenting quickly. Wait a minute and try again.")
             case "COMMENT_THREAD_UNAVAILABLE": throw SocialError.message("This reply thread is no longer available.")
+            case "ACCOUNT_BANNED": throw SocialError.message("Your account can't comment because it broke the community guidelines. Contact support if you think this is a mistake.")
             default:
                 if error.code == "42501" { throw SocialError.message("You can't comment on this video right now.") }
                 throw error
@@ -421,6 +430,7 @@ enum FeedService {
         struct Row: Encodable { let follower_id: UUID; let followee_id: UUID }
         if follow {
             try await supabase.from("follows").insert(Row(follower_id: user, followee_id: target)).execute()
+            PushManager.shared.askAfterMilestone()
         } else {
             try await supabase.from("follows").delete()
                 .eq("follower_id", value: user).eq("followee_id", value: target).execute()

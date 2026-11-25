@@ -8,7 +8,7 @@ without them; read the `.xcresult` skip messages before calling a run complete.
 ## App Store Connect handoff
 
 Before uploading, confirm that the version and build number are unused in
-App Store Connect. The local candidate is **1.0.1 (42)**; check it against
+App Store Connect. The local candidate is **1.0.2 (43)**; check it against
 the version train and TestFlight history. Use a Release archive from the
 reviewed commit, not a Debug install.
 
@@ -29,10 +29,15 @@ reviewed commit, not a Debug install.
   independently and can post, report, block, restore purchases, and delete
   their account. Include where each of those controls is found. Confirm the
   support inbox and report queue have an owner before submission.
-- **Release notes:** "Watch performances full screen, open sound options
-  without covering the video, and find music controls faster in redesigned
-  settings. Pro adds new scales, including Minor Pentatonic, and lets you
-  create and save your own scales."
+- **Release notes (draft):** "Reply to any performance with your own take,
+  and see every take on a sound on its new sound page. Play the daily sound
+  to build a streak, learn a post's notes in Learn mode, and choose triads or
+  7ths for wheel chords. Get notified when people play along, comment or
+  reply, and invite friends to earn rewards."
+- **Before the app:** deploy 1.0.2's migrations and Edge Functions
+  (`send-push`, `grant-invite-rewards`, `moderation-media`), set their
+  secrets (see `supabase/functions/.env.example`), then seed the official
+  posts and daily-sound schedule (`scripts/seed-official/README.md`).
 
 ## On representative iPhones
 

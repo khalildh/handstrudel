@@ -70,6 +70,8 @@ private func debugLog(_ msg: String) {
 }
 
 final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
+    /// Records notes during a video take for "Learn to play". Set by the engine.
+    var noteCapture: PerformanceNoteCapture?
     private var webView: WKWebView!
     @Published var isReady = false
 
@@ -252,14 +254,20 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         let safeVel = max(0, min(1, velocity))
         webView.evaluateJavaScript("noteOn('\(hand)',\(safeMidi),'\(waveform)',\(String(format: "%.2f", safeVel)))", completionHandler: nil)
         if isReady, !hand.hasPrefix("jam-") { onNoteStarted?() }
+        noteCapture?.noteOn(voice: hand, midi: safeMidi, role: PerformanceNoteCapture.role(forVoice: hand))
+        #if DEBUG
+        UITestNoteLog.shared.noteOn(voice: hand, midi: safeMidi)
+        #endif
     }
 
     func noteOff(hand: String) {
         webView.evaluateJavaScript("noteOff('\(hand)')", completionHandler: nil)
+        noteCapture?.noteOff(voice: hand)
     }
 
     func noteSlide(hand: String, midi: Int) {
         webView.evaluateJavaScript("noteSlide('\(hand)',\(midi))", completionHandler: nil)
+        noteCapture?.slide(voice: hand, midi: max(0, min(127, midi)))
     }
 
     /// Set a single synth-side parameter on the global `__hp` object that the
@@ -268,9 +276,11 @@ final class StrudelBridge: NSObject, ObservableObject, WKNavigationDelegate {
         webView.evaluateJavaScript("__hp.\(id)=\(String(format: "%.4f", value))", completionHandler: nil)
     }
 
-    func playNote(midi: Int, waveform: String = "sawtooth", velocity: Double = 0.6, duration: Double = 0.3) {
+    func playNote(midi: Int, waveform: String = "sawtooth", velocity: Double = 0.6, duration: Double = 0.3,
+                  capture role: NoteCaptureRole = .melody) {
         let safeMidi = max(0, min(127, midi))
         webView.evaluateJavaScript("playNote(\(safeMidi),'\(waveform)',\(String(format: "%.2f", velocity)),\(String(format: "%.2f", duration)))", completionHandler: nil)
+        noteCapture?.oneShot(midi: safeMidi, duration: duration, role: role)
     }
 
     func stop() {

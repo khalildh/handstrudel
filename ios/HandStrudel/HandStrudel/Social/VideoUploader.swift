@@ -36,8 +36,8 @@ final class VideoUploader: ObservableObject {
     nonisolated static let outputWidth = 720
 
     func post(clip: URL, draftID: UUID, accountID: UUID, store: RecordingDrafts,
-              caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?,
-              commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?,
+              caption: String, instrument: String?, mode: String?, soundSetup: SoundSetup?, noteTrack: NoteTrack? = nil,
+              commentsEnabled: Bool, backingEnabled: Bool, backingCredit: BackingCredit?, replyTo: ReplyTarget? = nil,
               onScreeningStarted: () -> Void = {}) async -> Bool {
         guard !isBusy else { return false }
         if store.postSubmission(for: draftID, accountID: accountID) != nil {
@@ -68,8 +68,9 @@ final class VideoUploader: ObservableObject {
             let fields = VideoPostFields(
                 caption: String(caption.prefix(150)), instrument: instrument, mode: mode,
                 durationS: prepared.duration, width: prepared.width, height: prepared.height,
-                soundSetup: soundSetup, commentsEnabled: commentsEnabled ? nil : false,
-                backingEnabled: backingEnabled ? true : nil, sourceVideoId: backingCredit?.videoId)
+                soundSetup: soundSetup, noteTrack: noteTrack, commentsEnabled: commentsEnabled ? nil : false,
+                backingEnabled: backingEnabled ? true : nil, sourceVideoId: backingCredit?.videoId,
+                replyToId: replyTo?.videoId)
             let pending = DraftPostSubmission.pending(id: signed.id, fields: fields)
             // Persist before submitting: even a lost HTTP response can mean the server accepted it.
             guard try store.replacePostSubmission(nil, with: pending, draftID: draftID, accountID: accountID) else {
@@ -140,7 +141,10 @@ final class VideoUploader: ObservableObject {
             switch status {
             case .published:
                 let changed = try store.replacePostSubmission(submission, with: .published(id: id), draftID: draftID, accountID: accountID)
-                if changed { AppAnalytics.shared.record(.recordingPosted) }
+                if changed {
+                    AppAnalytics.shared.record(.recordingPosted)
+                    Funnel.postPublished()
+                }
                 phase = .done
                 return changed
             case .held, .failed:

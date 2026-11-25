@@ -11,14 +11,22 @@ struct RecordingDraft: Codable, Identifiable, Equatable {
     let mode: String?
     var soundSetup: SoundSetup? = nil
     var backingCredit: BackingCredit? = nil
+    /// Set when the take was recorded with "Reply with a take"; posting offers to answer that post.
+    var replyTo: ReplyTarget? = nil
     var recordedAtHalfSpeed: Bool? = nil
     var trimStart: Double?
     var trimEnd: Double?
     var title: String? = nil
     var postSubmissions: [UUID: DraftPostSubmission]? = nil
+    /// Notes played during the take, in seconds since capture started (before trim or speed changes).
+    var capturedNotes: [NoteTrack.Note]? = nil
 
     var displayTitle: String { title ?? instrument ?? "Performance" }
     var outputScale: Double { recordedAtHalfSpeed == true ? 0.5 : 1 }
+    /// The notes as they line up with the clip that gets posted.
+    var postedNoteTrack: NoteTrack? {
+        capturedNotes.flatMap { NoteTrack.posted(from: $0, trimStart: trimStart, trimEnd: trimEnd, outputScale: outputScale) }
+    }
 
     static func normalizedTitle(_ input: String) -> String? {
         let singleLine = input.split { character in
@@ -104,10 +112,11 @@ final class RecordingDrafts: ObservableObject {
 
     // Create metadata before capture, so a completed file is discoverable after an app restart.
     func begin(instrument: String?, mode: String?, soundSetup: SoundSetup? = nil,
-               backingCredit: BackingCredit? = nil, halfSpeed: Bool = false) throws -> RecordingDraft {
+               backingCredit: BackingCredit? = nil, replyTo: ReplyTarget? = nil,
+               halfSpeed: Bool = false) throws -> RecordingDraft {
         try prepareDirectory()
         let draft = RecordingDraft(id: UUID(), createdAt: Date(), instrument: instrument, mode: mode,
-                                   soundSetup: soundSetup, backingCredit: backingCredit,
+                                   soundSetup: soundSetup, backingCredit: backingCredit, replyTo: replyTo,
                                    recordedAtHalfSpeed: halfSpeed ? true : nil)
         try files.createDirectory(at: folder(for: draft.id), withIntermediateDirectories: false)
         do {
@@ -123,6 +132,8 @@ final class RecordingDrafts: ObservableObject {
         let url = videoURL(for: draft.id)
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard size > 0 else { throw DraftError.unreadable }
+        // Notes are only known once capture ends; keep them with the take.
+        if draft.capturedNotes != nil { try writeMetadata(draft) }
         if !drafts.contains(where: { $0.id == draft.id }) { drafts.insert(draft, at: 0) }
     }
 
@@ -367,6 +378,7 @@ private struct RecordingDraftEditor: View {
     @State private var confirmDelete = false
     @State private var sharing: RecordingDraftExport?
     @State private var posting: RecordingDraftExport?
+    @State private var challenging: URL?
     @State private var pendingPost: RecordingDraftExport?
     @State private var returnAfterPosting = false
     @State private var signIn = false
@@ -480,6 +492,9 @@ private struct RecordingDraftEditor: View {
             ShareSheet(activityItems: [copy.url])
                 .onDisappear(perform: copy.remove)
         }
+        .sheet(item: $challenging) { link in
+            ShareSheet(activityItems: ["I challenge you to answer this with your own take on HandStrudel", link])
+        }
         .sheet(item: $posting, onDismiss: {
             if returnAfterPosting {
                 returnAfterPosting = false
@@ -488,7 +503,7 @@ private struct RecordingDraftEditor: View {
         }) { copy in
             PostComposerView(clip: copy.url, draftID: draft.id, drafts: store,
                              instrument: draft.instrument, mode: draft.mode, soundSetup: draft.soundSetup,
-                             backingCredit: draft.backingCredit, auth: auth, onSubmissionAccepted: {
+                             backingCredit: draft.backingCredit, replyTo: draft.replyTo, auth: auth, onSubmissionAccepted: {
                 returnAfterPosting = true
             }, onPostUpdate: { update in
                 if case .posted = update { onSuccessfulTake(draft.id) }
@@ -520,6 +535,8 @@ private struct RecordingDraftEditor: View {
             .disabled(postStatus.isBusy)
         case .published(let id):
             Button("View post", systemImage: "play.rectangle") { onViewPost(id) }
+            Button("Challenge a friend", systemImage: "flag.checkered") { challenging = ChallengeLink.url(for: id) }
+                .accessibilityIdentifier("draft-challenge-friend")
         case nil:
             Button("Post to HandStrudel", systemImage: "arrow.up.circle") {
                 export { copy in

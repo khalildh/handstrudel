@@ -17,6 +17,13 @@ Legacy clips and profile photos keep using `media.handstrudel.com`.
 - `migrations/20261114040000_comment_likes.sql`: one reaction per account per comment or reply, with public counts and private reaction rows.
 - `migrations/20261114050000_like_notifications.sql`: groups new likes by video, comment, or reply in the private in-app inbox. No historical backfill or push alerts. Older clients keep the comment/reply inbox.
 - `migrations/20261114060000_profile_avatars.sql`: exposes avatar keys on public creator profiles and restricts writes to the server.
+- `migrations/20261120000000_video_note_tracks.sql`: "Learn to play" note tracks (`videos.note_track`, at most 600 notes / 32 KB), written only by screened publication and only with a shared sound setup; feeds expose `has_note_track`.
+- `migrations/20261120010000_locked_sound_events.sql`: adds opt-in daily counters for Pro sounds opened from the feed (`locked_sound_tapped`) and unlocked from that screen (`locked_sound_unlocked`).
+- `migrations/20261121000000_push_notifications.sql`: push notifications. `device_tokens` (each account manages only its own), `notification_preferences` (per type, all on by default), and the `notifications` queue/log, filled by triggers on new posts, play-alongs, comments, likes (batched to one push per post per hour), and weekly challenges when their window opens. A pg_cron job wakes `send-push` every minute when something is due. Take replies call `push_internal.notify_take_reply(reply_video, replied_to_video)` from their own trigger.
+- `functions/send-push`: drains the queue through APNs (token-based .p8 auth, ES256 JWT, HTTP/2), skips blocked pairs, turned-off types and your own actions, and deletes tokens APNs reports as gone (410 or `BadDeviceToken`).
+- `migrations/20261121040000_daily_sound_streaks.sql`: the daily sound, its takes, posting streaks with a weekly freeze, streak badges and the 7-day hand theme loan. See [Daily sound](#daily-sound).
+- `migrations/20261121030000_invite_rewards.sql`: personal invite codes, one redemption per new account, the reward queue (`invite_reward_grants`) filled by a trigger on an invited account's first screened post, and private abuse signals in the `invite_internal` schema. See [Invite rewards](#invite-rewards).
+- `functions/grant-invite-rewards`: grants queued rewards through RevenueCat. `publish-upload` also tries right after publishing.
 - `tests/database/feed.test.sql`: pgTAP tests for RLS and triggers. Run them with `supabase test db`.
 - `tests/database/comments.test.sql`: pgTAP tests for comment permissions, thread visibility, and moderation.
 - `functions/sign-upload` and `functions/publish-upload`: reserve a private R2 upload and publish only after Sightengine clears the video and thumbnail. Set up the private bucket, secrets, and cutover using the [video upload release checklist](../docs/video-upload-release.md).
@@ -35,7 +42,7 @@ To use the local stack, set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MEDIA_BASE_URL
 
 ## Production setup (one time)
 1. Create the Supabase project, then `supabase link --project-ref <ref>` and `supabase db push`.
-2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload publish-upload delete-video delete-account profile-avatar`.
+2. Set function secrets with `supabase secrets set --env-file functions/.env`, then deploy with `supabase functions deploy sign-upload publish-upload delete-video delete-account profile-avatar grant-invite-rewards`.
 3. Auth providers:
    - **Apple:** add the bundle ID `com.handstrudel.app` as a client ID (native sign-in needs no Services ID or key).
    - **Email:** enable it, and change the "Magic Link" email template to include `{{ .Token }}`, so users get a 6-digit code for the in-app code entry.
@@ -44,6 +51,25 @@ To use the local stack, set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MEDIA_BASE_URL
    - Connect the custom domain `media.handstrudel.com` (the zone must be on Cloudflare).
    - Add a CORS rule allowing `PUT` (only needed for web clients).
 5. Put the project URL and anon key into `ios/HandStrudel/HandStrudel/Social/SocialConfig.swift`. Social features stay hidden until those values are filled in.
+
+## Push notifications setup (one time)
+Do these in order. Nothing is sent until step 4 is done.
+
+1. **APNs key (Apple Developer portal):** in Certificates, Identifiers & Profiles → Keys, create a key with **Apple Push Notifications service (APNs)** enabled (environment: Sandbox & Production; scope: team). Download `AuthKey_<KEY_ID>.p8` (it can be downloaded only once) and note the Key ID. Then in Identifiers → `com.handstrudel.app`, enable **Push Notifications** and regenerate the app's provisioning profiles so they carry `aps-environment`.
+2. **Function secrets:** generate a dispatch secret with `openssl rand -hex 32`, then:
+   ```bash
+   supabase secrets set APNS_KEY_ID=<KEY_ID> APNS_TEAM_ID=TVAG3T3Y65 APNS_BUNDLE_ID=com.handstrudel.app APNS_ENV=production PUSH_DISPATCH_SECRET=<secret>
+   supabase secrets set APNS_PRIVATE_KEY="$(cat AuthKey_<KEY_ID>.p8)"
+   ```
+   `APNS_ENV=production` delivers to App Store and TestFlight installs. Use `sandbox` to test with builds run from Xcode; the app records which environment each token belongs to, and the function only sends to tokens that match.
+3. **Migration and function:** preview with `supabase db push --dry-run`, apply with `supabase db push`, then `supabase functions deploy send-push` (its `verify_jwt = false` is in `config.toml`; it checks `PUSH_DISPATCH_SECRET` instead).
+4. **Turn on the cron wake-up:** in the SQL Editor, store the function URL and the same secret in Vault:
+   ```sql
+   select vault.create_secret('https://eygrtqbtbhktptphqdnn.supabase.co/functions/v1/send-push', 'push_dispatch_url');
+   select vault.create_secret('<secret>', 'push_dispatch_secret');
+   ```
+   Until both exist, the `send-push-notifications` cron job does nothing.
+5. **Check:** sign in on a device, post or follow someone, and allow notifications. Confirm a row in `public.device_tokens`, have a second account like the post, and watch `public.notifications` move from `pending` to `sent` within a minute. Failures keep the APNs reason in `last_error`; `select * from cron.job_run_details order by start_time desc limit 5` shows the wake-ups.
 
 ## Comment moderation
 Before enabling public comments, assign a reviewer to check `public.comment_reports` in the Supabase dashboard and monitor the community support inbox. Reports are never visible to clients. Three reports from distinct accounts hide a comment and its replies; moderators can set `comments.hidden` to hide or restore a comment after reviewing it. The server checks links and configured harmful phrases in `comment_internal.blocked_patterns` before posting. Treat this as a starter filter, not a replacement for review.
@@ -56,6 +82,34 @@ After the moderation reviewer is assigned, preview the remaining changes with `s
 ## Weekly play-along pilot
 Choose a source clip with the creator's approval and with play-along already enabled. In the dashboard, add a row to `public.weekly_challenges` with its video ID, a short title and prompt, a one-week UTC window, and `featured = true`. Only one featured window can be active at a time. During the window, attributed public takes on that source appear automatically. Leave the table empty to keep the pilot hidden; revoking the source's opt-in also hides the challenge.
 
+## Daily sound
+One sound is featured per **UTC day** (00:00 to 00:00 UTC, for everyone). The Music home shows it with a countdown, today's takes and the player's streak.
+
+**Picking.** If the owner scheduled a post for the day, that post's sound is used. Otherwise the first request of the day picks one automatically: a visible, unreported post with a shared playable preset that a player without Pro can open (the allowlist in the migration's `FREE SOUND VALUES` block, checked against the app catalog by `DailySoundTests`). Posts from the last 30 days come first, then creators not featured in the past week, then sounds not featured recently, then likes, views and remixes. A sound (same instrument, key, scale and progression) is not repeated within 30 days unless nothing else is left. The day keeps a copy of the sound, so it stays playable if the post is later deleted. If the post is hidden or its creator is blocked, the card shows the sound without the creator.
+
+**Schedule a sound** (SQL Editor, or any service-role connection). Find the post's ID in `public.videos`; it needs a shared playable preset:
+
+```sql
+-- Feature a post on a UTC date (today or later). Title (≤ 60 chars) and note (≤ 240) are optional.
+select * from public.schedule_daily_sound('2026-12-01', '<video uuid>', 'Night Drive', 'Keep the left hand on the root.');
+-- A Pro-only sound is refused unless you opt in; free players would see "Unlock".
+select * from public.schedule_daily_sound('2026-12-02', '<video uuid>', p_allow_pro => true);
+-- Remove a future schedule (the day then picks automatically).
+select public.unschedule_daily_sound('2026-12-01');
+-- What's coming up and what ran.
+select day, source, title, video_id from public.daily_sounds order by day desc limit 30;
+```
+
+Scheduling replaces an automatic pick for today only while nobody has posted a take yet (`DAILY_SOUND_HAS_TAKES`). Past days can't change.
+
+**Takes.** A screened post counts as a take when its upload was reserved during the day's window (server time, from `sign-upload`) and it either shares the same sound (tempo, mode and mix may differ) or plays along with the featured post. A take submitted just before midnight still counts for that day if screening finishes within six hours. The card lists visible takes only: hidden posts, posts the viewer reported, and blocked accounts are left out.
+
+**Streaks.** One take per day extends the streak. One freeze per ISO week (Monday to Sunday, UTC) covers a single missed day; two missed days in the same week reset it. Deleting or hiding a take after it counted keeps the credited day (`daily_streak_days`); a moderator can delete that row to remove it. Badges are earned once at 3, 7 and 30 days. Reaching 7 also lends one HandStrudel+ hand theme for 7 days (`daily_theme_grants`, rotating through the five premium themes). The app only times the loan from the server's grant. No device clock is involved.
+
+**Push notification hooks** (service role only; nothing sends notifications yet):
+- `select * from public.daily_sound_live();` at 00:00 UTC returns the new day's sound (picking it if needed) for a "Today's sound is live" push.
+- `select * from public.daily_streaks_at_risk(interval '3 hours');` returns players with a live streak and no take today whose deadline is within the interval, with `ends_at` and `freeze_would_cover` (true when missing today would only use this week's freeze).
+
 ## Optional app usage metrics
 In the project SQL Editor, view UTC daily totals with:
 
@@ -65,5 +119,45 @@ select day, event, events from public.app_usage_daily order by day desc, event;
 
 `active_day` counts one foreground day per opted-in install. `return_day` counts an active day after any earlier observed day on the same install; it is not a Day 1 or Day 7 cohort. `first_note` counts once per opted-in install. Recording events count successful starts, completed private drafts, and posts confirmed by the app. These are best-effort client signals, not exact totals or user histories.
 
+Since 1.0.2, rows also have a `detail` (`''` for most events): the product (`pro`, `plus_monthly`, `plus_yearly`) for `purchase_started`/`purchase_completed`, and the push type for `notification_opened`. The funnel events and their allow-list are in `20261121070000_crash_diagnostics_funnel.sql`; `AppAnalytics.Event` must match it (a unit test reads the migration). For step-by-step conversion over a date range:
+
+```sh
+SUPABASE_URL=https://<project>.supabase.co SUPABASE_SERVICE_ROLE_KEY=… node scripts/funnel-report.mjs --from 2026-11-21 --to 2026-12-05
+```
+
+## Crash and hang reports
+Opted-in installs upload MetricKit crash, hang, CPU and disk-write diagnostics to `public.app_diagnostics` (insert-only for the app; only the service role can read). Summarise them, optionally symbolicating app frames with the build's dSYM from the archive:
+
+```sh
+SUPABASE_URL=https://<project>.supabase.co SUPABASE_SERVICE_ROLE_KEY=… node scripts/diagnostics-report.mjs --version 1.0.2 --dsym ~/Library/Developer/Xcode/Archives/…/dSYMs/HandStrudel.app.dSYM
+```
+
+To prune old reports: `delete from public.app_diagnostics where received_at < now() - interval '180 days';`
+
 ## iOS Universal Links
 Deploy the site with `public/.well-known/apple-app-site-association` and `vercel.json`, and verify the file returns HTTPS 200 with JSON and no redirect. Enable Associated Domains for the iOS app ID in Apple's developer portal, then rebuild with a matching provisioning profile and test a `https://handstrudel.com/watch?v=…` link from Messages on a physical iPhone. The website remains the fallback.
+
+## Invite rewards
+Each account has an invite link, `https://handstrudel.com/invite?c=<CODE>`. Posts shared by their creator also carry it as `&invite=<CODE>`. When a new account enters the code and then publishes a first take that passes screening, the trigger queues 7 days of HandStrudel+ for both people. The queue is granted through RevenueCat's promotional API (`plus_features` and `pro`, `duration=weekly`). `pro` is also granted so 1.0.1 clients, which only check `pro`, unlock Pro sounds too.
+
+Rules enforced by `redeem_invite_code`. Anti-abuse is intentionally light, at the owner's request:
+- No self-invites.
+- One introducer per account, recorded once.
+- Before the account's first post, since that post is what triggers the reward.
+- One reward per redemption, granted idempotently.
+- At most `invite_reward_limit()` (10) rewarded weeks per inviter. That function is the single place to change the cap. Friends can still join past the cap: they get their own week and still count as intros.
+- The introducer can be named by code (link, typed or pasted) or by picking their @username. The same rules apply to both.
+
+Intro tracker: every redemption counts toward the inviter's tally, with no cap. A trigger stores milestone badges in `invite_milestones` at 1, 5, 10 and 25 intros (Spark, Bandleader, Connector, Headliner). These are kept once earned. `intro_stats(profile_id)` is public and returns only the count and the highest badge. `my_intros()` lists your own intros, and `my_introducer()` returns who introduced you. Both lists are visible only to the two people involved.
+
+Setup:
+1. Apply the migration with `supabase db push` after reviewing `supabase db push --dry-run`.
+2. In RevenueCat, create a secret API key (v1, `sk_…`) for the project. Then run `supabase secrets set REVENUECAT_SECRET_KEY=sk_…`. Without it, rewards stay queued and nothing is lost.
+3. Deploy with `supabase functions deploy grant-invite-rewards publish-upload`.
+4. Optional retry sweep: set `INVITE_WORKER_TOKEN`, then schedule a `POST` to `grant-invite-rewards` with the header `X-Invite-Worker-Token`. The app already retries each time its owner opens it.
+
+Monitor stuck grants with:
+
+```sql
+select status, count(*), max(last_error) from public.invite_reward_grants group by status;
+```

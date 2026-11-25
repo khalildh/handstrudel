@@ -70,6 +70,17 @@ struct ContentView: View {
     @State private var showLoops = false
     @State private var showSetups = false
     @State private var soundError: String?
+    /// A post whose notes to teach once the session opened with its sound is running.
+    @State private var pendingLearn: LearnToPlayRequest?
+    /// "Reply with a take": the post the session's takes will answer, once its sound is running.
+    @State private var pendingReply: ReplyTarget?
+    @State private var replyTarget: ReplyTarget?
+    /// A post opened from a "Challenge a friend" link, shown with the reply recorder ready.
+    @State private var linkedChallenge: Video?
+    @State private var learnLoad: Task<Void, Never>?
+    /// A posted Pro sound the viewer tapped without Pro; shows the unlock screen.
+    @State private var lockedSound: LockedSoundOffer?
+    @State private var lastLockedSound: LockedSoundOffer?
     @State private var sharedSoundLoad: Task<Void, Never>?
     @State private var linkedComments: Video?
     @State private var linkedPerformance: Video?
@@ -114,7 +125,7 @@ struct ContentView: View {
     @State private var chromeVisible = true
     /// Touch-driven highlights for Split mode (UIKit multitouch overlay).
     @State private var splitTouchChordZones: Set<ChordSubzone> = []
-    @State private var splitTouchMelodyLanes: Set<Int> = []
+    @State private var splitTouchMelodyNotes: Set<MelodySubzone> = []
     /// Stack of currently-held chord touches (parent voice ID + chord data).
     /// The last entry is the "live" touch chord — it overrides the camera so
     /// the melody snap follows whatever the player is touching.
@@ -124,11 +135,13 @@ struct ContentView: View {
     private var canShowReview: Bool {
         reviewReadyThisSession && scenePhase == .active && destination == .music
             && !engine.isRunning && !startingSession && !showDrafts && !showLoops && !showSetups && reviewingDraft == nil
-            && linkedComments == nil && linkedPerformance == nil && draftPostToOpen == nil && soundError == nil && recordingError == nil
+            && linkedComments == nil && linkedPerformance == nil && linkedChallenge == nil && draftPostToOpen == nil && soundError == nil && recordingError == nil
             && jamInvitation == nil && jamError == nil
     }
 
-    var body: some View {
+    // The root view is built in stages: one modifier chain this long is more than the Swift
+    // compiler can type-check in reasonable time.
+    private var rootContent: some View {
         ZStack {
             (engine.isRunning || feedFullscreen ? Color.black : palette.background).ignoresSafeArea()
 
@@ -221,6 +234,10 @@ struct ContentView: View {
             }
             #endif
         }
+    }
+
+    private var rootPresentations: some View {
+        rootContent
         .sheet(isPresented: $showDrafts, onDismiss: openDraftPostAfterDismissal) {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil,
                                 onSuccessfulTake: recordReviewMilestone, onViewPost: viewDraftPost,
@@ -250,8 +267,19 @@ struct ContentView: View {
             }
         }
         .onOpenURL(perform: openSocialLink)
+        .onReceive(PushManager.shared.$pendingLink.compactMap { $0 }) { url in
+            PushManager.shared.pendingLink = nil
+            openSocialLink(url)
+        }
+        .inviteRewards(auth: auth)
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { openSocialLink(url) }
+        }
+        .sheet(item: $linkedChallenge) { video in
+            CreatorVideoView(video: video, auth: auth, challenged: true, onTrySound: { sound in
+                linkedChallenge = nil
+                trySharedSound(sound)
+            })
         }
         .sheet(item: $linkedPerformance) { video in
             CreatorVideoView(video: video, auth: auth, onPlayAlong: { source in
@@ -302,6 +330,10 @@ struct ContentView: View {
         } message: {
             Text(jamError ?? "")
         }
+    }
+
+    private var rootLifecycle: some View {
+        rootPresentations
         .task { await engine.jamSession.listenForSessions() }
         .task(id: canShowReview) {
             guard canShowReview else { return }
@@ -332,6 +364,8 @@ struct ContentView: View {
         .onChange(of: engine.isRunning) { running in
             if running {
                 startingSession = false
+                replyTarget = pendingReply
+                pendingReply = nil
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--uitest-draft-after-start"),
                    let path = ProcessInfo.processInfo.environment["HANDSTRUDEL_TEST_CLIP"] {
@@ -342,7 +376,13 @@ struct ContentView: View {
                     backingAutoplayPending = false
                     if scenePhase == .active { playBacking(backing) }
                 }
+                if let learn = pendingLearn {
+                    pendingLearn = nil
+                    beginLearnToPlay(learn)
+                }
             } else {
+                replyTarget = nil
+                learnLoad?.cancel()
                 cancelCountdown()
                 backingLoad?.cancel()
                 stopBacking()
@@ -373,6 +413,10 @@ struct ContentView: View {
         .onChange(of: destination) { tab in
             if tab != .feed { feedFullscreen = false }
         }
+    }
+
+    var body: some View {
+        rootLifecycle
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
             guard !engine.isRunning, let presetId = notification.object as? String else { return }
             if let preset = PRESETS.first(where: { $0.id == presetId }) {
@@ -399,6 +443,29 @@ struct ContentView: View {
             guard engine.isRunning else { return }
             toggleAudioLoop()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .learnToPlayPost)) { notification in
+            guard let request = notification.object as? LearnToPlayRequest else { return }
+            pendingLearn = request
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .replyWithTake)) { notification in
+            guard let request = notification.object as? ReplyTakeRequest else { return }
+            pendingReply = request.target
+        }
+        .sheet(item: $lockedSound, onDismiss: resumeUnlockedSound) { offer in
+            proPaywall(storeManager: storeManager, title: offer.title, detail: offer.detail)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .environment(\.isSoundLocked) { setup in setup.isLocked(unlocked: storeManager.isUnlocked) }
+        .task(id: auth.userId) {
+            guard SocialConfig.isConfigured else { return }
+            if auth.userId == nil { DailySoundStore.shared.clear() }
+            await DailySoundStore.shared.refresh(viewer: auth.userId, maxAge: 30)
+        }
+        .onReceive(DailySoundStore.shared.$themeLoan) { loan in
+            storeManager.streakThemeLoan = loan
+            if !storeManager.isUnlocked(theme: engine.selectedHandTheme) { engine.selectedHandTheme = HAND_THEMES[0] }
+        }
     }
 
     private var destinations: some View {
@@ -418,7 +485,10 @@ struct ContentView: View {
                         onStart: { startSession() },
                         onDrafts: { showDrafts = true },
                         onLoops: { showLoops = true },
-                        onSetups: { showSetups = true }
+                        onSetups: { showSetups = true },
+                        dailyCard: SocialConfig.isConfigured ? AnyView(DailySoundCard(
+                            store: .shared, auth: auth, onPlay: trySharedSound, onPlayAlong: prepareBacking,
+                            onSignIn: { destination = .account })) : nil
                     )
                 case .account:
                     if SocialConfig.isConfigured {
@@ -502,6 +572,10 @@ struct ContentView: View {
 
     private func startSession(setup: SoundSetup? = nil, useCurrentSoundAsFallback: Bool = false) {
         guard !engine.isRunning, !startingSession else { return }
+        if let setup, !useCurrentSoundAsFallback, setup.isLocked(unlocked: storeManager.isUnlocked) {
+            offerUnlock(for: setup)
+            return
+        }
         let appliedSetup = setup.map { engine.applySoundSetup($0, store: storeManager) } ?? false
         if setup != nil, !appliedSetup, !useCurrentSoundAsFallback {
             soundError = "This setup is unavailable or requires a sound pack you don't own."
@@ -512,6 +586,32 @@ struct ContentView: View {
         destination = .music
         if !appliedSetup { engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true) }
         engine.start(config: DEFAULT_MAPPING, advanced: false, input: preferredInput)
+    }
+
+    /// Shows the Pro purchase screen for a posted sound instead of a dead-end error.
+    private func offerUnlock(for setup: SoundSetup) {
+        AppAnalytics.shared.record(.lockedSoundTapped)
+        let offer = LockedSoundOffer(setup: setup)
+        lastLockedSound = offer
+        // Let any sheet that started this (a creator's clip, the sound sheet) finish closing first.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard lastLockedSound?.id == offer.id, !engine.isRunning else { return }
+            lockedSound = offer
+        }
+    }
+
+    /// After the unlock screen closes, go straight into the sound if Pro is now unlocked.
+    private func resumeUnlockedSound() {
+        guard let offer = lastLockedSound else { return }
+        lastLockedSound = nil
+        guard !offer.setup.isLocked(unlocked: storeManager.isUnlocked) else {
+            pendingLearn = nil
+            pendingReply = nil
+            return
+        }
+        AppAnalytics.shared.record(.lockedSoundUnlocked)
+        trySharedSound(offer.setup)
     }
 
     private func limitScaleToEntitlement() {
@@ -526,12 +626,40 @@ struct ContentView: View {
         engine.setPlayInput(input)
     }
 
+    /// The session opened with the post's sound is running: load its notes and teach them.
+    private func beginLearnToPlay(_ request: LearnToPlayRequest) {
+        learnLoad?.cancel()
+        learnLoad = Task {
+            do {
+                guard let track = try await FeedService.noteTrack(for: request.videoID) else {
+                    throw SocialError.message("This performance doesn't have notes to learn.")
+                }
+                guard !Task.isCancelled, engine.isRunning else { return }
+                let setup = request.setup
+                let lanes = scaleNotes(key: setup.key, scale: setup.scale,
+                                       baseOctave: engine.gridBaseOctave, octaveRange: engine.gridOctaveRange)
+                guard let song = track.learnSong(title: request.title, key: setup.key, scale: setup.scale,
+                                                 bpm: setup.bpm, scaleNotes: lanes) else {
+                    throw SocialError.message("Couldn't turn this performance into a lesson.")
+                }
+                engine.switchMode(grid: false, drums: false, learn: true)
+                engine.loadLearnSong(song)
+            } catch {
+                if !Task.isCancelled { soundError = error.localizedDescription }
+            }
+        }
+    }
+
     private func trySharedSound(_ setup: SoundSetup) {
         guard !engine.isRunning, !startingSession else {
+            pendingLearn = nil
+            pendingReply = nil
             soundError = "Close your current session, then open this sound again."
             return
         }
         startSession(setup: setup)
+        // Keep a lesson or reply waiting while its sound's unlock screen is up.
+        if !startingSession && !engine.isRunning && lastLockedSound == nil { pendingLearn = nil; pendingReply = nil }
     }
 
     private func recordReviewMilestone(_ id: UUID) {
@@ -600,6 +728,7 @@ struct ContentView: View {
     }
 
     private func openSocialLink(_ url: URL) {
+        if InviteManager.shared.capture(url, signedInAndReady: auth.isSignedIn && !auth.needsProfileSetup) { return }
         guard let link = PerformanceLink(url: url) else { return }
         openPerformance(link)
     }
@@ -619,7 +748,7 @@ struct ContentView: View {
     private func showDraftPostUpdate(_ update: DraftPostUpdate) {
         switch update {
         case .checking: draftPostNotice = "Video submitted for checking."
-        case .posted: draftPostNotice = "Video posted."
+        case .posted: draftPostNotice = "Video posted."; InviteManager.shared.postPublished()
         case .failed(let detail): draftPostNotice = detail
         }
     }
@@ -638,8 +767,10 @@ struct ContentView: View {
                 let video = try await FeedService.video(id: link.videoID)
                 guard !Task.isCancelled else { return }
                 switch link {
-                case .watch:
-                    if let video { linkedPerformance = video }
+                case .watch, .challenge:
+                    if let video {
+                        if link == .challenge(video.id) { linkedChallenge = video } else { linkedPerformance = video }
+                    }
                     else { soundError = "This performance is no longer available." }
                 case .comments:
                     if let video, video.commentsEnabled != nil { linkedComments = video }
@@ -690,8 +821,32 @@ struct ContentView: View {
         if let prog = CHORD_PROGRESSIONS.first(where: { $0.id == progId }) {
             engine.chordMelodyProgression = prog
         }
-        demo.onBeginCapture = { [engine] url in engine.soundFontEngine.startCapture(to: url) }
-        demo.onEndCapture = { [engine] in engine.soundFontEngine.stopCapture() }
+        if let bpm = s.bpm, (20...400).contains(bpm) { engine.manualBPM = bpm }
+        engine.scaleUseSoundFont = true
+        demo.onBeginCapture = { [engine] url in
+            engine.soundFontEngine.startCapture(to: url)
+            engine.noteCapture.start()
+        }
+        demo.onEndCapture = { [engine] in
+            engine.soundFontEngine.stopCapture()
+            // What a real post of this take would carry: its sound setup and Learn-to-play notes,
+            // timed from the script start (= the start of the trimmed promo footage).
+            let notes = engine.noteCapture.stop()
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            if let setup = engine.currentSoundSetup, let data = try? encoder.encode(setup) {
+                try? data.write(to: demo.outputDir.appendingPathComponent("sound_setup.json"))
+            }
+            // The draft labels a real post sends as `instrument` and `mode`.
+            let labels = ["instrument": engine.selectedSoundFontInstrument.name, "mode": self.currentModeName]
+            if let data = try? encoder.encode(labels) {
+                try? data.write(to: demo.outputDir.appendingPathComponent("post_labels.json"))
+            }
+            if let track = NoteTrack.posted(from: notes, trimStart: 0, trimEnd: s.duration, outputScale: 1),
+               let data = try? encoder.encode(track) {
+                try? data.write(to: demo.outputDir.appendingPathComponent("note_track.json"))
+            }
+        }
         engine.switchMode(grid: false, drums: false, learn: false, scaleChordMelody: true)
         engine.start(config: DEFAULT_MAPPING, advanced: false)
     }
@@ -729,33 +884,30 @@ struct ContentView: View {
 
     // MARK: - Split / Scale overlay data helpers
 
-    /// Lettered chord names per zone, with a "⁷" suffix in Scale mode to
-    /// signal the 7th-chord voicing.
-    private func splitChordNames(zoneDegrees: [Int], scaleMode: Bool) -> [String] {
-        zoneDegrees.map {
-            chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
-                + (scaleMode ? "⁷" : "")
-        }
+    /// Lettered chord names per zone, with a "⁷" suffix when the player's
+    /// voicing is 7ths (Scale mode's default).
+    private func splitChordNames(zoneDegrees: [Int]) -> [String] {
+        zoneDegrees.map { engine.wheelChordName(degree: $0) }
     }
 
-    /// MIDI notes the melody side maps to. Split: triad × 3 octaves (9 notes,
-    /// chord-tone snap). Scale: one octave of the full diatonic scale (7).
+    /// MIDI notes the melody side maps to. Split: the voiced chord × 3 octaves
+    /// (9 notes for triads, 12 for 7ths). Scale: one octave of the full diatonic scale (7).
     private func splitMelodyMidis(melodyDegree: Int, scaleMode: Bool) -> [Int] {
         if scaleMode {
             return scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
         }
-        let triad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
-        return (0..<3).flatMap { oct in triad.map { $0 + oct * 12 } }.sorted()
+        return engine.wheelMelodyLanes(degree: melodyDegree)
     }
 
     /// Lane indices that are chord tones of the active chord (Scale mode only).
     /// The overlay colors these with the chord accent so the player can see
     /// safe targets — Split returns an empty set since every lane is already
     /// a chord tone.
-    private func splitChordToneLanes(melodyMidis: [Int], melodyDegree: Int, scaleMode: Bool) -> Set<Int> {
+    private func splitChordToneLanes(melodyMidis: [Int], melodyDegree: Int, scaleMode: Bool,
+                                     voicing: ChordVoicing) -> Set<Int> {
         guard scaleMode else { return [] }
-        let triad7 = chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
-        let toneClasses = Set(triad7.map { $0 % 12 })
+        let chord = voicing.notes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
+        let toneClasses = Set(chord.map { $0 % 12 })
         return Set(melodyMidis.enumerated().compactMap { idx, midi in
             toneClasses.contains(midi % 12) ? idx : nil
         })
@@ -835,11 +987,8 @@ struct ContentView: View {
         switch zone {
         case .chord(let sub):
             let degree = engine.chordMelodyModeManager.degreeForZone(sub.wedge)
-            // Scale mode voices the chord as a 7th — root / 3rd / 5th / 7th.
-            let voicing = scaleMode
-                ? chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-                : chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-            let absoluteTones = voicing.map { $0 + sub.octave * 12 }
+            // The player's voicing: 7ths in Scale mode by default, else triads.
+            let absoluteTones = engine.wheelChordTones(degree: degree).map { $0 + sub.octave * 12 }
             engine.holdJamVoice(parentVoice, pitches: absoluteTones, velocity: 0.7, native: native)
             var subs: [String] = []
             for (i, note) in absoluteTones.enumerated() {
@@ -856,25 +1005,24 @@ struct ContentView: View {
                                 octave: sub.octave, tones: absoluteTones)
             )
             syncSplitTouchChordToManager()
-        case .melody(let lane):
+        case .melody(let note):
+            let lane = note.lane
             let lanes: [Int]
             if scaleMode {
                 // Scale mode: one octave of the diatonic scale.
                 lanes = scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
             } else {
                 let degree = splitMelodySnapDegree
-                let triad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-                lanes = (0..<3).flatMap { oct in triad.map { $0 + oct * 12 } }.sorted()
+                lanes = engine.wheelMelodyLanes(degree: degree)
             }
             guard !lanes.isEmpty else { return }
             let safe = max(0, min(lanes.count - 1, lane))
-            // The touch UIView doesn't track the outer-band octave shift on
-            // the melody side yet — for now, a touch lands at base octave.
-            // The hand-tracked path still gets the ±1 octave from the radial
-            // band; touch is an explicit-tap experience.
+            // Scale mode's outer band shifts the note an octave, like the chord
+            // side and the hand-tracked melody. Other layouts always report 0.
+            let midi = lanes[safe] + (scaleMode ? note.octave * 12 : 0)
             let sv = "\(parentVoice)-m"
-            splitNoteOn(voice: sv, midi: lanes[safe], velocity: 0.75, native: native)
-            engine.holdJamVoice(parentVoice, pitches: [lanes[safe]], velocity: 0.75, native: native)
+            splitNoteOn(voice: sv, midi: midi, velocity: 0.75, native: native)
+            engine.holdJamVoice(parentVoice, pitches: [midi], velocity: 0.75, native: native)
             splitVoiceSubvoices[parentVoice] = (native, [sv])
         }
         engine.haptics.noteTrigger()
@@ -958,6 +1106,21 @@ struct ContentView: View {
                 .allowsHitTesting(false)
                 .opacity(isRecording && hideSkeletonWhenRecording ? 0 : 1)
 
+            #if DEBUG
+            if UITestNoteLog.isEnabled {
+                // Exposes the notes actually sent to the synths to UI tests.
+                TimelineView(.periodic(from: .now, by: 0.2)) { _ in
+                    Text("notes")
+                        .font(.system(size: 2))
+                        .opacity(0.02)
+                        .accessibilityIdentifier("uitest-note-log")
+                        .accessibilityValue(UITestNoteLog.shared.snapshot)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .allowsHitTesting(false)
+            }
+            #endif
+
             // Grid mode note lanes overlay (tappable for one-hand play)
             if engine.gridModeEnabled {
                 noteGridOverlay
@@ -979,10 +1142,11 @@ struct ContentView: View {
                     currentChordZone: engine.chordMelodyChordHandLane,
                     chordHandPinching: engine.chordMelodyModeManager.isChordHandPinching,
                     currentOctaveShift: engine.chordMelodyOctaveShift,
-                    currentChordName: engine.chordMelodyCurrentChordName,
+                    currentChordName: engine.chordMelodyCurrentChordName.isEmpty ? ""
+                        : engine.chordMelodyCurrentChordName + engine.chordVoicing.chordNameSuffix,
                     melodyLane: engine.chordMelodyMelodyLane,
                     melodyHandPinching: engine.chordMelodyModeManager.isMelodyHandPinching,
-                    melodyLaneCount: 9,
+                    melodyLaneCount: engine.wheelMelodyLanes(degree: engine.chordMelodyCurrentDegree ?? 0).count,
                     swapHands: engine.chordMelodySwapHands
                 )
                 .ignoresSafeArea()
@@ -992,12 +1156,9 @@ struct ContentView: View {
             // outer ring, melody on the inner ring, rest in the middle).
             if engine.radialChordMelodyModeEnabled {
                 let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
-                let chordNames = zoneDegrees.map {
-                    chordDisplayName(key: engine.selectedKey, scale: engine.selectedScale, degree: $0)
-                }
+                let chordNames = splitChordNames(zoneDegrees: zoneDegrees)
                 let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
-                let melodyTriad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: melodyDegree)
-                let melodyMidis = (0..<3).flatMap { oct in melodyTriad.map { $0 + oct * 12 } }.sorted()
+                let melodyMidis = engine.wheelMelodyLanes(degree: melodyDegree)
                 let melodyNames = melodyMidis.map { pitchClassName($0) }
                 RadialChordMelodyOverlayView(
                     zoneDegrees: zoneDegrees,
@@ -1016,18 +1177,20 @@ struct ContentView: View {
 
             // Split / Scale chord+melody overlay (single circle cut in half).
             // Scale mode has 7 melody wedges = one octave of the scale; Split
-            // has 9 melody wedges = 3 octaves of chord tones. The overlay
+            // has 3 octaves of chord tones (9 wedges, 12 with 7ths). The overlay
             // takes the same shape either way; what differs is the melody
             // labels + the count.
             if engine.splitChordMelodyModeEnabled || engine.scaleChordMelodyModeEnabled {
                 let scaleMode = engine.scaleChordMelodyModeEnabled
                 let zoneDegrees = engine.chordMelodyModeManager.zoneDegrees
-                let chordNames = splitChordNames(zoneDegrees: zoneDegrees, scaleMode: scaleMode)
+                let voicing = engine.chordVoicing
+                let chordNames = splitChordNames(zoneDegrees: zoneDegrees)
                 let melodyDegree = engine.chordMelodyCurrentDegree ?? zoneDegrees.first ?? 0
                 let melodyMidis = splitMelodyMidis(melodyDegree: melodyDegree, scaleMode: scaleMode)
                 let melodyNames = melodyMidis.map { pitchClassName($0) }
                 let melodyCount = melodyMidis.count
-                let chordToneLanes = splitChordToneLanes(melodyMidis: melodyMidis, melodyDegree: melodyDegree, scaleMode: scaleMode)
+                let chordToneLanes = splitChordToneLanes(melodyMidis: melodyMidis, melodyDegree: melodyDegree,
+                                                         scaleMode: scaleMode, voicing: voicing)
                 SplitChordMelodyOverlayView(
                     zoneDegrees: zoneDegrees,
                     chordNames: chordNames,
@@ -1042,9 +1205,10 @@ struct ContentView: View {
                     melodyResting: engine.chordMelodyModeManager.melodyResting,
                     swapHands: engine.chordMelodySwapHands,
                     touchedChordSubzones: splitTouchChordZones,
-                    touchedMelodyLanes: splitTouchMelodyLanes,
+                    touchedMelodyNotes: splitTouchMelodyNotes,
                     chordToneLanes: chordToneLanes,
-                    melodyOctaveShift: engine.chordMelodyModeManager.currentMelodyOctaveShift
+                    melodyOctaveShift: engine.chordMelodyModeManager.currentMelodyOctaveShift,
+                    scaleLayout: scaleMode
                 )
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
@@ -1059,10 +1223,11 @@ struct ContentView: View {
                     enabled: !engine.isPaused && scenePhase == .active,
                     chordLabels: chordNames,
                     melodyLabels: melodyMidis.map { midiNoteName($0) },
+                    melodyOctaveBand: scaleMode,
                     onZoneEnter: { voice, zone in splitTouchEnter(parentVoice: voice, zone: zone) },
                     onZoneExit: { voice in splitTouchExit(parentVoice: voice) },
                     touchedChordSubzones: $splitTouchChordZones,
-                    touchedMelodyLanes: $splitTouchMelodyLanes
+                    touchedMelodyNotes: $splitTouchMelodyNotes
                 )
                 .ignoresSafeArea()
             }
@@ -1123,6 +1288,9 @@ struct ContentView: View {
                 if let backing, !isRecording, !recorderBusy, recordCountdown == 0 {
                     backingControls(backing)
                         .padding(.horizontal, 16)
+                }
+                if let replyTarget, !isRecording, !recorderBusy, recordCountdown == 0 {
+                    ReplyingToPill(target: replyTarget) { self.replyTarget = nil }
                 }
                 if !isRecording, !recorderBusy, recordCountdown == 0,
                    hasSeenOnboarding || !engine.scaleChordMelodyModeEnabled {
@@ -2204,7 +2372,7 @@ struct ContentView: View {
         do {
             let sound = engine.currentSoundSetup
             draft = try drafts.begin(instrument: sound?.instrumentName, mode: currentModeName, soundSetup: sound,
-                                     backingCredit: backing?.credit, halfSpeed: recordAtHalfSpeed)
+                                     backingCredit: backing?.credit, replyTo: replyTarget, halfSpeed: recordAtHalfSpeed)
         } catch {
             recordingError = "Couldn’t create a private draft. \(error.localizedDescription)"
             return
@@ -2246,6 +2414,7 @@ struct ContentView: View {
                 } else {
                     recorderBusy = false
                     isRecording = true
+                    engine.noteCapture.start()
                     AppAnalytics.shared.record(.recordingStarted)
                     if scenePhase == .background { stopRecording(); return }
                     if draft.recordedAtHalfSpeed == true && !engine.supportsHalfSpeedRecording {
@@ -2272,8 +2441,11 @@ struct ContentView: View {
     }
 
     private func stopRecording() {
-        guard isRecording, !recorderBusy, let draft = activeDraft else { return }
+        guard isRecording, !recorderBusy, var take = activeDraft else { return }
         recorderBusy = true
+        let notes = engine.noteCapture.stop()
+        take.capturedNotes = notes.isEmpty ? nil : notes
+        let draft = take
         captureTask?.cancel()
         engine.setRecordingTempo(halfSpeed: false)
         let recorder = RPScreenRecorder.shared()
@@ -2316,6 +2488,7 @@ struct ContentView: View {
         }
         isRecording = false
         recorderBusy = false
+        _ = engine.noteCapture.stop()
         captureTask = nil
         activeDraft = nil
         watermarkView?.removeFromSuperview()
@@ -2325,7 +2498,8 @@ struct ContentView: View {
     #if DEBUG
     private func openSampleDraft(at url: URL) {
         do {
-            let draft = try drafts.begin(instrument: engine.selectedSoundFontInstrument.name, mode: currentModeName)
+            let draft = try drafts.begin(instrument: engine.selectedSoundFontInstrument.name, mode: currentModeName,
+                                         replyTo: replyTarget)
             do {
                 try FileManager.default.copyItem(at: url, to: drafts.videoURL(for: draft.id))
                 try drafts.complete(draft)
@@ -2579,5 +2753,16 @@ private struct JamStatus: View {
                 .background(.black.opacity(0.65), in: Capsule())
                 .allowsHitTesting(false)
         }
+    }
+}
+
+/// The Pro sound a viewer wanted to play, for the unlock screen's headline.
+struct LockedSoundOffer: Identifiable {
+    let id = UUID()
+    let setup: SoundSetup
+
+    var title: String { setup.instrumentName.map { "Unlock \($0)" } ?? "Unlock this sound" }
+    var detail: String {
+        "\(setup.presetDetails). This sound uses Pro: unlock every instrument, scale, and chord progression."
     }
 }

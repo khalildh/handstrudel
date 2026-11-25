@@ -440,3 +440,12 @@ verify_jwt = false
 
 [functions.profile-avatar]
 verify_jwt = false
+
+[functions.send-push]
+verify_jwt = false
+
+[functions.grant-invite-rewards]
+verify_jwt = false
+
+[functions.moderation-media]
+verify_jwt = false

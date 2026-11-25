@@ -264,29 +264,7 @@ struct ControlSheet: View {
     }
 
     private func paywallSheet(for packId: String) -> some View {
-        let info = packInfo(for: packId)
-        let resolvedId = StoreManager.productId(for: packId)
-        let product = storeManager.products.first(where: { $0.productIdentifier == resolvedId })
-        return PaywallOverlay(
-            packId: packId,
-            packName: info.name,
-            packDescription: info.description,
-            price: product?.localizedPriceString ?? "---",
-            items: info.items,
-            storeManager: storeManager
-        )
-    }
-
-    private func packInfo(for packId: String) -> (name: String, description: String, items: [String]) {
-        let resolved = StoreManager.productId(for: packId)
-        switch resolved {
-        case StoreManager.studioPack: return ("Studio Pack", "7 professional studio presets", ["Tape", "Glass", "Deep", "Foggy", "Pulse", "Cosmic", "Glitch"])
-        case StoreManager.partyPack: return ("Party Pack", "9 high-energy party presets", ["EDM", "DnB", "Dubstep", "Rave", "Reggaeton", "Future Bass", "Techno", "Garage", "Phonk"])
-        case StoreManager.kit808: return ("808 Kit", "8 hip-hop & urban drum patterns", ["Boom Bap", "Drill", "Lo-Fi Hip Hop", "R&B", "Afrobeat", "Bounce", "Jersey Club", "Memphis"])
-        case StoreManager.kitElectronic: return ("Electronic Kit", "8 electronic drum patterns", ["Techno", "Breakbeat", "IDM", "Jungle", "Ambient", "Industrial", "2-Step", "Synthwave"])
-        case StoreManager.pro: return ("Pro Upgrade", "Unlock every instrument, scale, and chord progression.", ["120+ additional GM instruments", "Every scale — modes, harmonic minor, exotic", "Every chord progression — jazz, cinematic, world, and more", "One-time purchase"])
-        default: return ("Pack", "Premium content", [])
-        }
+        upgradeSheet(storeManager: storeManager, packId: packId)
     }
 
     // MARK: - Mode
@@ -741,6 +719,8 @@ struct ControlSheet: View {
                             StudioSettingRow("Chords", value: engine.chordMelodyProgression.name, icon: "music.note.list")
                         }
                         .buttonStyle(.plain)
+                        StudioSettingsDivider()
+                        chordVoicingMenu
                     }
                 }
             }
@@ -749,6 +729,26 @@ struct ControlSheet: View {
                 VStack(alignment: .leading, spacing: 3) { harmonyToggles }
             }
         }
+    }
+
+    /// Triads or 7ths for the wheel's chords. Each mode keeps its own pick;
+    /// Scale defaults to 7ths, the others to triads.
+    private var chordVoicingMenu: some View {
+        Menu {
+            ForEach(ChordVoicing.allCases, id: \.self) { voicing in
+                Button {
+                    engine.chordVoicing = voicing
+                } label: {
+                    if engine.chordVoicing == voicing { Label(voicing.displayName, systemImage: "checkmark") }
+                    else { Text(voicing.displayName) }
+                }
+                .accessibilityIdentifier("chord-voicing-\(voicing.rawValue)")
+            }
+        } label: {
+            StudioSettingRow("Chord voicing", value: engine.chordVoicing.displayName, icon: "pianokeys.inverse",
+                             chevron: "chevron.up.chevron.down")
+        }
+        .accessibilityIdentifier("chord-voicing-picker")
     }
 
     @ViewBuilder private var harmonyToggles: some View {
@@ -1088,7 +1088,7 @@ struct ControlSheet: View {
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
-                                Text("PRO")
+                                Text("PLUS")
                                     .font(.system(size: 7, weight: .bold, design: .rounded))
                                     .foregroundColor(palette.ink.opacity(0.8))
                                     .padding(.horizontal, 4)
@@ -1117,7 +1117,7 @@ struct ControlSheet: View {
                 GridItem(.flexible(), spacing: 8)
             ], spacing: 8) {
                 ForEach(HAND_THEMES) { theme in
-                    let locked = theme.isPremium && !storeManager.isUnlocked(theme.packId ?? "")
+                    let locked = !storeManager.isUnlocked(theme: theme)
                     let isSelected = engine.selectedHandTheme.id == theme.id
                     Button(action: {
                         if locked, let packId = theme.packId {
@@ -1146,7 +1146,7 @@ struct ControlSheet: View {
                         )
                         .overlay(alignment: .topTrailing) {
                             if locked {
-                                Text("PRO")
+                                Text("PLUS")
                                     .font(.system(size: 7, weight: .bold, design: .rounded))
                                     .foregroundColor(palette.ink.opacity(0.8))
                                     .padding(.horizontal, 4)
@@ -1157,6 +1157,9 @@ struct ControlSheet: View {
                         }
                         .opacity(locked ? 0.5 : 1.0)
                     }
+                    .accessibilityIdentifier("hand-theme-\(theme.id)")
+                    .accessibilityValue(locked ? "Locked" : "Unlocked")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
         }

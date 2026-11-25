@@ -30,15 +30,22 @@ export default function Privacy() {
         <li><strong>Your posts:</strong> the videos, thumbnails, and captions you post, plus the instrument and play mode used. <strong>Posts are public.</strong></li>
         <li><strong>Your comments:</strong> the text you post, its timestamp, and the video or comment you reply to. <strong>Comments and your username are public.</strong></li>
         <li><strong>Activity:</strong> likes, follows, blocks, reports, and the performances you save. Your saved list is private to your account.</li>
+        <li><strong>Push notifications:</strong> if you allow notifications, your device&apos;s Apple push token, linked to your account, and which notification types you&apos;ve turned on. We keep a log of the notifications we send you.</li>
       </ul>
       <p>We use this only to run HandStrudel: to sign you in, show your posts, power the feed, keep the community safe, and contact you about your account. We don&apos;t sell your data, show ads, or track you across other apps or websites.</p>
+
+      <h2>Invites</h2>
+      <p>Your account has an invite code. If someone signs up with it, we record that they used your code so we can grant the reward and keep your intro tally. You can see the username and profile photo of each person who joined with your code, and whether they&apos;ve posted. The person who joined can see who invited them. Nobody else can see who introduced whom. Your intro count and milestone badge are public on your profile.</p>
+      <p>We don&apos;t use device identifiers, IP addresses or other device signals for invites. Rewards are granted through RevenueCat using your account ID.</p>
 
       <h2>Public video views</h2>
       <p>Public videos also show aggregate view counts. We count playback, not just loading the page, and use a random code for each watched clip to avoid counting the same session's replays. The code is not reused across clips and is separate from optional usage analytics.</p>
       <p>Public performance metrics also include a total of saves and completed in-app shares. Your Saved list stays private. We do not store who received a shared link.</p>
 
       <h2>Optional app usage analytics</h2>
-      <p>You can opt in from Account settings in the app. We count days the app is used, use on a later day, first notes played, and recordings started, saved to Private drafts, and posted. We store daily totals, not individual activity histories. The app does not send account or device IDs, played pitches, custom scale names, gestures, audio, or camera imagery with these events. Turn off Usage Analytics in Account settings to stop sending events.</p>
+      <p>You can opt in from Account settings in the app. We count days the app is used, use on a later day, first notes played, recordings started, saved to Private drafts, and posted, a first post, Pro sounds opened from the feed and then unlocked, store visits, purchases started and completed (with which product), restore taps, invite links shared and codes redeemed, replies and challenge links, daily sounds opened and takes posted, streaks extended, sound pages opened, "Play this sound" taps, and notifications opened (with the notification type). We store daily totals, not individual activity histories. The app does not send account or device IDs, played pitches, custom scale names, gestures, audio, or camera imagery with these events. Turn off Usage Analytics in Account settings to stop sending events.</p>
+      <h2>Crash and performance reports</h2>
+      <p>With Usage Analytics turned on, the app also sends crash, hang, and resource-use reports that iOS prepares for developers (Apple's MetricKit). A report includes the app version and build, the iOS version, the iPhone model, the kind of problem, and the code locations involved. It does not include your account, device IDs, region, audio, camera imagery, or anything you made. We store these reports on our own server to find and fix problems, and we don't share them with analytics or advertising companies. Turning off Usage Analytics stops sending reports and discards any waiting on your device.</p>
 
       <h2>Website analytics and download metrics</h2>
       <p>We use <a href="https://vercel.com/docs/analytics/privacy-policy">Vercel Web Analytics</a> to count visitors and page views and understand how people find the website. This includes information such as the page path, referrer, general location, and browser or device type. We remove query strings and fragments from reported page URLs. Analytics does not use third-party cookies or link visits to HandStrudel accounts.</p>
@@ -53,7 +60,7 @@ export default function Privacy() {
         <li><strong>Sightengine</strong> — automated content screening of videos and thumbnails you submit for public posting. Recordings kept in Private drafts are not submitted.</li>
         <li><strong>Resend</strong> — sending sign-in code emails.</li>
         <li><strong>Vercel</strong> — hosting the website and providing website analytics.</li>
-        <li><strong>Apple</strong> — Sign in with Apple and in-app purchases (we never see payment details).</li>
+        <li><strong>Apple</strong> — Sign in with Apple, in-app purchases (we never see payment details), and delivering push notifications.</li>
         <li><strong>RevenueCat</strong> — managing in-app purchase status, linked to your account ID when you&apos;re signed in.</li>
       </ul>
 
@@ -63,6 +70,7 @@ export default function Privacy() {
         <li>Replace or remove your public photo from Edit Profile. Previously shared image URLs may remain in caches for a limited time.</li>
         <li>Delete your comments using the menu beside them.</li>
         <li>Delete your account from your profile (<strong>⋯ → Delete account</strong>). This permanently removes your profile, posts, comments, and files from our systems.</li>
+        <li>Choose which notifications you get in Account settings (<strong>Notifications</strong>), or turn them off in iPhone Settings. Signing out removes this device&apos;s push token from your account.</li>
         <li>Email us to ask for a copy of your data or to correct it.</li>
       </ul>
 

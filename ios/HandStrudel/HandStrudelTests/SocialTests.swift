@@ -1149,7 +1149,7 @@ final class SocialTests: XCTestCase {
         XCTAssertLessThan(updated[2].accessibilityFrameInContainerSpace.midX, 195)
         let released = expectation(description: "Preview voice was released")
         var voiceID: String?
-        wheel.onZoneEnter = { id, zone in voiceID = id; XCTAssertEqual(zone, .melody(0)) }
+        wheel.onZoneEnter = { id, zone in voiceID = id; XCTAssertEqual(zone, .melody(MelodySubzone(lane: 0))) }
         wheel.onZoneExit = { id in XCTAssertEqual(id, voiceID); released.fulfill() }
         XCTAssertTrue(updated[2].accessibilityActivate())
         await fulfillment(of: [released], timeout: 1)
@@ -1283,6 +1283,76 @@ final class SocialTests: XCTestCase {
         XCTAssertNil(try link("https://handstrudel.com/watch?v=\(id)&v=\(id)"))
         XCTAssertNil(try link("https://handstrudel.com/watch?v=bad"))
         XCTAssertNil(try link("https://handstrudel.com/watch/other?v=\(id)"))
+    }
+
+    func testChallengeLinksOpenThePostWithTheReplyRecorder() throws {
+        let id = try XCTUnwrap(UUID(uuidString: "52000000-0000-0000-0000-000000000002"))
+        let challenge = ChallengeLink.url(for: id)
+        XCTAssertEqual(challenge.absoluteString, "https://handstrudel.com/watch?v=\(id.uuidString.lowercased())&reply=1")
+        XCTAssertEqual(PerformanceLink(url: challenge), .challenge(id))
+        XCTAssertEqual(PerformanceLink(url: try XCTUnwrap(URL(string: "handstrudel://reply/\(id)"))), .challenge(id))
+        XCTAssertEqual(PerformanceLink(url: try XCTUnwrap(URL(string: "https://handstrudel.com/watch?reply=1&v=\(id)"))), .challenge(id))
+        XCTAssertEqual(PerformanceLink(url: try XCTUnwrap(URL(string: "https://handstrudel.com/watch?v=\(id)&reply=0"))), .watch(id))
+        XCTAssertEqual(PerformanceLink.challenge(id).videoID, id)
+        XCTAssertNil(PerformanceLink(url: try XCTUnwrap(URL(string: "https://handstrudel.com/watch?reply=1"))))
+    }
+
+    func testReplyFieldsDecodeAndTravelWithThePost() throws {
+        let parent = "11111111-1111-1111-1111-111111111111"
+        let json = """
+        {"id":"22222222-2222-2222-2222-222222222222","user_id":"00000000-0000-0000-0000-00000000000a",
+         "video_key":"v.mp4","thumb_key":"t.jpg","caption":"","like_count":0,"created_at":"2026-11-21T05:00:00Z",
+         "username":"bob","reply_to_id":"\(parent)","reply_to_username":"alice","reply_count":3,
+         "sound_setup":{"version":1,"key":"C","scale":"Major","mode":"scalechordmelody"}}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let video = try decoder.decode(Video.self, from: Data(json.utf8))
+        XCTAssertEqual(video.replyToId, UUID(uuidString: parent))
+        XCTAssertEqual(video.replyToUsername, "alice")
+        XCTAssertEqual(video.replyCount, 3)
+
+        let fields = VideoPostFields(caption: "", instrument: nil, mode: nil, durationS: 3, width: 720, height: 1280,
+                                     replyToId: video.id)
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(fields)) as? [String: Any])
+        XCTAssertEqual((encoded["reply_to_id"] as? String)?.lowercased(), video.id.uuidString.lowercased())
+        let plain = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(VideoPostFields(caption: "", instrument: nil, mode: nil, durationS: 3, width: 720, height: 1280))
+        ) as? [String: Any])
+        XCTAssertNil(plain["reply_to_id"], "Ordinary posts don't name a target")
+    }
+
+    func testReplyRequestNeedsAPlayableSoundAndACreator() throws {
+        func video(_ extra: String) throws -> Video {
+            let json = """
+            {"id":"22222222-2222-2222-2222-222222222222","user_id":"00000000-0000-0000-0000-00000000000a",
+             "video_key":"v.mp4","thumb_key":"t.jpg","caption":"","like_count":0,"created_at":"2026-11-21T05:00:00Z"\(extra)}
+            """
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(Video.self, from: Data(json.utf8))
+        }
+        let sound = #","sound_setup":{"version":1,"instrument":"grand_piano","waveform":"sine","key":"D","scale":"Minor","# +
+            #""progression":"free","mode":"soundfont","bpm":96,"useSoundFont":true,"autoStrum":false,"padVolume":0.3,"# +
+            #""gridOctave":3,"gridRange":2}"#
+        XCTAssertNil(ReplyTakeRequest(video: try video(#","username":"alice""#)))
+        XCTAssertNil(ReplyTakeRequest(video: try video(sound)))
+        let request = try XCTUnwrap(ReplyTakeRequest(video: try video(sound + #","username":"alice""#)))
+        XCTAssertEqual(request.target, ReplyTarget(videoId: try XCTUnwrap(UUID(uuidString: "22222222-2222-2222-2222-222222222222")),
+                                                   username: "alice"))
+    }
+
+    @MainActor
+    func testDraftsKeepTheirReplyTargetAndOlderDraftsStillLoad() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let target = ReplyTarget(videoId: UUID(), username: "alice")
+        let draft = try RecordingDrafts(directory: directory).begin(instrument: "Piano", mode: "scale", replyTo: target)
+        XCTAssertEqual(draft.replyTo, target)
+        let roundTrip = try JSONDecoder().decode(RecordingDraft.self, from: JSONEncoder().encode(draft))
+        XCTAssertEqual(roundTrip.replyTo, target)
+        let older = #"{"id":"\#(UUID().uuidString)","createdAt":0}"#
+        XCTAssertNil(try JSONDecoder().decode(RecordingDraft.self, from: Data(older.utf8)).replyTo)
     }
 
     func testJamHoldSurvivesHeartbeatAndEndsOnRelease() throws {
@@ -2474,5 +2544,99 @@ final class SocialTests: XCTestCase {
         }
         _ = await expired.resume(draftID: draft.id, accountID: owner, store: store)
         XCTAssertNil(store.postSubmission(for: draft.id, accountID: owner))
+    }
+}
+
+/// Pro sounds in the feed: labelled, offered for unlock, and counted.
+final class ProSoundUnlockTests: XCTestCase {
+    private func sound(instrument: String, useSoundFont: Bool = true) -> SoundSetup {
+        SoundSetup(instrument: instrument, waveform: "sine", key: .D, scale: .minor,
+                   progression: "custom", customDegrees: [0, 3, 4], mode: .scalechordmelody,
+                   bpm: 100, useSoundFont: useSoundFont, autoStrum: false, padVolume: 0.3, gridOctave: 3, gridRange: 2)
+    }
+
+    func testOnlyValidSoundsNeedingAnUnownedPackAreLocked() throws {
+        let premium = try XCTUnwrap(SOUNDFONT_INSTRUMENTS.first { $0.packId != nil })
+        let free = try XCTUnwrap(SOUNDFONT_INSTRUMENTS.first { $0.packId == nil })
+        let pro = sound(instrument: premium.id)
+        XCTAssertTrue(pro.isLocked { _ in false })
+        XCTAssertFalse(pro.isLocked { _ in true }, "Owning the pack unlocks it.")
+        XCTAssertFalse(sound(instrument: free.id).isLocked { _ in false })
+        XCTAssertFalse(sound(instrument: premium.id, useSoundFont: false).isLocked { _ in false },
+                       "A synth sound doesn't need the unused sampler instrument.")
+        var broken = pro
+        broken.version = 99
+        XCTAssertFalse(broken.isLocked { _ in false }, "Invalid sounds keep the old error instead of a sales pitch.")
+    }
+
+    func testUnlockScreenNamesTheSoundTheViewerWanted() throws {
+        let premium = try XCTUnwrap(SOUNDFONT_INSTRUMENTS.first { $0.packId != nil })
+        let offer = LockedSoundOffer(setup: sound(instrument: premium.id))
+        XCTAssertEqual(offer.title, "Unlock \(premium.name)")
+        XCTAssertTrue(offer.detail.hasPrefix("D Minor"), offer.detail)
+        XCTAssertTrue(offer.detail.contains("This sound uses Pro"))
+        XCTAssertNotEqual(offer.id, LockedSoundOffer(setup: offer.setup).id)
+    }
+
+    @MainActor
+    func testLockedSoundEventsUseTheirDatabaseNamesAndRespectOptIn() throws {
+        XCTAssertEqual(AppAnalytics.Event.lockedSoundTapped.rawValue, "locked_sound_tapped")
+        XCTAssertEqual(AppAnalytics.Event.lockedSoundUnlocked.rawValue, "locked_sound_unlocked")
+        let suite = "locked-sound-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var sent: [AppAnalytics.Event] = []
+        let analytics = AppAnalytics(defaults: defaults) { sent.append($0) }
+        analytics.record(.lockedSoundTapped)
+        XCTAssertEqual(sent, [], "Nothing is sent without opt-in.")
+        defaults.set(true, forKey: AppAnalytics.optInKey)
+        analytics.record(.lockedSoundTapped)
+        analytics.record(.lockedSoundUnlocked)
+        XCTAssertEqual(sent, [.lockedSoundTapped, .lockedSoundUnlocked])
+    }
+}
+
+/// Touching the Scale-mode wheel: notes and chords share the same up/down octave band.
+@MainActor
+final class WheelTouchOctaveTests: XCTestCase {
+    private let wheel = SplitTouchUIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+    private let center = CGPoint(x: 195, y: 422)
+    private let wedge = 180.0 / 7
+
+    /// A point at `degrees` clockwise from 12 o'clock, `radius` × the wheel radius out.
+    private func point(_ degrees: Double, _ radius: Double) -> CGPoint {
+        let a = degrees * .pi / 180
+        return CGPoint(x: center.x + sin(a) * 195 * radius, y: center.y - cos(a) * 195 * radius)
+    }
+
+    override func setUp() {
+        wheel.zoneCount = 7
+        wheel.melodyCount = 7
+        wheel.melodyOctaveBand = true
+    }
+
+    func testScaleNotesUseTheOuterBandForOctaveUpAndDown() {
+        // Notes sit on the right; wedge 2 from the top is lane 4.
+        XCTAssertEqual(wheel.zone(at: point(2.5 * wedge, 0.6)), .melody(MelodySubzone(lane: 4, octave: 0)))
+        XCTAssertEqual(wheel.zone(at: point(2.25 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: 1)))
+        XCTAssertEqual(wheel.zone(at: point(2.75 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: -1)))
+    }
+
+    func testChordsKeepTheirBandAndTheRestHoleSelectsNothing() {
+        XCTAssertEqual(wheel.zone(at: point(360 - 2.25 * wedge, 0.9)), .chord(ChordSubzone(wedge: 2, octave: 1)))
+        XCTAssertEqual(wheel.zone(at: point(360 - 2.5 * wedge, 0.6)), .chord(ChordSubzone(wedge: 2, octave: 0)))
+        XCTAssertNil(wheel.zone(at: center))
+    }
+
+    func testLayoutsWithoutANoteBandPlayTheBaseNoteAcrossTheWholeWedge() {
+        wheel.melodyOctaveBand = false
+        XCTAssertEqual(wheel.zone(at: point(2.25 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: 0)))
+        XCTAssertEqual(wheel.zone(at: point(2.75 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: 0)))
+    }
+
+    func testSwappedHandsPutNotesOnTheLeft() {
+        wheel.swapHands = true
+        XCTAssertEqual(wheel.zone(at: point(360 - 2.25 * wedge, 0.9)), .melody(MelodySubzone(lane: 4, octave: 1)))
+        XCTAssertEqual(wheel.zone(at: point(2.25 * wedge, 0.9)), .chord(ChordSubzone(wedge: 2, octave: 1)))
     }
 }

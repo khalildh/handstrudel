@@ -53,6 +53,8 @@ struct StartOverlayView: View {
     let onDrafts: () -> Void
     let onLoops: () -> Void
     let onSetups: () -> Void
+    /// "Today's sound", shown under the title when social features are available.
+    var dailyCard: AnyView? = nil
 
     @State private var showSounds = false
     @State private var showAppearance = false
@@ -102,6 +104,7 @@ struct StartOverlayView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 title
+                if let dailyCard { dailyCard }
                 heroCard
                 libraryShortcuts
             }
@@ -751,28 +754,6 @@ private struct ProBadge: View {
             .padding(.vertical, 3)
             .background(palette.accent.opacity(0.10), in: Capsule())
     }
-}
-
-/// Build the paywall the sheet pickers should show when the user taps a
-/// locked row. All pickers gate against the single "pro" product, so the
-/// copy lives in one place.
-@MainActor
-private func proPaywall(storeManager: StoreManager) -> some View {
-    let resolved = StoreManager.productId(for: "pro")
-    let product = storeManager.products.first(where: { $0.productIdentifier == resolved })
-    return PaywallOverlay(
-        packId: resolved,
-        packName: "Pro Upgrade",
-        packDescription: "Unlock every instrument, scale, and chord progression.",
-        price: product?.localizedPriceString ?? "---",
-        items: [
-            "120+ additional GM instruments",
-            "Every scale — modes, harmonic minor, exotic",
-            "Every chord progression — jazz, cinematic, world, and more",
-            "One-time purchase",
-        ],
-        storeManager: storeManager
-    )
 }
 
 // MARK: - Instrument picker sheet

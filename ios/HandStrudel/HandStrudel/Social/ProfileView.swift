@@ -107,12 +107,15 @@ struct ProfileView: View {
     @State private var showBlocked = false
     @State private var showAppearance = false
     @State private var showUsageAnalytics = false
+    @State private var showNotifications = false
     @State private var showEdit = false
     @State private var deleteError = false
 
     let onMakeMusic: () -> Void
     let onTrySound: (SoundSetup) -> Void
     let onPlayAlong: (Video) -> Void
+    @ObservedObject private var moderation = ModerationAccess.shared
+    @State private var showModeration = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -152,6 +155,7 @@ struct ProfileView: View {
         .sheet(isPresented: $showBlocked) { BlockedUsersView(auth: auth) }
         .sheet(isPresented: $showAppearance) { StudioThemePicker() }
         .sheet(isPresented: $showUsageAnalytics) { UsageAnalyticsSettings() }
+        .sheet(isPresented: $showNotifications) { NotificationSettingsView(auth: auth) }
         .sheet(isPresented: $showEdit) { EditCreatorProfileView(auth: auth) }
         .fullScreenCover(item: $playing, onDismiss: {
             let action = pendingAction
@@ -188,6 +192,8 @@ struct ProfileView: View {
         .alert("Couldn't delete this post", isPresented: $deleteError) {
             Button("OK", role: .cancel) {}
         }
+        .sheet(isPresented: $showModeration) { ModerationView() }
+        .task(id: auth.userId) { await moderation.refresh(signedIn: auth.isSignedIn) }
         .environment(\.profileImageStore, portfolio.images)
     }
 
@@ -200,10 +206,15 @@ struct ProfileView: View {
             Menu {
                 Button("Appearance", systemImage: "paintpalette") { showAppearance = true }
                 Button("Usage Analytics", systemImage: "chart.bar") { showUsageAnalytics = true }
+                Button("Notifications", systemImage: "bell") { showNotifications = true }
                 if auth.isSignedIn {
                     Button("Blocked users") { showBlocked = true }
                     Button("Sign out") { Task { await auth.signOut() } }
                     Button("Delete account…", role: .destructive) { confirmDeleteAccount = true }
+                }
+                if auth.isSignedIn && moderation.isModerator {
+                    Button("Moderation", systemImage: "shield.lefthalf.filled") { showModeration = true }
+                        .accessibilityIdentifier("profile-moderation")
                 }
                 Link("Community Guidelines", destination: SocialConfig.guidelinesURL)
                 Link("Terms of Use", destination: SocialConfig.termsURL)
@@ -262,6 +273,7 @@ struct ProfileView: View {
                     Button("Edit profile", systemImage: "pencil") { showEdit = true }
                         .buttonStyle(ProfileActionStyle())
                 }
+                InviteFriendsCard(auth: auth, onTrySound: onTrySound, onPlayAlong: onPlayAlong)
                 CreatorPortfolio(videos: portfolio.videos, loading: !portfolio.hasLoadedPage || portfolio.isLoadingMore,
                                  failed: portfolio.failed, more: portfolio.more, isOwner: true, open: { playing = $0 },
                                  trySound: onTrySound, retry: { Task { await portfolio.load(for: profile.id) } },
@@ -271,7 +283,11 @@ struct ProfileView: View {
             .padding(.horizontal, 21)
             .padding(.bottom, 24)
         }
-        .refreshable { await portfolio.load(for: profile.id) }
+        .refreshable {
+            async let invites: Void = InviteManager.shared.loadSummary()
+            await portfolio.load(for: profile.id)
+            await invites
+        }
         .task(id: profile.id) { await portfolio.load(for: profile.id) }
     }
 
@@ -322,7 +338,7 @@ struct CreatorProfileHeader<Actions: View>: View {
                 }
                 .fixedSize(horizontal: false, vertical: true)
             }
-            stats
+            stats.dailyStreakStrip(username: username)
             HStack(spacing: 8) {
                 actions()
                     .frame(maxWidth: .infinity)

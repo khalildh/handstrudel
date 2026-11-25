@@ -14,6 +14,12 @@ struct PostSharingOptions {
         return setup
     }
 
+    /// The notes behind "Learn to play" travel with the playable preset, never without it.
+    func sharedNotes(_ track: NoteTrack?, setup: SoundSetup?) -> NoteTrack? {
+        guard sharedPreset(setup) != nil, let track, track.isValid else { return nil }
+        return track
+    }
+
     static func canShareBacking(hasAudio: Bool, backingCredit: BackingCredit?) -> Bool {
         hasAudio && backingCredit == nil
     }
@@ -38,6 +44,7 @@ struct PostComposerView: View {
     let mode: String?
     let soundSetup: SoundSetup?
     let backingCredit: BackingCredit?
+    var replyTo: ReplyTarget? = nil
     @ObservedObject var auth: AuthManager
     let onSubmissionAccepted: () -> Void
     let onPostUpdate: (DraftPostUpdate) -> Void
@@ -49,12 +56,14 @@ struct PostComposerView: View {
     @State private var sharing = PostSharingOptions()
     @State private var commentsEnabled = true
     @State private var hasAudio: Bool?
+    @State private var postAsReply = true
 
     private var submission: DraftPostSubmission? {
         auth.userId.flatMap { drafts.postSubmission(for: draftID, accountID: $0) }
     }
 
     private var checkingAudio: Bool { backingCredit == nil && hasAudio == nil }
+    private var noteTrack: NoteTrack? { drafts.drafts.first { $0.id == draftID }?.postedNoteTrack }
 
     var body: some View {
         NavigationStack {
@@ -80,10 +89,21 @@ struct PostComposerView: View {
                             Toggle("Share playable preset", isOn: $sharing.sharePlayablePreset)
                                 .font(.subheadline)
                                 .disabled(uploader.isBusy || submission != nil)
-                            Text(sharing.sharePlayablePreset ? soundSetup.presetDetails : "Your instrument settings won't be shared.")
+                            Text(sharing.sharePlayablePreset
+                                 ? soundSetup.presetDetails + (noteTrack == nil ? "" : " · Learn to play")
+                                 : "Your instrument settings and notes won't be shared.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                    DailyTakeHint(setup: soundSetup, sharesPreset: sharing.sharePlayablePreset)
+                    if let replyTo {
+                        Toggle(isOn: $postAsReply) {
+                            Label("Reply to @\(replyTo.username)", systemImage: "arrowshape.turn.up.left")
+                        }
+                        .font(.subheadline)
+                        .disabled(uploader.isBusy || submission != nil)
+                        .accessibilityIdentifier("post-as-reply")
                     }
                     Toggle("Allow comments", isOn: $commentsEnabled)
                         .font(.subheadline)
@@ -159,18 +179,21 @@ struct PostComposerView: View {
     private func post() {
         guard let accountID = auth.userId, submission != nil || !checkingAudio else { return }
         let preset = sharing.sharedPreset(soundSetup)
+        let notes = sharing.sharedNotes(noteTrack, setup: soundSetup)
         let allowBacking = sharing.sharesBacking(hasAudio: hasAudio == true, backingCredit: backingCredit)
         Task {
             var handedOff = false
             func leaveComposer() {
                 handedOff = true
                 onSubmissionAccepted()
+                PushManager.shared.askAfterMilestone()
                 dismiss()
             }
             let posted = await uploader.post(clip: clip, draftID: draftID, accountID: accountID, store: drafts,
                                              caption: caption, instrument: instrument, mode: mode,
-                                             soundSetup: preset, commentsEnabled: commentsEnabled,
-                                             backingEnabled: allowBacking, backingCredit: backingCredit) {
+                                             soundSetup: preset, noteTrack: notes, commentsEnabled: commentsEnabled,
+                                             backingEnabled: allowBacking, backingCredit: backingCredit,
+                                             replyTo: postAsReply ? replyTo : nil) {
                 guard auth.userId == accountID else { return }
                 leaveComposer()
                 onPostUpdate(.checking)

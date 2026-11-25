@@ -26,30 +26,19 @@ final class ChordMelodyModeController: ModeController {
 
         let scaleMode = engine.scaleChordMelodyModeEnabled
 
-        // Triad in Split / Radial / Chord+Melody; 7th-chord in Scale (so V → V7,
+        // The player's voicing: triads by default, 7ths in Scale (so V → V7,
         // ii → ii⁷, I → Imaj7, etc.).
-        let chordTones: (Int) -> [Int] = { degree in
-            scaleMode
-                ? chordNotesWithSeventh(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-                : chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-        }
+        let chordTones: (Int) -> [Int] = { degree in engine.wheelChordTones(degree: degree) }
 
-        // Split / Radial / Chord+Melody: triad expanded across 3 octaves (9
-        // lanes of chord tones). Scale: one octave of the full diatonic
+        // Split / Radial / Chord+Melody: the voiced chord across 3 octaves
+        // (9 lanes for triads, 12 for 7ths). Scale: one octave of the full diatonic
         // scale (7 lanes) — the manager applies a ±1 octave shift from the
         // outer radial band on top of that.
         let melodyTones: (Int) -> [Int] = { degree in
             if scaleMode {
                 return scaleNotesOneOctave(key: engine.selectedKey, scale: engine.selectedScale)
             }
-            let triad = chordNotes(key: engine.selectedKey, scale: engine.selectedScale, degree: degree)
-            var lanes: [Int] = []
-            for octave in 0..<3 {
-                for note in triad {
-                    lanes.append(note + octave * 12)
-                }
-            }
-            return lanes.sorted()
+            return engine.wheelMelodyLanes(degree: degree)
         }
 
         let actions = chordMelodyModeManager.tick(
@@ -87,7 +76,8 @@ final class ChordMelodyModeController: ModeController {
                 engine.releaseJamVoice("pad")
             case .chordAccent(let notes, _, let vel):
                 for midi in notes {
-                    strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: vel * 0.5, duration: 0.5)
+                    strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: vel * 0.5, duration: 0.5,
+                                           capture: .chord)
                     loopRecorder.recordEvent(.noteOn(midi: midi, waveform: engine.selectedWaveform, velocity: vel * 0.5), currentTime: elapsed)
                 }
                 engine.shareJamNotes(notes, velocity: vel * 0.5, duration: 0.5)
@@ -142,7 +132,8 @@ final class ChordMelodyModeController: ModeController {
            engine.currentBeat != lastBeat {
             lastBeat = engine.currentBeat
             for midi in chordMelodyModeManager.currentChordMidi {
-                strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.25, duration: 0.4)
+                strudelBridge.playNote(midi: midi, waveform: engine.selectedWaveform, velocity: 0.25, duration: 0.4,
+                                       capture: .chord)
             }
             engine.shareJamNotes(chordMelodyModeManager.currentChordMidi, velocity: 0.25, duration: 0.4)
         }

@@ -563,7 +563,7 @@ final class HandStrudelUITests: XCTestCase {
         sound.tap()
         let playAlong = app.buttons["play-along"].firstMatch
         XCTAssertTrue(playAlong.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.navigationBars["Sound options"].exists)
+        XCTAssertTrue(app.navigationBars["Sound"].exists)
         XCTAssertTrue(app.buttons["save-clip-preset"].exists)
         captureIfRequested("Feed-Sound-Options")
         playAlong.tap()
@@ -574,6 +574,181 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(play.waitForExistence(timeout: 5))
         play.tap()
         XCTAssertTrue(pause.waitForExistence(timeout: 5))
+    }
+
+    // MARK: - Take replies
+
+    /// Fixture: `FIXTURE_REPLIES=1 FIXTURE_DRAFT_POSTING=1 node scripts/notification-ui-fixture.mjs`.
+    private func launchWithReplyFixture(extraArguments: [String] = []) throws -> String {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_REPLY_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with FIXTURE_REPLIES=1 (and FIXTURE_DRAFT_POSTING=1 for posting).")
+        }
+        app.launchArguments = ["--uitesting", "-hasSeenOnboarding", "YES"] + extraArguments
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "notification-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        return endpoint
+    }
+
+    /// The Music tab's current-sound card ("Change sound"), which reflects the engine's live key and scale.
+    private func currentSoundShows(_ text: String) -> Bool {
+        app.buttons["Change sound"].staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH %@", text)).firstMatch.waitForExistence(timeout: 5)
+    }
+
+    func testReplyWithTakeOpensTheSoundReadyToAnswerThePost() throws {
+        // Start from a different key so the test proves the post's sound (D Minor) was loaded.
+        _ = try launchWithReplyFixture(extraArguments: ["-lastKey", "E"])
+        XCTAssertTrue(currentSoundShows("E "), "Precondition: the studio starts in E")
+        XCTAssertFalse(currentSoundShows("D Minor"))
+        element("tab-feed").tap()
+        let replies = app.buttons["feed-reply-count"].firstMatch
+        XCTAssertTrue(replies.waitForExistence(timeout: 8))
+        XCTAssertEqual(replies.label, "1 take in reply")
+        captureIfRequested("Feed-Reply-Count")
+
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 5))
+        sound.tap()
+        let reply = app.buttons["reply-with-take"].firstMatch
+        XCTAssertTrue(reply.waitForExistence(timeout: 5))
+        captureIfRequested("Feed-Sound-Options-Reply")
+        reply.tap()
+
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10), app.alerts.firstMatch.debugDescription)
+        let pill = app.staticTexts["Replying to @loopmaker"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 5))
+        captureIfRequested("Studio-Replying-To")
+        app.buttons["cancel-reply"].tap()
+        XCTAssertFalse(pill.waitForExistence(timeout: 1))
+        element("close-button").tap()
+        XCTAssertTrue(currentSoundShows("D Minor"), "The reply recorder must open with the post's sound")
+        XCTAssertEqual(app.buttons["Change sound"].value as? String, "Grand Piano")
+    }
+
+    func testReplyStripOpensTheAnsweringTake() throws {
+        _ = try launchWithReplyFixture()
+        element("tab-feed").tap()
+        let replies = app.buttons["feed-reply-count"].firstMatch
+        XCTAssertTrue(replies.waitForExistence(timeout: 8))
+        replies.tap()
+
+        let strip = element("reply-strip")
+        for _ in 0..<4 where !strip.exists { app.swipeUp() }
+        XCTAssertTrue(strip.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1 take in reply"].exists)
+        let clip = app.buttons["Take by @secondartist"]
+        XCTAssertTrue(clip.waitForExistence(timeout: 5))
+        captureIfRequested("Post-Reply-Strip")
+        clip.tap()
+        XCTAssertTrue(app.navigationBars["@secondartist"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Reply to @loopmaker"].waitForExistence(timeout: 5))
+    }
+
+    func testChallengeLinkOpensThePostWithTheReplyRecorderReady() throws {
+        _ = try launchWithReplyFixture()
+        XCTAssertTrue(element("tab-feed").waitForExistence(timeout: 5))
+        guard #available(iOS 16.4, *) else { throw XCTSkip("Opening a link needs iOS 16.4.") }
+        app.open(URL(string: "handstrudel://reply/30000000-0000-0000-0000-000000000001")!)
+        let card = element("challenge-card")
+        XCTAssertTrue(card.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["You've been challenged"].exists)
+        captureIfRequested("Challenge-Link")
+        XCTAssertTrue(app.buttons["performance-share-menu"].exists, "The post's share menu offers Challenge a friend")
+        app.buttons["challenge-reply-with-take"].tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10), app.alerts.firstMatch.debugDescription)
+        XCTAssertTrue(app.staticTexts["Replying to @loopmaker"].waitForExistence(timeout: 5))
+        element("close-button").tap()
+        XCTAssertTrue(currentSoundShows("D Minor"), "The challenge opens the challenged post's sound")
+    }
+
+    /// Against the local Supabase stack, seeded with `scripts/reply-ui-seed.sql` (a reply published
+    /// through `publish_screened_video`). Checks the real view's count, strip and label in the app.
+    func testLocalBackendCountsAndShowsAPublishedReply() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let api = env["HANDSTRUDEL_LOCAL_SUPABASE_URL"], let key = env["HANDSTRUDEL_LOCAL_SUPABASE_ANON_KEY"] else {
+            throw XCTSkip("Seed the local stack with scripts/reply-ui-seed.sql and set HANDSTRUDEL_LOCAL_SUPABASE_URL/_ANON_KEY.")
+        }
+        app.launchArguments = ["--uitesting", "-hasSeenOnboarding", "YES"]
+        app.launchEnvironment["SUPABASE_URL"] = api
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launchEnvironment["MEDIA_BASE_URL"] = env["HANDSTRUDEL_REPLY_FIXTURE_URL"] ?? "http://127.0.0.1:1"
+        app.launch()
+        element("tab-feed").tap()
+        // Newest first: the reply leads the feed, labelled with the post it answers.
+        let credit = app.buttons["Reply to @original_maker"].firstMatch
+        XCTAssertTrue(credit.waitForExistence(timeout: 10))
+        captureIfRequested("Local-Feed-Reply-Label")
+        credit.tap()
+        XCTAssertTrue(app.navigationBars["@original_maker"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Answer my loop"].exists)
+        let strip = element("reply-strip")
+        for _ in 0..<4 where !strip.exists { app.swipeUp() }
+        XCTAssertTrue(strip.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1 take in reply"].exists, "The original counts the published reply")
+        let take = app.buttons["Take by @take_replier"]
+        XCTAssertTrue(take.waitForExistence(timeout: 5))
+        captureIfRequested("Local-Reply-Strip")
+        take.tap()
+        XCTAssertTrue(app.navigationBars["@take_replier"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["My answer"].exists)
+    }
+
+    func testFeedShareMenuOffersChallengeAFriend() throws {
+        _ = try launchWithReplyFixture()
+        element("tab-feed").tap()
+        let share = app.buttons["feed-share"].firstMatch
+        XCTAssertTrue(share.waitForExistence(timeout: 8))
+        share.tap()
+        let challenge = app.buttons["Challenge a friend"]
+        XCTAssertTrue(challenge.waitForExistence(timeout: 5))
+        captureIfRequested("Feed-Share-Menu")
+        challenge.tap()
+        // The system share sheet carries the challenge link.
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 8)
+                      || app.navigationBars["UIActivityContentView"].waitForExistence(timeout: 2))
+        captureIfRequested("Challenge-Share-Sheet")
+    }
+
+    @MainActor
+    func testPostingAReplyTakeSendsTheReplyTarget() async throws {
+        guard let file = ProcessInfo.processInfo.environment["HANDSTRUDEL_DRAFT_TEST_CLIP"] else {
+            throw XCTSkip("Requires a simulator-readable MP4 in HANDSTRUDEL_DRAFT_TEST_CLIP.")
+        }
+        app.launchEnvironment["HANDSTRUDEL_TEST_CLIP"] = file
+        let address = try launchWithReplyFixture(extraArguments: ["--uitest-draft-after-start"])
+        signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 10))
+        element("tab-feed").tap()
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 8))
+        sound.tap()
+        app.buttons["reply-with-take"].firstMatch.tap()
+
+        XCTAssertTrue(app.navigationBars["Review take"].waitForExistence(timeout: 10))
+        let compose = app.buttons["Post to HandStrudel"]
+        if !compose.isHittable { app.swipeUp() }
+        compose.tap()
+        XCTAssertTrue(app.navigationBars["New post"].waitForExistence(timeout: 8))
+        let asReply = app.switches["post-as-reply"]
+        XCTAssertTrue(asReply.waitForExistence(timeout: 5))
+        XCTAssertEqual(asReply.value as? String, "1")
+        captureIfRequested("Composer-Reply")
+        let post = app.buttons["Post publicly"]
+        if !post.isHittable { app.swipeUp() }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND hittable == true"), object: post)
+        await fulfillment(of: [ready], timeout: 8)
+        post.tap()
+        let wheel = element("close-button")
+        let resumed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: wheel)
+        // Transcoding to the posted size can be slow on a shared simulator host.
+        await fulfillment(of: [resumed], timeout: 90)
+
+        let fieldsURL = try XCTUnwrap(URL(string: "\(address)/__fixture/last-post-fields"))
+        let (data, _) = try await URLSession.shared.data(from: fieldsURL)
+        let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual((fields["reply_to_id"] as? String)?.lowercased(), "30000000-0000-0000-0000-000000000001")
     }
 
     func testFeedAdvancesWhenAClipFinishes() throws {
@@ -831,6 +1006,184 @@ final class HandStrudelUITests: XCTestCase {
         copy.tap()
         let recorded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "5 shares"), object: share)
         XCTAssertEqual(XCTWaiter.wait(for: [recorded], timeout: 7), .completed)
+    }
+
+    func testFeedSoundRowOpensSoundPageWithTakes() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_SOUND_PAGE_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with FIXTURE_SOUND_PAGES=1.")
+        }
+        app.launchArguments = ["--uitesting"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "sound-page-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        element("tab-feed").tap()
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 8))
+        let counted = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "Sound: Grand Piano · D Minor · 2 takes"), object: sound)
+        XCTAssertEqual(XCTWaiter.wait(for: [counted], timeout: 8), .completed, sound.label)
+        captureIfRequested("Feed-Sound-Row")
+        sound.tap()
+
+        XCTAssertTrue(app.navigationBars["Sound"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["sound-page-title"].label, "Grand Piano")
+        let takeCount = app.staticTexts["sound-page-take-count"]
+        XCTAssertTrue(takeCount.waitForExistence(timeout: 5))
+        XCTAssertEqual(takeCount.label, "2 takes")
+        let original = app.buttons["sound-page-original"]
+        XCTAssertTrue(original.waitForExistence(timeout: 5))
+        XCTAssertEqual(original.label, "Original sound by @loopmaker")
+        XCTAssertEqual(app.buttons["play-clip-preset"].label, "Play this sound")
+        XCTAssertTrue(app.buttons["sound-page-share"].exists)
+        let takes = app.buttons.matching(identifier: "sound-take")
+        XCTAssertTrue(takes.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(takes.count, 2)
+        XCTAssertTrue(takes.element(boundBy: 0).label.hasPrefix("Original by @loopmaker"), takes.element(boundBy: 0).label)
+        captureIfRequested("Sound-Page-Top")
+
+        app.segmentedControls["sound-take-order"].buttons["Recent"].tap()
+        let newestFirst = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label BEGINSWITH %@", "Take by @secondartist"), object: takes.element(boundBy: 0))
+        XCTAssertEqual(XCTWaiter.wait(for: [newestFirst], timeout: 5), .completed)
+        captureIfRequested("Sound-Page-Recent")
+
+        takes.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["Second performance"].firstMatch.waitForExistence(timeout: 5))
+    }
+
+    /// End to end against a real local Supabase stack seeded with scripts/sound-pages-ui-seed.sql:
+    /// counts, Top/Recent order and paging come from the real `sound_takes` view and RPCs.
+    func testFeedSoundPageAgainstLocalSupabase() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let endpoint = env["HANDSTRUDEL_SOUND_PAGE_SUPABASE_URL"], let key = env["HANDSTRUDEL_SOUND_PAGE_SUPABASE_KEY"] else {
+            throw XCTSkip("Requires a local Supabase stack seeded with scripts/sound-pages-ui-seed.sql.")
+        }
+        app.launchArguments = ["--uitesting", "-lastSoundFont", "grand_piano"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        element("tab-feed").tap()
+
+        // The feed row counts the 30 visible takes (not the hidden one or the handle-less one).
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 10))
+        let counted = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "Sound: Rhodes EP · Eb Minor · 30 takes"), object: sound)
+        XCTAssertEqual(XCTWaiter.wait(for: [counted], timeout: 10), .completed, sound.label)
+        sound.tap()
+
+        // Whichever take the feed showed first, the page is the original's sound.
+        XCTAssertTrue(app.navigationBars["Sound"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["sound-page-title"].label, "Rhodes EP")
+        let takeCount = app.staticTexts["sound-page-take-count"]
+        XCTAssertTrue(takeCount.waitForExistence(timeout: 5))
+        XCTAssertEqual(takeCount.label, "30 takes")
+        XCTAssertEqual(app.buttons["sound-page-original"].label, "Original sound by @originalist")
+
+        // Top: most liked first; the least liked take is only on the second page.
+        let takes = app.buttons.matching(identifier: "sound-take")
+        XCTAssertTrue(takes.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(takes.element(boundBy: 0).label.hasPrefix("Original by @originalist, 50 likes"), takes.element(boundBy: 0).label)
+        XCTAssertTrue(takes.element(boundBy: 1).label.hasPrefix("Take by @take_29, 29 likes"), takes.element(boundBy: 1).label)
+        XCTAssertTrue(scrollUntilTake("Take by @take_01, 1 like"), "Top must page past 24 takes to the least liked one.")
+        XCTAssertFalse(takeExists("Hidden take"))
+        XCTAssertFalse(takeExists("No handle take"))
+        captureIfRequested("Sound-Page-Real-Top-End")
+
+        // Recent: newest first; the original (oldest) is only on the second page.
+        scrollToTop()
+        app.segmentedControls["sound-take-order"].buttons["Recent"].tap()
+        let newest = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label BEGINSWITH %@", "Take by @take_01, 1 like"), object: takes.element(boundBy: 0))
+        XCTAssertEqual(XCTWaiter.wait(for: [newest], timeout: 10), .completed, takes.element(boundBy: 0).label)
+        XCTAssertTrue(takes.element(boundBy: 1).label.hasPrefix("Take by @take_02"), takes.element(boundBy: 1).label)
+        XCTAssertTrue(scrollUntilTake("Original by @originalist, 50 likes"), "Recent must page to the oldest post.")
+        captureIfRequested("Sound-Page-Real-Recent-End")
+
+        // Share sends the original post's universal link (the value is the URL handed to the
+        // share sheet), and the sheet opens with the usual actions.
+        scrollToTop()
+        let share = app.buttons["sound-page-share"]
+        XCTAssertEqual(share.value as? String, "https://handstrudel.com/watch?v=69000000-0000-0000-0000-000000000000")
+        share.tap()
+        let copy = app.cells.matching(NSPredicate(format: "label == %@", "Copy")).firstMatch
+        XCTAssertTrue(copy.waitForExistence(timeout: 5))
+        captureIfRequested("Sound-Page-Share-Sheet")
+        let close = app.buttons["header.closeButton"].firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+
+        // A take's details sheet links back to the same sound page.
+        let take29 = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "sound-take", "Take by @take_29")).firstMatch
+        app.segmentedControls["sound-take-order"].buttons["Top"].tap()
+        XCTAssertTrue(take29.waitForExistence(timeout: 5))
+        take29.tap()
+        let detailSound = app.buttons["clip-sound-page"]
+        XCTAssertTrue(detailSound.waitForExistence(timeout: 8))
+        XCTAssertEqual(detailSound.label, "Sound: Rhodes EP")
+        detailSound.tap()
+        let nestedCount = app.staticTexts.matching(identifier: "sound-page-take-count")
+        let nestedLoaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "30 takes"), object: nestedCount.firstMatch)
+        XCTAssertEqual(XCTWaiter.wait(for: [nestedLoaded], timeout: 5), .completed)
+        captureIfRequested("Sound-Page-From-Details")
+
+        // Play this sound opens the Music tab with the sound's own setup.
+        // The outer page's button is still in the hierarchy under the nested sheet.
+        let play = try XCTUnwrap(app.buttons.matching(identifier: "play-clip-preset").allElementsBoundByIndex.last { $0.isHittable })
+        XCTAssertEqual(play.label, "Play this sound")
+        play.tap()
+        let settings = element("settings-button")
+        XCTAssertTrue(settings.waitForExistence(timeout: 12))
+        settings.tap()
+        let instrument = element("settings-instrument-picker")
+        XCTAssertTrue(instrument.waitForExistence(timeout: 5))
+        XCTAssertTrue(instrument.label.contains("Rhodes EP"), instrument.label)
+        XCTAssertTrue(element("studio-key-picker").label.contains("Eb"), element("studio-key-picker").label)
+        XCTAssertTrue(element("scale-picker").label.contains("Minor"), element("scale-picker").label)
+        captureIfRequested("Sound-Page-Played-Setup")
+    }
+
+    func testLockedSoundPageOffersUnlockAndOpensStore() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_LOCKED_SOUND_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the feed fixture with FIXTURE_SOUND_PAGES=1 FIXTURE_SOUND_LOCKED=1.")
+        }
+        app.launchArguments = ["--uitesting", "--force-locked"]
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "sound-page-fixture-key"
+        app.launchEnvironment["MEDIA_BASE_URL"] = endpoint
+        app.launch()
+        element("tab-feed").tap()
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 8))
+        sound.tap()
+        XCTAssertEqual(app.staticTexts["sound-page-title"].label, "Harpsichord")
+        let play = app.buttons["play-clip-preset"]
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        XCTAssertEqual(play.label, "Unlock & play")
+        XCTAssertTrue(element("pro-sound-badge").exists)
+        play.tap()
+        XCTAssertTrue(element("store-headline").waitForExistence(timeout: 8), "Unlock & play must open the store.")
+        XCTAssertFalse(element("close-button").exists, "A locked sound must not start a session.")
+        captureIfRequested("Sound-Page-Locked-Store")
+    }
+
+    private func takeExists(_ caption: String) -> Bool {
+        app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "sound-take", caption)).firstMatch.exists
+    }
+
+    private func scrollUntilTake(_ prefix: String) -> Bool {
+        let take = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "sound-take", prefix)).firstMatch
+        for _ in 0..<12 where !take.exists {
+            app.swipeUp()
+            _ = take.waitForExistence(timeout: 2)
+        }
+        return take.exists
+    }
+
+    private func scrollToTop() {
+        for _ in 0..<8 where !app.segmentedControls["sound-take-order"].isHittable { app.swipeDown() }
     }
 
     func testFeedRemixesOpensPublishedPlayAlongClips() throws {
@@ -1631,6 +1984,37 @@ final class HandStrudelUITests: XCTestCase {
         captureIfRequested("Artist-Profile-Largest-Text")
     }
 
+    /// Run the profile fixture with FIXTURE_SOUND_MODE=scalechordmelody, and
+    /// set HANDSTRUDEL_FIXTURE_CHORD_VOICING to what the post carries:
+    /// "triad" (FIXTURE_CHORD_VOICING=triad) must play triads on the Scale
+    /// wheel, whose own default is 7ths; "none" (an older post without the
+    /// field) must keep that default.
+    func testPlayThisSoundFromFeedReproducesChordVoicing() throws {
+        let posted = ProcessInfo.processInfo.environment["HANDSTRUDEL_FIXTURE_CHORD_VOICING"]
+        guard posted == "triad" || posted == "none" else {
+            throw XCTSkip("Requires the profile fixture serving a Scale-wheel sound (see the doc comment).")
+        }
+        let triads = posted == "triad"
+        app.launchArguments = ["--uitest-note-log", "--uitest-camera-denied"]
+        app.launchEnvironment["MEDIA_BASE_URL"] = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"]
+        try launchWithProfileFixture()
+        element("tab-feed").tap()
+        let sound = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(sound.waitForExistence(timeout: 8))
+        sound.tap()
+        let preset = app.buttons.matching(identifier: "play-clip-preset").firstMatch
+        XCTAssertTrue(preset.waitForExistence(timeout: 8))
+        preset.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
+        let gotIt = element("onboarding-got-it")
+        if gotIt.waitForExistence(timeout: 1) { gotIt.tap() }
+        let chord = playTouchChord(0)
+        XCTAssertEqual(chord.notes.count, triads ? 3 : 4, "Feed sound's chord: \(chord.notes)")
+        XCTAssertEqual(chord.label.hasSuffix("⁷"), !triads, chord.label)
+        XCTAssertEqual(chord.notes.first.map { $0 % 12 }, rootPitchClass(chord.label))
+        assertChordVoicingSetting(triads ? "Triads" : "7ths")
+    }
+
     func testPlayThisSoundFromFeedOpensMusicSession() throws {
         app.launchEnvironment["MEDIA_BASE_URL"] = ProcessInfo.processInfo.environment["HANDSTRUDEL_NOTIFICATION_FIXTURE_URL"]
         try launchWithProfileFixture()
@@ -1644,6 +2028,65 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertEqual(preset.label, "Play this sound")
         preset.tap()
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 10))
+    }
+
+    /// Runs against the seeded local stack from scripts/seed-official/test (see its README):
+    /// @handstrudel's posts open their own sounds, from the profile's Sounds list and from a
+    /// feed post's "Play this sound".
+    func testSeededOfficialPostsPlayTheirSounds() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let endpoint = env["HANDSTRUDEL_SEED_STACK_URL"], let key = env["HANDSTRUDEL_SEED_STACK_ANON_KEY"] else {
+            throw XCTSkip("Requires the seeded official-account stack (scripts/seed-official/test).")
+        }
+        app.launchArguments.append("--uitesting")
+        app.launchEnvironment["SUPABASE_URL"] = endpoint
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = key
+        app.launchEnvironment["MEDIA_BASE_URL"] = env["HANDSTRUDEL_SEED_MEDIA_URL"]
+        app.launchEnvironment["CLIP_MEDIA_BASE_URL"] = env["HANDSTRUDEL_SEED_CLIP_URL"]
+        app.launch()
+        let contains = { [app] (text: String) in app!.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", text)).firstMatch }
+
+        // 1. Profile → Sounds → Upright Dorian Groove (Upright Bass, G Dorian, 100 BPM).
+        XCTAssertFalse(app.staticTexts["Upright Bass"].exists, "Start from a different sound")
+        element("tab-feed").tap()
+        let author = app.buttons["@handstrudel"].firstMatch
+        XCTAssertTrue(author.waitForExistence(timeout: 10))
+        author.tap()
+        let sounds = app.buttons["profile-sounds"]
+        XCTAssertTrue(sounds.waitForExistence(timeout: 5))
+        sounds.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.15)).tap()
+        let bass = app.buttons.matching(identifier: "profile-play-sound")
+            .containing(NSPredicate(format: "label CONTAINS %@", "Upright Bass, G Dorian · 100 BPM")).firstMatch
+        XCTAssertTrue(bass.waitForExistence(timeout: 8), app.buttons.matching(identifier: "profile-play-sound")
+            .allElementsBoundByIndex.map(\.label).joined(separator: " | "))
+        for _ in 0..<10 where !bass.isHittable { app.swipeUp(velocity: .slow) }
+        captureIfRequested("Seed-Official-Sounds")
+        bass.tap()
+        let close = element("close-button")
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "The sound should open a session")
+        captureIfRequested("Seed-Official-Bass-Session")
+        close.tap()
+        XCTAssertTrue(app.staticTexts["Upright Bass"].waitForExistence(timeout: 8))
+        XCTAssertTrue(contains("G Dorian").exists)
+        captureIfRequested("Seed-Official-Bass-Loaded")
+
+        // 2. Feed post → "Play this sound": the newest seed post is Haunted Choir (Choir Aahs, D Minor).
+        element("tab-feed").tap()
+        XCTAssertTrue(contains("Haunted choir in D minor").waitForExistence(timeout: 10))
+        let options = app.buttons["feed-sound-options"].firstMatch
+        XCTAssertTrue(options.waitForExistence(timeout: 8))
+        options.tap()
+        let preset = app.buttons.matching(identifier: "play-clip-preset").firstMatch
+        XCTAssertTrue(preset.waitForExistence(timeout: 8))
+        XCTAssertEqual(preset.label, "Play this sound")
+        captureIfRequested("Seed-Official-Post-Sound")
+        preset.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "Play this sound should open a session")
+        captureIfRequested("Seed-Official-Choir-Session")
+        close.tap()
+        XCTAssertTrue(app.staticTexts["Choir Aahs"].waitForExistence(timeout: 8))
+        XCTAssertTrue(contains("D Minor").exists)
+        captureIfRequested("Seed-Official-Choir-Loaded")
     }
 
     func testAccountProfileEditsDisplayNameAndKeepsEmptyState() throws {
@@ -1852,7 +2295,8 @@ final class HandStrudelUITests: XCTestCase {
         let create = element("create-custom-scale")
         XCTAssertTrue(create.waitForExistence(timeout: 5))
         create.tap()
-        XCTAssertTrue(app.staticTexts["Pro Upgrade"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("store-headline").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("store-buy-pro").exists)
         XCTAssertFalse(app.textFields["custom-scale-name"].exists)
     }
 
@@ -1937,6 +2381,58 @@ final class HandStrudelUITests: XCTestCase {
         note.tap()
         XCTAssertTrue(app.staticTexts["Now try a pinch"].waitForExistence(timeout: 5))
         XCTAssertFalse(note.exists)
+    }
+
+    /// The store sells only Pro and HandStrudel+, and a Pro owner can subscribe.
+    func testStoreSellsProAndPlusForEachKindOfPlayer() {
+        for state in ["none", "pro", "plus"] {
+            app.terminate()
+            app.launchArguments = ["--uitesting", "--uitest-store-state=\(state)", "--uitest-camera-denied", "-hasSeenOnboarding", "YES"]
+            app.launch()
+            let start = element("start-button")
+            XCTAssertTrue(start.waitForExistence(timeout: 5), state)
+            start.tap()
+            XCTAssertTrue(element("settings-button").waitForExistence(timeout: 5), state)
+            element("settings-button").tap()
+            let bag = app.buttons["Store"]
+            XCTAssertTrue(bag.waitForExistence(timeout: 5), state)
+            bag.tap()
+            XCTAssertTrue(element("store-headline").waitForExistence(timeout: 5), state)
+            XCTAssertFalse(app.staticTexts["808 Kit"].exists, "Old packs are no longer sold")
+            XCTAssertFalse(app.staticTexts["Studio Pack"].exists)
+            switch state {
+            case "none":
+                XCTAssertTrue(element("store-buy-pro").exists)
+                XCTAssertTrue(element("store-subscribe").exists)
+            case "pro":
+                XCTAssertTrue(element("store-pro-owned").exists)
+                XCTAssertTrue(element("store-plus-pro-note").exists)
+                let subscribe = element("store-subscribe")
+                XCTAssertTrue(subscribe.exists, "A Pro owner can subscribe to HandStrudel+")
+                let yearly = element("store-plan-yearly")
+                let monthly = element("store-plan-monthly")
+                XCTAssertTrue(yearly.exists && monthly.exists)
+                if subscribe.isEnabled {
+                    XCTAssertTrue(app.staticTexts["Save 44%"].exists, "Yearly shows its saving over monthly")
+                }
+                if subscribe.isEnabled { monthly.tap() }
+            default:
+                XCTAssertTrue(element("store-plus-member").exists)
+                XCTAssertTrue(element("store-manage-subscription").exists)
+                XCTAssertTrue(element("store-pro-included").exists)
+            }
+            add(screenshotAttachment("store-\(state)"))
+            app.swipeUp()
+            add(screenshotAttachment("store-\(state)-bottom"))
+            element("store-done").tap()
+        }
+    }
+
+    private func screenshotAttachment(_ name: String) -> XCTAttachment {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        return attachment
     }
 
     func testTouchOnlySettingRemembersChoice() {
@@ -2029,6 +2525,251 @@ final class HandStrudelUITests: XCTestCase {
         XCTAssertTrue(app.switches["Include microphone (solo takes)"].isHittable)
         captureIfRequested("Music-Settings-Capture")
         closeMusicSettings()
+    }
+
+    // MARK: - Chord voicing (asserts the MIDI notes actually sent to the synths)
+
+    private static let pitchNames = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
+
+    /// `voice=midi` note-ons the app sent to its synths (`--uitest-note-log`).
+    private func noteLog() -> [(voice: String, midi: Int)] {
+        let log = element("uitest-note-log")
+        guard log.waitForExistence(timeout: 5) else { return [] }
+        return ((log.value as? String) ?? "").split(separator: " ").compactMap { entry in
+            let parts = entry.split(separator: "=")
+            guard parts.count == 2, let midi = Int(parts[1]) else { return nil }
+            return (String(parts[0]), midi)
+        }
+    }
+
+    private func waitForNotes(_ notes: () -> [Int], timeout: TimeInterval = 5) -> [Int] {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let found = notes()
+            if !found.isEmpty { return found }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        } while Date() < deadline
+        return []
+    }
+
+    /// Taps a chord wedge (a real touch) and returns the notes that touch sent.
+    private func playTouchChord(_ index: Int) -> (label: String, notes: [Int]) {
+        let wedge = app.buttons["wheel-chord-\(index)"]
+        XCTAssertTrue(wedge.waitForExistence(timeout: 5))
+        let label = wedge.label
+        let before = Set(noteLog().map(\.voice))
+        wedge.tap()
+        let notes = waitForNotes {
+            let fresh = noteLog().filter {
+                !before.contains($0.voice) && $0.voice.range(of: #"^splittouch-\d+-c\d+$"#, options: .regularExpression) != nil
+            }
+            guard let last = fresh.last, let cut = last.voice.range(of: "-c", options: .backwards) else { return [] }
+            let parent = String(last.voice[..<cut.lowerBound])
+            return fresh.filter { $0.voice.hasPrefix(parent + "-c") }.map(\.midi)
+        }
+        print("[voicing-ui] touch \(label) -> \(notes)")
+        return (label, notes)
+    }
+
+    /// Taps a melody wedge (a real touch) and returns the note that touch sent.
+    private func playTouchNote(_ index: Int) -> Int? {
+        let wedge = app.buttons["wheel-note-\(index)"]
+        XCTAssertTrue(wedge.waitForExistence(timeout: 5))
+        let before = Set(noteLog().map(\.voice))
+        wedge.tap()
+        let notes = waitForNotes {
+            noteLog().filter {
+                !before.contains($0.voice) && $0.voice.range(of: #"^splittouch-\d+-m$"#, options: .regularExpression) != nil
+            }.map(\.midi)
+        }
+        print("[voicing-ui] touch melody note \(index) -> \(notes)")
+        return notes.last
+    }
+
+    private var melodyWedgeCount: Int {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'wheel-note-'")).count
+    }
+
+    /// Root pitch class of a wedge label such as "Chord Ebmaj⁷".
+    private func rootPitchClass(_ label: String) -> Int? {
+        let name = label.replacingOccurrences(of: "Chord ", with: "")
+        let two = String(name.prefix(2)), one = String(name.prefix(1))
+        return Self.pitchNames.firstIndex(of: two) ?? Self.pitchNames.firstIndex(of: one)
+    }
+
+    /// Opens Music settings on the Sound section. A tap that lands while the
+    /// wheel is finishing a touch can be swallowed, so retry once.
+    private func openSoundSettings() {
+        let section = app.buttons["music-settings-sound"]
+        element("settings-button").tap()
+        if !section.waitForExistence(timeout: 4) {
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "settings-tap-swallowed"
+            shot.lifetime = .keepAlways
+            add(shot)
+            element("settings-button").tap()
+        }
+        selectMusicSettingsSection("sound")
+    }
+
+    private func chooseChordVoicing(_ name: String) {
+        openSoundSettings()
+        let picker = app.buttons["chord-voicing-picker"].firstMatch
+        revealInMusicSettings(picker)
+        let option = app.buttons[name].firstMatch
+        let picked = NSPredicate(format: "label CONTAINS %@", name)
+        // A menu tap can be swallowed while the wheel is animating; retry the
+        // pick until the setting reads back.
+        for _ in 0..<3 where !picked.evaluate(with: picker) {
+            // The sheet can still be settling, which makes the row briefly
+            // report "not hittable"; tap its centre instead.
+            picker.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            guard option.waitForExistence(timeout: 3) else { continue }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: picked, object: picker)], timeout: 3)
+        }
+        XCTAssertTrue(picked.evaluate(with: picker), picker.label)
+        closeMusicSettings()
+    }
+
+    private func assertChordVoicingSetting(_ name: String) {
+        openSoundSettings()
+        let picker = app.buttons["chord-voicing-picker"].firstMatch
+        revealInMusicSettings(picker)
+        XCTAssertTrue(picker.label.contains(name), picker.label)
+        closeMusicSettings()
+    }
+
+    private func launchTouchSession(_ extra: [String] = []) {
+        app.launchArguments = ["--uitesting", "--uitest-note-log", "--uitest-camera-denied"] + extra
+        app.launch()
+        let start = element("start-button")
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
+        let gotIt = element("onboarding-got-it")
+        if gotIt.waitForExistence(timeout: 1) { gotIt.tap() }
+    }
+
+    func testChordVoicingChangesTheNotesTouchChordsPlay() {
+        // Split wheel: its melody arc is the held chord's tones.
+        launchTouchSession()
+        element("settings-button").tap()
+        switchToMode("mode-splitChordMelody")
+        closeMusicSettings()
+        chooseChordVoicing("7ths")
+        let sevenths = playTouchChord(0)
+        XCTAssertEqual(sevenths.notes.count, 4, "7ths play root, 3rd, 5th and 7th: \(sevenths.notes)")
+        XCTAssertTrue(sevenths.label.hasSuffix("⁷"), sevenths.label)
+        XCTAssertEqual(sevenths.notes.first.map { $0 % 12 }, rootPitchClass(sevenths.label))
+
+        chooseChordVoicing("Triads")
+        let triads = playTouchChord(0)
+        XCTAssertEqual(triads.notes, Array(sevenths.notes.prefix(3)), "Same chord without its 7th")
+        XCTAssertFalse(triads.label.hasSuffix("⁷"), triads.label)
+
+        // The melody arc offers the held chord's tones, so it follows too:
+        // 3 octaves of the triad (9 wedges), or of the 7th chord (12).
+        func lanes(_ chord: [Int]) -> [Int] { Array(Set((0..<3).flatMap { o in chord.map { $0 + o * 12 } })).sorted() }
+        let triadLanes = lanes(triads.notes)
+        XCTAssertEqual(melodyWedgeCount, triadLanes.count)
+        XCTAssertEqual(playTouchNote(3), triadLanes[3], "Triads: the 4th melody note is the root an octave up")
+        chooseChordVoicing("7ths")
+        _ = playTouchChord(0)
+        let seventhLanes = lanes(sevenths.notes)
+        XCTAssertEqual(melodyWedgeCount, seventhLanes.count)
+        let seventhLane = try! XCTUnwrap(seventhLanes.firstIndex(of: sevenths.notes[3]))
+        XCTAssertEqual(playTouchNote(seventhLane), sevenths.notes[3], "7ths: the melody arc offers the chord's 7th")
+    }
+
+    /// Scripted hands (the DEBUG DemoDirector) pinch a Scale-wheel chord wedge
+    /// through the real hand pipeline. C major, so every pad must be a
+    /// diatonic triad or 7th chord of C major.
+    private func playScriptedHandChord() -> [Int] {
+        let script: [String: Any] = [
+            "name": "voicing", "duration": 6, "startDelay": 1, "key": "C", "scale": "Major", "progression": "free",
+            "left": [["t": 0, "x": 0.2, "y": 0.5, "pinch": 0], ["t": 1, "x": 0.2, "y": 0.5, "pinch": 1],
+                     ["t": 6, "x": 0.2, "y": 0.5, "pinch": 1]],
+            "right": [["t": 0, "x": 0.8, "y": 0.5, "pinch": 0, "visible": false]],
+        ]
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("voicing-\(UUID().uuidString).json")
+        XCTAssertNoThrow(try JSONSerialization.data(withJSONObject: script).write(to: url))
+        app.launchArguments = ["--uitesting", "--uitest-note-log", "--reset-studio-input"]
+        app.launchEnvironment["HANDSTRUDEL_DEMO_SCRIPT"] = url.path
+        app.launch()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10), "Demo opens the Scale wheel")
+        let notes = waitForNotes(timeout: 15) {
+            let pads = noteLog().filter { $0.voice.range(of: #"^pad\d$"#, options: .regularExpression) != nil }
+            guard let start = pads.lastIndex(where: { $0.voice == "pad0" }) else { return [] }
+            return pads[start...].map(\.midi)
+        }
+        app.launchEnvironment["HANDSTRUDEL_DEMO_SCRIPT"] = nil
+        print("[voicing-ui] hand-tracked pad -> \(notes)")
+        return notes
+    }
+
+    private func diatonicChordPitchClasses(size: Int) -> [Set<Int>] {
+        let major = [0, 2, 4, 5, 7, 9, 11]
+        return (0..<7).map { degree in Set((0..<size).map { major[(degree + 2 * $0) % 7] }) }
+    }
+
+    func testChordVoicingPersistsAndChangesHandTrackedChords() {
+        // Pick Triads on the Scale wheel (default 7ths), then relaunch.
+        launchTouchSession()
+        element("settings-button").tap()
+        switchToMode("mode-scaleChordMelody")
+        closeMusicSettings()
+        chooseChordVoicing("Triads")
+        app.terminate()
+
+        let triad = playScriptedHandChord()
+        XCTAssertEqual(triad.count, 3, "Hand-tracked pad after relaunch: \(triad)")
+        XCTAssertTrue(diatonicChordPitchClasses(size: 3).contains(Set(triad.map { $0 % 12 })), "\(triad)")
+        assertChordVoicingSetting("Triads")
+
+        chooseChordVoicing("7ths")
+        app.terminate()
+        let seventh = playScriptedHandChord()
+        XCTAssertEqual(seventh.count, 4, "Hand-tracked pad after relaunch: \(seventh)")
+        XCTAssertTrue(diatonicChordPitchClasses(size: 4).contains(Set(seventh.map { $0 % 12 })), "\(seventh)")
+        assertChordVoicingSetting("7ths")
+    }
+
+    func testSavedPresetReproducesItsChordVoicing() {
+        launchTouchSession()
+        chooseChordVoicing("Triads")
+        let saved = playTouchChord(0)
+        XCTAssertEqual(saved.notes.count, 3)
+        let name = "Voicing \(UUID().uuidString.prefix(6))"
+        element("studio-presets-button").tap()
+        let field = app.textFields["preset-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(name)
+        app.buttons["Save current preset"].tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
+        app.navigationBars.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(element("settings-button").waitForExistence(timeout: 5))
+        chooseChordVoicing("7ths")
+        XCTAssertEqual(playTouchChord(0).notes.count, 4)
+
+        app.terminate()
+        app.launchArguments = ["--uitesting", "--uitest-note-log", "--uitest-camera-denied"]
+        app.launch()
+        let presets = element("music-presets-button")
+        XCTAssertTrue(presets.waitForExistence(timeout: 5))
+        if !presets.isHittable { app.swipeUp() }
+        presets.tap()
+        let preset = app.staticTexts[name]
+        XCTAssertTrue(preset.waitForExistence(timeout: 5))
+        preset.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
+        let gotIt = element("onboarding-got-it")
+        if gotIt.waitForExistence(timeout: 1) { gotIt.tap() }
+        let replayed = playTouchChord(0)
+        XCTAssertEqual(replayed.notes, saved.notes, "The preset brings back Triads")
+        assertChordVoicingSetting("Triads")
     }
 
     func testControlSheet_showsHarmonySection() {
@@ -2262,5 +3003,256 @@ final class HandStrudelUITests: XCTestCase {
         }
 
         XCTAssertTrue(element("close-button").waitForExistence(timeout: 5))
+    }
+}
+
+// MARK: - Daily sound
+
+extension HandStrudelUITests {
+    /// Needs `node scripts/daily-sound-ui-fixture.mjs` and HANDSTRUDEL_DAILY_FIXTURE_URL.
+    func testDailySoundCardShowsTodaysSoundStreakAndPlaysIt() throws {
+        guard let endpoint = ProcessInfo.processInfo.environment["HANDSTRUDEL_DAILY_FIXTURE_URL"] else {
+            throw XCTSkip("Requires the daily sound fixture.")
+        }
+        let today = try fetchJSON(URL(string: "\(endpoint)/__fixture/daily")!)
+        let instrument = try XCTUnwrap(today["instrument"] as? String)
+        let key = try XCTUnwrap(today["key"] as? String)
+        app.launchArguments.append("--uitesting")
+        for name in ["SUPABASE_URL", "MEDIA_BASE_URL", "CLIP_MEDIA_BASE_URL"] { app.launchEnvironment[name] = endpoint }
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = "daily-fixture-key"
+        app.launch()
+        signOutOfDaily()
+
+        let card = element("daily-sound-card")
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "Today's sound sits at the top of the Music home")
+        XCTAssertTrue(app.staticTexts["Night Drive"].exists)
+        XCTAssertTrue(app.buttons["daily-sound-creator"].exists)
+        XCTAssertEqual(element("daily-take-count").label, "3 takes today")
+        for taker in ["cara", "dan_plays", "eve"] {
+            XCTAssertTrue(app.buttons["Take by @\(taker)"].exists, "Today's takes are on the card")
+        }
+        XCTAssertTrue((element("daily-time-left").label).hasPrefix("New sound in"))
+        XCTAssertTrue(app.buttons["daily-streak-sign-in"].exists, "Signed out, the card invites a sign-in")
+        captureIfRequested("Daily-Sound-Guest")
+
+        signInToProfile()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 12))
+        XCTAssertTrue(element("profile-daily-streak").waitForExistence(timeout: 5), "The profile shows the streak and badges")
+        element("tab-music").tap()
+
+        let current = element("daily-streak-current")
+        XCTAssertTrue(current.waitForExistence(timeout: 10))
+        XCTAssertEqual(current.label, "7-day streak")
+        XCTAssertEqual(element("daily-streak-best").label, "Best 12")
+        let freeze = element("daily-streak-freeze").label
+        XCTAssertTrue(freeze.contains("freeze covered"), freeze)
+        let loan = element("daily-theme-loan")
+        XCTAssertTrue(loan.exists, "A 7-day streak shows the lent hand theme")
+        XCTAssertTrue(loan.label.contains("Royal hand theme unlocked"), loan.label)
+        XCTAssertEqual(element("daily-streak-badges").label, "Streak badges: 3 days, 7 days")
+        app.swipeUp(velocity: .slow)
+        captureIfRequested("Daily-Sound-Streak")
+        app.swipeDown(velocity: .slow)
+
+        playTodaysSoundAndCheckStudio(instrument: instrument, key: key)
+        // The lent theme (Royal) is unlocked in the studio's hand themes; the others stay locked.
+        checkHandTheme("purple_gold", is: "Unlocked")
+        checkHandTheme("matrix", is: "Locked")
+        closeMusicSettings()
+        element("close-button").tap()
+        signOutOfDaily()
+    }
+
+    /// The whole feature against a real local Supabase stack seeded by
+    /// `scripts/daily-sound-e2e-seed.sh` (see its header). Needs HANDSTRUDEL_DAILY_E2E_* from the
+    /// seed, plus _URL, _ANON_KEY, _SERVICE_KEY and _MAILPIT_URL for that stack.
+    func testDailySoundEndToEndAgainstLocalSupabase() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let api = env["HANDSTRUDEL_DAILY_E2E_URL"], let anon = env["HANDSTRUDEL_DAILY_E2E_ANON_KEY"],
+              let service = env["HANDSTRUDEL_DAILY_E2E_SERVICE_KEY"], let mailpit = env["HANDSTRUDEL_DAILY_E2E_MAILPIT_URL"],
+              let email = env["HANDSTRUDEL_DAILY_E2E_EMAIL"], let viewer = env["HANDSTRUDEL_DAILY_E2E_VIEWER_ID"],
+              let title = env["HANDSTRUDEL_DAILY_E2E_TITLE"], let creator = env["HANDSTRUDEL_DAILY_E2E_CREATOR"],
+              let taker = env["HANDSTRUDEL_DAILY_E2E_TAKER"], let instrument = env["HANDSTRUDEL_DAILY_E2E_INSTRUMENT"],
+              let key = env["HANDSTRUDEL_DAILY_E2E_KEY"], let setup = env["HANDSTRUDEL_DAILY_E2E_SETUP"] else {
+            throw XCTSkip("Requires a local Supabase stack seeded by scripts/daily-sound-e2e-seed.sh.")
+        }
+        app.launchArguments.append("--uitesting")
+        for name in ["SUPABASE_URL", "MEDIA_BASE_URL", "CLIP_MEDIA_BASE_URL"] { app.launchEnvironment[name] = api }
+        app.launchEnvironment["SUPABASE_ANON_KEY"] = anon
+        app.launch()
+        signOutOfDaily()
+
+        // The owner's scheduled post is today's sound, with the seeded take on the card.
+        let card = element("daily-sound-card")
+        XCTAssertTrue(card.waitForExistence(timeout: 15))
+        XCTAssertEqual(element("daily-sound-title").label, title, "The scheduled sound is today's")
+        XCTAssertEqual(app.buttons["daily-sound-creator"].label, "Watch @\(creator)'s performance")
+        XCTAssertEqual(element("daily-take-count").label, "1 take today")
+        XCTAssertTrue(app.buttons["Take by @\(taker)"].exists, "The published take is on the card")
+
+        // Sign in with the code the local stack emailed.
+        let sentAfter = Date()
+        element("tab-account").tap()
+        let signIn = app.buttons["Sign in"]
+        XCTAssertTrue(signIn.waitForExistence(timeout: 5))
+        signIn.tap()
+        let emailField = app.textFields["you@example.com"]
+        XCTAssertTrue(emailField.waitForExistence(timeout: 5))
+        emailField.tap()
+        emailField.typeText(email)
+        app.buttons["Email me a code"].tap()
+        let codeField = app.textFields["6-digit code"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10))
+        codeField.tap()
+        codeField.typeText(try signInCode(mailpit: mailpit, to: email, after: sentAfter))
+        app.buttons["verify-sign-in-code"].tap()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 15))
+        element("tab-music").tap()
+
+        // Six earlier days with one missed day: the freeze keeps the streak alive at 6.
+        let current = element("daily-streak-current")
+        XCTAssertTrue(current.waitForExistence(timeout: 10))
+        XCTAssertEqual(current.label, "6-day streak")
+        XCTAssertTrue(element("daily-streak-status").label.hasPrefix("Post a take"))
+        XCTAssertFalse(element("daily-theme-loan").exists)
+
+        // Before the reward: the + hand theme is locked in the studio.
+        playTodaysSoundAndCheckStudio(instrument: instrument, key: key)
+        checkHandTheme("fire_ice", is: "Locked")
+        closeMusicSettings()
+        element("close-button").tap()
+
+        // The server publishes the viewer's screened take with today's sound.
+        let upload = try serviceRPC(api, key: service, "reserve_video_upload",
+                                    ["uploader": viewer, "video_size": 100, "thumb_size": 20]) as? String
+        let uploadID = try XCTUnwrap(upload)
+        try serviceRequest(api, key: service, method: "PATCH", path: "/rest/v1/pending_video_uploads?id=eq.\(uploadID)",
+                           body: ["status": "checking"])
+        let fields: [String: Any] = ["duration_s": 8, "width": 720, "height": 1280, "caption": "My daily take",
+                                     "sound_setup": try JSONSerialization.jsonObject(with: Data(setup.utf8))]
+        _ = try serviceRPC(api, key: service, "publish_screened_video",
+                           ["upload_id": uploadID, "fields": fields, "checked_attempt": 0])
+
+        // Coming back to Music shows the take counted, the streak at 7 and the reward.
+        element("tab-account").tap()
+        element("tab-music").tap()
+        let seven = NSPredicate(format: "label == %@", "7-day streak")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: seven, object: current)], timeout: 15), .completed,
+                       "Publishing today's take extends the streak: \(current.label)")
+        XCTAssertEqual(element("daily-streak-status").label, "Today's take counted. Come back tomorrow.")
+        XCTAssertEqual(element("daily-take-count").label, "2 takes today")
+        XCTAssertTrue(element("daily-theme-loan").label.contains("Fire & Ice hand theme unlocked"), element("daily-theme-loan").label)
+        XCTAssertEqual(element("daily-streak-badges").label, "Streak badges: 3 days, 7 days")
+
+        // After the reward: StoreManager unlocks that theme, and choosing it works.
+        playTodaysSoundAndCheckStudio(instrument: instrument, key: key, expectChange: false)
+        checkHandTheme("fire_ice", is: "Unlocked")
+        checkHandTheme("ocean", is: "Locked")
+        let fireIce = element("hand-theme-fire_ice")
+        fireIce.tap()
+        XCTAssertTrue(fireIce.isSelected, "The lent theme can be chosen without a purchase")
+        closeMusicSettings()
+        element("close-button").tap()
+        signOutOfDaily()
+    }
+
+    /// Taps "Play today's sound" and checks the studio opened with that instrument and key.
+    private func playTodaysSoundAndCheckStudio(instrument: String, key: String, expectChange: Bool = true) {
+        let artwork = element("sound-artwork")
+        if expectChange, artwork.waitForExistence(timeout: 5) {
+            let before = (artwork.value as? String) ?? ""
+            XCTAssertFalse(before.hasPrefix("\(instrument), \(key) "),
+                           "The studio already had today's sound (\(before)); rerun so the check means something")
+        }
+        let play = app.buttons["daily-play-sound"]
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        XCTAssertEqual(play.label, "Play today's sound")
+        play.tap()
+        XCTAssertTrue(element("close-button").waitForExistence(timeout: 10), "Play today's sound opens the studio")
+        element("settings-button").tap()
+        let sound = app.buttons["music-settings-sound"]
+        XCTAssertTrue(sound.waitForExistence(timeout: 5))
+        if !sound.isSelected { sound.tap() }
+        // The "Current sound" header: the instrument, then "<key> <scale> / <progression>".
+        XCTAssertTrue(element("studio-current-sound").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts[instrument].exists, "The studio plays today's instrument, \(instrument)")
+        let keyLine = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", "\(key) ", " / ")).firstMatch
+        XCTAssertTrue(keyLine.exists, "The studio is in today's key, \(key)")
+    }
+
+    /// Opens the Capture settings and checks a hand theme's lock state.
+    private func checkHandTheme(_ id: String, is state: String) {
+        let capture = app.buttons["music-settings-capture"]
+        XCTAssertTrue(capture.waitForExistence(timeout: 5))
+        if !capture.isSelected { capture.tap() }
+        let theme = element("hand-theme-\(id)")
+        revealInMusicSettings(theme)
+        XCTAssertEqual(theme.value as? String, state, "Hand theme \(id)")
+    }
+
+    /// Leaves any account so the next run starts signed out.
+    private func signOutOfDaily() {
+        let account = element("tab-account")
+        XCTAssertTrue(account.waitForExistence(timeout: 10))
+        account.tap()
+        // Also covers a stale session from another backend ("Couldn't load your profile").
+        if !app.buttons["Sign in"].waitForExistence(timeout: 4) {
+            app.buttons["Account settings"].tap()
+            let signOut = app.buttons["Sign out"]
+            if signOut.waitForExistence(timeout: 3) { signOut.tap() }
+            XCTAssertTrue(app.buttons["Sign in"].waitForExistence(timeout: 8))
+        }
+        element("tab-music").tap()
+    }
+
+    private func fetchJSON(_ url: URL) throws -> [String: Any] {
+        try XCTUnwrap(try JSONSerialization.jsonObject(with: try syncRequest(URLRequest(url: url))) as? [String: Any])
+    }
+
+    /// The 6-digit sign-in code from the local stack's Mailpit inbox.
+    private func signInCode(mailpit: String, to email: String, after: Date) throws -> String {
+        let deadline = Date().addingTimeInterval(20)
+        let search = URL(string: "\(mailpit)/api/v1/search?query=" + "to:\(email)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        while Date() < deadline {
+            if let messages = try fetchJSON(search)["messages"] as? [[String: Any]], let id = messages.first?["ID"] as? String {
+                let message = try fetchJSON(URL(string: "\(mailpit)/api/v1/message/\(id)")!)
+                let text = (message["Text"] as? String ?? "") + (message["HTML"] as? String ?? "")
+                if let range = text.range(of: #"\b\d{6}\b"#, options: .regularExpression) { return String(text[range]) }
+            }
+            Thread.sleep(forTimeInterval: 1)
+        }
+        throw XCTSkip("No sign-in email reached Mailpit after \(after).")
+    }
+
+    @discardableResult
+    private func serviceRPC(_ api: String, key: String, _ function: String, _ body: [String: Any]) throws -> Any? {
+        let data = try serviceRequest(api, key: key, method: "POST", path: "/rest/v1/rpc/\(function)", body: body)
+        return data.isEmpty ? nil : try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
+    }
+
+    @discardableResult
+    private func serviceRequest(_ api: String, key: String, method: String, path: String, body: [String: Any]) throws -> Data {
+        var request = URLRequest(url: URL(string: api + path)!)
+        request.httpMethod = method
+        request.setValue(key, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try syncRequest(request)
+    }
+
+    private func syncRequest(_ request: URLRequest) throws -> Data {
+        var result: Result<Data, Error> = .failure(URLError(.timedOut))
+        let done = expectation(description: request.url?.absoluteString ?? "request")
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error { result = .failure(error) }
+            else if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                result = .failure(NSError(domain: "HTTP", code: http.statusCode,
+                                          userInfo: [NSLocalizedDescriptionKey: String(decoding: data ?? Data(), as: UTF8.self)]))
+            } else { result = .success(data ?? Data()) }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 20)
+        return try result.get()
     }
 }
