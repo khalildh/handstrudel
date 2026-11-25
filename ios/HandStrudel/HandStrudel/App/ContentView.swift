@@ -139,7 +139,9 @@ struct ContentView: View {
             && jamInvitation == nil && jamError == nil
     }
 
-    var body: some View {
+    // The root view is built in stages: one modifier chain this long is more than the Swift
+    // compiler can type-check in reasonable time.
+    private var rootContent: some View {
         ZStack {
             (engine.isRunning || feedFullscreen ? Color.black : palette.background).ignoresSafeArea()
 
@@ -232,6 +234,10 @@ struct ContentView: View {
             }
             #endif
         }
+    }
+
+    private var rootPresentations: some View {
+        rootContent
         .sheet(isPresented: $showDrafts, onDismiss: openDraftPostAfterDismissal) {
             RecordingDraftsView(store: drafts, auth: auth, openedDraft: nil, onRetake: nil,
                                 onSuccessfulTake: recordReviewMilestone, onViewPost: viewDraftPost,
@@ -324,6 +330,10 @@ struct ContentView: View {
         } message: {
             Text(jamError ?? "")
         }
+    }
+
+    private var rootLifecycle: some View {
+        rootPresentations
         .task { await engine.jamSession.listenForSessions() }
         .task(id: canShowReview) {
             guard canShowReview else { return }
@@ -403,6 +413,10 @@ struct ContentView: View {
         .onChange(of: destination) { tab in
             if tab != .feed { feedFullscreen = false }
         }
+    }
+
+    var body: some View {
+        rootLifecycle
         .onReceive(NotificationCenter.default.publisher(for: .siriStartPreset)) { notification in
             guard !engine.isRunning, let presetId = notification.object as? String else { return }
             if let preset = PRESETS.first(where: { $0.id == presetId }) {
